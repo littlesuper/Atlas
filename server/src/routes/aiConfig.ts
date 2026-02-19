@@ -115,6 +115,64 @@ router.post(
 );
 
 /**
+ * POST /api/ai-config/fetch-models
+ * 从 AI 供应商获取可用模型列表（通过 /models 端点）
+ * 权限: user:update
+ */
+router.post(
+  '/fetch-models',
+  authenticate,
+  requirePermission('user', 'update'),
+  async (req: Request, res: Response): Promise<void> => {
+    const { apiUrl, apiKey, configId } = req.body;
+
+    // 如果 apiKey 是掩码或为空，且提供了 configId，则从数据库读取真实 key
+    let realApiKey = apiKey;
+    if ((!apiKey || apiKey.startsWith('****')) && configId) {
+      const existing = await prisma.aiConfig.findUnique({ where: { id: configId } });
+      if (existing) {
+        realApiKey = existing.apiKey;
+      }
+    }
+
+    if (!apiUrl || !realApiKey) {
+      res.json({ success: false, models: [], message: '请填写 API URL 和 API Key' });
+      return;
+    }
+
+    try {
+      // 从 apiUrl 推导 models 端点：去掉路径末尾的具体接口，拼接 /models
+      const modelsUrl = apiUrl.replace(/\/(chat\/completions|messages|chatcompletion_v2)$/, '') + '/models';
+
+      const response = await fetch(modelsUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${realApiKey}`,
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        res.json({ success: false, models: [], message: `API 返回 ${response.status}: ${body.slice(0, 200)}` });
+        return;
+      }
+
+      const result = await response.json();
+      // 标准 OpenAI 格式: { data: [{ id: "model-name", ... }] }
+      const models: string[] = Array.isArray(result.data)
+        ? result.data.map((m: { id: string }) => m.id).filter(Boolean).sort()
+        : [];
+
+      res.json({ success: true, models, message: `获取到 ${models.length} 个模型` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '获取模型列表失败';
+      res.json({ success: false, models: [], message });
+    }
+  }
+);
+
+/**
  * POST /api/ai-config
  * 创建新配置
  * 权限: user:update

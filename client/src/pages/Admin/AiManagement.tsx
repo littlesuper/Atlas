@@ -120,6 +120,8 @@ const AiManagement: React.FC = () => {
   const [saveLoading, setSaveLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>('custom');
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
 
   // 使用统计
   const [stats, setStats] = useState<AiUsageStats | null>(null);
@@ -165,6 +167,7 @@ const AiManagement: React.FC = () => {
 
   const handleProviderChange = (providerKey: string) => {
     setSelectedProvider(providerKey);
+    setModelOptions([]);
     const provider = AI_PROVIDERS.find((p) => p.key === providerKey);
     if (provider && providerKey !== 'custom') {
       configForm.setFieldsValue({
@@ -182,6 +185,7 @@ const AiManagement: React.FC = () => {
   const handleCreate = () => {
     setEditingConfig(null);
     setSelectedProvider('custom');
+    setModelOptions([]);
     configForm.resetFields();
     setDrawerVisible(true);
   };
@@ -189,6 +193,7 @@ const AiManagement: React.FC = () => {
   const handleEdit = (record: AiConfig) => {
     setEditingConfig(record);
     setSelectedProvider(detectProvider(record.apiUrl));
+    setModelOptions([]);
     configForm.setFieldsValue({
       ...record,
       features: record.features ? record.features.split(',').filter(Boolean) : [],
@@ -251,6 +256,37 @@ const AiManagement: React.FC = () => {
       Message.error('验证请求失败');
     } finally {
       setTestLoading(false);
+    }
+  };
+
+  const handleFetchModels = async () => {
+    const fields = configForm.getFields();
+    const apiUrl = fields.apiUrl as string | undefined;
+    const apiKey = fields.apiKey as string | undefined;
+    const isMasked = apiKey?.startsWith('****');
+
+    if (!apiUrl || (!apiKey && !editingConfig)) {
+      Message.warning('请先填写 API URL 和 API Key');
+      return;
+    }
+
+    setModelsLoading(true);
+    try {
+      const response = await aiConfigApi.fetchModels({
+        apiUrl,
+        apiKey: apiKey || '',
+        ...(isMasked && editingConfig ? { configId: editingConfig.id } : {}),
+      });
+      if (response.data.success && response.data.models.length > 0) {
+        setModelOptions(response.data.models);
+        Message.success(response.data.message);
+      } else {
+        Message.warning(response.data.message || '未获取到模型列表，可手动输入模型名称');
+      }
+    } catch {
+      Message.warning('获取模型列表失败，可手动输入模型名称');
+    } finally {
+      setModelsLoading(false);
     }
   };
 
@@ -487,12 +523,28 @@ const AiManagement: React.FC = () => {
             <Input.Password placeholder="sk-..." />
           </Form.Item>
           <Form.Item label="模型名称" field="modelName">
-            <Input placeholder="gpt-4o-mini" />
+            <Select
+              showSearch
+              allowCreate
+              placeholder="选择或输入模型名称"
+              loading={modelsLoading}
+            >
+              {modelOptions.map((m) => (
+                <Select.Option key={m} value={m}>
+                  {m}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
           <Form.Item label=" " colon={false}>
-            <Button loading={testLoading} onClick={handleTestConnection}>
-              验证连接
-            </Button>
+            <Space>
+              <Button loading={modelsLoading} onClick={handleFetchModels}>
+                获取模型列表
+              </Button>
+              <Button loading={testLoading} onClick={handleTestConnection}>
+                验证连接
+              </Button>
+            </Space>
           </Form.Item>
           <Form.Item label="关联功能" field="features">
             <Select mode="multiple" placeholder="选择此配置服务的功能" allowClear>

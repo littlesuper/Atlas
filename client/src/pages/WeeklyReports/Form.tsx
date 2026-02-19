@@ -159,9 +159,11 @@ const WeeklyReportForm: React.FC = () => {
     try {
       if (isEdit && id) {
         await weeklyReportsApi.update(id, buildData());
+        clearDraft();
         Message.success('保存成功');
       } else {
         const res = await weeklyReportsApi.create({ ...buildData(), projectId });
+        clearDraft();
         Message.success('创建成功');
         navigate(`/weekly-reports/${res.data.id}/edit`, { replace: true });
       }
@@ -187,6 +189,7 @@ const WeeklyReportForm: React.FC = () => {
         reportId = res.data.id;
       }
       await weeklyReportsApi.submit(reportId!);
+      clearDraft();
       Message.success('周报提交成功');
       goBack();
     } catch (e: unknown) {
@@ -200,6 +203,7 @@ const WeeklyReportForm: React.FC = () => {
   const handleAiSuggestions = async () => {
     if (!projectId) { Message.error('请先选择项目'); return; }
     setAiLoading(true);
+    const hideLoading = Message.loading({ content: '正在进行 AI 分析...', duration: 0 });
     try {
       const res = await weeklyReportsApi.getAiSuggestions(
         projectId,
@@ -211,6 +215,7 @@ const WeeklyReportForm: React.FC = () => {
     } catch {
       Message.error('获取 AI 建议失败');
     } finally {
+      hideLoading();
       setAiLoading(false);
     }
   };
@@ -233,6 +238,41 @@ const WeeklyReportForm: React.FC = () => {
     }));
   };
 
+  // 自动保存草稿到 localStorage（每 30 秒）
+  const draftKey = `weekly-report-draft-${id || projectId || 'new'}`;
+  const lastSavedRef = useRef('');
+
+  useEffect(() => {
+    // 页面加载时恢复草稿
+    if (!isEdit) {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved);
+          if (draft.keyProgress && !keyProgress) setKeyProgress(draft.keyProgress);
+          if (draft.nextWeekPlan && !nextWeekPlan) setNextWeekPlan(draft.nextWeekPlan);
+          if (draft.riskWarning && !riskWarning) setRiskWarning(draft.riskWarning);
+          if (draft.progressStatus) setProgressStatus(draft.progressStatus);
+          Message.info('已恢复上次编辑的草稿');
+        } catch { /* ignore */ }
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const snapshot = JSON.stringify({ keyProgress, nextWeekPlan, riskWarning, progressStatus });
+      if (snapshot !== lastSavedRef.current && (keyProgress || nextWeekPlan || riskWarning)) {
+        localStorage.setItem(draftKey, snapshot);
+        lastSavedRef.current = snapshot;
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [keyProgress, nextWeekPlan, riskWarning, progressStatus, draftKey]);
+
+  // 保存/提交成功后清除本地草稿
+  const clearDraft = () => localStorage.removeItem(draftKey);
+
   // 附件按 section 分组处理
   const getAttachmentsForSection = (section: string) => attachments.filter((a) => a.section === section);
   const updateAttachmentsForSection = (section: string, sectionAttachments: ReportAttachment[]) => {
@@ -245,7 +285,7 @@ const WeeklyReportForm: React.FC = () => {
       try {
         const res = await uploadApi.upload(file);
         const newAtt: ReportAttachment = {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: crypto.randomUUID(),
           name: res.data.name,
           url: res.data.url,
           uploadedAt: new Date().toISOString(),
@@ -369,7 +409,7 @@ const WeeklyReportForm: React.FC = () => {
                   />
                 </div>
                 {aiSuggestions?.keyProgress && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', height: '100%', overflow: 'auto' }}>
+                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', maxHeight: 300, overflowY: 'auto' }}>
                     <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.keyProgress} />
                   </Card>
                 )}
@@ -407,7 +447,7 @@ const WeeklyReportForm: React.FC = () => {
                   />
                 </div>
                 {aiSuggestions?.nextWeekPlan && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', height: '100%', overflow: 'auto' }}>
+                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', maxHeight: 300, overflowY: 'auto' }}>
                     <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.nextWeekPlan} />
                   </Card>
                 )}
@@ -445,7 +485,7 @@ const WeeklyReportForm: React.FC = () => {
                   />
                 </div>
                 {aiSuggestions?.riskWarning !== undefined && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', height: '100%', overflow: 'auto' }}>
+                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', maxHeight: 300, overflowY: 'auto' }}>
                     {aiSuggestions.riskWarning ? (
                       <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.riskWarning} />
                     ) : (

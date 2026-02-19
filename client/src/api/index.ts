@@ -309,6 +309,8 @@ export const weeklyReportsApi = {
 
   submit: (id: string) => request.post<WeeklyReport>(`/weekly-reports/${id}/submit`),
 
+  archive: (id: string) => request.post<WeeklyReport>(`/weekly-reports/${id}/archive`),
+
   delete: (id: string) => request.delete(`/weekly-reports/${id}`),
 
   getAiSuggestions: (projectId: string, weekStart: string, weekEnd: string) =>
@@ -354,6 +356,9 @@ export const aiConfigApi = {
 
   testConnection: (data: { apiUrl: string; apiKey: string; modelName?: string; configId?: string }) =>
     request.post<{ success: boolean; message: string }>('/ai-config/test-connection', data),
+
+  fetchModels: (data: { apiUrl: string; apiKey: string; configId?: string }) =>
+    request.post<{ success: boolean; models: string[]; message: string }>('/ai-config/fetch-models', data),
 
   getUsageStats: (params?: { startDate?: string; endDate?: string }) =>
     request.get<AiUsageStats>('/ai-config/usage-stats', { params }),

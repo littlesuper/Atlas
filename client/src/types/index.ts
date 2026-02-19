@@ -202,7 +202,7 @@ export interface WeeklyReport {
   progressStatus: string; // ON_TRACK | MINOR_ISSUE | MAJOR_ISSUE
   submittedAt?: string;
   createdBy: string;
-  createdById: string;
+  creator?: { id: string; realName: string; username: string };
   createdAt: string;
   updatedAt: string;
 }

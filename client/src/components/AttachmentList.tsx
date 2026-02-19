@@ -40,7 +40,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
     try {
       const res = await uploadApi.upload(file, (p) => setProgress(p));
       const newAttachment: ReportAttachment = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: crypto.randomUUID(),
         name: res.data.name,
         url: res.data.url,
         uploadedAt: new Date().toISOString(),
@@ -100,9 +100,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
 
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      for (let i = 0; i < files.length; i++) {
-        handleUpload(files[i]);
-      }
+      Array.from(files).forEach((f) => handleUpload(f));
     }
   }, [handleUpload]);
 

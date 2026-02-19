@@ -482,10 +482,12 @@ router.put(
 /**
  * POST /api/weekly-reports/:id/submit
  * 提交周报
+ * 权限：weekly_report:update
  */
 router.post(
   '/:id/submit',
   authenticate,
+  requirePermission('weekly_report', 'update'),
   async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -544,6 +546,61 @@ router.post(
     res.json(report);
   } catch (error) {
     console.error('提交周报错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * POST /api/weekly-reports/:id/archive
+ * 归档周报
+ * 权限：weekly_report:update
+ */
+router.post(
+  '/:id/archive',
+  authenticate,
+  requirePermission('weekly_report', 'update'),
+  async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const existingReport = await prisma.weeklyReport.findUnique({
+      where: { id },
+    });
+
+    if (!existingReport) {
+      res.status(404).json({ error: '周报不存在' });
+      return;
+    }
+
+    // 归属检查：管理员、项目经理可以归档
+    if (!isAdmin(req)) {
+      const reportProject = await prisma.project.findUnique({
+        where: { id: existingReport.projectId },
+        select: { managerId: true },
+      });
+      const isManager = reportProject?.managerId === req.user!.id;
+      if (!isManager) {
+        res.status(403).json({ error: '只有管理员或项目经理可以归档周报' });
+        return;
+      }
+    }
+
+    const report = await prisma.weeklyReport.update({
+      where: { id },
+      data: { status: 'ARCHIVED' },
+      include: {
+        project: {
+          select: { id: true, name: true, productLine: true, managerId: true },
+        },
+        creator: {
+          select: { id: true, realName: true, username: true },
+        },
+      },
+    });
+
+    res.json(report);
+  } catch (error) {
+    console.error('归档周报错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -705,7 +762,11 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
       });
 
       if (aiResult?.content) {
-        const parsed = JSON.parse(aiResult.content);
+        // 提取 JSON（AI 有时在 JSON 外包裹 ```json ... ```）
+        let jsonStr = aiResult.content;
+        const fenced = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fenced) jsonStr = fenced[1];
+        const parsed = JSON.parse(jsonStr.trim());
         keyProgress = parsed.keyProgress || '';
         nextWeekPlan = parsed.nextWeekPlan || '';
         riskWarning = parsed.riskWarning || '';

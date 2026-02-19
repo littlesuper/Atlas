@@ -18,6 +18,7 @@ import {
 } from '@arco-design/web-react/icon';
 import { weeklyReportsApi } from '../../api';
 import { useAuthStore } from '../../store/authStore';
+import { useReportPermission } from '../../hooks/useReportPermission';
 import { WeeklyReport, ReportAttachment } from '../../types';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
@@ -47,19 +48,9 @@ const PROGRESS_COLOR: Record<string, string> = {
 const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
   const navigate = useNavigate();
   const { hasPermission, isProjectManager } = useAuthStore();
-  const user = useAuthStore((s) => s.user);
+  const { canEdit: canEditReport, canDelete } = useReportPermission();
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // 检查当前用户是否可以修改指定周报（创建人、项目经理、协作者或管理员）
-  const canEditReport = (report: WeeklyReport) => {
-    if (!user) return false;
-    if (user.permissions?.includes('*:*')) return true; // 管理员
-    if (report.createdBy === user.id) return true; // 创建人
-    if (managerId && managerId === user.id) return true; // 项目经理
-    if (user.collaboratingProjectIds?.includes(projectId)) return true; // 协作者
-    return false;
-  };
 
   const load = async () => {
     setLoading(true);
@@ -164,7 +155,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                           onClick={() => handleSubmit(report)} />
                       </Tooltip>
                     )}
-                    {hasPermission('weekly_report', 'delete') && (
+                    {canDelete(report) && (
                       <Tooltip content="删除">
                         <Button type="text" status="danger" icon={<IconDelete />} size="small"
                           onClick={() => handleDelete(report)} />
@@ -244,7 +235,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                 {/* 卡片底部 */}
                 <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f2f3f5', display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, color: '#86909c' }}>
-                    创建人：{(report as unknown as { creator?: { realName?: string; username?: string } }).creator?.realName || '-'}
+                    创建人：{report.creator?.realName || '-'}
                   </span>
                   {report.submittedAt && (
                     <span style={{ fontSize: 12, color: '#86909c' }}>

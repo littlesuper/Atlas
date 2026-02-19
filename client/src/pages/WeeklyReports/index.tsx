@@ -23,7 +23,7 @@ import {
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi } from '../../api';
 import { WeeklyReport, ReportAttachment } from '../../types';
-import { useAuthStore } from '../../store/authStore';
+import { useReportPermission } from '../../hooks/useReportPermission';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
 import { PRODUCT_LINE_MAP, REPORT_STATUS_MAP } from '../../utils/constants';
@@ -50,19 +50,7 @@ const PROGRESS_COLOR: Record<string, string> = {
 
 const WeeklyReportsSummary: React.FC = () => {
   const navigate = useNavigate();
-  const { hasPermission } = useAuthStore();
-  const user = useAuthStore((s) => s.user);
-
-  // 检查当前用户是否可以修改指定周报（创建人、项目经理、协作者或管理员）
-  const canEditReport = (report: WeeklyReport) => {
-    if (!user) return false;
-    if (user.permissions?.includes('*:*')) return true; // 管理员
-    if (report.createdBy === user.id) return true; // 创建人
-    const managerId = (report as unknown as { project?: { managerId?: string } }).project?.managerId;
-    if (managerId && managerId === user.id) return true; // 项目经理
-    if (user.collaboratingProjectIds?.includes(report.projectId)) return true; // 协作者
-    return false;
-  };
+  const { canEdit: canEditReport, canDelete } = useReportPermission();
   const [currentWeek, setCurrentWeek] = useState<dayjs.Dayjs | null>(null);
   const [productLine, setProductLine] = useState<string>('');
   const [reports, setReports] = useState<WeeklyReport[]>([]);
@@ -137,8 +125,8 @@ const WeeklyReportsSummary: React.FC = () => {
       dataIndex: 'project.name',
       width: 200,
       sorter: (a: WeeklyReport, b: WeeklyReport) => {
-        const nameA = (a as unknown as { project?: { name?: string } }).project?.name || '';
-        const nameB = (b as unknown as { project?: { name?: string } }).project?.name || '';
+        const nameA = a.project?.name || '';
+        const nameB = b.project?.name || '';
         return nameA.localeCompare(nameB);
       },
       render: (_: unknown, record: WeeklyReport) => (
@@ -147,7 +135,7 @@ const WeeklyReportsSummary: React.FC = () => {
             style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
             onClick={() => navigate(`/projects/${record.projectId}?tab=weekly`)}
           >
-            {(record as unknown as { project?: { name?: string } }).project?.name || '-'}
+            {record.project?.name || '-'}
           </a>
           {record.status === 'DRAFT' && (
             <div style={{ marginTop: 4 }}>
@@ -176,7 +164,7 @@ const WeeklyReportsSummary: React.FC = () => {
       title: '产品线',
       width: 120,
       render: (_: unknown, record: WeeklyReport) => {
-        const pl = (record as unknown as { project?: { productLine?: string } }).project?.productLine || '';
+        const pl = record.project?.productLine || '';
         const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP] ?? { label: pl || '-', color: 'default' };
         return <Tag color={cfg.color}>{cfg.label}</Tag>;
       },
@@ -269,7 +257,7 @@ const WeeklyReportsSummary: React.FC = () => {
                   onClick={() => handleSubmit(record)} />
               </Tooltip>
             )}
-            {hasPermission('weekly_report', 'delete') && (
+            {canDelete(record) && (
               <Tooltip content="删除">
                 <Button type="text" status="danger" icon={<IconDelete />} size="small"
                   onClick={() => handleDelete(record)} />
