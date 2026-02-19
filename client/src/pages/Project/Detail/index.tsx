@@ -783,7 +783,7 @@ const ProjectDetail: React.FC = () => {
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             {/* 第一行：返回 + 项目名称 + 状态 + 产品线 + 优先级 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Button icon={<IconLeft />} onClick={() => navigate('/projects')}>返回</Button>
+              <Button icon={<IconLeft />} onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/projects')}>返回</Button>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{project.name}</h2>
               <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
               <Tag color={productLineConfig.color}>{productLineConfig.label}</Tag>
