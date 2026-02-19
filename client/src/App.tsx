@@ -1,0 +1,213 @@
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Spin } from '@arco-design/web-react';
+import { useAuthStore } from './store/authStore';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// 页面组件（需要实际创建）
+const Login = React.lazy(() => import('./pages/Login'));
+const ProjectList = React.lazy(() => import('./pages/Project/List'));
+const ProjectDetail = React.lazy(() => import('./pages/Project/Detail'));
+const ProductManagement = React.lazy(() => import('./pages/Product'));
+const AdminManagement = React.lazy(() => import('./pages/Admin'));
+const WeeklyReportsSummary = React.lazy(() => import('./pages/WeeklyReports'));
+const WeeklyReportForm = React.lazy(() => import('./pages/WeeklyReports/Form'));
+
+// 受保护的路由组件
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requirePermission?: { resource: string; action: string };
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requirePermission,
+}) => {
+  const { isAuthenticated, hasPermission, loading } = useAuthStore();
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <Spin size={40} />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // 检查权限
+  if (requirePermission) {
+    const { resource, action } = requirePermission;
+    if (!hasPermission(resource, action)) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100vh',
+            fontSize: '16px',
+            color: '#8c8ca1',
+          }}
+        >
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+            <div>您没有访问此页面的权限</div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  return <>{children}</>;
+};
+
+const App: React.FC = () => {
+  const { fetchUser, isAuthenticated } = useAuthStore();
+
+  useEffect(() => {
+    // 应用启动时尝试获取用户信息
+    fetchUser();
+  }, [fetchUser]);
+
+  return (
+    <ErrorBoundary>
+    <BrowserRouter>
+      <React.Suspense
+        fallback={
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: '100vh',
+            }}
+          >
+            <Spin size={40} />
+          </div>
+        }
+      >
+        <Routes>
+          {/* 登录页 */}
+          <Route path="/login" element={<Login />} />
+
+          {/* 首页重定向 */}
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/projects" replace />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* 项目列表（首页） */}
+          <Route
+            path="/projects"
+            element={
+              <ProtectedRoute>
+                <ProjectList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 项目详情 */}
+          <Route
+            path="/projects/:id"
+            element={
+              <ProtectedRoute>
+                <ProjectDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 产品管理 */}
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <ProductManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 账号管理（需要user:read权限） */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requirePermission={{ resource: 'user', action: 'read' }}>
+                <AdminManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 项目周报汇总 */}
+          <Route
+            path="/weekly-reports"
+            element={
+              <ProtectedRoute>
+                <WeeklyReportsSummary />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 新建周报 */}
+          <Route
+            path="/weekly-reports/new"
+            element={
+              <ProtectedRoute>
+                <WeeklyReportForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 编辑周报 */}
+          <Route
+            path="/weekly-reports/:id/edit"
+            element={
+              <ProtectedRoute>
+                <WeeklyReportForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 404页面 */}
+          <Route
+            path="*"
+            element={
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  height: '100vh',
+                  fontSize: '16px',
+                  color: '#8c8ca1',
+                }}
+              >
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>404</div>
+                  <div>页面不存在</div>
+                </div>
+              </div>
+            }
+          />
+        </Routes>
+      </React.Suspense>
+    </BrowserRouter>
+    </ErrorBoundary>
+  );
+};
+
+export default App;

@@ -1,0 +1,10 @@
+<svg width="144" height="36" viewBox="0 0 144 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="36" height="36" rx="8" fill="url(#paint0_linear)"/>
+  <text x="46" y="24" font-family="Arial, sans-serif" font-size="18" font-weight="600" fill="white">贝锐科技</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F7CFF"/>
+      <stop offset="1" stop-color="#6C5CE7"/>
+    </linearGradient>
+  </defs>
+</svg>

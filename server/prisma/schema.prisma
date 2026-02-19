@@ -1,0 +1,331 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ==================== 用户认证 ====================
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id        String     @id @default(uuid())
+  username  String     @unique
+  email     String     @unique
+  password  String
+  realName  String
+  phone     String?
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // 关联关系
+  userRoles              UserRole[]
+  managedProjects        Project[]        @relation("ProjectManager")
+  collaboratingProjects  ProjectMember[]
+  assignedActivities     Activity[]       @relation("ActivityAssignee")
+  createdReports         WeeklyReport[]   @relation("ReportCreator")
+
+  @@map("users")
+}
+
+// ==================== 权限管理 ====================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  // 关联关系
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id       String @id @default(uuid())
+  resource String
+  action   String
+
+  // 关联关系
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  // 关联关系
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ==================== 项目管理 ====================
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  productLine String?
+  status      ProjectStatus @default(PLANNING)
+  priority    Priority      @default(MEDIUM)
+  startDate   DateTime?
+  endDate     DateTime?
+  progress    Float         @default(0)
+  managerId   String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // 关联关系
+  manager          User              @relation("ProjectManager", fields: [managerId], references: [id])
+  members          ProjectMember[]
+  activities       Activity[]
+  products         Product[]
+  riskAssessments  RiskAssessment[]
+  weeklyReports    WeeklyReport[]
+  aiUsageLogs      AiUsageLog[]
+
+  @@index([managerId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  // 关联关系
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@map("project_members")
+}
+
+enum ActivityType {
+  TASK
+  MILESTONE
+  PHASE
+}
+
+enum ActivityStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  CANCELLED
+}
+
+model Activity {
+  id            String         @id @default(uuid())
+  projectId     String
+  parentId      String?
+  name          String
+  description   String?
+  type          ActivityType   @default(TASK)
+  phase         String?
+  assigneeId    String?
+  status        ActivityStatus @default(NOT_STARTED)
+  priority      Priority       @default(MEDIUM)
+  planStartDate DateTime?
+  planEndDate   DateTime?
+  planDuration  Int?
+  startDate     DateTime?
+  endDate       DateTime?
+  duration      Int?
+  dependencies  Json?
+  notes         String?
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // 关联关系
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   Activity?  @relation("ActivityHierarchy", fields: [parentId], references: [id])
+  children Activity[] @relation("ActivityHierarchy")
+  assignee User?      @relation("ActivityAssignee", fields: [assigneeId], references: [id])
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([parentId])
+  @@map("activities")
+}
+
+model RiskAssessment {
+  id           String   @id @default(uuid())
+  projectId    String
+  riskLevel    String
+  riskFactors  Json
+  suggestions  Json
+  assessedAt   DateTime @default(now())
+
+  // 关联关系
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("risk_assessments")
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  ARCHIVED
+}
+
+enum ProgressStatus {
+  ON_TRACK
+  MINOR_ISSUE
+  MAJOR_ISSUE
+}
+
+model WeeklyReport {
+  id              String         @id @default(uuid())
+  projectId       String
+  weekStart       DateTime
+  weekEnd         DateTime
+  year            Int
+  weekNumber      Int
+  changeOverview  String?
+  demandAnalysis  String?
+  keyProgress     String?
+  nextWeekPlan    String?
+  riskWarning     String?
+  risks           Json?
+  phaseProgress   Json?
+  attachments     Json?
+  status          ReportStatus   @default(DRAFT)
+  progressStatus  ProgressStatus @default(ON_TRACK)
+  submittedAt     DateTime?
+  createdBy       String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // 关联关系
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation("ReportCreator", fields: [createdBy], references: [id])
+
+  @@index([projectId, year, weekNumber])
+  @@index([weekStart, weekEnd])
+  @@index([createdBy])
+  @@map("weekly_reports")
+}
+
+// ==================== 产品管理 ====================
+
+enum ProductStatus {
+  DEVELOPING
+  PRODUCTION
+  DISCONTINUED
+}
+
+model Product {
+  id             String        @id @default(uuid())
+  name           String
+  model          String?
+  revision       String?
+  category       String?
+  description    String?
+  status         ProductStatus @default(DEVELOPING)
+  specifications Json?
+  performance    Json?
+  images         Json?
+  documents      Json?
+  projectId      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // 关联关系
+  project    Project?           @relation(fields: [projectId], references: [id])
+  changeLogs ProductChangeLog[]
+
+  @@unique([model, revision])
+  @@index([projectId])
+  @@map("products")
+}
+
+model ProductChangeLog {
+  id        String   @id @default(uuid())
+  productId String?
+  userId    String
+  userName  String
+  action    String
+  changes   Json?
+  createdAt DateTime @default(now())
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@map("product_change_logs")
+}
+
+// ==================== AI 管理 ====================
+
+model AiConfig {
+  id        String   @id @default(uuid())
+  name      String   @default("")
+  apiKey    String   @default("")
+  apiUrl    String   @default("")
+  modelName String   @default("gpt-4o-mini")
+  features  String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_configs")
+}
+
+model AiUsageLog {
+  id               String   @id @default(uuid())
+  feature          String
+  projectId        String?
+  modelName        String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  createdAt        DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("ai_usage_logs")
+}

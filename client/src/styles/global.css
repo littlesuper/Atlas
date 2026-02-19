@@ -1,0 +1,337 @@
+/* ============ 基础样式 ============ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ============ 页面内容区背景 ============ */
+.page-content {
+  background-color: #f4f6f9;
+  min-height: calc(100vh - 60px);
+  padding: 24px;
+}
+
+/* ============ Arco Design 样式覆盖 ============ */
+
+/* 卡片样式 */
+.arco-card {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.arco-card-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
+}
+
+.arco-card-body {
+  padding: 20px;
+}
+
+/* 表格样式 */
+.arco-table {
+  font-size: 14px;
+}
+
+.arco-table-th {
+  background-color: #fafafa;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* 输入框样式 */
+.arco-input,
+.arco-textarea,
+.arco-select-view,
+.arco-picker {
+  border-radius: 8px;
+}
+
+/* 按钮样式 */
+.arco-btn {
+  border-radius: 8px;
+}
+
+/* 标签样式 */
+.arco-tag {
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* 下拉面板样式 */
+.arco-select-dropdown,
+.arco-picker-container,
+.arco-dropdown {
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 弹窗样式 */
+.arco-modal {
+  border-radius: 16px;
+}
+
+/* 进度条样式 */
+.arco-progress-line-wrapper {
+  border-radius: 100px;
+}
+
+/* 通知样式 */
+.arco-message {
+  border-radius: 8px;
+}
+
+/* 空状态样式 */
+.arco-empty {
+  color: #bfbfbf;
+  font-size: 14px;
+}
+
+/* ============ wangEditor 富文本编辑器 ============ */
+.w-e-text-container {
+  font-size: 14px !important;
+  color: #1d2129;
+}
+
+.w-e-text-container [data-slate-editor] p {
+  margin: 0 0 4px;
+}
+
+/* ============ HTML 富文本内容 ============ */
+.html-content p,
+.html-content ol,
+.html-content ul {
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+.html-content ol,
+.html-content ul {
+  padding-left: 18px;
+}
+
+.html-content p:last-child,
+.html-content ol:last-child,
+.html-content ul:last-child {
+  margin-bottom: 0;
+}
+
+/* ============ 工具栏样式 ============ */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.toolbar-left {
+  font-size: 13px;
+  color: #8c8ca1;
+  font-weight: 400;
+}
+
+/* ============ 文本样式层级 ============ */
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+}
+
+.text-content {
+  font-size: 14px;
+  font-weight: 400;
+  color: #595959;
+  line-height: 1.6;
+}
+
+.text-meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8ca1;
+}
+
+.text-placeholder {
+  font-size: 14px;
+  font-weight: 400;
+  color: #bfbfbf;
+}
+
+/* ============ 登录页样式 ============ */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4f7cff 0%, #6c5ce7 100%);
+}
+
+.login-card {
+  width: 400px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 40px;
+}
+
+.login-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 32px;
+}
+
+/* ============ 导航栏样式 ============ */
+.main-header {
+  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 60px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.main-header .logo {
+  height: 44px;
+  cursor: pointer;
+}
+
+.main-header .nav-menu {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.main-header .nav-item {
+  color: rgba(255, 255, 255, 0.8);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+}
+
+.main-header .nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.main-header .nav-item.active {
+  color: #fff;
+  background: rgba(79, 124, 255, 0.3);
+}
+
+/* ============ 表格行拖拽排序（飞书风格） ============ */
+
+/* 拖拽手柄 */
+.drag-handle {
+  cursor: grab;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 0;
+  user-select: none;
+  color: #86909c;
+  font-size: 16px;
+}
+.drag-handle svg {
+  pointer-events: none;
+}
+.arco-table-body tr:hover .drag-handle {
+  color: #4e5969;
+}
+
+/* 源行：蓝色左边框 + 浅蓝背景 */
+tr.drag-source td {
+  background: rgba(79, 124, 255, 0.06) !important;
+  opacity: 0.6;
+}
+tr.drag-source td:first-child {
+  box-shadow: inset 3px 0 0 #4f7cff;
+}
+
+/* 插入线指示器：通过 td 的 box-shadow 实现，避免 tr 的 position/overflow 问题 */
+tr.drag-insert-above td {
+  box-shadow: inset 0 2px 0 0 #4f7cff;
+}
+tr.drag-insert-above td:first-child {
+  position: relative;
+}
+tr.drag-insert-above td:first-child::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4f7cff;
+  pointer-events: none;
+}
+
+tr.drag-insert-below td {
+  box-shadow: inset 0 -2px 0 0 #4f7cff;
+}
+tr.drag-insert-below td:first-child {
+  position: relative;
+}
+tr.drag-insert-below td:first-child::before {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4f7cff;
+  pointer-events: none;
+}
+
+/* ============ 响应式布局 ============ */
+@media (max-width: 768px) {
+  .page-content {
+    padding: 16px;
+  }
+
+  .login-card {
+    width: 90%;
+    padding: 24px;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

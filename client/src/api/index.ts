@@ -1,0 +1,360 @@
+import request from './request';
+import {
+  User,
+  Role,
+  Permission,
+  Project,
+  Activity,
+  Product,
+  ProductChangeLog,
+  WeeklyReport,
+  ReportAttachment,
+  AiConfig,
+  AiUsageStats,
+} from '../types';
+
+// 分页响应结构
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ============ 认证 API ============
+export const authApi = {
+  login: (data: { username: string; password: string }) =>
+    request.post<{ accessToken: string; refreshToken: string; user: User }>('/auth/login', data),
+
+  refresh: (refreshToken: string) =>
+    request.post<{ accessToken: string }>('/auth/refresh', { refreshToken }),
+
+  getMe: () => request.get<User>('/auth/me'),
+};
+
+// ============ 用户管理 API ============
+export const usersApi = {
+  list: (params?: { page?: number; pageSize?: number; keyword?: string }) =>
+    request.get<PaginatedResponse<User>>('/users', { params }),
+
+  create: (data: {
+    username: string;
+    email: string;
+    password: string;
+    realName: string;
+    phone?: string;
+    roleIds: string[];
+  }) => request.post<User>('/users', data),
+
+  update: (id: string, data: {
+    email?: string;
+    realName?: string;
+    phone?: string;
+    status?: string;
+    roleIds?: string[];
+    password?: string;
+  }) => request.put<User>(`/users/${id}`, data),
+
+  delete: (id: string) => request.delete(`/users/${id}`),
+};
+
+// ============ 角色管理 API ============
+export const rolesApi = {
+  list: () => request.get<Role[]>('/roles'),
+
+  getPermissions: () => request.get<Permission[]>('/roles/permissions'),
+
+  create: (data: { name: string; description?: string; permissionIds: string[] }) =>
+    request.post<Role>('/roles', data),
+
+  update: (id: string, data: { name?: string; description?: string; permissionIds?: string[] }) =>
+    request.put<Role>(`/roles/${id}`, data),
+
+  delete: (id: string) => request.delete(`/roles/${id}`),
+};
+
+// ============ 项目管理 API ============
+export const projectsApi = {
+  list: (params?: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    keyword?: string;
+    productLine?: string;
+  }) => request.get<PaginatedResponse<Project> & { stats: { all: number; inProgress: number; completed: number; onHold: number } }>('/projects', { params }),
+
+  get: (id: string) => request.get<Project>(`/projects/${id}`),
+
+  create: (data: {
+    name: string;
+    description?: string;
+    productLine: string;
+    priority: string;
+    status: string;
+    startDate?: string;
+    endDate?: string;
+    managerId: string;
+  }) => request.post<Project>('/projects', data),
+
+  update: (id: string, data: {
+    name?: string;
+    description?: string;
+    productLine?: string;
+    priority?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    managerId?: string;
+    progress?: number;
+  }) => request.put<Project>(`/projects/${id}`, data),
+
+  delete: (id: string) => request.delete(`/projects/${id}`),
+
+  // 协作者管理
+  getMembers: (projectId: string) =>
+    request.get<Array<{ user: { id: string; realName: string; username: string } }>>(`/projects/${projectId}/members`),
+
+  addMember: (projectId: string, userId: string) =>
+    request.post<{ user: { id: string; realName: string; username: string } }>(`/projects/${projectId}/members`, { userId }),
+
+  removeMember: (projectId: string, userId: string) =>
+    request.delete(`/projects/${projectId}/members/${userId}`),
+};
+
+// ============ 活动/任务管理 API ============
+export const activitiesApi = {
+  // 获取项目所有活动（树形结构）
+  list: (projectId: string) =>
+    request.get<Activity[]>(`/activities/project/${projectId}`),
+
+  // 获取甘特图数据
+  getGantt: (projectId: string) =>
+    request.get<{ tasks: unknown[]; links: unknown[] }>(`/activities/project/${projectId}/gantt`),
+
+  // 创建活动
+  create: (data: {
+    projectId: string;
+    name: string;
+    type?: string;
+    phase?: string;
+    status?: string;
+    priority?: string;
+    description?: string;
+    planStartDate?: string;
+    planEndDate?: string;
+    planDuration?: number;
+    startDate?: string;
+    endDate?: string;
+    duration?: number;
+    assigneeId?: string;
+    parentId?: string;
+    notes?: string;
+    sortOrder?: number;
+    dependencies?: Array<{ id: string; type: string }>;
+  }) => request.post<Activity>('/activities', data),
+
+  // 更新活动
+  update: (activityId: string, data: {
+    name?: string;
+    type?: string;
+    phase?: string;
+    status?: string;
+    priority?: string;
+    description?: string;
+    planStartDate?: string;
+    planEndDate?: string;
+    planDuration?: number;
+    startDate?: string;
+    endDate?: string;
+    duration?: number;
+    assigneeId?: string | null;
+    parentId?: string | null;
+    notes?: string | null;
+    [key: string]: unknown;
+  }) => request.put<Activity>(`/activities/${activityId}`, data),
+
+  // 删除活动
+  delete: (activityId: string) => request.delete(`/activities/${activityId}`),
+
+  // 批量排序
+  reorder: (projectId: string, items: { id: string; sortOrder: number; parentId?: string | null }[]) =>
+    request.put(`/activities/project/${projectId}/reorder`, { items }),
+};
+
+// ============ 产品管理 API ============
+export const productsApi = {
+  list: (params?: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    category?: string;
+    keyword?: string;
+    projectId?: string;
+    projectStatus?: string;
+    specKeyword?: string;
+  }) => request.get<PaginatedResponse<Product> & {
+    stats: { all: number; developing: number; production: number; discontinued: number };
+  }>('/products', { params }),
+
+  get: (id: string) => request.get<Product>(`/products/${id}`),
+
+  create: (data: {
+    name: string;
+    model?: string;
+    revision?: string;
+    category?: string;
+    status?: string;
+    projectId?: string;
+    description?: string;
+    specifications?: Record<string, string>;
+    performance?: Record<string, string>;
+    documents?: Array<{ id: string; name: string; url: string; uploadedAt: string }>;
+  }) => request.post<Product>('/products', data),
+
+  update: (id: string, data: {
+    name?: string;
+    model?: string;
+    revision?: string;
+    category?: string;
+    status?: string;
+    projectId?: string;
+    description?: string;
+    specifications?: Record<string, string>;
+    performance?: Record<string, string>;
+    documents?: Array<{ id: string; name: string; url: string; uploadedAt: string }>;
+  }) => request.put<Product>(`/products/${id}`, data),
+
+  delete: (id: string) => request.delete(`/products/${id}`),
+
+  copy: (id: string, revision: string) =>
+    request.post<Product>(`/products/${id}/copy`, { revision }),
+
+  getChangelog: (id: string) =>
+    request.get<ProductChangeLog[]>(`/products/${id}/changelog`),
+
+  exportCsv: (params?: { status?: string; category?: string; keyword?: string; projectStatus?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.category) query.set('category', params.category);
+    if (params?.keyword) query.set('keyword', params.keyword);
+    if (params?.projectStatus) query.set('projectStatus', params.projectStatus);
+    return request.get('/products/export', {
+      params,
+      responseType: 'blob',
+    });
+  },
+};
+
+// ============ 风险评估 API ============
+export const riskApi = {
+  getHistory: (projectId: string) =>
+    request.get<Array<{
+      id: string;
+      projectId: string;
+      riskLevel: string;
+      riskFactors: Array<{ factor: string; severity: string; description: string }>;
+      suggestions: string[];
+      assessedAt: string;
+    }>>(`/risk/project/${projectId}`),
+
+  assess: (projectId: string) =>
+    request.post<{
+      id: string;
+      riskLevel: string;
+      riskFactors: Array<{ factor: string; severity: string; description: string }>;
+      suggestions: string[];
+      assessedAt: string;
+    }>(`/risk/project/${projectId}/assess`),
+};
+
+// ============ 周报管理 API ============
+export const weeklyReportsApi = {
+  list: (params?: { projectId?: string; page?: number; pageSize?: number; status?: string; year?: number; weekNumber?: number; productLine?: string }) =>
+    request.get<PaginatedResponse<WeeklyReport>>('/weekly-reports', { params }),
+
+  getByProject: (projectId: string) =>
+    request.get<WeeklyReport[]>(`/weekly-reports/project/${projectId}`),
+
+  getLatest: (projectId: string) =>
+    request.get<WeeklyReport>(`/weekly-reports/project/${projectId}/latest`),
+
+  get: (id: string) => request.get<WeeklyReport>(`/weekly-reports/${id}`),
+
+  getByWeek: (year: number, weekNumber: number, params?: { productLine?: string }) =>
+    request.get<WeeklyReport[]>(`/weekly-reports/week/${year}/${weekNumber}`, { params }),
+
+  create: (data: {
+    projectId: string;
+    weekStart: string;
+    weekEnd: string;
+    progressStatus?: string;
+    keyProgress?: string;
+    nextWeekPlan?: string;
+    riskWarning?: string;
+    phaseProgress?: Record<string, { progress: string; risks: string; schedule: string }>;
+    attachments?: ReportAttachment[];
+  }) => request.post<WeeklyReport>('/weekly-reports', data),
+
+  update: (id: string, data: {
+    weekStart?: string;
+    weekEnd?: string;
+    progressStatus?: string;
+    keyProgress?: string;
+    nextWeekPlan?: string;
+    riskWarning?: string;
+    phaseProgress?: Record<string, { progress: string; risks: string; schedule: string }>;
+    attachments?: ReportAttachment[];
+    status?: string;
+  }) => request.put<WeeklyReport>(`/weekly-reports/${id}`, data),
+
+  submit: (id: string) => request.post<WeeklyReport>(`/weekly-reports/${id}/submit`),
+
+  delete: (id: string) => request.delete(`/weekly-reports/${id}`),
+
+  getAiSuggestions: (projectId: string, weekStart: string, weekEnd: string) =>
+    request.post<{ keyProgress: string; nextWeekPlan: string; riskWarning: string }>(
+      `/weekly-reports/project/${projectId}/ai-suggestions`,
+      { weekStart, weekEnd }
+    ),
+};
+
+// ============ 文件上传 API ============
+export const uploadApi = {
+  upload: (file: File, onProgress?: (progress: number) => void) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request.post<{ name: string; url: string; size: number; mimetype: string }>(
+      '/uploads',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total && onProgress) {
+            onProgress(Math.round((e.loaded * 100) / e.total));
+          }
+        },
+      }
+    );
+  },
+
+  delete: (filename: string) => request.delete(`/uploads/${filename}`),
+};
+
+// ============ AI 配置管理 API ============
+export const aiConfigApi = {
+  list: () => request.get<AiConfig[]>('/ai-config'),
+
+  create: (data: { name: string; apiKey?: string; apiUrl?: string; modelName?: string; features?: string }) =>
+    request.post<AiConfig>('/ai-config', data),
+
+  update: (id: string, data: { name?: string; apiKey?: string; apiUrl?: string; modelName?: string; features?: string }) =>
+    request.put<AiConfig>(`/ai-config/${id}`, data),
+
+  delete: (id: string) => request.delete(`/ai-config/${id}`),
+
+  testConnection: (data: { apiUrl: string; apiKey: string; modelName?: string; configId?: string }) =>
+    request.post<{ success: boolean; message: string }>('/ai-config/test-connection', data),
+
+  getUsageStats: (params?: { startDate?: string; endDate?: string }) =>
+    request.get<AiUsageStats>('/ai-config/usage-stats', { params }),
+};

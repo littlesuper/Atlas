@@ -1,0 +1,1143 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Card,
+  Button,
+  Space,
+  Tag,
+  Tabs,
+  Table,
+  Drawer,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  Message,
+  Modal,
+  Tooltip,
+  Empty,
+  Progress,
+  InputNumber,
+} from '@arco-design/web-react';
+import {
+  IconLeft,
+  IconPlus,
+  IconEdit,
+  IconDelete,
+  IconDragDotVertical,
+} from '@arco-design/web-react/icon';
+import MainLayout from '../../../layouts/MainLayout';
+import { projectsApi, activitiesApi, usersApi } from '../../../api';
+import { useAuthStore } from '../../../store/authStore';
+import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
+import GanttChart from './GanttChart';
+import RiskAssessmentTab from './RiskAssessmentTab';
+import ProductsTab from './ProductsTab';
+import { Project, Activity, User } from '../../../types';
+import {
+  STATUS_MAP,
+  PRIORITY_MAP,
+  PRODUCT_LINE_MAP,
+  ACTIVITY_STATUS_MAP,
+  ACTIVITY_TYPE_MAP,
+} from '../../../utils/constants';
+import dayjs from 'dayjs';
+
+// 三方联动辅助：根据已有值自动计算第三个值
+// start + end → duration; start + duration → end; end + duration → start
+type DateTriple = { start: dayjs.Dayjs | null; end: dayjs.Dayjs | null; dur: number | null };
+function resolveTriple(t: DateTriple, changed: 'start' | 'end' | 'dur'): DateTriple {
+  const { start, end, dur } = t;
+  if (changed === 'start') {
+    if (start && end) return { start, end, dur: calcWorkdays(start, end) };
+    if (start && dur && dur > 0) return { start, end: addWorkdays(start, dur), dur };
+  } else if (changed === 'end') {
+    if (start && end) return { start, end, dur: calcWorkdays(start, end) };
+    if (end && dur && dur > 0) return { start: subtractWorkdays(end, dur), end, dur };
+  } else {
+    // changed === 'dur'
+    if (start && dur && dur > 0) return { start, end: addWorkdays(start, dur), dur };
+    if (end && dur && dur > 0) return { start: subtractWorkdays(end, dur), end, dur };
+  }
+  return t;
+}
+
+// 阶段配置
+const PHASE_OPTIONS = ['EVT', 'DVT', 'PVT', 'MP'];
+const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
+
+import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/workday';
+
+// 格式化3位序号
+function formatSeq(n: number): string {
+  return String(n).padStart(3, '0');
+}
+
+const ProjectDetail: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { hasPermission, isProjectManager } = useAuthStore();
+  const [form] = Form.useForm();
+
+  // 数据状态
+  const [project, setProject] = useState<Project | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+  // UI 状态：从 URL query 读取初始 tab（如 ?tab=weekly）
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'activities');
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+
+  // 拖拽排序状态
+  const dragIndexRef = useRef<number>(-1);
+  const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
+  const [saving, setSaving] = useState(false);
+
+  // 活动列表表头吸顶
+  const tableWrapRef    = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  const [theadFixed, setTheadFixed]       = useState(false);
+  const [theadFixedPos, setTheadFixedPos] = useState({ left: 0, width: 0, height: 0 });
+
+  // 协作者管理
+  const [membersModalVisible, setMembersModalVisible] = useState(false);
+  const [membersLoading, setMembersLoading] = useState(false);
+
+  // 双击内联编辑
+  const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
+  const [inlineValue, setInlineValue] = useState<string>('');
+
+  // 表单中计划/实际工期
+  const [planDuration, setPlanDuration] = useState<number | null>(null);
+  const [actualDuration, setActualDuration] = useState<number | null>(null);
+
+  const loadProject = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const res = await projectsApi.get(id);
+      setProject(res.data);
+    } catch {
+      Message.error('加载项目详情失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadActivities = async () => {
+    if (!id) return;
+    setActivitiesLoading(true);
+    try {
+      const res = await activitiesApi.list(id);
+      // 扁平化树形结构（按 sortOrder 排序）
+      const flatten = (arr: Activity[]): Activity[] =>
+        arr.flatMap((a) => [a, ...flatten(a.children || [])]);
+      const flat = flatten(res.data || []).sort((a, b) => a.sortOrder - b.sortOrder);
+      setActivities(flat);
+    } catch {
+      Message.error('加载活动列表失败');
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const res = await usersApi.list();
+      setUsers(res.data.data || []);
+    } catch {
+      console.error('加载用户失败');
+    }
+  };
+
+  const handleAddMember = async (userId: string) => {
+    if (!id) return;
+    setMembersLoading(true);
+    try {
+      await projectsApi.addMember(id, userId);
+      Message.success('协作者添加成功');
+      await loadProject();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || '添加失败';
+      Message.error(msg);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!id) return;
+    setMembersLoading(true);
+    try {
+      await projectsApi.removeMember(id, userId);
+      Message.success('协作者已移除');
+      await loadProject();
+    } catch {
+      Message.error('移除失败');
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProject();
+    loadActivities();
+    loadUsers();
+  }, [id]);
+
+  // ===== 活动列表表头吸顶：滚动检测 =====
+  useEffect(() => {
+    const onScroll = () => {
+      const wrap = tableWrapRef.current;
+      if (!wrap) return;
+      const { top, left, width } = wrap.getBoundingClientRect();
+      if (width === 0) { setTheadFixed(false); return; }
+      const thead = wrap.querySelector('thead') as HTMLElement | null;
+      const h = thead ? thead.getBoundingClientRect().height : 40;
+      if (top < 0) {
+        setTheadFixed(true);
+        setTheadFixedPos({ left, width, height: h });
+      } else {
+        setTheadFixed(false);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  // ===== 活动列表表头吸顶：克隆 thead + 横向滚动同步 =====
+  useEffect(() => {
+    const wrap = tableWrapRef.current;
+    const stickyDiv = stickyHeaderRef.current;
+    if (!wrap || !stickyDiv) return;
+
+    if (!theadFixed) {
+      stickyDiv.innerHTML = '';
+      return;
+    }
+
+    // 克隆整张 table，隐藏 tbody（保留 colgroup + thead 以保证列宽一致）
+    const originalTable = wrap.querySelector('table') as HTMLElement | null;
+    if (!originalTable) return;
+    const cloned = originalTable.cloneNode(true) as HTMLElement;
+    const clonedTbody = cloned.querySelector('tbody') as HTMLElement | null;
+    if (clonedTbody) clonedTbody.style.display = 'none';
+    stickyDiv.innerHTML = '';
+    stickyDiv.appendChild(cloned);
+
+    // 横向滚动同步
+    const scrollEl = wrap.querySelector('.arco-table-container') as HTMLElement | null;
+    if (!scrollEl) return;
+    cloned.style.transform = `translateX(-${scrollEl.scrollLeft}px)`;
+    const onHScroll = () => {
+      cloned.style.transform = `translateX(-${scrollEl.scrollLeft}px)`;
+    };
+    scrollEl.addEventListener('scroll', onHScroll, { passive: true });
+    return () => scrollEl.removeEventListener('scroll', onHScroll);
+  }, [theadFixed, theadFixedPos]);
+
+  // 打开创建/编辑抽屉
+  const handleOpenDrawer = (activity?: Activity) => {
+    if (activity) {
+      setEditingActivity(activity);
+      const pd = activity.planStartDate && activity.planEndDate
+        ? calcWorkdays(dayjs(activity.planStartDate), dayjs(activity.planEndDate))
+        : activity.planDuration ?? null;
+      const ad = activity.startDate && activity.endDate
+        ? calcWorkdays(dayjs(activity.startDate), dayjs(activity.endDate))
+        : activity.duration ?? null;
+      setPlanDuration(pd);
+      setActualDuration(ad);
+      form.setFieldsValue({
+        phase: activity.phase,
+        name: activity.name,
+        description: activity.description,
+        parentId: activity.parentId,
+        type: activity.type,
+        status: activity.status,
+        priority: activity.priority,
+        planStart: activity.planStartDate ? dayjs(activity.planStartDate) : undefined,
+        planEnd: activity.planEndDate ? dayjs(activity.planEndDate) : undefined,
+        actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
+        actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
+        assigneeId: activity.assigneeId,
+        notes: activity.notes,
+      });
+    } else {
+      setEditingActivity(null);
+      setPlanDuration(null);
+      setActualDuration(null);
+      form.resetFields();
+    }
+    setDrawerVisible(true);
+  };
+
+  // 三方联动：计划时间
+  const handlePlanChange = (changed: 'start' | 'end' | 'dur', value: dayjs.Dayjs | number | null) => {
+    let start = form.getFieldValue('planStart') as dayjs.Dayjs | null ?? null;
+    let end = form.getFieldValue('planEnd') as dayjs.Dayjs | null ?? null;
+    let dur = planDuration;
+    if (changed === 'start') start = value as dayjs.Dayjs | null;
+    else if (changed === 'end') end = value as dayjs.Dayjs | null;
+    else dur = value as number | null;
+
+    const result = resolveTriple({ start, end, dur }, changed);
+    form.setFieldsValue({ planStart: result.start ?? undefined, planEnd: result.end ?? undefined });
+    setPlanDuration(result.dur);
+  };
+
+  // 三方联动：实际时间
+  const handleActualChange = (changed: 'start' | 'end' | 'dur', value: dayjs.Dayjs | number | null) => {
+    let start = form.getFieldValue('actualStart') as dayjs.Dayjs | null ?? null;
+    let end = form.getFieldValue('actualEnd') as dayjs.Dayjs | null ?? null;
+    let dur = actualDuration;
+    if (changed === 'start') start = value as dayjs.Dayjs | null;
+    else if (changed === 'end') end = value as dayjs.Dayjs | null;
+    else dur = value as number | null;
+
+    const result = resolveTriple({ start, end, dur }, changed);
+    form.setFieldsValue({ actualStart: result.start ?? undefined, actualEnd: result.end ?? undefined });
+    setActualDuration(result.dur);
+  };
+
+  // 提交活动表单
+  const handleSubmitActivity = async () => {
+    if (!id) return;
+    try {
+      const values = await form.validate();
+      const data: Parameters<typeof activitiesApi.create>[0] = {
+        projectId: id,
+        name: values.name,
+        description: values.description,
+        type: values.type,
+        phase: values.phase,
+        status: values.status,
+        priority: values.priority,
+        planStartDate: values.planStart?.format('YYYY-MM-DD'),
+        planEndDate: values.planEnd?.format('YYYY-MM-DD'),
+        planDuration: planDuration ?? undefined,
+        startDate: values.actualStart?.format('YYYY-MM-DD'),
+        endDate: values.actualEnd?.format('YYYY-MM-DD'),
+        duration: actualDuration ?? undefined,
+        assigneeId: values.assigneeId,
+        parentId: values.parentId,
+        notes: values.notes,
+        sortOrder: editingActivity ? editingActivity.sortOrder : (activities.length + 1) * 10,
+      };
+
+      if (editingActivity) {
+        await activitiesApi.update(editingActivity.id, data);
+        Message.success('活动更新成功');
+      } else {
+        await activitiesApi.create(data);
+        Message.success('活动创建成功');
+      }
+      setDrawerVisible(false);
+      loadActivities();
+      loadProject(); // 刷新进度
+    } catch (e) {
+      console.error('提交失败', e);
+    }
+  };
+
+  // 删除活动
+  const handleDeleteActivity = (activity: Activity) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除活动"${activity.name}"吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await activitiesApi.delete(activity.id);
+          Message.success('活动删除成功');
+          loadActivities();
+          loadProject();
+        } catch {
+          Message.error('活动删除失败');
+        }
+      },
+    });
+  };
+
+  // ========== 拖拽排序 ==========
+  // 自定义拖拽（用 mouse 事件实现，以便控制光标为 grabbing）
+  const isDraggingRef = useRef(false);
+  const dragFromRef = useRef(-1);
+  const dragOverRef = useRef(-1);
+  const [, forceRender] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    dragIndexRef.current = index;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent, index: number) => {
+    if (dragIndexRef.current === -1) return;
+    e.preventDefault();
+    let needRender = false;
+    if (!isDraggingRef.current) {
+      isDraggingRef.current = true;
+      dragFromRef.current = dragIndexRef.current;
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+      needRender = true;
+    }
+    if (dragOverRef.current !== index) {
+      dragOverRef.current = index;
+      needRender = true;
+    }
+    if (needRender) forceRender((n) => n + 1);
+  };
+
+  const resetDragState = () => {
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    isDraggingRef.current = false;
+    dragFromRef.current = -1;
+    dragOverRef.current = -1;
+    dragIndexRef.current = -1;
+    forceRender((n) => n + 1);
+  };
+
+  const handleMouseUp = async (e: React.MouseEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (!isDraggingRef.current) {
+      dragIndexRef.current = -1;
+      return;
+    }
+    const fromIndex = dragIndexRef.current;
+    resetDragState();
+
+    if (fromIndex === -1 || fromIndex === targetIndex) return;
+
+    const newList = [...activities];
+    const [removed] = newList.splice(fromIndex, 1);
+    newList.splice(targetIndex, 0, removed);
+    const reordered = newList.map((a, i) => ({ ...a, sortOrder: (i + 1) * 10 }));
+    setActivities(reordered);
+
+    if (!id) return;
+    setSaving(true);
+    try {
+      await activitiesApi.reorder(id, reordered.map((a, i) => ({ id: a.id, sortOrder: (i + 1) * 10, parentId: a.parentId })));
+    } catch {
+      Message.error('保存排序失败');
+      loadActivities(); // 回滚
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 全局 mouseup 兜底（鼠标在表格外释放时清理状态）
+  useEffect(() => {
+    const cleanup = () => {
+      if (isDraggingRef.current) resetDragState();
+    };
+    window.addEventListener('mouseup', cleanup);
+    return () => window.removeEventListener('mouseup', cleanup);
+  }, []);
+
+  // ========== 双击内联编辑 ==========
+  const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
+    if (!(hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))) return;
+    setInlineEditing({ id: activityId, field });
+    setInlineValue(currentValue);
+  };
+
+  const commitInlineEdit = async (activity: Activity, field: string) => {
+    setInlineEditing(null);
+    const original = (activity as unknown as Record<string, unknown>)[field] as string;
+    if (inlineValue === original || inlineValue === (original ?? '')) return;
+    try {
+      await activitiesApi.update(activity.id, { [field]: inlineValue || undefined });
+      setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: inlineValue } : a));
+      Message.success('更新成功');
+    } catch {
+      Message.error('更新失败');
+    }
+  };
+
+  const commitSelectEdit = async (activity: Activity, field: string, value: string) => {
+    setInlineEditing(null);
+    try {
+      await activitiesApi.update(activity.id, { [field]: value });
+      setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: value } : a));
+      Message.success('更新成功');
+    } catch {
+      Message.error('更新失败');
+    }
+  };
+
+  // 活动 ID → 序号映射（O(1) 查找替代 O(n) findIndex）
+  const activitySeqMap = React.useMemo(() => {
+    const map = new Map<string, number>();
+    activities.forEach((a, i) => map.set(a.id, i + 1));
+    return map;
+  }, [activities]);
+
+  // 获取活动序号（1-indexed, padded）
+  const getSeq = (activity: Activity): string => {
+    return formatSeq(activitySeqMap.get(activity.id) || 0);
+  };
+
+  // 获取前置任务序号显示（兼容 dependencies 为字符串的旧数据）
+  const getPredecessorSeq = (activity: Activity): string => {
+    if (!activity.dependencies) return '-';
+    const rawDeps = activity.dependencies;
+    const deps = Array.isArray(rawDeps)
+      ? rawDeps
+      : (() => { try { return JSON.parse(rawDeps as unknown as string) as typeof rawDeps; } catch { return []; } })();
+    if (!deps || deps.length === 0) return '-';
+    return deps.map((dep) => {
+      const idx = activitySeqMap.get(dep.id);
+      return idx ? formatSeq(idx) : '?';
+    }).join(', ');
+  };
+
+  // 计划日期显示（含工作日数）
+  const renderPlanDates = (activity: Activity) => {
+    if (!activity.planStartDate) return '-';
+    const startD = dayjs(activity.planStartDate);
+    const start = startD.format('MM-DD');
+    const end = activity.planEndDate ? dayjs(activity.planEndDate).format('MM-DD') : '';
+    const days = activity.planEndDate
+      ? calcWorkdays(startD, dayjs(activity.planEndDate))
+      : null;
+    return (
+      <span>
+        {start}{end ? ' ~ ' + end : ''}
+        {days !== null && <span style={{ color: '#86909c', fontSize: 12, marginLeft: 4 }}>({days}天)</span>}
+      </span>
+    );
+  };
+
+  // 实际日期显示（含工作日数，超期显示红色）
+  const renderActualDates = (activity: Activity) => {
+    if (!activity.startDate) return '-';
+    const startD = dayjs(activity.startDate);
+    const start = startD.format('MM-DD');
+    const endD = activity.endDate ? dayjs(activity.endDate) : null;
+    const end = endD ? endD.format('MM-DD') : '进行中';
+    const isOverdue = activity.planEndDate && !activity.endDate &&
+      dayjs(activity.planEndDate).isBefore(dayjs(), 'day') &&
+      activity.status !== 'COMPLETED';
+    const days = endD
+      ? calcWorkdays(startD, endD)
+      : calcWorkdays(startD, dayjs());
+    return (
+      <span style={{ color: isOverdue ? '#f53f3f' : undefined }}>
+        {start} ~ {end}
+        <span style={{ color: isOverdue ? '#f53f3f' : '#86909c', fontSize: 12, marginLeft: 4 }}>({days}天)</span>
+      </span>
+    );
+  };
+
+  // 表格列配置
+  const activityColumns = [
+    {
+      title: '',
+      dataIndex: 'id',
+      width: 50,
+      render: (_: unknown, record: Activity, index: number) =>
+        hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
+          <div
+            className="drag-handle"
+            onMouseDown={(e) => handleMouseDown(e, index)}
+          >
+            <IconDragDotVertical style={{ color: '#86909c', fontSize: 20 }} />
+          </div>
+        ) : null,
+    },
+    {
+      title: 'ID',
+      width: 60,
+      render: (_: unknown, record: Activity) => (
+        <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getSeq(record)}</span>
+      ),
+    },
+    {
+      title: '前置',
+      width: 60,
+      render: (_: unknown, record: Activity) => (
+        <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getPredecessorSeq(record)}</span>
+      ),
+    },
+    {
+      title: '阶段',
+      width: 70,
+      render: (_: unknown, record: Activity) =>
+        record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: '#c2c7d0' }}>-</span>,
+    },
+    {
+      title: '活动名称',
+      dataIndex: 'name',
+      width: 200,
+      render: (name: string, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
+          return (
+            <Input
+              autoFocus
+              size="small"
+              value={inlineValue}
+              onChange={setInlineValue}
+              onBlur={() => commitInlineEdit(record, 'name')}
+              onPressEnter={() => commitInlineEdit(record, 'name')}
+            />
+          );
+        }
+        return (
+          <span
+            style={{ fontWeight: 500, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => startInlineEdit(record.id, 'name', name)}
+          >
+            {name}
+          </span>
+        );
+      },
+    },
+    {
+      title: '类型',
+      width: 80,
+      render: (_: unknown, record: Activity) => {
+        const cfg = ACTIVITY_TYPE_MAP[record.type as keyof typeof ACTIVITY_TYPE_MAP] ?? { label: record.type, color: 'default' };
+        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+      },
+    },
+    {
+      title: '状态',
+      width: 100,
+      render: (_: unknown, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'status') {
+          return (
+            <Select
+              size="small"
+              style={{ width: 100 }}
+              value={record.status}
+              onBlur={() => setInlineEditing(null)}
+              onChange={(v) => commitSelectEdit(record, 'status', v)}
+            >
+              {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
+                <Select.Option key={k} value={k}>{v.label}</Select.Option>
+              ))}
+            </Select>
+          );
+        }
+        const cfg = ACTIVITY_STATUS_MAP[record.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: record.status, color: 'default' };
+        return (
+          <Tag
+            color={cfg.color}
+            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'status' })}
+          >
+            {cfg.label}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: '优先级',
+      width: 80,
+      render: (_: unknown, record: Activity) => {
+        const cfg = PRIORITY_MAP[record.priority as keyof typeof PRIORITY_MAP] ?? { label: record.priority, color: 'default' };
+        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+      },
+    },
+    {
+      title: '负责人',
+      width: 100,
+      render: (_: unknown, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeId') {
+          return (
+            <Select
+              size="small"
+              allowClear
+              style={{ width: 100 }}
+              value={record.assigneeId ?? undefined}
+              onBlur={() => setInlineEditing(null)}
+              onChange={(v) => commitSelectEdit(record, 'assigneeId', v ?? '')}
+            >
+              {users.map((u) => (
+                <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
+              ))}
+            </Select>
+          );
+        }
+        return (
+          <span
+            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeId' })}
+          >
+            {record.assignee?.realName || '-'}
+          </span>
+        );
+      },
+    },
+    {
+      title: '计划时间',
+      width: 170,
+      render: (_: unknown, record: Activity) => renderPlanDates(record),
+    },
+    {
+      title: '实际时间',
+      width: 170,
+      render: (_: unknown, record: Activity) => renderActualDates(record),
+    },
+    {
+      title: '备注',
+      dataIndex: 'notes',
+      render: (notes: string | null, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
+          return (
+            <Input
+              autoFocus
+              size="small"
+              value={inlineValue}
+              onChange={setInlineValue}
+              onBlur={() => commitInlineEdit(record, 'notes')}
+              onPressEnter={() => commitInlineEdit(record, 'notes')}
+            />
+          );
+        }
+        return (
+          <Tooltip content={notes || ''}>
+            <span
+              style={{
+                cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default',
+                maxWidth: 120,
+                display: 'inline-block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: notes ? undefined : '#c2c7d0',
+              }}
+              onDoubleClick={() => startInlineEdit(record.id, 'notes', notes || '')}
+            >
+              {notes || '-'}
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: '操作',
+      width: 100,
+      fixed: 'right' as const,
+      render: (_: unknown, record: Activity) => (
+        <Space>
+          {hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && (
+            <Tooltip content="编辑">
+              <Button type="text" icon={<IconEdit />} size="small" onClick={() => handleOpenDrawer(record)} />
+            </Tooltip>
+          )}
+          {hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id) && (
+            <Tooltip content="删除">
+              <Button type="text" status="danger" icon={<IconDelete />} size="small" onClick={() => handleDeleteActivity(record)} />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  if (loading || !project) {
+    return <MainLayout>加载中...</MainLayout>;
+  }
+
+  const statusConfig = STATUS_MAP[project.status as keyof typeof STATUS_MAP] ?? { label: project.status, color: 'default' };
+  const priorityConfig = PRIORITY_MAP[project.priority as keyof typeof PRIORITY_MAP] ?? { label: project.priority, color: 'default' };
+  const productLineConfig = PRODUCT_LINE_MAP[project.productLine as keyof typeof PRODUCT_LINE_MAP] ?? { label: project.productLine, color: 'default' };
+
+  // 可选的前置任务（排除自身）
+  const predecessorOptions = activities.filter((a) => editingActivity ? a.id !== editingActivity.id : true);
+
+  return (
+    <MainLayout>
+      {/* 活动列表吸顶表头：通过 Portal 渲染到 body，避开 Tabs 的 transform 上下文 */}
+      {theadFixed && createPortal(
+        <div
+          ref={stickyHeaderRef}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: theadFixedPos.left,
+            width: theadFixedPos.width,
+            overflow: 'hidden',
+            zIndex: 1000,
+            background: '#fff',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+          }}
+        />,
+        document.body,
+      )}
+      <div>
+        {/* 顶部卡片 */}
+        <Card style={{ marginBottom: 16 }}>
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            {/* 第一行：返回 + 项目名称 + 状态 + 产品线 + 优先级 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Button icon={<IconLeft />} onClick={() => navigate('/projects')}>返回</Button>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{project.name}</h2>
+              <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
+              <Tag color={productLineConfig.color}>{productLineConfig.label}</Tag>
+              <Tag color={priorityConfig.color}>{priorityConfig.label}</Tag>
+            </div>
+
+            {/* 第二行：项目描述 */}
+            {project.description && (
+              <div style={{ color: '#4e5969' }}>{project.description}</div>
+            )}
+
+            {/* 第三行：统计卡片 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+              {[
+                {
+                  label: '时间',
+                  value: `${dayjs(project.startDate).format('YYYY-MM-DD')}${project.endDate ? ' ~ ' + dayjs(project.endDate).format('YYYY-MM-DD') : ''}`,
+                },
+                { label: '整体进度', value: <Progress percent={project.progress || 0} size="small" style={{ width: 100 }} /> },
+                { label: '活动数量', value: `${activities.length} 个` },
+                { label: '项目经理', value: project.manager?.realName || project.manager?.username || '-' },
+                {
+                  label: '协作者',
+                  value: (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {project.members && project.members.length > 0
+                        ? project.members.map((m) => (
+                            <Tag key={m.user.id} size="small">{m.user.realName}</Tag>
+                          ))
+                        : <span style={{ color: '#c2c7d0' }}>暂无</span>
+                      }
+                      {(useAuthStore.getState().user?.permissions?.includes('*:*') || useAuthStore.getState().user?.id === project.managerId) && (
+                        <Button type="text" size="mini" onClick={() => setMembersModalVisible(true)} style={{ padding: '0 4px' }}>管理</Button>
+                      )}
+                    </div>
+                  ),
+                },
+              ].map((item, i) => (
+                <Card key={i} style={{ height: 88 }} bodyStyle={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 12, color: '#86909c', marginBottom: 6 }}>{item.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>{item.value}</div>
+                </Card>
+              ))}
+            </div>
+          </Space>
+        </Card>
+
+        {/* Tab 区域 */}
+        <Card>
+          <Tabs
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          tabBarStyle={{ position: 'sticky', top: 0, zIndex: 15, background: '#fff', marginBottom: 0 }}
+        >
+            {/* 活动列表 */}
+            <Tabs.TabPane key="activities" title="活动列表">
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: '#86909c' }}>
+                  {saving ? '保存排序中...' : ''}
+                </span>
+                {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                  <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
+                )}
+              </div>
+
+              <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
+                {/* 自定义表格行（支持拖拽） */}
+                <Table
+                  columns={activityColumns}
+                  data={activities}
+                  loading={activitiesLoading}
+                  rowKey="id"
+                  pagination={false}
+                  scroll={{ x: 1300 }}
+                  components={{
+                    body: {
+                      row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number; [key: string]: unknown }) => {
+                        const isSource = dragFromRef.current === index;
+                        const isTarget = dragOverRef.current === index && dragOverRef.current !== dragFromRef.current;
+                        const insertAbove = isTarget && dragFromRef.current > index;
+                        const insertBelow = isTarget && dragFromRef.current < index;
+                        const cls = [
+                          typeof rest.className === 'string' ? rest.className : '',
+                          isSource ? 'drag-source' : '',
+                          insertAbove ? 'drag-insert-above' : '',
+                          insertBelow ? 'drag-insert-below' : '',
+                        ].filter(Boolean).join(' ');
+                        return (
+                          <tr
+                            {...rest}
+                            className={cls}
+                            onMouseMove={(e) => handleMouseMove(e, index)}
+                            onMouseUp={(e) => handleMouseUp(e, index)}
+                          >
+                            {children}
+                          </tr>
+                        );
+                      },
+                    },
+                  }}
+                />
+              </div>{/* tableWrapRef */}
+            </Tabs.TabPane>
+
+            {/* 甘特图 */}
+            <Tabs.TabPane key="gantt" title="甘特图">
+              <GanttChart activities={activities} />
+            </Tabs.TabPane>
+
+            {/* AI 风险评估 */}
+            <Tabs.TabPane key="risk" title="AI风险评估">
+              {id && <RiskAssessmentTab projectId={id} />}
+            </Tabs.TabPane>
+
+            {/* 产品列表 */}
+            <Tabs.TabPane key="products" title="产品列表">
+              {id && <ProductsTab projectId={id} />}
+            </Tabs.TabPane>
+
+            {/* 项目周报 */}
+            <Tabs.TabPane key="weekly" title="项目周报">
+              {id && <ProjectWeeklyTab projectId={id} managerId={project?.managerId} />}
+            </Tabs.TabPane>
+          </Tabs>
+        </Card>
+
+        {/* 新建/编辑活动抽屉 */}
+        <Drawer
+          width={700}
+          title={editingActivity ? '编辑活动' : '新建活动'}
+          visible={drawerVisible}
+          onCancel={() => setDrawerVisible(false)}
+          footer={
+            <div style={{ textAlign: 'right' }}>
+              <Space>
+                <Button onClick={() => setDrawerVisible(false)}>取消</Button>
+                <Button type="primary" onClick={handleSubmitActivity}>
+                  {editingActivity ? '保存' : '创建'}
+                </Button>
+              </Space>
+            </div>
+          }
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ type: 'TASK', status: 'NOT_STARTED', priority: 'MEDIUM' }}
+          >
+            {/* 第一行：阶段 + 活动名称 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12 }}>
+              <Form.Item label="阶段" field="phase" rules={[{ required: true, message: '请选择阶段' }]}>
+                <Select placeholder="请选择">
+                  {PHASE_OPTIONS.map((p) => (
+                    <Select.Option key={p} value={p}>
+                      <Tag color={PHASE_COLOR[p]}>{p}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="活动名称" field="name" rules={[{ required: true, message: '请输入活动名称' }]}>
+                <Input placeholder="请输入活动名称" />
+              </Form.Item>
+            </div>
+
+            {/* 描述 */}
+            <Form.Item label="描述" field="description">
+              <Input.TextArea placeholder="请输入描述" rows={3} maxLength={500} showWordLimit />
+            </Form.Item>
+
+            {/* 前置活动 */}
+            <Form.Item label="前置活动" field="parentId">
+              <Select placeholder="请选择前置活动（可选）" allowClear>
+                {predecessorOptions.map((a) => (
+                  <Select.Option key={a.id} value={a.id}>
+                    {formatSeq(activities.findIndex((x) => x.id === a.id) + 1)} - {a.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            {/* 类型 / 状态 / 优先级 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Form.Item label="类型" field="type" rules={[{ required: true }]}>
+                <Select placeholder="类型">
+                  {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
+                    <Select.Option key={k} value={k}>
+                      <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="状态" field="status" rules={[{ required: true }]}>
+                <Select placeholder="状态">
+                  {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
+                    <Select.Option key={k} value={k}>
+                      <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="优先级" field="priority" rules={[{ required: true }]}>
+                <Select placeholder="优先级">
+                  {Object.entries(PRIORITY_MAP).map(([k, v]) => (
+                    <Select.Option key={k} value={k}>
+                      <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </div>
+
+            {/* 时间分隔 */}
+            <div style={{ borderTop: '1px solid #e4e6ef', margin: '4px 0 16px', paddingTop: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969' }}>时间</span>
+            </div>
+
+            {/* 计划时间：开始 + 结束 + 工期 三方联动 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 12 }}>
+              <Form.Item label="计划开始" field="planStart">
+                <DatePicker
+                  style={{ width: '100%' }}
+                  placeholder="开始日期"
+                  onChange={(_s, d) => handlePlanChange('start', d ? dayjs(d as unknown as string) : null)}
+                />
+              </Form.Item>
+              <Form.Item label="计划结束" field="planEnd">
+                <DatePicker
+                  style={{ width: '100%' }}
+                  placeholder="结束日期"
+                  onChange={(_s, d) => handlePlanChange('end', d ? dayjs(d as unknown as string) : null)}
+                />
+              </Form.Item>
+              <Form.Item label="工期(天)">
+                <InputNumber
+                  min={1}
+                  value={planDuration ?? undefined}
+                  onChange={(v) => handlePlanChange('dur', v ?? null)}
+                  placeholder="工期"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </div>
+
+            {/* 实际时间：开始 + 结束 + 工期 三方联动 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 12 }}>
+              <Form.Item label="实际开始" field="actualStart">
+                <DatePicker
+                  style={{ width: '100%' }}
+                  placeholder="开始日期"
+                  onChange={(_s, d) => handleActualChange('start', d ? dayjs(d as unknown as string) : null)}
+                />
+              </Form.Item>
+              <Form.Item label="实际结束" field="actualEnd">
+                <DatePicker
+                  style={{ width: '100%' }}
+                  placeholder="结束日期"
+                  onChange={(_s, d) => handleActualChange('end', d ? dayjs(d as unknown as string) : null)}
+                />
+              </Form.Item>
+              <Form.Item label="工期(天)">
+                <InputNumber
+                  min={1}
+                  value={actualDuration ?? undefined}
+                  onChange={(v) => handleActualChange('dur', v ?? null)}
+                  placeholder="工期"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </div>
+
+            {/* 负责人 */}
+            <Form.Item label="负责人" field="assigneeId">
+              <Select placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
+                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+              }>
+                {users.map((u) => (
+                  <Select.Option key={u.id} value={u.id}>
+                    {u.realName} ({u.username})
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            {/* 备注 */}
+            <Form.Item label="备注" field="notes">
+              <Input.TextArea placeholder="请输入备注" rows={3} maxLength={500} showWordLimit />
+            </Form.Item>
+          </Form>
+        </Drawer>
+
+        {/* 协作者管理 Modal */}
+        <Modal
+          title="管理协作者"
+          visible={membersModalVisible}
+          onCancel={() => setMembersModalVisible(false)}
+          footer={<Button onClick={() => setMembersModalVisible(false)}>关闭</Button>}
+          style={{ maxWidth: 480 }}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: '#86909c', marginBottom: 8 }}>添加协作者</div>
+            <Select
+              placeholder="搜索并选择用户"
+              showSearch
+              allowClear
+              loading={membersLoading}
+              filterOption={(input, option) =>
+                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+              onChange={(userId) => {
+                if (userId) handleAddMember(userId);
+              }}
+              value={undefined}
+              style={{ width: '100%' }}
+            >
+              {users
+                .filter((u) =>
+                  u.id !== project?.managerId &&
+                  !project?.members?.some((m) => m.user.id === u.id)
+                )
+                .map((u) => (
+                  <Select.Option key={u.id} value={u.id}>
+                    {u.realName} ({u.username})
+                  </Select.Option>
+                ))
+              }
+            </Select>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: '#86909c', marginBottom: 8 }}>当前协作者</div>
+            {project?.members && project.members.length > 0 ? (
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                {project.members.map((m) => (
+                  <div key={m.user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f2f3f5' }}>
+                    <span>{m.user.realName} ({m.user.username})</span>
+                    <Button
+                      type="text"
+                      status="danger"
+                      size="small"
+                      loading={membersLoading}
+                      onClick={() => handleRemoveMember(m.user.id)}
+                    >
+                      移除
+                    </Button>
+                  </div>
+                ))}
+              </Space>
+            ) : (
+              <Empty description="暂无协作者" style={{ padding: '12px 0' }} />
+            )}
+          </div>
+        </Modal>
+      </div>
+    </MainLayout>
+  );
+};
+
+export default ProjectDetail;
