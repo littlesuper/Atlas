@@ -30,6 +30,12 @@ export const authApi = {
     request.post<{ accessToken: string }>('/auth/refresh', { refreshToken }),
 
   getMe: () => request.get<User>('/auth/me'),
+
+  updateProfile: (data: { realName?: string; email?: string; phone?: string }) =>
+    request.put<Pick<User, 'id' | 'username' | 'email' | 'realName' | 'phone'>>('/auth/profile', data),
+
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    request.post<{ success: boolean; message: string }>('/auth/change-password', data),
 };
 
 // ============ 用户管理 API ============
@@ -150,7 +156,7 @@ export const activitiesApi = {
     parentId?: string;
     notes?: string;
     sortOrder?: number;
-    dependencies?: Array<{ id: string; type: string }>;
+    dependencies?: Array<{ id: string; type: string; lag?: number }>;
   }) => request.post<Activity>('/activities', data),
 
   // 更新活动
@@ -170,6 +176,7 @@ export const activitiesApi = {
     assigneeId?: string | null;
     parentId?: string | null;
     notes?: string | null;
+    dependencies?: Array<{ id: string; type: string; lag?: number }> | null;
     [key: string]: unknown;
   }) => request.put<Activity>(`/activities/${activityId}`, data),
 

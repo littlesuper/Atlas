@@ -41,6 +41,7 @@ import {
   PRODUCT_LINE_MAP,
   ACTIVITY_STATUS_MAP,
   ACTIVITY_TYPE_MAP,
+  DEPENDENCY_TYPE_MAP,
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
@@ -115,6 +116,7 @@ const ProjectDetail: React.FC = () => {
   // 表单中计划/实际工期
   const [planDuration, setPlanDuration] = useState<number | null>(null);
   const [actualDuration, setActualDuration] = useState<number | null>(null);
+  const [formDeps, setFormDeps] = useState<Array<{ id: string; type: string; lag: number }>>([]);
 
   const loadProject = async () => {
     if (!id) return;
@@ -272,10 +274,17 @@ const ProjectDetail: React.FC = () => {
         assigneeId: activity.assigneeId,
         notes: activity.notes,
       });
+      // Load dependencies
+      const rawDeps = activity.dependencies;
+      const deps = Array.isArray(rawDeps)
+        ? rawDeps
+        : (() => { try { return JSON.parse(rawDeps as unknown as string) as typeof rawDeps; } catch { return []; } })();
+      setFormDeps((deps || []).map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 })));
     } else {
       setEditingActivity(null);
       setPlanDuration(null);
       setActualDuration(null);
+      setFormDeps([]);
       form.resetFields();
     }
     setDrawerVisible(true);
@@ -332,6 +341,11 @@ const ProjectDetail: React.FC = () => {
         parentId: values.parentId,
         notes: values.notes,
         sortOrder: editingActivity ? editingActivity.sortOrder : (activities.length + 1) * 10,
+        dependencies: formDeps.filter((d) => d.id).map((d) => ({
+          id: d.id,
+          type: d.type,
+          lag: d.lag || 0,
+        })),
       };
 
       if (editingActivity) {
@@ -488,7 +502,7 @@ const ProjectDetail: React.FC = () => {
     return formatSeq(activitySeqMap.get(activity.id) || 0);
   };
 
-  // 获取前置任务序号显示（兼容 dependencies 为字符串的旧数据）
+  // 获取前置任务序号显示 — MS Project 格式: {seq}{type}±{lag}
   const getPredecessorSeq = (activity: Activity): string => {
     if (!activity.dependencies) return '-';
     const rawDeps = activity.dependencies;
@@ -498,7 +512,11 @@ const ProjectDetail: React.FC = () => {
     if (!deps || deps.length === 0) return '-';
     return deps.map((dep) => {
       const idx = activitySeqMap.get(dep.id);
-      return idx ? formatSeq(idx) : '?';
+      const seq = idx ? String(idx) : '?';
+      const typeLabel = DEPENDENCY_TYPE_MAP[dep.type as keyof typeof DEPENDENCY_TYPE_MAP]?.label || 'FS';
+      const lag = dep.lag ?? 0;
+      const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
+      return `${seq}${typeLabel}${lagStr}`;
     }).join(', ');
   };
 
@@ -565,7 +583,7 @@ const ProjectDetail: React.FC = () => {
     },
     {
       title: '前置',
-      width: 60,
+      width: 100,
       render: (_: unknown, record: Activity) => (
         <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getPredecessorSeq(record)}</span>
       ),
@@ -953,9 +971,9 @@ const ProjectDetail: React.FC = () => {
               <Input.TextArea placeholder="请输入描述" rows={3} maxLength={500} showWordLimit />
             </Form.Item>
 
-            {/* 前置活动 */}
-            <Form.Item label="前置活动" field="parentId">
-              <Select placeholder="请选择前置活动（可选）" allowClear>
+            {/* 父活动 */}
+            <Form.Item label="父活动" field="parentId">
+              <Select placeholder="请选择父活动（可选）" allowClear>
                 {predecessorOptions.map((a) => (
                   <Select.Option key={a.id} value={a.id}>
                     {formatSeq(activities.findIndex((x) => x.id === a.id) + 1)} - {a.name}
@@ -963,6 +981,84 @@ const ProjectDetail: React.FC = () => {
                 ))}
               </Select>
             </Form.Item>
+
+            {/* 前置依赖 */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969' }}>前置依赖</span>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<IconPlus />}
+                  onClick={() => setFormDeps([...formDeps, { id: '', type: '0', lag: 0 }])}
+                >
+                  添加
+                </Button>
+              </div>
+              {formDeps.length === 0 ? (
+                <div style={{ color: '#c2c7d0', fontSize: 13, padding: '4px 0' }}>无前置依赖</div>
+              ) : (
+                formDeps.map((dep, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <Select
+                      placeholder="选择活动"
+                      showSearch
+                      allowClear
+                      value={dep.id || undefined}
+                      onChange={(v) => {
+                        const next = [...formDeps];
+                        next[idx] = { ...next[idx], id: v || '' };
+                        setFormDeps(next);
+                      }}
+                      filterOption={(input, option) =>
+                        (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
+                      {activities
+                        .filter((a) =>
+                          (editingActivity ? a.id !== editingActivity.id : true) &&
+                          !formDeps.some((d, di) => di !== idx && d.id === a.id)
+                        )
+                        .map((a) => (
+                          <Select.Option key={a.id} value={a.id}>
+                            {String(activitySeqMap.get(a.id) || 0)} - {a.name}
+                          </Select.Option>
+                        ))}
+                    </Select>
+                    <Select
+                      value={dep.type}
+                      onChange={(v) => {
+                        const next = [...formDeps];
+                        next[idx] = { ...next[idx], type: v };
+                        setFormDeps(next);
+                      }}
+                    >
+                      {Object.entries(DEPENDENCY_TYPE_MAP).map(([k, v]) => (
+                        <Select.Option key={k} value={k}>{v.fullLabel}</Select.Option>
+                      ))}
+                    </Select>
+                    <InputNumber
+                      value={dep.lag}
+                      onChange={(v) => {
+                        const next = [...formDeps];
+                        next[idx] = { ...next[idx], lag: v ?? 0 };
+                        setFormDeps(next);
+                      }}
+                      suffix="天"
+                      placeholder="延迟"
+                      style={{ width: '100%' }}
+                    />
+                    <Button
+                      type="text"
+                      status="danger"
+                      icon={<IconDelete />}
+                      size="small"
+                      onClick={() => setFormDeps(formDeps.filter((_, i) => i !== idx))}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
 
             {/* 类型 / 状态 / 优先级 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
@@ -1000,12 +1096,19 @@ const ProjectDetail: React.FC = () => {
               <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969' }}>时间</span>
             </div>
 
+            {formDeps.some((d) => d.id) && (
+              <div style={{ background: '#e8f3ff', border: '1px solid #bedaff', borderRadius: 4, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#165dff' }}>
+                已设置前置依赖，计划时间将由系统自动计算
+              </div>
+            )}
+
             {/* 计划时间：开始 + 结束 + 工期 三方联动 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 12 }}>
               <Form.Item label="计划开始" field="planStart">
                 <DatePicker
                   style={{ width: '100%' }}
                   placeholder="开始日期"
+                  disabled={formDeps.some((d) => d.id)}
                   onChange={(_s, d) => handlePlanChange('start', d ? dayjs(d as unknown as string) : null)}
                 />
               </Form.Item>
@@ -1013,6 +1116,7 @@ const ProjectDetail: React.FC = () => {
                 <DatePicker
                   style={{ width: '100%' }}
                   placeholder="结束日期"
+                  disabled={formDeps.some((d) => d.id)}
                   onChange={(_s, d) => handlePlanChange('end', d ? dayjs(d as unknown as string) : null)}
                 />
               </Form.Item>
@@ -1020,6 +1124,7 @@ const ProjectDetail: React.FC = () => {
                 <InputNumber
                   min={1}
                   value={planDuration ?? undefined}
+                  disabled={formDeps.some((d) => d.id)}
                   onChange={(v) => handlePlanChange('dur', v ?? null)}
                   placeholder="工期"
                   style={{ width: '100%' }}

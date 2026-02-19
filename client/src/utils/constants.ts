@@ -94,23 +94,27 @@ export const PRODUCT_LINE_MAP = {
 export const PRODUCT_CATEGORY_MAP = {
   ROUTER: {
     label: '路由器',
-    color: 'blue',
+    color: 'arcoblue',
   },
   GATEWAY: {
     label: '网关',
-    color: 'cyan',
+    color: 'green',
   },
   REMOTE_CONTROL: {
     label: '远控设备',
     color: 'purple',
   },
+  HARDWARE: {
+    label: '硬件',
+    color: 'cyan',
+  },
   ACCESSORY: {
     label: '配件',
-    color: 'default',
+    color: 'orangered',
   },
   OTHER: {
     label: '其他',
-    color: 'default',
+    color: 'gold',
   },
 } as const;
 
@@ -228,4 +232,12 @@ export const USER_STATUS_MAP = {
     label: '禁用',
     color: 'red',
   },
+} as const;
+
+// ============ 依赖类型映射 ============
+export const DEPENDENCY_TYPE_MAP = {
+  '0': { label: 'FS', fullLabel: '完成-开始 (FS)' },
+  '1': { label: 'SS', fullLabel: '开始-开始 (SS)' },
+  '2': { label: 'FF', fullLabel: '完成-完成 (FF)' },
+  '3': { label: 'SF', fullLabel: '开始-完成 (SF)' },
 } as const;
