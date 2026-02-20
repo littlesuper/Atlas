@@ -292,6 +292,12 @@ const ProjectDetail: React.FC = () => {
 
   // 三方联动：计划时间
   const handlePlanChange = (changed: 'start' | 'end' | 'dur', value: dayjs.Dayjs | number | null) => {
+    // When dependencies are set, only allow duration changes (server computes dates)
+    if (formDeps.some((d) => d.id)) {
+      if (changed === 'dur') setPlanDuration(value as number | null);
+      return;
+    }
+
     let start = form.getFieldValue('planStart') as dayjs.Dayjs | null ?? null;
     let end = form.getFieldValue('planEnd') as dayjs.Dayjs | null ?? null;
     let dur = planDuration;
@@ -1098,7 +1104,7 @@ const ProjectDetail: React.FC = () => {
 
             {formDeps.some((d) => d.id) && (
               <div style={{ background: '#e8f3ff', border: '1px solid #bedaff', borderRadius: 4, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#165dff' }}>
-                已设置前置依赖，计划时间将由系统自动计算
+                已设置前置依赖，计划开始/结束日期将由系统根据依赖关系自动计算。可设置工期辅助推算。
               </div>
             )}
 
@@ -1124,7 +1130,6 @@ const ProjectDetail: React.FC = () => {
                 <InputNumber
                   min={1}
                   value={planDuration ?? undefined}
-                  disabled={formDeps.some((d) => d.id)}
                   onChange={(v) => handlePlanChange('dur', v ?? null)}
                   placeholder="工期"
                   style={{ width: '100%' }}
