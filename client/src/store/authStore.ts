@@ -8,8 +8,10 @@ interface AuthState {
   isAuthenticated: boolean;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  loginWithWecom: (data: { accessToken: string; refreshToken: string; user: User }) => void;
   logout: () => void;
   fetchUser: () => Promise<void>;
+  updateProfile: (data: { realName?: string; email?: string; phone?: string }) => void;
   hasPermission: (resource: string, action: string) => boolean;
   isProjectManager: (managerId: string, projectId?: string) => boolean;
 }
@@ -42,6 +44,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ loading: false });
       throw error;
     }
+  },
+
+  // 企微登录（接收已获取的 token 和用户信息）
+  loginWithWecom: (data) => {
+    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    set({
+      user: data.user,
+      isAuthenticated: true,
+      loading: false,
+    });
+    Message.success('登录成功');
   },
 
   // 退出登录
@@ -89,6 +103,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: false,
         loading: false,
       });
+    }
+  },
+
+  // 更新个人信息（本地状态）
+  updateProfile: (data) => {
+    const { user } = get();
+    if (user) {
+      set({ user: { ...user, ...data } });
     }
   },
 

@@ -11,6 +11,7 @@ import {
   ReportAttachment,
   AiConfig,
   AiUsageStats,
+  AuditLog,
 } from '../types';
 
 // 分页响应结构
@@ -36,6 +37,12 @@ export const authApi = {
 
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     request.post<{ success: boolean; message: string }>('/auth/change-password', data),
+
+  getWecomConfig: () =>
+    request.get<{ enabled: boolean; corpId?: string; agentId?: string; redirectUri?: string; state?: string }>('/auth/wecom/config'),
+
+  wecomLogin: (data: { code: string }) =>
+    request.post<{ accessToken: string; refreshToken: string; user: User }>('/auth/wecom/login', data),
 };
 
 // ============ 用户管理 API ============
@@ -250,6 +257,23 @@ export const productsApi = {
       responseType: 'blob',
     });
   },
+};
+
+// ============ 审计日志 API ============
+export const auditLogsApi = {
+  list: (params?: {
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+    action?: string;
+    resourceType?: string;
+    startDate?: string;
+    endDate?: string;
+    keyword?: string;
+  }) => request.get<PaginatedResponse<AuditLog>>('/audit-logs', { params }),
+
+  getUsers: () =>
+    request.get<Array<{ userId: string; userName: string }>>('/audit-logs/users'),
 };
 
 // ============ 风险评估 API ============

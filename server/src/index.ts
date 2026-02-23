@@ -15,12 +15,17 @@ import riskRoutes from './routes/risk';
 import weeklyReportsRoutes from './routes/weeklyReports';
 import uploadsRoutes from './routes/uploads';
 import aiConfigRoutes from './routes/aiConfig';
+import auditLogsRoutes from './routes/auditLogs';
 
 const app = express();
 const prisma = new PrismaClient();
 const PORT = Number(process.env.PORT) || 3000;
 
 // ==================== 中间件配置 ====================
+
+// 信任一层反向代理（Vite dev proxy / Nginx），使 req.ip 和 x-forwarded-for 正确
+// 使用具体跳数而非 true，避免 express-rate-limit 的 ERR_ERL_PERMISSIVE_TRUST_PROXY
+app.set('trust proxy', 1);
 
 // 安全响应头
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -68,6 +73,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // 认证路由（登录接口限流）
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/wecom/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 
 // 用户管理路由
@@ -96,6 +102,9 @@ app.use('/api/uploads', uploadsRoutes);
 
 // AI配置路由
 app.use('/api/ai-config', aiConfigRoutes);
+
+// 审计日志路由
+app.use('/api/audit-logs', auditLogsRoutes);
 
 // ==================== 错误处理中间件 ====================
 

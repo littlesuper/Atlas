@@ -11,6 +11,7 @@ export interface User {
   email: string;
   realName: string;
   phone?: string;
+  wecomUserId?: string;
   status: UserStatus;
   roles: string[]; // 角色名称数组
   permissions: string[]; // 权限代码数组 (格式: resource:action)
@@ -94,6 +95,7 @@ export enum ActivityStatus {
 export interface ActivityDependency {
   id: string;
   type: string; // '0'=FS, '1'=SS, '2'=FF, '3'=SF
+  lag?: number; // workdays, default 0, negative = lead
 }
 
 export interface Activity {
@@ -264,6 +266,21 @@ export interface AiUsageStats {
     totalTokens: number;
   }>;
   recentLogs: AiUsageLog[];
+}
+
+// ============ 审计日志相关类型 ============
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;       // LOGIN, CREATE, UPDATE, DELETE
+  resourceType: string;  // auth, project, activity, product, user, role
+  resourceId?: string;
+  resourceName?: string;
+  changes?: Record<string, { from: unknown; to: unknown }> | null;
+  ipAddress?: string;
+  createdAt: string;
 }
 
 // ============ 通用类型 ============

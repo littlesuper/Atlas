@@ -54,7 +54,12 @@ request.interceptors.response.use(
 
     // 处理401错误：token过期
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // 如果是refresh接口失败，直接跳转登录
+      // 如果是登录或刷新接口失败，直接抛出错误（不尝试刷新token）
+      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/wecom/login')) {
+        const errorMessage = getErrorMessage(error);
+        Message.error(errorMessage);
+        return Promise.reject(error);
+      }
       if (originalRequest.url?.includes('/auth/refresh')) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
