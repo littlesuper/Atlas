@@ -268,6 +268,17 @@ export interface AiUsageStats {
   recentLogs: AiUsageLog[];
 }
 
+// ============ 企微配置相关类型 ============
+
+export interface WecomConfig {
+  id?: string;
+  corpId: string;
+  agentId: string;
+  secret: string;
+  redirectUri: string;
+  updatedAt?: string;
+}
+
 // ============ 审计日志相关类型 ============
 
 export interface AuditLog {

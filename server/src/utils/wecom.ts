@@ -1,16 +1,73 @@
 import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
 
 const WECOM_API = 'https://qyapi.weixin.qq.com/cgi-bin';
+const prisma = new PrismaClient();
 
 // 内存缓存 access_token
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
+// 内存缓存 DB 配置（5 分钟 TTL）
+let cachedConfig: {
+  data: { corpId: string; agentId: string; secret: string; redirectUri: string } | null;
+  expiresAt: number;
+} | null = null;
+const CONFIG_CACHE_TTL = 5 * 60 * 1000;
+
+/**
+ * 从 DB 读取企微配置，fallback 到环境变量（带 5 分钟内存缓存）
+ */
+export async function getWecomConfig(): Promise<{
+  corpId: string;
+  agentId: string;
+  secret: string;
+  redirectUri: string;
+}> {
+  const now = Date.now();
+  if (cachedConfig && cachedConfig.expiresAt > now) {
+    return cachedConfig.data || { corpId: '', agentId: '', secret: '', redirectUri: '' };
+  }
+
+  try {
+    const dbConfig = await prisma.wecomConfig.findFirst();
+    if (dbConfig && dbConfig.corpId && dbConfig.secret) {
+      const data = {
+        corpId: dbConfig.corpId,
+        agentId: dbConfig.agentId,
+        secret: dbConfig.secret,
+        redirectUri: dbConfig.redirectUri,
+      };
+      cachedConfig = { data, expiresAt: now + CONFIG_CACHE_TTL };
+      return data;
+    }
+  } catch {
+    // DB read failure — fall through to env vars
+  }
+
+  // Fallback to environment variables
+  const data = {
+    corpId: process.env.WECOM_CORP_ID || '',
+    agentId: process.env.WECOM_AGENT_ID || '',
+    secret: process.env.WECOM_SECRET || '',
+    redirectUri: process.env.WECOM_REDIRECT_URI || '',
+  };
+  cachedConfig = { data, expiresAt: now + CONFIG_CACHE_TTL };
+  return data;
+}
+
+/** 清除配置缓存（配置更新后可调用） */
+export function invalidateWecomConfigCache(): void {
+  cachedConfig = null;
+  // access_token 也需要失效，因为 secret 可能已变
+  cachedToken = null;
+}
+
 /**
  * 检查企业微信登录是否已配置
  */
-export function isWecomEnabled(): boolean {
-  const { WECOM_CORP_ID, WECOM_AGENT_ID, WECOM_SECRET } = process.env;
-  return !!(WECOM_CORP_ID && WECOM_AGENT_ID && WECOM_SECRET);
+export async function isWecomEnabled(): Promise<boolean> {
+  const config = await getWecomConfig();
+  return !!(config.corpId && config.agentId && config.secret);
 }
 
 /**
@@ -22,9 +79,9 @@ export async function getAccessToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  const { WECOM_CORP_ID, WECOM_SECRET } = process.env;
+  const config = await getWecomConfig();
   const res = await axios.get(`${WECOM_API}/gettoken`, {
-    params: { corpid: WECOM_CORP_ID, corpsecret: WECOM_SECRET },
+    params: { corpid: config.corpId, corpsecret: config.secret },
   });
 
   if (res.data.errcode !== 0) {

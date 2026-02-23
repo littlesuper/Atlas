@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { authenticate } from '../middleware/auth';
 import { auditLog } from '../utils/auditLog';
-import { isWecomEnabled, getUserInfoByCode, getUserDetail } from '../utils/wecom';
+import { isWecomEnabled, getWecomConfig, getUserInfoByCode, getUserDetail } from '../utils/wecom';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -367,19 +367,21 @@ router.post('/change-password', authenticate, async (req: Request, res: Response
  * GET /api/auth/wecom/config
  * 返回前端初始化企微二维码所需的配置
  */
-router.get('/wecom/config', (req: Request, res: Response): void => {
-  if (!isWecomEnabled()) {
+router.get('/wecom/config', async (req: Request, res: Response): Promise<void> => {
+  const enabled = await isWecomEnabled();
+  if (!enabled) {
     res.json({ enabled: false });
     return;
   }
 
+  const config = await getWecomConfig();
   const state = crypto.randomBytes(16).toString('hex');
 
   res.json({
     enabled: true,
-    corpId: process.env.WECOM_CORP_ID,
-    agentId: process.env.WECOM_AGENT_ID,
-    redirectUri: process.env.WECOM_REDIRECT_URI,
+    corpId: config.corpId,
+    agentId: config.agentId,
+    redirectUri: config.redirectUri,
     state,
   });
 });
@@ -397,7 +399,7 @@ router.post('/wecom/login', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (!isWecomEnabled()) {
+    if (!(await isWecomEnabled())) {
       res.status(400).json({ error: '企业微信登录未配置' });
       return;
     }

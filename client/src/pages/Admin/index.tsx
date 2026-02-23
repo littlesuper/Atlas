@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Card,
   Tabs,
@@ -22,12 +22,15 @@ import {
   IconEdit,
   IconDelete,
 } from '@arco-design/web-react/icon';
+import { useSearchParams } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import { usersApi, rolesApi } from '../../api';
 import { useAuthStore } from '../../store/authStore';
 import { User, Role, Permission } from '../../types';
 import { USER_STATUS_MAP, PERMISSION_RESOURCE_MAP, PERMISSION_ACTION_MAP } from '../../utils/constants';
 import AiManagement from './AiManagement';
+import AuditLogTab from './AuditLog';
+import WecomManagement from './WecomManagement';
 import dayjs from 'dayjs';
 
 const AdminPage: React.FC = () => {
@@ -35,9 +38,32 @@ const AdminPage: React.FC = () => {
   const [userForm] = Form.useForm();
   const [roleForm] = Form.useForm();
 
-  // Tab状态
-  const [mainTab, setMainTab] = useState('ai');
+  // Tab状态（从 URL 读取，刷新后保持）
+  const [searchParams, setSearchParams] = useSearchParams();
+  const setMainTab = useCallback((tab: string) => {
+    setSearchParams({ tab }, { replace: true });
+  }, [setSearchParams]);
   const [accountTab, setAccountTab] = useState('users');
+
+  // 计算可见 Tab 列表，自动回退到第一个有权限的 Tab
+  const visibleTabs = useMemo(() => {
+    const tabs: string[] = [];
+    if (hasPermission('system', 'ai')) tabs.push('ai');
+    if (hasPermission('system', 'ai')) tabs.push('wecom');
+    if (hasPermission('system', 'account')) tabs.push('account');
+    if (hasPermission('system', 'audit_log')) tabs.push('audit');
+    return tabs;
+  }, [hasPermission]);
+
+  const urlTab = searchParams.get('tab') || '';
+  const mainTab = visibleTabs.includes(urlTab) ? urlTab : (visibleTabs[0] || 'ai');
+
+  // URL 上的 tab 不在可见列表中时，自动纠正 URL
+  useEffect(() => {
+    if (visibleTabs.length > 0 && urlTab !== mainTab) {
+      setSearchParams({ tab: mainTab }, { replace: true });
+    }
+  }, [mainTab, urlTab, visibleTabs]);
 
   // 用户数据
   const [users, setUsers] = useState<User[]>([]);
@@ -440,77 +466,95 @@ const AdminPage: React.FC = () => {
       <Card>
         <Tabs activeTab={mainTab} onChange={setMainTab}>
           {/* AI管理 */}
-          <Tabs.TabPane key="ai" title="AI管理">
-            <AiManagement />
-          </Tabs.TabPane>
+          {hasPermission('system', 'ai') && (
+            <Tabs.TabPane key="ai" title="AI管理">
+              <AiManagement />
+            </Tabs.TabPane>
+          )}
+
+          {/* 企微配置 */}
+          {hasPermission('system', 'ai') && (
+            <Tabs.TabPane key="wecom" title="企微配置">
+              <WecomManagement />
+            </Tabs.TabPane>
+          )}
 
           {/* 账号管理 */}
-          <Tabs.TabPane key="account" title="账号管理">
-            <Tabs activeTab={accountTab} onChange={setAccountTab} type="text">
-              {/* 用户管理 */}
-              <Tabs.TabPane key="users" title="用户管理">
-                <div className="toolbar">
-                  <div className="toolbar-left">
-                    共 {users.length} 个用户
-                  </div>
-                  <Space>
-                    <Input
-                      style={{ width: 240 }}
-                      prefix={<IconSearch />}
-                      placeholder="搜索用户..."
-                      allowClear
-                      onChange={handleUserSearch}
+          {hasPermission('system', 'account') && (
+            <Tabs.TabPane key="account" title="账号管理">
+                <Tabs activeTab={accountTab} onChange={setAccountTab} type="text">
+                  {/* 用户管理 */}
+                  <Tabs.TabPane key="users" title="用户管理">
+                    <div className="toolbar">
+                      <div className="toolbar-left">
+                        共 {users.length} 个用户
+                      </div>
+                      <Space>
+                        <Input
+                          style={{ width: 240 }}
+                          prefix={<IconSearch />}
+                          placeholder="搜索用户..."
+                          allowClear
+                          onChange={handleUserSearch}
+                        />
+                        {hasPermission('user', 'create') && (
+                          <Button
+                            type="primary"
+                            icon={<IconPlus />}
+                            onClick={() => handleOpenUserModal()}
+                          >
+                            新建用户
+                          </Button>
+                        )}
+                      </Space>
+                    </div>
+
+                    <Table
+                      columns={userColumns}
+                      data={users}
+                      loading={usersLoading}
+                      rowKey="id"
+                      pagination={{ pageSize: 20, showTotal: true }}
+                      scroll={{ x: 1300 }}
                     />
-                    {hasPermission('user', 'create') && (
-                      <Button
-                        type="primary"
-                        icon={<IconPlus />}
-                        onClick={() => handleOpenUserModal()}
-                      >
-                        新建用户
-                      </Button>
-                    )}
-                  </Space>
-                </div>
+                  </Tabs.TabPane>
 
-                <Table
-                  columns={userColumns}
-                  data={users}
-                  loading={usersLoading}
-                  rowKey="id"
-                  pagination={{ pageSize: 20, showTotal: true }}
-                  scroll={{ x: 1300 }}
-                />
-              </Tabs.TabPane>
+                  {/* 角色管理 */}
+                  <Tabs.TabPane key="roles" title="角色管理">
+                    <div className="toolbar">
+                      <div className="toolbar-left">
+                        共 {roles.length} 个角色
+                      </div>
+                      {hasPermission('role', 'create') && (
+                        <Button
+                          type="primary"
+                          icon={<IconPlus />}
+                          onClick={() => handleOpenRoleModal()}
+                        >
+                          新建角色
+                        </Button>
+                      )}
+                    </div>
 
-              {/* 角色管理 */}
-              <Tabs.TabPane key="roles" title="角色管理">
-                <div className="toolbar">
-                  <div className="toolbar-left">
-                    共 {roles.length} 个角色
-                  </div>
-                  {hasPermission('role', 'create') && (
-                    <Button
-                      type="primary"
-                      icon={<IconPlus />}
-                      onClick={() => handleOpenRoleModal()}
-                    >
-                      新建角色
-                    </Button>
-                  )}
-                </div>
-
-                <Table
-                  columns={roleColumns}
-                  data={roles}
-                  loading={rolesLoading}
-                  rowKey="id"
-                  pagination={false}
-                  scroll={{ x: 1000 }}
-                />
-              </Tabs.TabPane>
-            </Tabs>
+                    <Table
+                      columns={roleColumns}
+                      data={roles}
+                      loading={rolesLoading}
+                      rowKey="id"
+                      pagination={false}
+                      scroll={{ x: 1000 }}
+                    />
+                  </Tabs.TabPane>
+                </Tabs>
           </Tabs.TabPane>
+          )}
+
+          {/* 操作日志 */}
+          {hasPermission('system', 'audit_log') && (
+            <Tabs.TabPane key="audit" title="操作日志">
+              <AuditLogTab />
+            </Tabs.TabPane>
+          )}
         </Tabs>
       </Card>
 

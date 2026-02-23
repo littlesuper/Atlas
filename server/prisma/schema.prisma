@@ -331,6 +331,19 @@ model AiUsageLog {
   @@map("ai_usage_logs")
 }
 
+// ==================== 企微配置 ====================
+
+model WecomConfig {
+  id          String   @id @default(uuid())
+  corpId      String   @default("")
+  agentId     String   @default("")
+  secret      String   @default("")
+  redirectUri String   @default("")
+  updatedAt   DateTime @updatedAt
+
+  @@map("wecom_configs")
+}
+
 // ==================== 操作审计 ====================
 
 model AuditLog {

@@ -12,6 +12,7 @@ import {
   AiConfig,
   AiUsageStats,
   AuditLog,
+  WecomConfig,
 } from '../types';
 
 // 分页响应结构
@@ -371,6 +372,14 @@ export const uploadApi = {
   },
 
   delete: (filename: string) => request.delete(`/uploads/${filename}`),
+};
+
+// ============ 企微配置管理 API ============
+export const wecomConfigApi = {
+  get: () => request.get<WecomConfig>('/wecom-config'),
+
+  update: (data: { corpId?: string; agentId?: string; secret?: string; redirectUri?: string }) =>
+    request.put<WecomConfig>('/wecom-config', data),
 };
 
 // ============ AI 配置管理 API ============

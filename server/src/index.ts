@@ -16,6 +16,7 @@ import weeklyReportsRoutes from './routes/weeklyReports';
 import uploadsRoutes from './routes/uploads';
 import aiConfigRoutes from './routes/aiConfig';
 import auditLogsRoutes from './routes/auditLogs';
+import wecomConfigRoutes from './routes/wecomConfig';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -105,6 +106,9 @@ app.use('/api/ai-config', aiConfigRoutes);
 
 // 审计日志路由
 app.use('/api/audit-logs', auditLogsRoutes);
+
+// 企微配置路由
+app.use('/api/wecom-config', wecomConfigRoutes);
 
 // ==================== 错误处理中间件 ====================
 
