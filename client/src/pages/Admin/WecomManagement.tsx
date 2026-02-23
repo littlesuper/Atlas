@@ -46,35 +46,37 @@ const WecomManagement: React.FC = () => {
   };
 
   return (
-    <Spin loading={loading} style={{ display: 'block' }}>
-      <Form
-        form={form}
-        layout="vertical"
-        style={{ maxWidth: 520 }}
-      >
-        <Form.Item label="企业ID (CorpID)" field="corpId">
-          <Input placeholder="请输入企业ID" />
-        </Form.Item>
+    <div>
+      <Spin loading={loading} style={{ display: 'block' }}>
+        <Form
+          form={form}
+          layout="vertical"
+          style={{ maxWidth: 520, marginTop: 16 }}
+        >
+          <Form.Item label="企业ID (CorpID)" field="corpId">
+            <Input placeholder="请输入企业ID" />
+          </Form.Item>
 
-        <Form.Item label="AgentID" field="agentId">
-          <Input placeholder="请输入AgentID" />
-        </Form.Item>
+          <Form.Item label="AgentID" field="agentId">
+            <Input placeholder="请输入AgentID" />
+          </Form.Item>
 
-        <Form.Item label="Secret" field="secret">
-          <Input.Password placeholder="请输入Secret" />
-        </Form.Item>
+          <Form.Item label="Secret" field="secret">
+            <Input.Password placeholder="请输入Secret" />
+          </Form.Item>
 
-        <Form.Item label="回调地址 (Redirect URI)" field="redirectUri">
-          <Input placeholder="如 https://example.com/wecom-callback" />
-        </Form.Item>
+          <Form.Item label="回调地址 (Redirect URI)" field="redirectUri">
+            <Input placeholder="如 https://example.com/wecom-callback" />
+          </Form.Item>
 
-        <Form.Item>
-          <Button type="primary" loading={saving} onClick={handleSave}>
-            保存
-          </Button>
-        </Form.Item>
-      </Form>
-    </Spin>
+          <Form.Item>
+            <Button type="primary" loading={saving} onClick={handleSave}>
+              保存
+            </Button>
+          </Form.Item>
+        </Form>
+      </Spin>
+    </div>
   );
 };
 
