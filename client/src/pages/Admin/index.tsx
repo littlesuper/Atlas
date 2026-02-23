@@ -49,7 +49,6 @@ const AdminPage: React.FC = () => {
   const visibleTabs = useMemo(() => {
     const tabs: string[] = [];
     if (hasPermission('system', 'ai')) tabs.push('ai');
-    if (hasPermission('system', 'ai')) tabs.push('wecom');
     if (hasPermission('system', 'account')) tabs.push('account');
     if (hasPermission('system', 'audit_log')) tabs.push('audit');
     return tabs;
@@ -149,6 +148,7 @@ const AdminPage: React.FC = () => {
         realName: user.realName,
         email: user.email,
         phone: user.phone,
+        wecomUserId: user.wecomUserId,
         roleIds: user.roles || [],
         status: user.status,
       });
@@ -175,12 +175,14 @@ const AdminPage: React.FC = () => {
           email?: string;
           realName?: string;
           phone?: string;
+          wecomUserId?: string;
           status?: string;
           roleIds?: string[];
         } = {
           email: values.email,
           realName: values.realName,
           phone: values.phone,
+          wecomUserId: values.wecomUserId || null,
           status: values.status,
           roleIds,
         };
@@ -472,13 +474,6 @@ const AdminPage: React.FC = () => {
             </Tabs.TabPane>
           )}
 
-          {/* 企微配置 */}
-          {hasPermission('system', 'ai') && (
-            <Tabs.TabPane key="wecom" title="企微配置">
-              <WecomManagement />
-            </Tabs.TabPane>
-          )}
-
           {/* 账号管理 */}
           {hasPermission('system', 'account') && (
             <Tabs.TabPane key="account" title="账号管理">
@@ -544,6 +539,11 @@ const AdminPage: React.FC = () => {
                       pagination={false}
                       scroll={{ x: 1000 }}
                     />
+                  </Tabs.TabPane>
+
+                  {/* 企微配置 */}
+                  <Tabs.TabPane key="wecom" title="企微配置">
+                    <WecomManagement />
                   </Tabs.TabPane>
                 </Tabs>
           </Tabs.TabPane>
@@ -642,6 +642,14 @@ const AdminPage: React.FC = () => {
             ]}
           >
             <Input placeholder="请输入手机号" />
+          </Form.Item>
+
+          <Form.Item
+            label="企微UserID"
+            field="wecomUserId"
+            extra="关联企业微信账号，用于企微扫码登录"
+          >
+            <Input placeholder="请输入企微UserID（选填）" allowClear />
           </Form.Item>
 
           <Form.Item

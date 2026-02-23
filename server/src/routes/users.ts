@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
+import { auditLog, diffFields } from '../utils/auditLog';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -51,6 +52,7 @@ router.get(
             email: true,
             realName: true,
             phone: true,
+            wecomUserId: true,
             status: true,
             createdAt: true,
             userRoles: {
@@ -76,6 +78,7 @@ router.get(
         email: user.email,
         realName: user.realName,
         phone: user.phone,
+        wecomUserId: user.wecomUserId,
         status: user.status,
         createdAt: user.createdAt,
         roles: user.userRoles.map((ur) => ur.role.name),
@@ -187,6 +190,8 @@ router.post(
         },
       });
 
+      auditLog({ req, action: 'CREATE', resourceType: 'user', resourceId: user.id, resourceName: userWithRoles!.realName });
+
       res.status(201).json({
         id: userWithRoles!.id,
         username: userWithRoles!.username,
@@ -216,7 +221,7 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const { email, realName, phone, status, roleIds, password } = req.body;
+      const { email, realName, phone, wecomUserId, status, roleIds, password } = req.body;
 
       // 1. 检查用户是否存在
       const existingUser = await prisma.user.findUnique({
@@ -248,10 +253,17 @@ router.put(
       if (email) updateData.email = email;
       if (realName) updateData.realName = realName;
       if (phone !== undefined) updateData.phone = phone || null;
+      if (wecomUserId !== undefined) updateData.wecomUserId = wecomUserId || null;
       if (status) updateData.status = status;
       if (password) {
         updateData.password = await bcrypt.hash(password, 10);
       }
+
+      const userChanges = diffFields(
+        existingUser as unknown as Record<string, unknown>,
+        updateData,
+        ['email', 'realName', 'phone', 'wecomUserId', 'status'],
+      );
 
       // 4. 更新用户基本信息
       await prisma.user.update({
@@ -303,12 +315,15 @@ router.put(
         },
       });
 
+      auditLog({ req, action: 'UPDATE', resourceType: 'user', resourceId: id, resourceName: existingUser.realName, changes: userChanges });
+
       res.json({
         id: updatedUser!.id,
         username: updatedUser!.username,
         email: updatedUser!.email,
         realName: updatedUser!.realName,
         phone: updatedUser!.phone,
+        wecomUserId: updatedUser!.wecomUserId,
         status: updatedUser!.status,
         createdAt: updatedUser!.createdAt,
         roles: updatedUser!.userRoles.map((ur) => ur.role.name),
@@ -356,6 +371,8 @@ router.delete(
       await prisma.user.delete({
         where: { id },
       });
+
+      auditLog({ req, action: 'DELETE', resourceType: 'user', resourceId: id, resourceName: existingUser.realName });
 
       res.json({ success: true });
     } catch (error) {

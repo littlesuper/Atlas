@@ -64,6 +64,7 @@ export const usersApi = {
     email?: string;
     realName?: string;
     phone?: string;
+    wecomUserId?: string | null;
     status?: string;
     roleIds?: string[];
     password?: string;
