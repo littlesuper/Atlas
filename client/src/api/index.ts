@@ -12,6 +12,8 @@ import {
   AiConfig,
   AiUsageStats,
   AuditLog,
+  ActivityArchiveSummary,
+  ActivityArchive,
   WecomConfig,
 } from '../types';
 
@@ -260,6 +262,21 @@ export const productsApi = {
       responseType: 'blob',
     });
   },
+};
+
+// ============ 活动归档 API ============
+export const activityArchivesApi = {
+  create: (projectId: string, label?: string) =>
+    request.post<ActivityArchiveSummary>(`/activity-archives/project/${projectId}`, { label }),
+
+  list: (projectId: string) =>
+    request.get<ActivityArchiveSummary[]>(`/activity-archives/project/${projectId}`),
+
+  get: (id: string) =>
+    request.get<ActivityArchive>(`/activity-archives/${id}`),
+
+  delete: (id: string) =>
+    request.delete(`/activity-archives/${id}`),
 };
 
 // ============ 审计日志 API ============
