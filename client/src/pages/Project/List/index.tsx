@@ -30,7 +30,6 @@ import {
   STATUS_MAP,
   PRIORITY_MAP,
   PRODUCT_LINE_MAP,
-  PROGRESS_STATUS_MAP,
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
@@ -263,23 +262,17 @@ const ProjectList: React.FC = () => {
       width: 250,
       sorter: (a: Project, b: Project) => a.name.localeCompare(b.name),
       render: (name: string, record: Project) => {
-        const ps = record.latestProgressStatus as keyof typeof PROGRESS_STATUS_MAP | null | undefined;
-        const statusConfig = ps ? PROGRESS_STATUS_MAP[ps] : null;
-        const colorMap: Record<string, string> = { green: '#00b42a', orange: '#ff7d00', red: '#f53f3f' };
+        const PROGRESS_ICON: Record<string, string> = { ON_TRACK: '✓', MINOR_ISSUE: '⚠️', MAJOR_ISSUE: '✕' };
+        const PROGRESS_COLOR: Record<string, string> = { ON_TRACK: '#00b42a', MINOR_ISSUE: '#ff7d00', MAJOR_ISSUE: '#f53f3f' };
+        const PROGRESS_TOOLTIP: Record<string, string> = { ON_TRACK: '顺利进行', MINOR_ISSUE: '轻度阻碍', MAJOR_ISSUE: '严重阻碍' };
+        const ps = record.latestProgressStatus;
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            {statusConfig && (
-              <Tooltip content={`周报状态: ${statusConfig.label}`}>
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    backgroundColor: colorMap[statusConfig.color] || statusConfig.color,
-                    display: 'inline-block',
-                    flexShrink: 0,
-                  }}
-                />
+            {ps && PROGRESS_ICON[ps] && (
+              <Tooltip content={PROGRESS_TOOLTIP[ps]}>
+                <span style={{ color: PROGRESS_COLOR[ps], fontWeight: 700, fontSize: 14, cursor: 'default', flexShrink: 0 }}>
+                  {PROGRESS_ICON[ps]}
+                </span>
               </Tooltip>
             )}
             <a
