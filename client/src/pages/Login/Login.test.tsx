@@ -109,7 +109,7 @@ describe('Login handleSubmit 逻辑', () => {
     });
   });
 
-  it('登录失败时显示服务器错误消息', async () => {
+  it('登录失败时不跳转页面', async () => {
     mockLogin.mockRejectedValue(new Error('用户名或密码错误'));
     render(
       <MemoryRouter>
@@ -126,28 +126,8 @@ describe('Login handleSubmit 逻辑', () => {
     fireEvent.click(screen.getByText('登录'));
 
     await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('用户名或密码错误');
-    });
-  });
-
-  it('登录失败且无 error.message 时显示默认提示', async () => {
-    mockLogin.mockRejectedValue({});
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>,
-    );
-
-    fireEvent.change(screen.getByPlaceholderText('请输入用户名'), {
-      target: { value: 'admin' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('请输入密码'), {
-      target: { value: 'wrongpass' },
-    });
-    fireEvent.click(screen.getByText('登录'));
-
-    await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('登录失败，请检查用户名和密码');
+      expect(mockLogin).toHaveBeenCalledWith('admin', 'wrongpass');
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 });

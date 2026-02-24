@@ -196,7 +196,7 @@ describe('AiManagement 新建配置', () => {
       expect(screen.getByPlaceholderText('如：GPT-4o 风险评估')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('https://api.openai.com/v1/chat/completions')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('sk-...')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('gpt-4o-mini')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('选择或输入模型名称')).toBeInTheDocument();
       expect(screen.getByText('验证连接')).toBeInTheDocument();
     });
   });

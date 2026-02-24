@@ -133,10 +133,10 @@ describe('PRODUCT_LINE_MAP', () => {
 // ============ PRODUCT_CATEGORY_MAP（产品类别）============
 
 describe('PRODUCT_CATEGORY_MAP', () => {
-  const keys = ['ROUTER', 'GATEWAY', 'REMOTE_CONTROL', 'ACCESSORY', 'OTHER'] as const;
+  const keys = ['ROUTER', 'GATEWAY', 'REMOTE_CONTROL', 'HARDWARE', 'ACCESSORY', 'OTHER'] as const;
 
-  it('包含所有 5 个产品类别', () => {
-    expect(Object.keys(PRODUCT_CATEGORY_MAP)).toHaveLength(5);
+  it('包含所有 6 个产品类别', () => {
+    expect(Object.keys(PRODUCT_CATEGORY_MAP)).toHaveLength(6);
   });
 
   keys.forEach((key) => {
