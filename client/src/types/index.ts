@@ -71,6 +71,7 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   latestProgressStatus?: string | null;
+  currentPhase?: string | null;
   activities?: Activity[];
   products?: Product[];
   _count?: { activities: number; products: number };

@@ -109,6 +109,10 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
             orderBy: { weekEnd: 'desc' },
             take: 1,
           },
+          activities: {
+            where: { phase: { not: null } },
+            select: { phase: true, status: true },
+          },
           _count: {
             select: {
               activities: true,
@@ -120,10 +124,36 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       prisma.project.count({ where }),
     ]);
 
-    // Flatten: attach latestProgressStatus to each project
-    const data = projects.map(({ weeklyReports, ...rest }) => ({
+    // Determine current phase per project
+    const PHASE_ORDER = ['EVT', 'DVT', 'PVT', 'MP'];
+    function getCurrentPhase(activities: { phase: string | null; status: string }[]): string | null {
+      const withPhase = activities.filter((a) => a.phase);
+      if (withPhase.length === 0) return null;
+      // Prefer the most advanced phase that has IN_PROGRESS activities
+      for (let i = PHASE_ORDER.length - 1; i >= 0; i--) {
+        if (withPhase.some((a) => a.phase === PHASE_ORDER[i] && a.status === 'IN_PROGRESS')) {
+          return PHASE_ORDER[i];
+        }
+      }
+      // Fallback: earliest phase with NOT_STARTED or DELAYED activities
+      for (const p of PHASE_ORDER) {
+        if (withPhase.some((a) => a.phase === p && (a.status === 'NOT_STARTED' || a.status === 'DELAYED'))) {
+          return p;
+        }
+      }
+      // All completed: return the most advanced phase
+      for (let i = PHASE_ORDER.length - 1; i >= 0; i--) {
+        if (withPhase.some((a) => a.phase === PHASE_ORDER[i])) {
+          return PHASE_ORDER[i];
+        }
+      }
+      return null;
+    }
+
+    const data = projects.map(({ weeklyReports, activities, ...rest }) => ({
       ...rest,
       latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
+      currentPhase: getCurrentPhase(activities),
     }));
 
     res.json({

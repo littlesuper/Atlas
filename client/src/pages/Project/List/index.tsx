@@ -265,6 +265,7 @@ const ProjectList: React.FC = () => {
         const PROGRESS_ICON: Record<string, string> = { ON_TRACK: '✓', MINOR_ISSUE: '⚠️', MAJOR_ISSUE: '✕' };
         const PROGRESS_COLOR: Record<string, string> = { ON_TRACK: '#00b42a', MINOR_ISSUE: '#ff7d00', MAJOR_ISSUE: '#f53f3f' };
         const PROGRESS_TOOLTIP: Record<string, string> = { ON_TRACK: '顺利进行', MINOR_ISSUE: '轻度阻碍', MAJOR_ISSUE: '严重阻碍' };
+        const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
         const ps = record.latestProgressStatus;
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -281,6 +282,11 @@ const ProjectList: React.FC = () => {
             >
               {name}
             </a>
+            {record.currentPhase && (
+              <Tag size="small" color={PHASE_COLOR[record.currentPhase] || 'default'}>
+                {record.currentPhase}
+              </Tag>
+            )}
           </span>
         );
       },
