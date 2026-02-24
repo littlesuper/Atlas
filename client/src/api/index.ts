@@ -96,6 +96,7 @@ export const projectsApi = {
     status?: string;
     keyword?: string;
     productLine?: string;
+    phase?: string;
   }) => request.get<PaginatedResponse<Project> & { stats: { all: number; inProgress: number; completed: number; onHold: number } }>('/projects', { params }),
 
   get: (id: string) => request.get<Project>(`/projects/${id}`),

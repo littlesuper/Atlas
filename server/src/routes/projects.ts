@@ -20,6 +20,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       status,
       keyword,
       productLine,
+      phase,
     } = req.query;
 
     const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
@@ -49,6 +50,11 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
         { productLine: { in: lines } },
         { productLine: null },
       ];
+    }
+
+    // 阶段筛选（项目包含该阶段的活动）
+    if (phase) {
+      where.activities = { some: { phase: phase as string } };
     }
 
     // 统计条件（不受status和分页影响，仅受productLine和keyword影响）

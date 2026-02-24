@@ -85,6 +85,7 @@ const ProjectList: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
   const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') ?? 'IN_PROGRESS');
   const [selectedProductLine, setSelectedProductLine] = useState<string>(searchParams.get('productLine') || '');
+  const [selectedPhase, setSelectedPhase] = useState<string>(searchParams.get('phase') || '');
 
   // 分页状态 — 从 URL 初始化
   const [pagination, setPagination] = useState({
@@ -101,19 +102,21 @@ const ProjectList: React.FC = () => {
     if (searchKeyword) params.set('keyword', searchKeyword);
     if (selectedStatus) params.set('status', selectedStatus);
     if (selectedProductLine) params.set('productLine', selectedProductLine);
+    if (selectedPhase) params.set('phase', selectedPhase);
     setSearchParams(params, { replace: true });
-  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLine, setSearchParams]);
+  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLine, selectedPhase, setSearchParams]);
 
   // 加载项目列表
   const loadProjects = async (page = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true);
     try {
-      const params: { status?: string; productLine?: string; keyword?: string; page?: number; pageSize?: number } = {
+      const params: { status?: string; productLine?: string; keyword?: string; phase?: string; page?: number; pageSize?: number } = {
         page,
         pageSize,
       };
       if (selectedStatus) params.status = selectedStatus;
       if (selectedProductLine) params.productLine = selectedProductLine;
+      if (selectedPhase) params.phase = selectedPhase;
       if (searchKeyword) params.keyword = searchKeyword;
 
       const response = await projectsApi.list(params);
@@ -141,7 +144,7 @@ const ProjectList: React.FC = () => {
   useEffect(() => {
     loadProjects(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, selectedProductLine, searchKeyword]);
+  }, [selectedStatus, selectedProductLine, selectedPhase, searchKeyword]);
 
   useEffect(() => {
     loadUsers();
@@ -265,7 +268,6 @@ const ProjectList: React.FC = () => {
         const PROGRESS_ICON: Record<string, string> = { ON_TRACK: '✓', MINOR_ISSUE: '⚠️', MAJOR_ISSUE: '✕' };
         const PROGRESS_COLOR: Record<string, string> = { ON_TRACK: '#00b42a', MINOR_ISSUE: '#ff7d00', MAJOR_ISSUE: '#f53f3f' };
         const PROGRESS_TOOLTIP: Record<string, string> = { ON_TRACK: '顺利进行', MINOR_ISSUE: '轻度阻碍', MAJOR_ISSUE: '严重阻碍' };
-        const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
         const ps = record.latestProgressStatus;
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -282,13 +284,18 @@ const ProjectList: React.FC = () => {
             >
               {name}
             </a>
-            {record.currentPhase && (
-              <Tag size="small" color={PHASE_COLOR[record.currentPhase] || 'default'}>
-                {record.currentPhase}
-              </Tag>
-            )}
           </span>
         );
+      },
+    },
+    {
+      title: '阶段',
+      dataIndex: 'currentPhase',
+      width: 80,
+      render: (phase: string | null) => {
+        if (!phase) return <span style={{ color: '#c2c7d0' }}>-</span>;
+        const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
+        return <Tag color={PHASE_COLOR[phase] || 'default'}>{phase}</Tag>;
       },
     },
     {
@@ -440,7 +447,7 @@ const ProjectList: React.FC = () => {
               />
               <Select
                 style={{ width: 140 }}
-                placeholder="产品线筛选"
+                placeholder="产品线"
                 allowClear
                 value={selectedProductLine || undefined}
                 onChange={(value) => setSelectedProductLine(value || '')}
@@ -449,6 +456,17 @@ const ProjectList: React.FC = () => {
                   <Select.Option key={key} value={key}>
                     {value.label}
                   </Select.Option>
+                ))}
+              </Select>
+              <Select
+                style={{ width: 110 }}
+                placeholder="阶段"
+                allowClear
+                value={selectedPhase || undefined}
+                onChange={(value) => setSelectedPhase(value || '')}
+              >
+                {['EVT', 'DVT', 'PVT', 'MP'].map((p) => (
+                  <Select.Option key={p} value={p}>{p}</Select.Option>
                 ))}
               </Select>
               {hasPermission('project', 'create') && (
