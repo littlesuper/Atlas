@@ -128,7 +128,6 @@ model Project {
   riskAssessments  RiskAssessment[]
   weeklyReports    WeeklyReport[]
   aiUsageLogs      AiUsageLog[]
-  activityArchives ActivityArchive[]
 
   @@index([managerId])
   @@map("projects")
@@ -194,24 +193,6 @@ model Activity {
   @@index([assigneeId])
   @@index([parentId])
   @@map("activities")
-}
-
-model ActivityArchive {
-  id            String   @id @default(uuid())
-  projectId     String
-  version       Int
-  label         String?
-  snapshot      Json
-  activityCount Int
-  createdBy     String
-  createdByName String
-  createdAt     DateTime @default(now())
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, version])
-  @@index([projectId])
-  @@map("activity_archives")
 }
 
 model RiskAssessment {

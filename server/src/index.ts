@@ -15,7 +15,6 @@ import riskRoutes from './routes/risk';
 import weeklyReportsRoutes from './routes/weeklyReports';
 import uploadsRoutes from './routes/uploads';
 import aiConfigRoutes from './routes/aiConfig';
-import activityArchivesRoutes from './routes/activityArchives';
 import auditLogsRoutes from './routes/auditLogs';
 import wecomConfigRoutes from './routes/wecomConfig';
 
@@ -89,9 +88,6 @@ app.use('/api/projects', projectsRoutes);
 
 // 活动管理路由
 app.use('/api/activities', activitiesRoutes);
-
-// 活动归档路由
-app.use('/api/activity-archives', activityArchivesRoutes);
 
 // 产品管理路由
 app.use('/api/products', productsRoutes);
