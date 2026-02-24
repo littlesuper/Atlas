@@ -289,16 +289,6 @@ const ProjectList: React.FC = () => {
       },
     },
     {
-      title: '阶段',
-      dataIndex: 'currentPhase',
-      width: 80,
-      render: (phase: string | null) => {
-        if (!phase) return <span style={{ color: '#c2c7d0' }}>-</span>;
-        const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
-        return <Tag color={PHASE_COLOR[phase] || 'default'}>{phase}</Tag>;
-      },
-    },
-    {
       title: '产品线',
       dataIndex: 'productLine',
       width: 120,
@@ -325,6 +315,16 @@ const ProjectList: React.FC = () => {
       render: (priority: string) => {
         const config = PRIORITY_MAP[priority as keyof typeof PRIORITY_MAP] ?? { label: priority, color: 'default' };
         return <Tag color={config.color}>{config.label}</Tag>;
+      },
+    },
+    {
+      title: '阶段',
+      dataIndex: 'currentPhase',
+      width: 80,
+      render: (phase: string | null) => {
+        if (!phase) return <span style={{ color: '#c2c7d0' }}>-</span>;
+        const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
+        return <Tag color={PHASE_COLOR[phase] || 'default'}>{phase}</Tag>;
       },
     },
     {

@@ -4,6 +4,7 @@ import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, canDeleteProject, sanitizePagination } from '../middleware/permission';
 import { VALID_PROJECT_STATUSES, VALID_PRIORITIES, isValidProjectStatus, isValidPriority, isValidDateRange, isValidProgress } from '../utils/validation';
 import { auditLog, diffFields } from '../utils/auditLog';
+import { getCurrentPhase } from '../utils/projectPhase';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -52,11 +53,6 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       ];
     }
 
-    // 阶段筛选（项目包含该阶段的活动）
-    if (phase) {
-      where.activities = { some: { phase: phase as string } };
-    }
-
     // 统计条件（不受status和分页影响，仅受productLine和keyword影响）
     const statsWhere: any = {};
     if (keyword) {
@@ -82,98 +78,97 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.ON_HOLD } }),
     ]);
 
-    // 获取项目列表
-    const [projects, total] = await Promise.all([
-      prisma.project.findMany({
-        where,
-        skip,
-        take: pageSizeNum,
-        orderBy: {
-          startDate: 'asc', // 按开始时间升序（从远到近）
+    // When phase filter is active, we need to fetch all matching projects first,
+    // compute currentPhase, filter, then paginate manually.
+    const needsPhaseFilter = !!phase;
+
+    const projectInclude = {
+      manager: {
+        select: {
+          id: true,
+          realName: true,
+          username: true,
         },
+      },
+      members: {
         include: {
-          manager: {
+          user: {
             select: {
               id: true,
               realName: true,
               username: true,
             },
           },
-          members: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  realName: true,
-                  username: true,
-                },
-              },
-            },
-          },
-          weeklyReports: {
-            select: { progressStatus: true },
-            orderBy: { weekEnd: 'desc' },
-            take: 1,
-          },
-          activities: {
-            where: { phase: { not: null } },
-            select: { phase: true, status: true },
-          },
-          _count: {
-            select: {
-              activities: true,
-              products: true,
-            },
-          },
         },
-      }),
-      prisma.project.count({ where }),
-    ]);
-
-    // Determine current phase per project
-    const PHASE_ORDER = ['EVT', 'DVT', 'PVT', 'MP'];
-    function getCurrentPhase(activities: { phase: string | null; status: string }[]): string | null {
-      const withPhase = activities.filter((a) => a.phase);
-      if (withPhase.length === 0) return null;
-      // Prefer the most advanced phase that has IN_PROGRESS activities
-      for (let i = PHASE_ORDER.length - 1; i >= 0; i--) {
-        if (withPhase.some((a) => a.phase === PHASE_ORDER[i] && a.status === 'IN_PROGRESS')) {
-          return PHASE_ORDER[i];
-        }
-      }
-      // Fallback: earliest phase with NOT_STARTED or DELAYED activities
-      for (const p of PHASE_ORDER) {
-        if (withPhase.some((a) => a.phase === p && (a.status === 'NOT_STARTED' || a.status === 'DELAYED'))) {
-          return p;
-        }
-      }
-      // All completed: return the most advanced phase
-      for (let i = PHASE_ORDER.length - 1; i >= 0; i--) {
-        if (withPhase.some((a) => a.phase === PHASE_ORDER[i])) {
-          return PHASE_ORDER[i];
-        }
-      }
-      return null;
-    }
-
-    const data = projects.map(({ weeklyReports, activities, ...rest }) => ({
-      ...rest,
-      latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
-      currentPhase: getCurrentPhase(activities),
-    }));
-
-    res.json({
-      data,
-      total,
-      page: pageNum,
-      pageSize: pageSizeNum,
-      stats: {
-        all,
-        inProgress,
-        completed,
-        onHold,
       },
-    });
+      weeklyReports: {
+        select: { progressStatus: true },
+        orderBy: { weekEnd: 'desc' as const },
+        take: 1,
+      },
+      activities: {
+        where: { phase: { not: null } },
+        select: { phase: true, status: true },
+      },
+      _count: {
+        select: {
+          activities: true,
+          products: true,
+        },
+      },
+    };
+
+    if (needsPhaseFilter) {
+      // Fetch all projects (no pagination) to compute and filter by currentPhase
+      const allProjects = await prisma.project.findMany({
+        where,
+        orderBy: { startDate: 'asc' },
+        include: projectInclude,
+      });
+
+      const allWithPhase = allProjects.map(({ weeklyReports, activities, ...rest }) => ({
+        ...rest,
+        latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
+        currentPhase: getCurrentPhase(activities),
+      }));
+
+      const filtered = allWithPhase.filter((p) => p.currentPhase === phase);
+      const total = filtered.length;
+      const data = filtered.slice(skip, skip + pageSizeNum);
+
+      res.json({
+        data,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        stats: { all, inProgress, completed, onHold },
+      });
+    } else {
+      const [projects, total] = await Promise.all([
+        prisma.project.findMany({
+          where,
+          skip,
+          take: pageSizeNum,
+          orderBy: { startDate: 'asc' },
+          include: projectInclude,
+        }),
+        prisma.project.count({ where }),
+      ]);
+
+      const data = projects.map(({ weeklyReports, activities, ...rest }) => ({
+        ...rest,
+        latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
+        currentPhase: getCurrentPhase(activities),
+      }));
+
+      res.json({
+        data,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        stats: { all, inProgress, completed, onHold },
+      });
+    }
   } catch (error) {
     console.error('获取项目列表错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
