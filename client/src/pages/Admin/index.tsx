@@ -15,10 +15,7 @@ import {
   Tooltip,
   Checkbox,
   Divider,
-  Grid,
 } from '@arco-design/web-react';
-
-const { Row, Col } = Grid;
 import {
   IconSearch,
   IconPlus,
@@ -585,127 +582,107 @@ const AdminPage: React.FC = () => {
             status: 'ACTIVE',
           }}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="用户名"
-                field="username"
-                rules={[
-                  { required: true, message: '请输入用户名' },
-                  { minLength: 2, message: '用户名长度不能少于2位' },
-                ]}
-              >
-                <Input
-                  placeholder="请输入用户名"
-                  disabled={!!editingUser}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="姓名"
-                field="realName"
-                rules={[{ required: true, message: '请输入姓名' }]}
-              >
-                <Input placeholder="请输入姓名" />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item
+            label="用户名"
+            field="username"
+            rules={[
+              { required: true, message: '请输入用户名' },
+              { minLength: 2, message: '用户名长度不能少于2位' },
+            ]}
+          >
+            <Input
+              placeholder="请输入用户名"
+              disabled={!!editingUser}
+            />
+          </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="邮箱"
-                field="email"
-                rules={[
-                  { required: true, message: '请输入邮箱' },
-                  { type: 'email', message: '请输入有效的邮箱地址' },
-                ]}
-              >
-                <Input placeholder="请输入邮箱" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label={editingUser ? '密码（留空不修改）' : '密码'}
-                field="password"
-                rules={editingUser ? [{ minLength: 6, message: '密码长度不能少于6位' }] : [
-                  { required: true, message: '请输入密码' },
-                  { minLength: 6, message: '密码长度不能少于6位' },
-                ]}
-              >
-                <Input.Password placeholder="请输入密码" />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item
+            label="姓名"
+            field="realName"
+            rules={[{ required: true, message: '请输入姓名' }]}
+          >
+            <Input placeholder="请输入姓名" />
+          </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="手机号"
-                field="phone"
-                rules={[
-                  {
-                    validator: (value, callback) => {
-                      if (value && !/^1[3-9]\d{9}$/.test(value)) {
-                        callback('请输入有效的手机号码');
-                      } else {
-                        callback();
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input placeholder="请输入手机号" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="企微UserID"
-                field="wecomUserId"
-                extra="关联企微账号，用于扫码登录"
-              >
-                <Input placeholder="选填" allowClear />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item
+            label="邮箱"
+            field="email"
+            rules={[
+              { required: true, message: '请输入邮箱' },
+              { type: 'email', message: '请输入有效的邮箱地址' },
+            ]}
+          >
+            <Input placeholder="请输入邮箱" />
+          </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={16}>
-              <Form.Item
-                label="角色"
-                field="roleIds"
-                rules={[{ required: true, message: '请选择至少一个角色' }]}
-              >
-                <Select
-                  placeholder="请选择角色"
-                  mode="multiple"
-                  allowClear
-                >
-                  {roles.map((role) => (
-                    <Select.Option key={role.id} value={role.name}>
-                      {role.name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="状态"
-                field="status"
-                rules={[{ required: true, message: '请选择状态' }]}
-              >
-                <Select placeholder="请选择状态">
-                  {Object.entries(USER_STATUS_MAP).map(([key, value]) => (
-                    <Select.Option key={key} value={key}>
-                      <Tag color={value.color}>{value.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item
+            label={editingUser ? '密码（留空表示不修改）' : '密码'}
+            field="password"
+            rules={editingUser ? [{ minLength: 6, message: '密码长度不能少于6位' }] : [
+              { required: true, message: '请输入密码' },
+              { minLength: 6, message: '密码长度不能少于6位' },
+            ]}
+          >
+            <Input.Password placeholder="请输入密码" />
+          </Form.Item>
+
+          <Form.Item
+            label="手机号"
+            field="phone"
+            rules={[
+              {
+                validator: (value, callback) => {
+                  if (value && !/^1[3-9]\d{9}$/.test(value)) {
+                    callback('请输入有效的手机号码');
+                  } else {
+                    callback();
+                  }
+                },
+              },
+            ]}
+          >
+            <Input placeholder="请输入手机号" />
+          </Form.Item>
+
+          <Form.Item
+            label="企微UserID"
+            field="wecomUserId"
+            extra="关联企业微信账号，用于企微扫码登录"
+          >
+            <Input placeholder="请输入企微UserID（选填）" allowClear />
+          </Form.Item>
+
+          <Form.Item
+            label="角色"
+            field="roleIds"
+            rules={[{ required: true, message: '请选择至少一个角色' }]}
+          >
+            <Select
+              placeholder="请选择角色"
+              mode="multiple"
+              allowClear
+            >
+              {roles.map((role) => (
+                <Select.Option key={role.id} value={role.name}>
+                  {role.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="状态"
+            field="status"
+            rules={[{ required: true, message: '请选择状态' }]}
+          >
+            <Select placeholder="请选择状态">
+              {Object.entries(USER_STATUS_MAP).map(([key, value]) => (
+                <Select.Option key={key} value={key}>
+                  <Tag color={value.color}>{value.label}</Tag>
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
         </Form>
       </Drawer>
 

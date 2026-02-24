@@ -83,9 +83,8 @@ const ProjectList: React.FC = () => {
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
-  const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') ?? 'IN_PROGRESS');
+  const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') || '');
   const [selectedProductLine, setSelectedProductLine] = useState<string>(searchParams.get('productLine') || '');
-  const [selectedPhase, setSelectedPhase] = useState<string>(searchParams.get('phase') || '');
 
   // 分页状态 — 从 URL 初始化
   const [pagination, setPagination] = useState({
@@ -102,21 +101,19 @@ const ProjectList: React.FC = () => {
     if (searchKeyword) params.set('keyword', searchKeyword);
     if (selectedStatus) params.set('status', selectedStatus);
     if (selectedProductLine) params.set('productLine', selectedProductLine);
-    if (selectedPhase) params.set('phase', selectedPhase);
     setSearchParams(params, { replace: true });
-  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLine, selectedPhase, setSearchParams]);
+  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLine, setSearchParams]);
 
   // 加载项目列表
   const loadProjects = async (page = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true);
     try {
-      const params: { status?: string; productLine?: string; keyword?: string; phase?: string; page?: number; pageSize?: number } = {
+      const params: { status?: string; productLine?: string; keyword?: string; page?: number; pageSize?: number } = {
         page,
         pageSize,
       };
       if (selectedStatus) params.status = selectedStatus;
       if (selectedProductLine) params.productLine = selectedProductLine;
-      if (selectedPhase) params.phase = selectedPhase;
       if (searchKeyword) params.keyword = searchKeyword;
 
       const response = await projectsApi.list(params);
@@ -144,7 +141,7 @@ const ProjectList: React.FC = () => {
   useEffect(() => {
     loadProjects(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, selectedProductLine, selectedPhase, searchKeyword]);
+  }, [selectedStatus, selectedProductLine, searchKeyword]);
 
   useEffect(() => {
     loadUsers();
@@ -214,8 +211,8 @@ const ProjectList: React.FC = () => {
         productLine: values.productLine,
         status: values.status,
         priority: values.priority,
-        startDate: dayjs(values.dateRange[0]).format('YYYY-MM-DD'),
-        endDate: values.dateRange[1] ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
+        startDate: values.dateRange[0].format('YYYY-MM-DD'),
+        endDate: values.dateRange[1] ? values.dateRange[1].format('YYYY-MM-DD') : undefined,
         managerId: values.managerId,
       };
       const memberIds: string[] = values.memberIds || [];
@@ -264,29 +261,14 @@ const ProjectList: React.FC = () => {
       dataIndex: 'name',
       width: 250,
       sorter: (a: Project, b: Project) => a.name.localeCompare(b.name),
-      render: (name: string, record: Project) => {
-        const PROGRESS_ICON: Record<string, string> = { ON_TRACK: '✓', MINOR_ISSUE: '⚠️', MAJOR_ISSUE: '✕' };
-        const PROGRESS_COLOR: Record<string, string> = { ON_TRACK: '#00b42a', MINOR_ISSUE: '#ff7d00', MAJOR_ISSUE: '#f53f3f' };
-        const PROGRESS_TOOLTIP: Record<string, string> = { ON_TRACK: '顺利进行', MINOR_ISSUE: '轻度阻碍', MAJOR_ISSUE: '严重阻碍' };
-        const ps = record.latestProgressStatus;
-        return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            {ps && PROGRESS_ICON[ps] && (
-              <Tooltip content={PROGRESS_TOOLTIP[ps]}>
-                <span style={{ color: PROGRESS_COLOR[ps], fontWeight: 700, fontSize: 14, cursor: 'default', flexShrink: 0 }}>
-                  {PROGRESS_ICON[ps]}
-                </span>
-              </Tooltip>
-            )}
-            <a
-              onClick={() => navigate(`/projects/${record.id}`)}
-              style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
-            >
-              {name}
-            </a>
-          </span>
-        );
-      },
+      render: (name: string, record: Project) => (
+        <a
+          onClick={() => navigate(`/projects/${record.id}`)}
+          style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
+        >
+          {name}
+        </a>
+      ),
     },
     {
       title: '产品线',
@@ -315,16 +297,6 @@ const ProjectList: React.FC = () => {
       render: (priority: string) => {
         const config = PRIORITY_MAP[priority as keyof typeof PRIORITY_MAP] ?? { label: priority, color: 'default' };
         return <Tag color={config.color}>{config.label}</Tag>;
-      },
-    },
-    {
-      title: '阶段',
-      dataIndex: 'currentPhase',
-      width: 80,
-      render: (phase: string | null) => {
-        if (!phase) return <span style={{ color: '#c2c7d0' }}>-</span>;
-        const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
-        return <Tag color={PHASE_COLOR[phase] || 'default'}>{phase}</Tag>;
       },
     },
     {
@@ -447,7 +419,7 @@ const ProjectList: React.FC = () => {
               />
               <Select
                 style={{ width: 140 }}
-                placeholder="产品线"
+                placeholder="产品线筛选"
                 allowClear
                 value={selectedProductLine || undefined}
                 onChange={(value) => setSelectedProductLine(value || '')}
@@ -456,17 +428,6 @@ const ProjectList: React.FC = () => {
                   <Select.Option key={key} value={key}>
                     {value.label}
                   </Select.Option>
-                ))}
-              </Select>
-              <Select
-                style={{ width: 110 }}
-                placeholder="阶段"
-                allowClear
-                value={selectedPhase || undefined}
-                onChange={(value) => setSelectedPhase(value || '')}
-              >
-                {['EVT', 'DVT', 'PVT', 'MP'].map((p) => (
-                  <Select.Option key={p} value={p}>{p}</Select.Option>
                 ))}
               </Select>
               {hasPermission('project', 'create') && (
@@ -487,7 +448,6 @@ const ProjectList: React.FC = () => {
             data={projects}
             loading={loading}
             rowKey="id"
-            noDataElement={loading ? <div style={{ height: 300 }} /> : undefined}
             pagination={{
               ...pagination,
               showTotal: true,
@@ -521,7 +481,7 @@ const ProjectList: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{
-              status: 'IN_PROGRESS',
+              status: 'PLANNING',
               priority: 'MEDIUM',
               productLine: 'DANDELION',
             }}

@@ -3,8 +3,6 @@ import { PrismaClient, ProjectStatus } from '@prisma/client';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, canDeleteProject, sanitizePagination } from '../middleware/permission';
 import { VALID_PROJECT_STATUSES, VALID_PRIORITIES, isValidProjectStatus, isValidPriority, isValidDateRange, isValidProgress } from '../utils/validation';
-import { auditLog, diffFields } from '../utils/auditLog';
-import { getCurrentPhase } from '../utils/projectPhase';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -21,7 +19,6 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       status,
       keyword,
       productLine,
-      phase,
     } = req.query;
 
     const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
@@ -78,97 +75,57 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.ON_HOLD } }),
     ]);
 
-    // When phase filter is active, we need to fetch all matching projects first,
-    // compute currentPhase, filter, then paginate manually.
-    const needsPhaseFilter = !!phase;
-
-    const projectInclude = {
-      manager: {
-        select: {
-          id: true,
-          realName: true,
-          username: true,
+    // 获取项目列表
+    const [projects, total] = await Promise.all([
+      prisma.project.findMany({
+        where,
+        skip,
+        take: pageSizeNum,
+        orderBy: {
+          startDate: 'asc', // 按开始时间升序（从远到近）
         },
-      },
-      members: {
         include: {
-          user: {
+          manager: {
             select: {
               id: true,
               realName: true,
               username: true,
             },
           },
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  realName: true,
+                  username: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              activities: true,
+              products: true,
+            },
+          },
         },
+      }),
+      prisma.project.count({ where }),
+    ]);
+
+    res.json({
+      data: projects,
+      total,
+      page: pageNum,
+      pageSize: pageSizeNum,
+      stats: {
+        all,
+        inProgress,
+        completed,
+        onHold,
       },
-      weeklyReports: {
-        select: { progressStatus: true },
-        orderBy: { weekEnd: 'desc' as const },
-        take: 1,
-      },
-      activities: {
-        where: { phase: { not: null } },
-        select: { phase: true, status: true },
-      },
-      _count: {
-        select: {
-          activities: true,
-          products: true,
-        },
-      },
-    };
-
-    if (needsPhaseFilter) {
-      // Fetch all projects (no pagination) to compute and filter by currentPhase
-      const allProjects = await prisma.project.findMany({
-        where,
-        orderBy: { startDate: 'asc' },
-        include: projectInclude,
-      });
-
-      const allWithPhase = allProjects.map(({ weeklyReports, activities, ...rest }) => ({
-        ...rest,
-        latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
-        currentPhase: getCurrentPhase(activities),
-      }));
-
-      const filtered = allWithPhase.filter((p) => p.currentPhase === phase);
-      const total = filtered.length;
-      const data = filtered.slice(skip, skip + pageSizeNum);
-
-      res.json({
-        data,
-        total,
-        page: pageNum,
-        pageSize: pageSizeNum,
-        stats: { all, inProgress, completed, onHold },
-      });
-    } else {
-      const [projects, total] = await Promise.all([
-        prisma.project.findMany({
-          where,
-          skip,
-          take: pageSizeNum,
-          orderBy: { startDate: 'asc' },
-          include: projectInclude,
-        }),
-        prisma.project.count({ where }),
-      ]);
-
-      const data = projects.map(({ weeklyReports, activities, ...rest }) => ({
-        ...rest,
-        latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
-        currentPhase: getCurrentPhase(activities),
-      }));
-
-      res.json({
-        data,
-        total,
-        page: pageNum,
-        pageSize: pageSizeNum,
-        stats: { all, inProgress, completed, onHold },
-      });
-    }
+    });
   } catch (error) {
     console.error('获取项目列表错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
@@ -310,8 +267,6 @@ router.post(
         },
       });
 
-      auditLog({ req, action: 'CREATE', resourceType: 'project', resourceId: project.id, resourceName: project.name });
-
       res.status(201).json(project);
     } catch (error) {
       console.error('创建项目错误:', error);
@@ -408,12 +363,6 @@ router.put(
       if (managerId !== undefined) updateData.managerId = managerId;
       if (progress !== undefined) updateData.progress = progress;
 
-      const changes = diffFields(
-        existingProject as unknown as Record<string, unknown>,
-        updateData,
-        ['name', 'status', 'priority', 'managerId', 'startDate', 'endDate', 'productLine'],
-      );
-
       const project = await prisma.project.update({
         where: { id },
         data: updateData,
@@ -433,8 +382,6 @@ router.put(
           },
         },
       });
-
-      auditLog({ req, action: 'UPDATE', resourceType: 'project', resourceId: id, resourceName: existingProject.name, changes });
 
       res.json(project);
     } catch (error) {
@@ -477,8 +424,6 @@ router.delete(
       await prisma.project.delete({
         where: { id },
       });
-
-      auditLog({ req, action: 'DELETE', resourceType: 'project', resourceId: id, resourceName: existingProject.name });
 
       res.json({ success: true });
     } catch (error) {
@@ -525,6 +470,7 @@ router.get('/:id/members', authenticate, async (req: Request, res: Response): Pr
 router.post(
   '/:id/members',
   authenticate,
+  requirePermission('project', 'update'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
@@ -608,6 +554,7 @@ router.post(
 router.delete(
   '/:id/members/:userId',
   authenticate,
+  requirePermission('project', 'update'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id, userId } = req.params;

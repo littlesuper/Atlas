@@ -39,6 +39,7 @@ export interface Permission {
 // ============ 项目相关类型 ============
 
 export enum ProjectStatus {
+  PLANNING = 'PLANNING',
   IN_PROGRESS = 'IN_PROGRESS',
   ON_HOLD = 'ON_HOLD',
   COMPLETED = 'COMPLETED',
@@ -70,8 +71,6 @@ export interface Project {
   members?: ProjectMember[];
   createdAt: string;
   updatedAt: string;
-  latestProgressStatus?: string | null;
-  currentPhase?: string | null;
   activities?: Activity[];
   products?: Product[];
   _count?: { activities: number; products: number };
