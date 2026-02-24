@@ -280,23 +280,6 @@ export interface WecomConfig {
   updatedAt?: string;
 }
 
-// ============ 活动归档相关类型 ============
-
-export interface ActivityArchiveSummary {
-  id: string;
-  projectId: string;
-  version: number;
-  label?: string;
-  activityCount: number;
-  createdBy: string;
-  createdByName: string;
-  createdAt: string;
-}
-
-export interface ActivityArchive extends ActivityArchiveSummary {
-  snapshot: Activity[];
-}
-
 // ============ 审计日志相关类型 ============
 
 export interface AuditLog {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -26,18 +26,15 @@ import {
   IconEdit,
   IconDelete,
   IconDragDotVertical,
-  IconSave,
-  IconHistory,
-  IconEye,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, activitiesApi, activityArchivesApi, usersApi } from '../../../api';
+import { projectsApi, activitiesApi, usersApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
 import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
 import GanttChart from './GanttChart';
 import RiskAssessmentTab from './RiskAssessmentTab';
 import ProductsTab from './ProductsTab';
-import { Project, Activity, User, ActivityArchiveSummary, ActivityArchive } from '../../../types';
+import { Project, Activity, User } from '../../../types';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
@@ -112,12 +109,6 @@ const ProjectDetail: React.FC = () => {
   const [membersModalVisible, setMembersModalVisible] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
 
-  // 归档相关状态
-  const [archives, setArchives] = useState<ActivityArchiveSummary[]>([]);
-  const [archiving, setArchiving] = useState(false);
-  const [archiveDrawerVisible, setArchiveDrawerVisible] = useState(false);
-  const [viewingArchive, setViewingArchive] = useState<ActivityArchive | null>(null);
-
   // 双击内联编辑
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [inlineValue, setInlineValue] = useState<string>('');
@@ -166,61 +157,6 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  const loadArchives = async () => {
-    if (!id) return;
-    try {
-      const res = await activityArchivesApi.list(id);
-      setArchives(res.data || []);
-    } catch {
-      // silent
-    }
-  };
-
-  const handleCreateArchive = () => {
-    Modal.confirm({
-      title: '确认归档',
-      content: `将对当前全部 ${activities.length} 个活动创建只读快照，是否继续？`,
-      onOk: async () => {
-        if (!id) return;
-        setArchiving(true);
-        try {
-          await activityArchivesApi.create(id);
-          Message.success('归档创建成功');
-          loadArchives();
-        } catch {
-          Message.error('归档创建失败');
-        } finally {
-          setArchiving(false);
-        }
-      },
-    });
-  };
-
-  const handleDeleteArchive = (archive: ActivityArchiveSummary) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除归档 v${archive.version}${archive.label ? ' - ' + archive.label : ''} 吗？此操作不可恢复。`,
-      onOk: async () => {
-        try {
-          await activityArchivesApi.delete(archive.id);
-          Message.success('归档已删除');
-          loadArchives();
-        } catch {
-          Message.error('删除失败');
-        }
-      },
-    });
-  };
-
-  const handleViewArchive = async (archive: ActivityArchiveSummary) => {
-    try {
-      const res = await activityArchivesApi.get(archive.id);
-      setViewingArchive(res.data);
-    } catch {
-      Message.error('加载归档详情失败');
-    }
-  };
-
   const handleAddMember = async (userId: string) => {
     if (!id) return;
     setMembersLoading(true);
@@ -254,7 +190,6 @@ const ProjectDetail: React.FC = () => {
     loadProject();
     loadActivities();
     loadUsers();
-    loadArchives();
   }, [id]);
 
   // ===== 活动列表表头吸顶：滚动检测 =====
@@ -572,26 +507,6 @@ const ProjectDetail: React.FC = () => {
   const getSeq = (activity: Activity): string => {
     return formatSeq(activitySeqMap.get(activity.id) || 0);
   };
-
-  // 里程碑数据：过滤 type === 'MILESTONE'
-  const milestones = useMemo(
-    () => activities.filter((a) => a.type === 'MILESTONE'),
-    [activities],
-  );
-
-  // 里程碑时间轴：计算日期范围
-  const msTimelineRange = useMemo((): [dayjs.Dayjs, dayjs.Dayjs] => {
-    const dates: dayjs.Dayjs[] = [dayjs()];
-    milestones.forEach((m) => {
-      if (m.planStartDate) dates.push(dayjs(m.planStartDate));
-      if (m.planEndDate) dates.push(dayjs(m.planEndDate));
-      if (m.startDate) dates.push(dayjs(m.startDate));
-      if (m.endDate) dates.push(dayjs(m.endDate));
-    });
-    const min = dates.reduce((a, b) => (a.isBefore(b) ? a : b));
-    const max = dates.reduce((a, b) => (a.isAfter(b) ? a : b));
-    return [min.subtract(7, 'day').startOf('month'), max.add(14, 'day').endOf('month')];
-  }, [milestones]);
 
   // 获取前置任务序号显示 — MS Project 格式: {seq}{type}±{lag}
   const getPredecessorSeq = (activity: Activity): string => {
@@ -950,25 +865,12 @@ const ProjectDetail: React.FC = () => {
             {/* 活动列表 */}
             <Tabs.TabPane key="activities" title="活动列表">
               <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Space>
-                  <Button
-                    icon={<IconHistory />}
-                    onClick={() => { setViewingArchive(null); setArchiveDrawerVisible(true); }}
-                  >
-                    归档记录{archives.length > 0 ? `(${archives.length})` : ''}
-                  </Button>
-                  <span style={{ fontSize: 12, color: '#86909c' }}>
-                    {saving ? '保存排序中...' : ''}
-                  </span>
-                </Space>
-                <Space>
-                  {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                    <>
-                      <Button icon={<IconSave />} loading={archiving} onClick={handleCreateArchive}>归档</Button>
-                      <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
-                    </>
-                  )}
-                </Space>
+                <span style={{ fontSize: 12, color: '#86909c' }}>
+                  {saving ? '保存排序中...' : ''}
+                </span>
+                {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                  <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
+                )}
               </div>
 
               <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
@@ -1008,181 +910,6 @@ const ProjectDetail: React.FC = () => {
                   }}
                 />
               </div>{/* tableWrapRef */}
-            </Tabs.TabPane>
-
-            {/* 里程碑时间轴 */}
-            <Tabs.TabPane key="milestones" title="里程碑">
-              {milestones.length > 0 ? (() => {
-                const MS_LABEL_W = 280;
-                const MS_DAY_W = 6;
-                const MS_ROW_H = 52;
-                const MS_HEADER_H = 32;
-                const [msStart, msEnd] = msTimelineRange;
-                const msTotalDays = msEnd.diff(msStart, 'day') + 1;
-                const msTotalW = msTotalDays * MS_DAY_W;
-                const msToday = dayjs();
-                const msTodayX = msToday.diff(msStart, 'day') * MS_DAY_W;
-
-                // 月份分组
-                const msMonths: Array<{ label: string; days: number }> = [];
-                let cur = msStart.startOf('month');
-                while (cur.isBefore(msEnd) || cur.isSame(msEnd, 'month')) {
-                  const mEnd = cur.endOf('month');
-                  const cStart = cur.isBefore(msStart) ? msStart : cur;
-                  const cEnd = mEnd.isAfter(msEnd) ? msEnd : mEnd;
-                  msMonths.push({ label: cur.format('YYYY年M月'), days: cEnd.diff(cStart, 'day') + 1 });
-                  cur = cur.add(1, 'month').startOf('month');
-                }
-
-                const getMsX = (dateStr: string | null | undefined) =>
-                  dateStr ? dayjs(dateStr).diff(msStart, 'day') * MS_DAY_W : null;
-
-                return (
-                  <div>
-                    {/* 图例 */}
-                    <div style={{ display: 'flex', gap: 16, padding: '8px 0 12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {[
-                        { node: <div style={{ width: 12, height: 12, border: '2px dashed #86909c', transform: 'rotate(45deg)', borderRadius: 1 }} />, label: '计划日期' },
-                        { node: <div style={{ width: 12, height: 12, background: '#ff7d00', transform: 'rotate(45deg)', borderRadius: 1 }} />, label: '实际日期' },
-                        { node: <div style={{ width: 2, height: 14, background: '#f53f3f' }} />, label: '今天' },
-                      ].map((item, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#86909c' }}>
-                          {item.node}<span>{item.label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 图表 */}
-                    <div style={{ display: 'flex', border: '1px solid #e4e6ef', borderRadius: 6, overflow: 'hidden' }}>
-                      {/* 左侧标签列 */}
-                      <div style={{ width: MS_LABEL_W, minWidth: MS_LABEL_W, flexShrink: 0, borderRight: '1px solid #e4e6ef', background: '#fff' }}>
-                        {/* 标签列表头 */}
-                        <div style={{ height: MS_HEADER_H, display: 'flex', alignItems: 'center', paddingLeft: 12, fontWeight: 600, fontSize: 13, borderBottom: '1px solid #e4e6ef', background: '#fafafa' }}>
-                          里程碑
-                        </div>
-                        {milestones.map((m, idx) => {
-                          const statusCfg = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: m.status, color: 'default' };
-                          return (
-                            <div
-                              key={m.id}
-                              style={{
-                                height: MS_ROW_H,
-                                display: 'flex', alignItems: 'center', gap: 8,
-                                paddingLeft: 12, paddingRight: 8,
-                                borderBottom: idx < milestones.length - 1 ? '1px solid #f2f3f5' : 'none',
-                                background: idx % 2 === 0 ? '#fff' : '#fafafa',
-                              }}
-                            >
-                              {m.phase && <Tag color={PHASE_COLOR[m.phase] || 'default'} style={{ flexShrink: 0 }}>{m.phase}</Tag>}
-                              <a
-                                style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#165dff', cursor: 'pointer', fontSize: 13 }}
-                                onClick={() => handleOpenDrawer(m)}
-                              >
-                                {m.name}
-                              </a>
-                              <Tag color={statusCfg.color} style={{ flexShrink: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
-                                {statusCfg.label}
-                              </Tag>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* 右侧时间轴（横向可滚动） */}
-                      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'visible' }}>
-                        <div style={{ width: msTotalW, minWidth: '100%', position: 'relative' }}>
-                          {/* 月份表头 */}
-                          <div style={{ display: 'flex', height: MS_HEADER_H, borderBottom: '1px solid #e4e6ef', background: '#fafafa' }}>
-                            {msMonths.map((g, i) => (
-                              <div key={i} style={{ width: g.days * MS_DAY_W, minWidth: g.days * MS_DAY_W, flexShrink: 0, borderRight: '1px solid #e4e6ef', paddingLeft: 6, fontSize: 12, color: '#4e5969', display: 'flex', alignItems: 'center' }}>
-                                {g.label}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* 今天竖线 */}
-                          {msTodayX >= 0 && msTodayX <= msTotalW && (
-                            <div style={{ position: 'absolute', left: msTodayX, top: MS_HEADER_H, bottom: 0, width: 2, background: '#f53f3f', zIndex: 5, opacity: 0.7 }} />
-                          )}
-
-                          {/* 里程碑行 */}
-                          {milestones.map((m, idx) => {
-                            const planX = getMsX(m.planEndDate) ?? getMsX(m.planStartDate);
-                            const actualX = getMsX(m.endDate) ?? getMsX(m.startDate);
-                            const isOverdue = m.planEndDate && !m.endDate && dayjs(m.planEndDate).isBefore(dayjs(), 'day') && m.status !== 'COMPLETED';
-                            const actualColor = m.status === 'COMPLETED' ? '#00b42a' : isOverdue ? '#f53f3f' : '#ff7d00';
-
-                            return (
-                              <Tooltip
-                                key={m.id}
-                                content={
-                                  <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-                                    <div><strong>{m.name}</strong></div>
-                                    {m.assignee && <div>负责人：{m.assignee.realName}</div>}
-                                    {m.planEndDate && <div>计划：{dayjs(m.planEndDate).format('YYYY-MM-DD')}</div>}
-                                    {(m.endDate || m.startDate) && <div>实际：{dayjs(m.endDate || m.startDate).format('YYYY-MM-DD')}</div>}
-                                    {m.notes && <div>备注：{m.notes}</div>}
-                                  </div>
-                                }
-                                position="top"
-                              >
-                                <div style={{
-                                  height: MS_ROW_H, position: 'relative',
-                                  borderBottom: idx < milestones.length - 1 ? '1px solid #f2f3f5' : 'none',
-                                  background: idx % 2 === 0 ? '#fff' : '#fafafa',
-                                }}>
-                                  {/* 计划日期与实际日期之间的连线 */}
-                                  {planX !== null && actualX !== null && planX !== actualX && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      left: Math.min(planX, actualX),
-                                      top: MS_ROW_H / 2,
-                                      width: Math.abs(actualX - planX),
-                                      height: 2,
-                                      background: isOverdue ? '#fdcdc5' : '#ffe4ba',
-                                    }} />
-                                  )}
-
-                                  {/* 计划日期菱形（空心） */}
-                                  {planX !== null && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      left: planX - 7,
-                                      top: MS_ROW_H / 2 - 7,
-                                      width: 12, height: 12,
-                                      border: '2px dashed #86909c',
-                                      transform: 'rotate(45deg)',
-                                      borderRadius: 1,
-                                      background: '#fff',
-                                      zIndex: 2,
-                                    }} />
-                                  )}
-
-                                  {/* 实际日期菱形（实心） */}
-                                  {actualX !== null && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      left: actualX - 7,
-                                      top: MS_ROW_H / 2 - 7,
-                                      width: 12, height: 12,
-                                      background: actualColor,
-                                      transform: 'rotate(45deg)',
-                                      borderRadius: 1,
-                                      zIndex: 3,
-                                    }} />
-                                  )}
-                                </div>
-                              </Tooltip>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })() : (
-                <Empty description="暂无里程碑" style={{ padding: '48px 0' }} />
-              )}
             </Tabs.TabPane>
 
             {/* 甘特图 */}
@@ -1455,121 +1182,6 @@ const ProjectDetail: React.FC = () => {
               <Input.TextArea placeholder="请输入备注" rows={3} maxLength={500} showWordLimit />
             </Form.Item>
           </Form>
-        </Drawer>
-
-        {/* 归档记录 Drawer */}
-        <Drawer
-          width={900}
-          title={viewingArchive ? `归档快照 v${viewingArchive.version}${viewingArchive.label ? ' - ' + viewingArchive.label : ''}` : '归档记录'}
-          visible={archiveDrawerVisible}
-          onCancel={() => { setArchiveDrawerVisible(false); setViewingArchive(null); }}
-          footer={null}
-        >
-          {viewingArchive ? (
-            <div>
-              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Button icon={<IconLeft />} size="small" onClick={() => setViewingArchive(null)}>返回列表</Button>
-                <span style={{ color: '#86909c', fontSize: 13 }}>
-                  {viewingArchive.createdByName} 于 {dayjs(viewingArchive.createdAt).format('YYYY-MM-DD HH:mm')} 创建 · {viewingArchive.activityCount} 个活动
-                </span>
-              </div>
-              <Table
-                columns={[
-                  {
-                    title: 'ID',
-                    width: 60,
-                    render: (_: unknown, __: unknown, index: number) => (
-                      <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{formatSeq(index + 1)}</span>
-                    ),
-                  },
-                  {
-                    title: '阶段',
-                    width: 70,
-                    render: (_: unknown, record: Activity) =>
-                      record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: '#c2c7d0' }}>-</span>,
-                  },
-                  {
-                    title: '活动名称',
-                    dataIndex: 'name',
-                    width: 200,
-                    render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span>,
-                  },
-                  {
-                    title: '类型',
-                    width: 80,
-                    render: (_: unknown, record: Activity) => {
-                      const cfg = ACTIVITY_TYPE_MAP[record.type as keyof typeof ACTIVITY_TYPE_MAP] ?? { label: record.type, color: 'default' };
-                      return <Tag color={cfg.color}>{cfg.label}</Tag>;
-                    },
-                  },
-                  {
-                    title: '状态',
-                    width: 90,
-                    render: (_: unknown, record: Activity) => {
-                      const cfg = ACTIVITY_STATUS_MAP[record.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: record.status, color: 'default' };
-                      return <Tag color={cfg.color}>{cfg.label}</Tag>;
-                    },
-                  },
-                  {
-                    title: '负责人',
-                    width: 80,
-                    render: (_: unknown, record: Activity) => record.assignee?.realName || '-',
-                  },
-                  {
-                    title: '计划时间',
-                    width: 160,
-                    render: (_: unknown, record: Activity) => renderPlanDates(record),
-                  },
-                  {
-                    title: '实际时间',
-                    width: 160,
-                    render: (_: unknown, record: Activity) => renderActualDates(record),
-                  },
-                  {
-                    title: '备注',
-                    dataIndex: 'notes',
-                    render: (notes: string | null) => (
-                      <Tooltip content={notes || ''}>
-                        <span style={{ maxWidth: 100, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: notes ? undefined : '#c2c7d0' }}>
-                          {notes || '-'}
-                        </span>
-                      </Tooltip>
-                    ),
-                  },
-                ]}
-                data={viewingArchive.snapshot}
-                rowKey="id"
-                pagination={false}
-                scroll={{ x: 1000 }}
-              />
-            </div>
-          ) : (
-            <Table
-              columns={[
-                { title: '版本', dataIndex: 'version', width: 70, render: (v: number) => `v${v}` },
-                { title: '标签', dataIndex: 'label', width: 150, render: (v: string | null) => v || <span style={{ color: '#c2c7d0' }}>-</span> },
-                { title: '活动数', dataIndex: 'activityCount', width: 80 },
-                { title: '创建人', dataIndex: 'createdByName', width: 90 },
-                { title: '创建时间', dataIndex: 'createdAt', width: 160, render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm') },
-                {
-                  title: '操作',
-                  width: 120,
-                  render: (_: unknown, record: ActivityArchiveSummary) => (
-                    <Space>
-                      <Button type="text" icon={<IconEye />} size="small" onClick={() => handleViewArchive(record)}>查看</Button>
-                      {hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                        <Button type="text" status="danger" icon={<IconDelete />} size="small" onClick={() => handleDeleteArchive(record)} />
-                      )}
-                    </Space>
-                  ),
-                },
-              ]}
-              data={archives}
-              rowKey="id"
-              pagination={false}
-              noDataElement={<Empty description="暂无归档记录" />}
-            />
-          )}
         </Drawer>
 
         {/* 协作者管理 Modal */}
