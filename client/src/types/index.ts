@@ -70,6 +70,7 @@ export interface Project {
   members?: ProjectMember[];
   createdAt: string;
   updatedAt: string;
+  latestProgressStatus?: string | null;
   activities?: Activity[];
   products?: Product[];
   _count?: { activities: number; products: number };

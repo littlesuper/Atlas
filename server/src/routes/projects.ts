@@ -3,6 +3,7 @@ import { PrismaClient, ProjectStatus } from '@prisma/client';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, canDeleteProject, sanitizePagination } from '../middleware/permission';
 import { VALID_PROJECT_STATUSES, VALID_PRIORITIES, isValidProjectStatus, isValidPriority, isValidDateRange, isValidProgress } from '../utils/validation';
+import { auditLog, diffFields } from '../utils/auditLog';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -103,6 +104,11 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
               },
             },
           },
+          weeklyReports: {
+            select: { progressStatus: true },
+            orderBy: { weekEnd: 'desc' },
+            take: 1,
+          },
           _count: {
             select: {
               activities: true,
@@ -114,8 +120,14 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       prisma.project.count({ where }),
     ]);
 
+    // Flatten: attach latestProgressStatus to each project
+    const data = projects.map(({ weeklyReports, ...rest }) => ({
+      ...rest,
+      latestProgressStatus: weeklyReports[0]?.progressStatus ?? null,
+    }));
+
     res.json({
-      data: projects,
+      data,
       total,
       page: pageNum,
       pageSize: pageSizeNum,
@@ -267,6 +279,8 @@ router.post(
         },
       });
 
+      auditLog({ req, action: 'CREATE', resourceType: 'project', resourceId: project.id, resourceName: project.name });
+
       res.status(201).json(project);
     } catch (error) {
       console.error('创建项目错误:', error);
@@ -363,6 +377,12 @@ router.put(
       if (managerId !== undefined) updateData.managerId = managerId;
       if (progress !== undefined) updateData.progress = progress;
 
+      const changes = diffFields(
+        existingProject as unknown as Record<string, unknown>,
+        updateData,
+        ['name', 'status', 'priority', 'managerId', 'startDate', 'endDate', 'productLine'],
+      );
+
       const project = await prisma.project.update({
         where: { id },
         data: updateData,
@@ -382,6 +402,8 @@ router.put(
           },
         },
       });
+
+      auditLog({ req, action: 'UPDATE', resourceType: 'project', resourceId: id, resourceName: existingProject.name, changes });
 
       res.json(project);
     } catch (error) {
@@ -424,6 +446,8 @@ router.delete(
       await prisma.project.delete({
         where: { id },
       });
+
+      auditLog({ req, action: 'DELETE', resourceType: 'project', resourceId: id, resourceName: existingProject.name });
 
       res.json({ success: true });
     } catch (error) {
@@ -470,7 +494,6 @@ router.get('/:id/members', authenticate, async (req: Request, res: Response): Pr
 router.post(
   '/:id/members',
   authenticate,
-  requirePermission('project', 'update'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
@@ -554,7 +577,6 @@ router.post(
 router.delete(
   '/:id/members/:userId',
   authenticate,
-  requirePermission('project', 'update'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id, userId } = req.params;

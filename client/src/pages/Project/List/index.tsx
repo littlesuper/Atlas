@@ -30,6 +30,7 @@ import {
   STATUS_MAP,
   PRIORITY_MAP,
   PRODUCT_LINE_MAP,
+  PROGRESS_STATUS_MAP,
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
@@ -261,14 +262,35 @@ const ProjectList: React.FC = () => {
       dataIndex: 'name',
       width: 250,
       sorter: (a: Project, b: Project) => a.name.localeCompare(b.name),
-      render: (name: string, record: Project) => (
-        <a
-          onClick={() => navigate(`/projects/${record.id}`)}
-          style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
-        >
-          {name}
-        </a>
-      ),
+      render: (name: string, record: Project) => {
+        const ps = record.latestProgressStatus as keyof typeof PROGRESS_STATUS_MAP | null | undefined;
+        const statusConfig = ps ? PROGRESS_STATUS_MAP[ps] : null;
+        const colorMap: Record<string, string> = { green: '#00b42a', orange: '#ff7d00', red: '#f53f3f' };
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {statusConfig && (
+              <Tooltip content={`周报状态: ${statusConfig.label}`}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: colorMap[statusConfig.color] || statusConfig.color,
+                    display: 'inline-block',
+                    flexShrink: 0,
+                  }}
+                />
+              </Tooltip>
+            )}
+            <a
+              onClick={() => navigate(`/projects/${record.id}`)}
+              style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
+            >
+              {name}
+            </a>
+          </span>
+        );
+      },
     },
     {
       title: '产品线',
