@@ -1,9 +1,5 @@
 // ============ 项目状态映射 ============
 export const STATUS_MAP = {
-  PLANNING: {
-    label: '规划中',
-    color: 'blue',
-  },
   IN_PROGRESS: {
     label: '进行中',
     color: 'green',
@@ -211,6 +207,7 @@ export const PERMISSION_RESOURCE_MAP: Record<string, string> = {
   user: '用户',
   role: '角色',
   weekly_report: '项目周报',
+  system: '系统管理',
 };
 
 // ============ 权限操作映射 ============
@@ -220,6 +217,9 @@ export const PERMISSION_ACTION_MAP: Record<string, string> = {
   read: '查看',
   update: '编辑',
   delete: '删除',
+  ai: 'AI管理',
+  account: '账号管理',
+  audit_log: '操作日志',
 };
 
 // ============ 用户状态映射 ============
@@ -233,6 +233,24 @@ export const USER_STATUS_MAP = {
     color: 'red',
   },
 } as const;
+
+// ============ 审计操作映射 ============
+export const AUDIT_ACTION_MAP: Record<string, { label: string; color: string }> = {
+  LOGIN: { label: '登录', color: 'cyan' },
+  CREATE: { label: '创建', color: 'green' },
+  UPDATE: { label: '更新', color: 'blue' },
+  DELETE: { label: '删除', color: 'red' },
+};
+
+// ============ 审计资源类型映射 ============
+export const AUDIT_RESOURCE_MAP: Record<string, { label: string; color: string }> = {
+  auth: { label: '认证', color: 'cyan' },
+  project: { label: '项目', color: 'blue' },
+  activity: { label: '活动', color: 'green' },
+  product: { label: '产品', color: 'purple' },
+  user: { label: '用户', color: 'orange' },
+  role: { label: '角色', color: 'gold' },
+};
 
 // ============ 依赖类型映射 ============
 export const DEPENDENCY_TYPE_MAP = {

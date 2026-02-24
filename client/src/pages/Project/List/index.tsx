@@ -83,7 +83,7 @@ const ProjectList: React.FC = () => {
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
-  const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') || '');
+  const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') ?? 'IN_PROGRESS');
   const [selectedProductLine, setSelectedProductLine] = useState<string>(searchParams.get('productLine') || '');
 
   // 分页状态 — 从 URL 初始化
@@ -211,8 +211,8 @@ const ProjectList: React.FC = () => {
         productLine: values.productLine,
         status: values.status,
         priority: values.priority,
-        startDate: values.dateRange[0].format('YYYY-MM-DD'),
-        endDate: values.dateRange[1] ? values.dateRange[1].format('YYYY-MM-DD') : undefined,
+        startDate: dayjs(values.dateRange[0]).format('YYYY-MM-DD'),
+        endDate: values.dateRange[1] ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
         managerId: values.managerId,
       };
       const memberIds: string[] = values.memberIds || [];
@@ -448,6 +448,7 @@ const ProjectList: React.FC = () => {
             data={projects}
             loading={loading}
             rowKey="id"
+            noDataElement={loading ? <div style={{ height: 300 }} /> : undefined}
             pagination={{
               ...pagination,
               showTotal: true,
@@ -481,7 +482,7 @@ const ProjectList: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{
-              status: 'PLANNING',
+              status: 'IN_PROGRESS',
               priority: 'MEDIUM',
               productLine: 'DANDELION',
             }}
