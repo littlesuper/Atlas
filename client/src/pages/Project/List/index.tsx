@@ -378,28 +378,28 @@ const ProjectList: React.FC = () => {
           <StatCard
             title="全部项目"
             count={statistics.total}
-            color="#4f7cff"
+            color="var(--status-info)"
             selected={selectedStatus === ''}
             onClick={() => setSelectedStatus('')}
           />
           <StatCard
             title="进行中"
             count={statistics.inProgress}
-            color="#00b42a"
+            color="var(--status-success)"
             selected={selectedStatus === 'IN_PROGRESS'}
             onClick={() => setSelectedStatus('IN_PROGRESS')}
           />
           <StatCard
             title="已完成"
             count={statistics.completed}
-            color="#86909c"
+            color="var(--status-not-started)"
             selected={selectedStatus === 'COMPLETED'}
             onClick={() => setSelectedStatus('COMPLETED')}
           />
           <StatCard
             title="已暂停"
             count={statistics.onHold}
-            color="#ff7d00"
+            color="var(--status-warning)"
             selected={selectedStatus === 'ON_HOLD'}
             onClick={() => setSelectedStatus('ON_HOLD')}
           />

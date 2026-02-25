@@ -19,10 +19,10 @@ interface Props {
 }
 
 const RISK_LEVEL_CONFIG: Record<string, { color: string; bgVar: string }> = {
-  LOW:      { color: '#00b42a', bgVar: 'var(--risk-low-bg)' },
-  MEDIUM:   { color: '#ff7d00', bgVar: 'var(--risk-medium-bg)' },
-  HIGH:     { color: '#f53f3f', bgVar: 'var(--risk-high-bg)' },
-  CRITICAL: { color: '#cb2634', bgVar: 'var(--risk-high-bg)' },
+  LOW:      { color: 'var(--status-success)', bgVar: 'var(--risk-low-bg)' },
+  MEDIUM:   { color: 'var(--status-warning)', bgVar: 'var(--risk-medium-bg)' },
+  HIGH:     { color: 'var(--status-danger)', bgVar: 'var(--risk-high-bg)' },
+  CRITICAL: { color: 'var(--status-danger-dark)', bgVar: 'var(--risk-high-bg)' },
 };
 
 const SEVERITY_COLOR: Record<string, string> = {

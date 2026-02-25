@@ -27,10 +27,10 @@ function getStatusProgress(status: string): number {
 }
 
 const STATUS_BAR_COLOR: Record<string, string> = {
-  COMPLETED:  '#00b42a',
-  IN_PROGRESS: '#4f7cff',
-  NOT_STARTED: '#86909c',
-  CANCELLED:  '#4e5969',
+  COMPLETED:  'var(--gantt-completed)',
+  IN_PROGRESS: 'var(--status-in-progress)',
+  NOT_STARTED: 'var(--status-not-started)',
+  CANCELLED:  'var(--status-not-started)',
 };
 
 // ============ 日期工具 ============
@@ -110,15 +110,15 @@ const BAR_H_PLAN  = 5;
 const BAR_Y_ACT   = 15;
 const BAR_H_ACT   = 14;
 const LABEL_COL_W = 220;
-const TODAY_COLOR = '#f53f3f';
+const TODAY_COLOR = 'var(--gantt-today)';
 
 // 图例数据
 const LEGEND_ITEMS = [
-  { icon: <div style={{ width: 24, height: 4, border: '1px dashed #86909c' }} />, label: '计划条' },
-  { icon: <div style={{ width: 10, height: 10, background: '#4f7cff', borderRadius: 2 }} />, label: '进行中' },
-  { icon: <div style={{ width: 10, height: 10, background: '#00b42a', borderRadius: 2 }} />, label: '已完成' },
-  { icon: <div style={{ width: 10, height: 10, background: '#86909c', borderRadius: 2 }} />, label: '未开始' },
-  { icon: <div style={{ width: 10, height: 10, background: '#ff7d00', transform: 'rotate(45deg)' }} />, label: '里程碑' },
+  { icon: <div style={{ width: 24, height: 4, border: '1px dashed var(--gantt-dashed-border)' }} />, label: '计划条' },
+  { icon: <div style={{ width: 10, height: 10, background: 'var(--status-in-progress)', borderRadius: 2 }} />, label: '进行中' },
+  { icon: <div style={{ width: 10, height: 10, background: 'var(--gantt-completed)', borderRadius: 2 }} />, label: '已完成' },
+  { icon: <div style={{ width: 10, height: 10, background: 'var(--status-not-started)', borderRadius: 2 }} />, label: '未开始' },
+  { icon: <div style={{ width: 10, height: 10, background: 'var(--status-warning)', transform: 'rotate(45deg)' }} />, label: '里程碑' },
   { icon: <div style={{ width: 2, height: 12, background: TODAY_COLOR }} />, label: '今天', color: TODAY_COLOR },
 ];
 
@@ -450,7 +450,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
             {activities.map((a, idx) => {
               const planBar     = getBarProps(a, 'plan');
               const actualBar   = getBarProps(a, 'actual');
-              const color       = STATUS_BAR_COLOR[a.status] || '#86909c';
+              const color       = STATUS_BAR_COLOR[a.status] || 'var(--status-not-started)';
               const progress    = getStatusProgress(a.status);
               const isMilestone = a.type === 'MILESTONE';
 
@@ -488,7 +488,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                           position: 'absolute',
                           left: planBar.x, top: BAR_Y_PLAN,
                           width: planBar.w, height: BAR_H_PLAN,
-                          border: '1px dashed #c2c7d0',
+                          border: '1px dashed var(--gantt-dashed-border)',
                           background: 'transparent',
                           borderRadius: 2,
                         }}
@@ -524,7 +524,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                           left: actualBar.x + actualBar.w / 2 - 7,
                           top: BAR_Y_ACT - 2,
                           width: 14, height: 14,
-                          background: '#ff7d00',
+                          background: 'var(--status-warning)',
                           transform: 'rotate(45deg)',
                           borderRadius: 2,
                         }}

@@ -133,9 +133,9 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
               }}
             >
               {isImageUrl(att.url) ? (
-                <IconImage style={{ color: '#00b42a', flexShrink: 0 }} />
+                <IconImage style={{ color: 'var(--status-success)', flexShrink: 0 }} />
               ) : (
-                <IconFile style={{ color: '#4080ff', flexShrink: 0 }} />
+                <IconFile style={{ color: 'var(--status-info)', flexShrink: 0 }} />
               )}
               <span
                 onClick={() => handleClick(att)}
@@ -206,7 +206,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
       <div
         style={{
           marginTop: 8,
-          border: dragging ? '2px dashed #4080ff' : '2px dashed transparent',
+          border: dragging ? '2px dashed var(--status-info)' : '2px dashed transparent',
           borderRadius: 6,
           padding: dragging ? 10 : 0,
           background: dragging ? 'var(--color-primary-light-1)' : 'transparent',
@@ -219,7 +219,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
       >
         {/* 拖拽提示 */}
         {dragging && (
-          <div style={{ textAlign: 'center', color: '#4080ff', fontSize: 13, padding: '8px 0' }}>
+          <div style={{ textAlign: 'center', color: 'var(--status-info)', fontSize: 13, padding: '8px 0' }}>
             松开鼠标上传文件
           </div>
         )}
@@ -242,9 +242,9 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
                 }}
               >
                 {isImageUrl(att.url) ? (
-                  <IconImage style={{ color: '#00b42a', flexShrink: 0 }} />
+                  <IconImage style={{ color: 'var(--status-success)', flexShrink: 0 }} />
                 ) : (
-                  <IconFile style={{ color: '#4080ff', flexShrink: 0 }} />
+                  <IconFile style={{ color: 'var(--status-info)', flexShrink: 0 }} />
                 )}
                 <span
                   onClick={() => handleClick(att)}

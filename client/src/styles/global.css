@@ -29,6 +29,37 @@ body {
   --info-color: #165dff;
   --highlight-bg: #fff7e6;
   --gantt-label-bg: #fff;
+
+  /* 语义状态色 */
+  --status-success: #00b42a;
+  --status-warning: #ff7d00;
+  --status-danger: #f53f3f;
+  --status-danger-dark: #cb2634;
+  --status-info: #4f7cff;
+  --status-on-track: #00b42a;
+  --status-in-progress: #4080ff;
+  --status-not-started: #86909c;
+
+  /* 分隔线 / 浅背景 */
+  --divider-color: #f2f3f5;
+  --subtle-bg: #fafafa;
+  --ai-card-bg: #f9fffe;
+
+  /* 甘特图 */
+  --gantt-not-started: #c9cdd4;
+  --gantt-completed: #00b42a;
+  --gantt-today: #f53f3f;
+  --gantt-milestone-pending: #d9d9d9;
+  --gantt-milestone-in-progress: #1890ff;
+  --gantt-milestone-completed: #00b42a;
+  --gantt-milestone-overdue: #bfbfbf;
+  --gantt-grid-line: #e5e6eb;
+  --gantt-dashed-border: #86909c;
+
+  /* 时间线 */
+  --timeline-line: #e5e6eb;
+  --timeline-dot: #c9cdd4;
+  --timeline-dot-active: #b5b8bf;
 }
 
 /* ============ 页面内容区背景 ============ */
@@ -381,35 +412,66 @@ body[arco-theme='dark'] {
   --color-bg-5: #3c3d4e;
 
   /* 文字层级：降低最亮一级，拉开层次 */
-  --color-text-1: rgba(230, 233, 240, 0.9);
-  --color-text-2: rgba(200, 205, 215, 0.78);
-  --color-text-3: rgba(160, 165, 180, 0.65);
-  --color-text-4: rgba(130, 135, 150, 0.48);
+  --color-text-1: rgba(220, 224, 232, 0.85);
+  --color-text-2: rgba(185, 192, 205, 0.7);
+  --color-text-3: rgba(145, 152, 168, 0.55);
+  --color-text-4: rgba(115, 122, 140, 0.4);
 
-  /* 填充层级：与背景形成柔和梯度 */
-  --color-fill-1: #282938;
-  --color-fill-2: #2e2f40;
-  --color-fill-3: #363748;
-  --color-fill-4: #3e3f52;
+  /* 填充层级：使用透明叠加，与 Arco 保持一致 */
+  --color-fill-1: rgba(255, 255, 255, 0.04);
+  --color-fill-2: rgba(255, 255, 255, 0.08);
+  --color-fill-3: rgba(255, 255, 255, 0.12);
+  --color-fill-4: rgba(255, 255, 255, 0.16);
 
   /* 边框：低对比度，不扎眼 */
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-2: rgba(255, 255, 255, 0.06);
   --color-border-3: rgba(255, 255, 255, 0.04);
 
-  /* 主色调微调：降低亮度避免刺眼 */
-  --color-primary-light-1: rgba(79, 124, 255, 0.08);
+  /* 主色调微调 */
+  --color-primary-light-1: rgba(var(--primary-6), 0.15);
 
   /* 自定义变量 */
   --page-bg: #1a1b22;
-  --risk-low-bg: rgba(34, 195, 94, 0.1);
-  --risk-medium-bg: rgba(255, 152, 40, 0.1);
-  --risk-high-bg: rgba(240, 80, 80, 0.1);
-  --info-bg: rgba(79, 124, 255, 0.1);
-  --info-border: rgba(79, 124, 255, 0.2);
+  --risk-low-bg: rgba(34, 195, 94, 0.08);
+  --risk-medium-bg: rgba(255, 152, 40, 0.08);
+  --risk-high-bg: rgba(240, 80, 80, 0.08);
+  --info-bg: rgba(79, 124, 255, 0.08);
+  --info-border: rgba(79, 124, 255, 0.15);
   --info-color: #6b9aff;
-  --highlight-bg: rgba(255, 152, 40, 0.1);
+  --highlight-bg: rgba(255, 152, 40, 0.08);
   --gantt-label-bg: var(--color-bg-1);
+
+  /* 语义状态色：暗色模式降低饱和度、提升明度 */
+  --status-success: #63d98b;
+  --status-warning: #ffb357;
+  --status-danger: #ff8c8c;
+  --status-danger-dark: #ff7875;
+  --status-info: #7eaaff;
+  --status-on-track: #63d98b;
+  --status-in-progress: #7eaaff;
+  --status-not-started: #6b7280;
+
+  /* 分隔线 / 浅背景 */
+  --divider-color: rgba(255, 255, 255, 0.06);
+  --subtle-bg: rgba(255, 255, 255, 0.03);
+  --ai-card-bg: rgba(255, 255, 255, 0.04);
+
+  /* 甘特图 */
+  --gantt-not-started: #4b5563;
+  --gantt-completed: #63d98b;
+  --gantt-today: #ff8c8c;
+  --gantt-milestone-pending: #4b5563;
+  --gantt-milestone-in-progress: #7eaaff;
+  --gantt-milestone-completed: #63d98b;
+  --gantt-milestone-overdue: #6b7280;
+  --gantt-grid-line: rgba(255, 255, 255, 0.06);
+  --gantt-dashed-border: #6b7280;
+
+  /* 时间线 */
+  --timeline-line: rgba(255, 255, 255, 0.06);
+  --timeline-dot: #4b5563;
+  --timeline-dot-active: #6b7280;
 
   background-color: var(--page-bg);
 }

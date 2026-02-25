@@ -43,9 +43,9 @@ const PROGRESS_TOOLTIP: Record<string, string> = {
   MAJOR_ISSUE: '严重阻碍',
 };
 const PROGRESS_COLOR: Record<string, string> = {
-  ON_TRACK: '#00b42a',
-  MINOR_ISSUE: '#ff7d00',
-  MAJOR_ISSUE: '#f53f3f',
+  ON_TRACK: 'var(--status-success)',
+  MINOR_ISSUE: 'var(--status-warning)',
+  MAJOR_ISSUE: 'var(--status-danger)',
 };
 
 const WeeklyReportsSummary: React.FC = () => {
@@ -175,7 +175,7 @@ const WeeklyReportsSummary: React.FC = () => {
       sorter: (a: WeeklyReport, b: WeeklyReport) => a.progressStatus.localeCompare(b.progressStatus),
       render: (_: unknown, record: WeeklyReport) => {
         const icon = PROGRESS_ICON[record.progressStatus] || '?';
-        const color = PROGRESS_COLOR[record.progressStatus] || '#86909c';
+        const color = PROGRESS_COLOR[record.progressStatus] || 'var(--status-not-started)';
         const tip = PROGRESS_TOOLTIP[record.progressStatus] || record.progressStatus;
         return (
           <Tooltip content={tip}>
@@ -193,7 +193,7 @@ const WeeklyReportsSummary: React.FC = () => {
             <SafeHtml
               className="html-content"
               style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
-              html={record.keyProgress || '<span style="color:#c2c7d0">暂无</span>'}
+              html={record.keyProgress || '<span style="color:var(--color-text-4)">暂无</span>'}
             />
             {sectionAtts.length > 0 && (
               <AttachmentList attachments={sectionAtts} section="keyProgress" readOnly />
@@ -211,7 +211,7 @@ const WeeklyReportsSummary: React.FC = () => {
             <SafeHtml
               className="html-content"
               style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
-              html={record.nextWeekPlan || '<span style="color:#c2c7d0">暂无</span>'}
+              html={record.nextWeekPlan || '<span style="color:var(--color-text-4)">暂无</span>'}
             />
             {sectionAtts.length > 0 && (
               <AttachmentList attachments={sectionAtts} section="nextWeekPlan" readOnly />
@@ -230,7 +230,7 @@ const WeeklyReportsSummary: React.FC = () => {
             <SafeHtml
               className="html-content"
               style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13 }}
-              html={record.riskWarning || '<span style="color:#00b42a">无</span>'}
+              html={record.riskWarning || '<span style="color:var(--status-success)">无</span>'}
             />
             {sectionAtts.length > 0 && (
               <AttachmentList attachments={sectionAtts} section="riskWarning" readOnly />
@@ -279,7 +279,7 @@ const WeeklyReportsSummary: React.FC = () => {
 
             <Space>
               {/* 周次选择器 */}
-              <div style={{ background: '#fafafa', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ background: 'var(--subtle-bg)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Tooltip content="上一周">
                   <Button
                     type="text"

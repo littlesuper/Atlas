@@ -41,9 +41,9 @@ interface PhaseData {
 }
 
 const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: string; color: string }> = [
-  { value: 'ON_TRACK', label: '✓ 顺利进行', color: '#00b42a' },
-  { value: 'MINOR_ISSUE', label: '⚠️ 轻度阻碍', color: '#ff7d00' },
-  { value: 'MAJOR_ISSUE', label: '✕ 严重阻碍', color: '#f53f3f' },
+  { value: 'ON_TRACK', label: '✓ 顺利进行', color: 'var(--status-success)' },
+  { value: 'MINOR_ISSUE', label: '⚠️ 轻度阻碍', color: 'var(--status-warning)' },
+  { value: 'MAJOR_ISSUE', label: '✕ 严重阻碍', color: 'var(--status-danger)' },
 ];
 
 const WeeklyReportForm: React.FC = () => {
@@ -409,7 +409,7 @@ const WeeklyReportForm: React.FC = () => {
                   />
                 </div>
                 {aiSuggestions?.keyProgress && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', maxHeight: 300, overflowY: 'auto' }}>
+                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: 'var(--ai-card-bg)', maxHeight: 300, overflowY: 'auto' }}>
                     <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.keyProgress} />
                   </Card>
                 )}
@@ -447,7 +447,7 @@ const WeeklyReportForm: React.FC = () => {
                   />
                 </div>
                 {aiSuggestions?.nextWeekPlan && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', maxHeight: 300, overflowY: 'auto' }}>
+                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: 'var(--ai-card-bg)', maxHeight: 300, overflowY: 'auto' }}>
                     <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.nextWeekPlan} />
                   </Card>
                 )}
@@ -457,7 +457,7 @@ const WeeklyReportForm: React.FC = () => {
             {/* 风险预警 */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 500, color: '#f53f3f' }}>风险预警</span>
+                <span style={{ fontWeight: 500, color: 'var(--status-danger)' }}>风险预警</span>
                 {aiSuggestions?.riskWarning !== undefined && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
@@ -485,11 +485,11 @@ const WeeklyReportForm: React.FC = () => {
                   />
                 </div>
                 {aiSuggestions?.riskWarning !== undefined && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: '#f9fffe', maxHeight: 300, overflowY: 'auto' }}>
+                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: 'var(--ai-card-bg)', maxHeight: 300, overflowY: 'auto' }}>
                     {aiSuggestions.riskWarning ? (
                       <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.riskWarning} />
                     ) : (
-                      <span style={{ color: '#00b42a', fontSize: 13 }}>✓ 未发现明显风险</span>
+                      <span style={{ color: 'var(--status-success)', fontSize: 13 }}>✓ 未发现明显风险</span>
                     )}
                   </Card>
                 )}

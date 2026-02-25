@@ -132,8 +132,8 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
                 alignItems: 'center',
                 padding: '4px 0',
                 opacity: isDragSource ? 0.4 : 1,
-                borderTop: insertAbove ? '2px solid #165DFF' : '2px solid transparent',
-                borderBottom: insertBelow ? '2px solid #165DFF' : '2px solid transparent',
+                borderTop: insertAbove ? '2px solid var(--status-info)' : '2px solid transparent',
+                borderBottom: insertBelow ? '2px solid var(--status-info)' : '2px solid transparent',
                 userSelect: 'none',
               }}
             >

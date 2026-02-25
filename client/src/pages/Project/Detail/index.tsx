@@ -865,9 +865,9 @@ const ProjectDetail: React.FC = () => {
       ? calcWorkdays(startD, endD)
       : calcWorkdays(startD, dayjs());
     return (
-      <span style={{ color: isOverdue ? '#f53f3f' : undefined }}>
+      <span style={{ color: isOverdue ? 'var(--status-danger)' : undefined }}>
         {start} ~ {end}
-        <span style={{ color: isOverdue ? '#f53f3f' : 'var(--color-text-3)', fontSize: 12, marginLeft: 4 }}>({days}天)</span>
+        <span style={{ color: isOverdue ? 'var(--status-danger)' : 'var(--color-text-3)', fontSize: 12, marginLeft: 4 }}>({days}天)</span>
       </span>
     );
   };
@@ -1471,8 +1471,8 @@ const ProjectDetail: React.FC = () => {
                 }
 
                 const statusColor: Record<string, string> = {
-                  COMPLETED: '#52c41a', IN_PROGRESS: '#1890ff',
-                  NOT_STARTED: '#d9d9d9', CANCELLED: '#bfbfbf',
+                  COMPLETED: 'var(--gantt-milestone-completed)', IN_PROGRESS: 'var(--gantt-milestone-in-progress)',
+                  NOT_STARTED: 'var(--gantt-milestone-pending)', CANCELLED: 'var(--gantt-milestone-overdue)',
                 };
 
                 // 取里程碑日期（优先 planEndDate）
@@ -1552,7 +1552,7 @@ const ProjectDetail: React.FC = () => {
                           }} />
                           <div style={{
                             position: 'absolute', left: tick.x, top: axisY + 10,
-                            transform: 'translateX(-50%)', fontSize: 10, color: '#b5b8bf',
+                            transform: 'translateX(-50%)', fontSize: 10, color: 'var(--timeline-dot-active)',
                             whiteSpace: 'nowrap', zIndex: 0,
                           }}>
                             {tick.label}
@@ -1566,7 +1566,7 @@ const ProjectDetail: React.FC = () => {
                           position: 'absolute',
                           left: positions[0] - 16,
                           width: positions[positions.length - 1] - positions[0] + 32,
-                          top: axisY, height: 3, background: '#c9cdd4', borderRadius: 2,
+                          top: axisY, height: 3, background: 'var(--timeline-dot)', borderRadius: 2,
                         }} />
                       )}
 
@@ -1574,7 +1574,7 @@ const ProjectDetail: React.FC = () => {
                       {dated.map((m, idx) => {
                         const x = positions[idx];
                         const above = idx % 2 === 0;
-                        const color = statusColor[m.status] || '#d9d9d9';
+                        const color = statusColor[m.status] || 'var(--gantt-milestone-pending)';
                         const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
                         const names = m.assignees?.map(a => a.realName).join('、') || m.assignee?.realName || '-';
                         const dateStr = getMsDate(m)!.format('YYYY-MM-DD');
@@ -1613,14 +1613,14 @@ const ProjectDetail: React.FC = () => {
                               style={{
                                 position: 'absolute', left: x - cardW / 2, top: cardTop,
                                 width: cardW, background: 'var(--color-bg-1)',
-                                border: `1px solid #e5e6eb`, borderLeft: `3px solid ${color}`,
+                                border: '1px solid var(--gantt-grid-line)', borderLeft: `3px solid ${color}`,
                                 borderRadius: 8, padding: '8px 12px',
                                 cursor: 'pointer', transition: 'box-shadow .2s, transform .15s',
                                 zIndex: 1,
                               }}
                               onClick={() => handleOpenDrawer(m)}
                               onMouseEnter={e => {
-                                e.currentTarget.style.boxShadow = `0 4px 14px ${color}30`;
+                                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.12)';
                                 e.currentTarget.style.transform = 'translateY(' + (above ? '-2px' : '2px') + ')';
                               }}
                               onMouseLeave={e => {
@@ -1654,7 +1654,7 @@ const ProjectDetail: React.FC = () => {
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           {undated.map(m => {
                             const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
-                            const color = statusColor[m.status] || '#d9d9d9';
+                            const color = statusColor[m.status] || 'var(--gantt-milestone-pending)';
                             return (
                               <div
                                 key={m.id}
@@ -2114,7 +2114,7 @@ const ProjectDetail: React.FC = () => {
                         if (!r.startDate) return '-';
                         const text = `${dayjs(r.startDate).format('YYYY-MM-DD')}${r.endDate ? ' ~ ' + dayjs(r.endDate).format('MM-DD') : ''}`;
                         const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
-                        return <span style={overdue ? { color: '#f53f3f' } : undefined}>{text}</span>;
+                        return <span style={overdue ? { color: 'var(--status-danger)' } : undefined}>{text}</span>;
                       }},
                       { title: '备注', width: 200, dataIndex: 'notes', render: (v: string | null) => {
                         if (!v) return '-';

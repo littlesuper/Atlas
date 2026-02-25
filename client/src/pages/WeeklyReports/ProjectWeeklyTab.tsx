@@ -40,9 +40,9 @@ const PROGRESS_ICON: Record<string, string> = {
 };
 
 const PROGRESS_COLOR: Record<string, string> = {
-  ON_TRACK: '#00b42a',
-  MINOR_ISSUE: '#ff7d00',
-  MAJOR_ISSUE: '#f53f3f',
+  ON_TRACK: 'var(--status-success)',
+  MINOR_ISSUE: 'var(--status-warning)',
+  MAJOR_ISSUE: 'var(--status-danger)',
 };
 
 const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
@@ -123,7 +123,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
             const statusCfg = REPORT_STATUS_MAP[report.status as keyof typeof REPORT_STATUS_MAP] ?? { label: report.status, color: 'default' };
             const progressCfg = PROGRESS_STATUS_MAP[report.progressStatus as keyof typeof PROGRESS_STATUS_MAP] ?? { label: report.progressStatus, color: 'default' };
             const icon = PROGRESS_ICON[report.progressStatus] || '?';
-            const iconColor = PROGRESS_COLOR[report.progressStatus] || '#86909c';
+            const iconColor = PROGRESS_COLOR[report.progressStatus] || 'var(--status-not-started)';
 
             return (
               <Card
@@ -210,7 +210,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
 
                   {/* 风险预警 */}
                   <div style={{ borderLeft: '1px solid var(--color-border-2)', paddingLeft: 16 }}>
-                    <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13, color: report.riskWarning ? '#f53f3f' : 'var(--color-text-2)' }}>
+                    <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13, color: report.riskWarning ? 'var(--status-danger)' : 'var(--color-text-2)' }}>
                       风险预警
                     </div>
                     {report.riskWarning ? (
@@ -220,7 +220,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                         html={report.riskWarning}
                       />
                     ) : (
-                      <span style={{ color: '#00b42a', fontSize: 13 }}>✓ 无风险</span>
+                      <span style={{ color: 'var(--status-success)', fontSize: 13 }}>✓ 无风险</span>
                     )}
                     {((report.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'riskWarning').length > 0 && (
                       <AttachmentList
@@ -233,7 +233,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                 </div>
 
                 {/* 卡片底部 */}
-                <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f2f3f5', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--divider-color)', display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
                     创建人：{report.creator?.realName || '-'}
                   </span>

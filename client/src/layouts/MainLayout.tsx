@@ -140,7 +140,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 e.currentTarget.style.background = 'transparent';
               }}
             >
-              <Avatar size={28} style={{ backgroundColor: '#4f7cff' }}>
+              <Avatar size={28} style={{ backgroundColor: 'var(--status-info)' }}>
                 <IconUser />
               </Avatar>
               <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
