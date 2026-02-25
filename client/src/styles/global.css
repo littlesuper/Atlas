@@ -333,6 +333,104 @@ tr.drag-insert-below td:first-child::before {
   background: rgba(79, 124, 255, 0.1);
 }
 
+/* ============ 主题切换按钮 ============ */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 18px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-toggle-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============ 暗色模式适配 ============ */
+body[arco-theme='dark'] {
+  background-color: #17171a;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body[arco-theme='dark'] .page-content {
+  background-color: #17171a;
+}
+
+body[arco-theme='dark'] .arco-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body[arco-theme='dark'] .arco-card-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+body[arco-theme='dark'] .arco-table-th {
+  background-color: #2a2a2b;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body[arco-theme='dark'] .section-title {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body[arco-theme='dark'] .text-content {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+body[arco-theme='dark'] .text-meta {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+body[arco-theme='dark'] .text-placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+body[arco-theme='dark'] .toolbar-left {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+body[arco-theme='dark'] .login-card {
+  background: rgba(36, 36, 39, 0.95);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+body[arco-theme='dark'] .login-title {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body[arco-theme='dark'] .drag-handle {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+body[arco-theme='dark'] .row-insert-trigger {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+body[arco-theme='dark'] .row-insert-trigger:hover {
+  color: #4f7cff;
+  background: rgba(79, 124, 255, 0.15);
+}
+
+body[arco-theme='dark'] .w-e-text-container {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+body[arco-theme='dark'] .arco-select-dropdown,
+body[arco-theme='dark'] .arco-picker-container,
+body[arco-theme='dark'] .arco-dropdown {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+body[arco-theme='dark'] .arco-empty {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 /* ============ 响应式布局 ============ */
 @media (max-width: 768px) {
   .page-content {

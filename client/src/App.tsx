@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from '@arco-design/web-react';
 import { useAuthStore } from './store/authStore';
+import { useThemeStore } from './store/themeStore';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // 页面组件（需要实际创建）
@@ -73,11 +74,19 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
 const App: React.FC = () => {
   const { fetchUser, isAuthenticated } = useAuthStore();
+  const { loadTheme, syncFromServer } = useThemeStore();
 
   useEffect(() => {
-    // 应用启动时尝试获取用户信息
-    fetchUser();
-  }, [fetchUser]);
+    // 立即从 localStorage 加载主题（无闪烁）
+    loadTheme();
+    // 获取用户信息，成功后从服务端同步主题偏好
+    fetchUser().then(() => {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        syncFromServer();
+      }
+    });
+  }, [fetchUser, loadTheme, syncFromServer]);
 
   return (
     <ErrorBoundary>

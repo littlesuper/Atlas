@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Dropdown, Menu, Avatar, Modal } from '@arco-design/web-react';
-import { IconUser, IconPoweroff } from '@arco-design/web-react/icon';
+import { Layout, Dropdown, Menu, Avatar, Modal, Tooltip } from '@arco-design/web-react';
+import { IconUser, IconPoweroff, IconSun, IconMoon } from '@arco-design/web-react/icon';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 import '../styles/global.css';
 
 const { Header, Content } = Layout;
@@ -15,6 +16,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, hasPermission, logout } = useAuthStore();
+  const { theme, toggleTheme } = useThemeStore();
 
   // 菜单项配置
   const menuItems = [
@@ -108,6 +110,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </div>
             ))}
           </div>
+
+          {/* 主题切换 */}
+          <Tooltip content={theme === 'light' ? '切换为暗色模式' : '切换为明亮模式'}>
+            <div
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+            >
+              {theme === 'light' ? <IconMoon /> : <IconSun />}
+            </div>
+          </Tooltip>
 
           {/* 用户下拉菜单 */}
           <Dropdown droplist={userDropdownMenu} position="br">
