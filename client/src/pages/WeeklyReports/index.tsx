@@ -132,7 +132,7 @@ const WeeklyReportsSummary: React.FC = () => {
       render: (_: unknown, record: WeeklyReport) => (
         <div>
           <a
-            style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
+            style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
             onClick={() => navigate(`/projects/${record.projectId}?tab=weekly`)}
           >
             {record.project?.name || '-'}
@@ -192,7 +192,7 @@ const WeeklyReportsSummary: React.FC = () => {
           <div>
             <SafeHtml
               className="html-content"
-              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: '#4e5969' }}
+              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
               html={record.keyProgress || '<span style="color:#c2c7d0">暂无</span>'}
             />
             {sectionAtts.length > 0 && (
@@ -210,7 +210,7 @@ const WeeklyReportsSummary: React.FC = () => {
           <div>
             <SafeHtml
               className="html-content"
-              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: '#4e5969' }}
+              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
               html={record.nextWeekPlan || '<span style="color:#c2c7d0">暂无</span>'}
             />
             {sectionAtts.length > 0 && (
@@ -320,7 +320,7 @@ const WeeklyReportsSummary: React.FC = () => {
               </div>
 
               {currentWeek && weekStart && weekEnd && (
-                <span style={{ color: '#86909c', fontSize: 13 }}>
+                <span style={{ color: 'var(--color-text-3)', fontSize: 13 }}>
                   {weekStart.format('MM-DD')} ~ {weekEnd.format('MM-DD')}
                 </span>
               )}

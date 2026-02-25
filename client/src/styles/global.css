@@ -18,9 +18,22 @@ body {
   min-height: 100vh;
 }
 
+/* ============ 自定义 CSS 变量 ============ */
+:root {
+  --page-bg: #f4f6f9;
+  --risk-low-bg: #e8ffea;
+  --risk-medium-bg: #fff7e8;
+  --risk-high-bg: #ffece8;
+  --info-bg: #e8f3ff;
+  --info-border: #bedaff;
+  --info-color: #165dff;
+  --highlight-bg: #fff7e6;
+  --gantt-label-bg: #fff;
+}
+
 /* ============ 页面内容区背景 ============ */
 .page-content {
-  background-color: #f4f6f9;
+  background-color: var(--page-bg);
   min-height: calc(100vh - 60px);
   padding: 24px;
 }
@@ -35,7 +48,7 @@ body {
 }
 
 .arco-card-header {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-2);
   padding: 16px 20px;
 }
 
@@ -49,9 +62,9 @@ body {
 }
 
 .arco-table-th {
-  background-color: #fafafa;
+  background-color: var(--color-fill-1);
   font-weight: 600;
-  color: #1a1a2e;
+  color: var(--color-text-1);
 }
 
 /* 输入框样式 */
@@ -98,14 +111,14 @@ body {
 
 /* 空状态样式 */
 .arco-empty {
-  color: #bfbfbf;
+  color: var(--color-text-4);
   font-size: 14px;
 }
 
 /* ============ wangEditor 富文本编辑器 ============ */
 .w-e-text-container {
   font-size: 14px !important;
-  color: #1d2129;
+  color: var(--color-text-1);
 }
 
 .w-e-text-container [data-slate-editor] p {
@@ -141,7 +154,7 @@ body {
 
 .toolbar-left {
   font-size: 13px;
-  color: #8c8ca1;
+  color: var(--color-text-3);
   font-weight: 400;
 }
 
@@ -149,27 +162,27 @@ body {
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a2e;
+  color: var(--color-text-1);
   margin-bottom: 12px;
 }
 
 .text-content {
   font-size: 14px;
   font-weight: 400;
-  color: #595959;
+  color: var(--color-text-2);
   line-height: 1.6;
 }
 
 .text-meta {
   font-size: 12px;
   font-weight: 400;
-  color: #8c8ca1;
+  color: var(--color-text-3);
 }
 
 .text-placeholder {
   font-size: 14px;
   font-weight: 400;
-  color: #bfbfbf;
+  color: var(--color-text-4);
 }
 
 /* ============ 登录页样式 ============ */
@@ -206,7 +219,7 @@ body {
   text-align: center;
   font-size: 24px;
   font-weight: 600;
-  color: #1a1a2e;
+  color: var(--color-text-1);
   margin-bottom: 32px;
 }
 
@@ -262,7 +275,7 @@ body {
   align-items: center;
   padding: 2px 0;
   user-select: none;
-  color: #86909c;
+  color: var(--color-text-3);
   font-size: 16px;
 }
 .drag-handle svg {
@@ -324,7 +337,7 @@ tr.drag-insert-below td:first-child::before {
   height: 18px;
   border-radius: 4px;
   cursor: pointer;
-  color: #c9cdd4;
+  color: var(--color-text-4);
   font-size: 12px;
 }
 
@@ -353,82 +366,111 @@ tr.drag-insert-below td:first-child::before {
 }
 
 /* ============ 暗色模式适配 ============ */
+
+/*
+ * 覆盖 Arco Design 暗色模式的基础色板
+ * 默认值太黑 (#17171a)、文字太亮 (0.9)，对比度过高
+ * 调整为更柔和的深灰蓝色调，降低视觉疲劳
+ */
 body[arco-theme='dark'] {
-  background-color: #17171a;
-  color: rgba(255, 255, 255, 0.9);
+  /* 基底背景：偏暖的深灰，避免纯黑 */
+  --color-bg-1: #1e1f25;
+  --color-bg-2: #252630;
+  --color-bg-3: #2c2d3a;
+  --color-bg-4: #343544;
+  --color-bg-5: #3c3d4e;
+
+  /* 文字层级：降低最亮一级，拉开层次 */
+  --color-text-1: rgba(230, 233, 240, 0.9);
+  --color-text-2: rgba(200, 205, 215, 0.78);
+  --color-text-3: rgba(160, 165, 180, 0.65);
+  --color-text-4: rgba(130, 135, 150, 0.48);
+
+  /* 填充层级：与背景形成柔和梯度 */
+  --color-fill-1: #282938;
+  --color-fill-2: #2e2f40;
+  --color-fill-3: #363748;
+  --color-fill-4: #3e3f52;
+
+  /* 边框：低对比度，不扎眼 */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-2: rgba(255, 255, 255, 0.06);
+  --color-border-3: rgba(255, 255, 255, 0.04);
+
+  /* 主色调微调：降低亮度避免刺眼 */
+  --color-primary-light-1: rgba(79, 124, 255, 0.08);
+
+  /* 自定义变量 */
+  --page-bg: #1a1b22;
+  --risk-low-bg: rgba(34, 195, 94, 0.1);
+  --risk-medium-bg: rgba(255, 152, 40, 0.1);
+  --risk-high-bg: rgba(240, 80, 80, 0.1);
+  --info-bg: rgba(79, 124, 255, 0.1);
+  --info-border: rgba(79, 124, 255, 0.2);
+  --info-color: #6b9aff;
+  --highlight-bg: rgba(255, 152, 40, 0.1);
+  --gantt-label-bg: var(--color-bg-1);
+
+  background-color: var(--page-bg);
 }
 
-body[arco-theme='dark'] .page-content {
-  background-color: #17171a;
-}
-
+/* 卡片：用极细边框代替重阴影，更通透 */
 body[arco-theme='dark'] .arco-card {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-body[arco-theme='dark'] .arco-card-header {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+/* 表格行底线柔化 */
+body[arco-theme='dark'] .arco-table-td {
+  border-color: rgba(255, 255, 255, 0.04);
 }
 
-body[arco-theme='dark'] .arco-table-th {
-  background-color: #2a2a2b;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-body[arco-theme='dark'] .section-title {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-body[arco-theme='dark'] .text-content {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-body[arco-theme='dark'] .text-meta {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-body[arco-theme='dark'] .text-placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-body[arco-theme='dark'] .toolbar-left {
-  color: rgba(255, 255, 255, 0.5);
+/* 登录页 */
+body[arco-theme='dark'] .login-container {
+  background: linear-gradient(135deg, #1e1f30 0%, #252035 100%);
 }
 
 body[arco-theme='dark'] .login-card {
-  background: rgba(36, 36, 39, 0.95);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: rgba(30, 31, 40, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
 }
 
-body[arco-theme='dark'] .login-title {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-body[arco-theme='dark'] .drag-handle {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-body[arco-theme='dark'] .row-insert-trigger {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-body[arco-theme='dark'] .row-insert-trigger:hover {
-  color: #4f7cff;
-  background: rgba(79, 124, 255, 0.15);
-}
-
-body[arco-theme='dark'] .w-e-text-container {
-  color: rgba(255, 255, 255, 0.85) !important;
-}
-
+/* 弹出层：加深背景、用细边框 */
 body[arco-theme='dark'] .arco-select-dropdown,
 body[arco-theme='dark'] .arco-picker-container,
 body[arco-theme='dark'] .arco-dropdown {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-body[arco-theme='dark'] .arco-empty {
-  color: rgba(255, 255, 255, 0.3);
+body[arco-theme='dark'] .arco-modal-content {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Drawer 抽屉 */
+body[arco-theme='dark'] .arco-drawer-content {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* wangEditor 富文本编辑器在暗色模式下的适配 */
+body[arco-theme='dark'] .w-e-toolbar {
+  background-color: var(--color-bg-2) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body[arco-theme='dark'] .w-e-text-container {
+  background-color: var(--color-bg-1) !important;
+}
+
+body[arco-theme='dark'] .w-e-bar-item button:hover {
+  background-color: var(--color-fill-2) !important;
+}
+
+/* Tag 标签在暗色模式下降低饱和度 */
+body[arco-theme='dark'] .arco-tag {
+  --tw-saturate: saturate(0.8);
+  filter: var(--tw-saturate);
 }
 
 /* ============ 响应式布局 ============ */

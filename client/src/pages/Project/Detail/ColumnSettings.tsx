@@ -110,7 +110,7 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
 
   const content = (
     <div style={{ width: 220 }}>
-      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#1d2129' }}>
+      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-1)' }}>
         列显示设置
       </div>
       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
@@ -141,7 +141,7 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
                 style={{ cursor: 'grab', marginRight: 6, display: 'flex', alignItems: 'center' }}
                 onMouseDown={(e) => handleMouseDown(e, index)}
               >
-                <IconDragDotVertical style={{ color: '#86909c', fontSize: 16 }} />
+                <IconDragDotVertical style={{ color: 'var(--color-text-3)', fontSize: 16 }} />
               </span>
               <Checkbox
                 checked={isVisible}
@@ -155,7 +155,7 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
           );
         })}
       </div>
-      <div style={{ borderTop: '1px solid #e5e6eb', marginTop: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Button
           size="small"
           type="text"

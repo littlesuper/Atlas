@@ -104,12 +104,12 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
     });
   };
 
-  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: '#86909c' }}>加载中...</div>;
+  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-3)' }}>加载中...</div>;
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: '#86909c' }}>共 {reports.length} 份周报</span>
+        <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>共 {reports.length} 份周报</span>
         {hasPermission('weekly_report', 'create') && isProjectManager(managerId ?? '', projectId) && (
           <Button type="primary" icon={<IconPlus />} onClick={handleCreate}>创建周报</Button>
         )}
@@ -135,7 +135,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                     <span style={{ fontWeight: 600 }}>
                       {report.year} 年第 {report.weekNumber} 周
                     </span>
-                    <span style={{ color: '#86909c', fontSize: 12 }}>
+                    <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>
                       {dayjs(report.weekStart).format('MM-DD')} ~ {dayjs(report.weekEnd).format('MM-DD')}
                     </span>
                     <Tag color={statusCfg.color}>{statusCfg.label}</Tag>
@@ -172,11 +172,11 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                     {report.keyProgress ? (
                       <SafeHtml
                         className="html-content"
-                        style={{ fontSize: 13, color: '#4e5969', maxHeight: 120, overflow: 'hidden' }}
+                        style={{ fontSize: 13, color: 'var(--color-text-2)', maxHeight: 120, overflow: 'hidden' }}
                         html={report.keyProgress}
                       />
                     ) : (
-                      <span style={{ color: '#c2c7d0', fontSize: 13 }}>暂无内容</span>
+                      <span style={{ color: 'var(--color-text-4)', fontSize: 13 }}>暂无内容</span>
                     )}
                     {((report.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'keyProgress').length > 0 && (
                       <AttachmentList
@@ -188,16 +188,16 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                   </div>
 
                   {/* 下周工作计划 */}
-                  <div style={{ borderLeft: '1px solid #e4e6ef', paddingLeft: 16 }}>
+                  <div style={{ borderLeft: '1px solid var(--color-border-2)', paddingLeft: 16 }}>
                     <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>下周工作计划</div>
                     {report.nextWeekPlan ? (
                       <SafeHtml
                         className="html-content"
-                        style={{ fontSize: 13, color: '#4e5969', maxHeight: 120, overflow: 'hidden' }}
+                        style={{ fontSize: 13, color: 'var(--color-text-2)', maxHeight: 120, overflow: 'hidden' }}
                         html={report.nextWeekPlan}
                       />
                     ) : (
-                      <span style={{ color: '#c2c7d0', fontSize: 13 }}>暂无内容</span>
+                      <span style={{ color: 'var(--color-text-4)', fontSize: 13 }}>暂无内容</span>
                     )}
                     {((report.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'nextWeekPlan').length > 0 && (
                       <AttachmentList
@@ -209,14 +209,14 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                   </div>
 
                   {/* 风险预警 */}
-                  <div style={{ borderLeft: '1px solid #e4e6ef', paddingLeft: 16 }}>
-                    <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13, color: report.riskWarning ? '#f53f3f' : '#4e5969' }}>
+                  <div style={{ borderLeft: '1px solid var(--color-border-2)', paddingLeft: 16 }}>
+                    <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13, color: report.riskWarning ? '#f53f3f' : 'var(--color-text-2)' }}>
                       风险预警
                     </div>
                     {report.riskWarning ? (
                       <SafeHtml
                         className="html-content"
-                        style={{ fontSize: 13, color: '#4e5969', maxHeight: 120, overflow: 'hidden' }}
+                        style={{ fontSize: 13, color: 'var(--color-text-2)', maxHeight: 120, overflow: 'hidden' }}
                         html={report.riskWarning}
                       />
                     ) : (
@@ -234,11 +234,11 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
 
                 {/* 卡片底部 */}
                 <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f2f3f5', display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12, color: '#86909c' }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
                     创建人：{report.creator?.realName || '-'}
                   </span>
                   {report.submittedAt && (
-                    <span style={{ fontSize: 12, color: '#86909c' }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
                       提交时间：{dayjs(report.submittedAt).format('YYYY-MM-DD HH:mm')}
                     </span>
                   )}

@@ -320,7 +320,7 @@ const WeeklyReportForm: React.FC = () => {
               {isEdit ? '编辑周报' : '创建周报'}
             </h2>
             {project && (
-              <span style={{ color: '#86909c', fontSize: 14 }}>— {project.name}</span>
+              <span style={{ color: 'var(--color-text-3)', fontSize: 14 }}>— {project.name}</span>
             )}
           </div>
           <Button
@@ -349,7 +349,7 @@ const WeeklyReportForm: React.FC = () => {
                 style={{ width: 200 }}
                 format="YYYY-wo"
               />
-              <span style={{ color: '#86909c', fontSize: 13 }}>
+              <span style={{ color: 'var(--color-text-3)', fontSize: 13 }}>
                 {weekStart.format('MM-DD')} ~ {weekEnd.format('MM-DD')}
               </span>
             </div>
@@ -384,7 +384,7 @@ const WeeklyReportForm: React.FC = () => {
                 <span style={{ fontWeight: 500 }}>本周重要进展</span>
                 {aiSuggestions?.keyProgress && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#86909c' }}>AI 建议：</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
                     <Button size="mini" type="primary"
                       onClick={() => adoptAiSuggestion('keyProgress', aiSuggestions.keyProgress || '', keyProgressRef)}>
                       采用
@@ -422,7 +422,7 @@ const WeeklyReportForm: React.FC = () => {
                 <span style={{ fontWeight: 500 }}>下周工作计划</span>
                 {aiSuggestions?.nextWeekPlan && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#86909c' }}>AI 建议：</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
                     <Button size="mini" type="primary"
                       onClick={() => adoptAiSuggestion('nextWeekPlan', aiSuggestions.nextWeekPlan || '', nextWeekPlanRef)}>
                       采用
@@ -460,7 +460,7 @@ const WeeklyReportForm: React.FC = () => {
                 <span style={{ fontWeight: 500, color: '#f53f3f' }}>风险预警</span>
                 {aiSuggestions?.riskWarning !== undefined && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#86909c' }}>AI 建议：</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
                     <Button size="mini" type="primary"
                       onClick={() => adoptAiSuggestion('riskWarning', aiSuggestions.riskWarning || '', riskWarningRef)}>
                       采用

@@ -867,7 +867,7 @@ const ProjectDetail: React.FC = () => {
     return (
       <span style={{ color: isOverdue ? '#f53f3f' : undefined }}>
         {start} ~ {end}
-        <span style={{ color: isOverdue ? '#f53f3f' : '#86909c', fontSize: 12, marginLeft: 4 }}>({days}天)</span>
+        <span style={{ color: isOverdue ? '#f53f3f' : 'var(--color-text-3)', fontSize: 12, marginLeft: 4 }}>({days}天)</span>
       </span>
     );
   };
@@ -879,7 +879,7 @@ const ProjectDetail: React.FC = () => {
       title: 'ID',
       width: 60,
       render: (_: unknown, record: Activity) => (
-        <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getSeq(record)}</span>
+        <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
       ),
     },
     predecessor: {
@@ -903,7 +903,7 @@ const ProjectDetail: React.FC = () => {
         const text = getPredecessorSeq(record);
         return (
           <span
-            style={{ fontFamily: 'monospace', color: '#86909c', cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
+            style={{ fontFamily: 'monospace', color: 'var(--color-text-3)', cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
             onDoubleClick={() => startInlineEdit(record.id, 'predecessor', text)}
           >
             {text || '-'}
@@ -937,7 +937,7 @@ const ProjectDetail: React.FC = () => {
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'phase' })}
           >
-            {record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: '#c2c7d0' }}>-</span>}
+            {record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
           </span>
         );
       },
@@ -1099,7 +1099,7 @@ const ProjectDetail: React.FC = () => {
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onDoubleClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
           >
-            {days != null ? `${days}天` : <span style={{ color: '#c2c7d0' }}>-</span>}
+            {days != null ? `${days}天` : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
           </span>
         );
       },
@@ -1197,7 +1197,7 @@ const ProjectDetail: React.FC = () => {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                color: notes ? undefined : '#c2c7d0',
+                color: notes ? undefined : 'var(--color-text-4)',
               }}
               onDoubleClick={() => startInlineEdit(record.id, 'notes', notes || '')}
             >
@@ -1304,7 +1304,7 @@ const ProjectDetail: React.FC = () => {
             width: theadFixedPos.width,
             overflow: 'hidden',
             zIndex: 1000,
-            background: '#fff',
+            background: 'var(--color-bg-1)',
             boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
           }}
         />,
@@ -1325,7 +1325,7 @@ const ProjectDetail: React.FC = () => {
 
             {/* 第二行：项目描述 */}
             {project.description && (
-              <div style={{ color: '#4e5969' }}>{project.description}</div>
+              <div style={{ color: 'var(--color-text-2)' }}>{project.description}</div>
             )}
 
             {/* 第三行：统计卡片 */}
@@ -1346,7 +1346,7 @@ const ProjectDetail: React.FC = () => {
                         ? project.members.map((m) => (
                             <Tag key={m.user.id} size="small">{m.user.realName}</Tag>
                           ))
-                        : <span style={{ color: '#c2c7d0' }}>暂无</span>
+                        : <span style={{ color: 'var(--color-text-4)' }}>暂无</span>
                       }
                       {(useAuthStore.getState().user?.permissions?.includes('*:*') || useAuthStore.getState().user?.id === project.managerId) && (
                         <Button type="text" size="mini" onClick={() => setMembersModalVisible(true)} style={{ padding: '0 4px' }}>管理</Button>
@@ -1356,7 +1356,7 @@ const ProjectDetail: React.FC = () => {
                 },
               ].map((item, i) => (
                 <Card key={i} style={{ height: 88 }} bodyStyle={{ padding: '12px 16px' }}>
-                  <div style={{ fontSize: 12, color: '#86909c', marginBottom: 6 }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 6 }}>{item.label}</div>
                   <div style={{ fontSize: 14, fontWeight: 500 }}>{item.value}</div>
                 </Card>
               ))}
@@ -1370,25 +1370,25 @@ const ProjectDetail: React.FC = () => {
           activeTab={activeTab}
           onChange={setActiveTab}
           style={{ '--tab-bar-style': 'sticky' } as React.CSSProperties}
-          {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: '#fff', marginBottom: 0 } } as any}
+          {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: 'var(--color-bg-1)', marginBottom: 0 } } as any}
         >
             {/* 活动列表 */}
             <Tabs.TabPane key="activities" title="活动列表">
               <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#86909c' }}>
+                <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
                   {saving ? '保存排序中...' : ''}
                 </span>
                 <Space>
                   <span style={{ fontSize: 12 }}>
                     <span
-                      style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'NOT_STARTED' ? '#f2f3f5' : undefined, color: statusFilter === 'NOT_STARTED' ? '#1d2129' : '#86909c' }}
+                      style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'NOT_STARTED' ? 'var(--color-fill-2)' : undefined, color: statusFilter === 'NOT_STARTED' ? 'var(--color-text-1)' : 'var(--color-text-3)' }}
                       onClick={() => setStatusFilter(prev => prev === 'NOT_STARTED' ? null : 'NOT_STARTED')}
                     >
                       未开始 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'NOT_STARTED').length}</span>
                     </span>
-                    <span style={{ margin: '0 2px', color: '#e5e6eb' }}>|</span>
+                    <span style={{ margin: '0 2px', color: 'var(--color-border)' }}>|</span>
                     <span
-                      style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'IN_PROGRESS' ? '#e8f3ff' : undefined, color: statusFilter === 'IN_PROGRESS' ? '#165DFF' : '#86909c' }}
+                      style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'IN_PROGRESS' ? 'var(--color-primary-light-1)' : undefined, color: statusFilter === 'IN_PROGRESS' ? 'rgb(var(--primary-6))' : 'var(--color-text-3)' }}
                       onClick={() => setStatusFilter(prev => prev === 'IN_PROGRESS' ? null : 'IN_PROGRESS')}
                     >
                       进行中 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
@@ -1548,7 +1548,7 @@ const ProjectDetail: React.FC = () => {
                         <React.Fragment key={i}>
                           <div style={{
                             position: 'absolute', left: tick.x, top: 24, bottom: 20,
-                            width: 1, background: '#f2f3f5', zIndex: 0,
+                            width: 1, background: 'var(--color-fill-2)', zIndex: 0,
                           }} />
                           <div style={{
                             position: 'absolute', left: tick.x, top: axisY + 10,
@@ -1595,14 +1595,14 @@ const ProjectDetail: React.FC = () => {
                               position: 'absolute', left: x - 7, top: axisY - 5,
                               width: 13, height: 13, background: color,
                               transform: 'rotate(45deg)',
-                              border: '2px solid #fff', boxShadow: `0 0 0 1px ${color}`,
+                              border: '2px solid var(--color-bg-1)', boxShadow: `0 0 0 1px ${color}`,
                               zIndex: 3,
                             }} />
 
                             {/* 日期标签（菱形下/上方） */}
                             <div style={{
                               position: 'absolute', left: x, top: above ? axisY + 10 : axisY - 18,
-                              transform: 'translateX(-50%)', fontSize: 10, color: '#86909c',
+                              transform: 'translateX(-50%)', fontSize: 10, color: 'var(--color-text-3)',
                               whiteSpace: 'nowrap', zIndex: 2,
                             }}>
                               {dateStr}
@@ -1612,7 +1612,7 @@ const ProjectDetail: React.FC = () => {
                             <div
                               style={{
                                 position: 'absolute', left: x - cardW / 2, top: cardTop,
-                                width: cardW, background: '#fff',
+                                width: cardW, background: 'var(--color-bg-1)',
                                 border: `1px solid #e5e6eb`, borderLeft: `3px solid ${color}`,
                                 borderRadius: 8, padding: '8px 12px',
                                 cursor: 'pointer', transition: 'box-shadow .2s, transform .15s',
@@ -1638,7 +1638,7 @@ const ProjectDetail: React.FC = () => {
                                 {m.phase && <Tag size="small" color={PHASE_COLOR[m.phase] || 'default'}>{m.phase}</Tag>}
                                 {stInfo && <Tag size="small" color={stInfo.color}>{stInfo.label}</Tag>}
                               </div>
-                              <div style={{ fontSize: 11, color: '#86909c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: 11, color: 'var(--color-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 负责人: {names}
                               </div>
                             </div>
@@ -1650,7 +1650,7 @@ const ProjectDetail: React.FC = () => {
                     {/* 无日期的里程碑 */}
                     {undated.length > 0 && (
                       <div style={{ marginTop: 16, padding: '0 8px' }}>
-                        <div style={{ fontSize: 13, color: '#86909c', marginBottom: 8 }}>未设定日期</div>
+                        <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>未设定日期</div>
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           {undated.map(m => {
                             const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
@@ -1659,7 +1659,7 @@ const ProjectDetail: React.FC = () => {
                               <div
                                 key={m.id}
                                 style={{
-                                  background: '#fff', border: '1px solid #e5e6eb', borderLeft: `3px solid ${color}`,
+                                  background: 'var(--color-bg-1)', border: '1px solid var(--color-border)', borderLeft: `3px solid ${color}`,
                                   borderRadius: 8, padding: '8px 12px', width: 190, cursor: 'pointer',
                                   transition: 'box-shadow .2s',
                                 }}
@@ -1793,7 +1793,7 @@ const ProjectDetail: React.FC = () => {
             </div>
 
             {/* 分隔线 */}
-            <div style={{ borderTop: '1px solid #e4e6ef', margin: '4px 0 16px' }} />
+            <div style={{ borderTop: '1px solid var(--color-border-2)', margin: '4px 0 16px' }} />
 
             {/* 父活动 */}
             <Form.Item label="父活动" field="parentId">
@@ -1809,7 +1809,7 @@ const ProjectDetail: React.FC = () => {
             {/* 前置依赖 */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969' }}>前置依赖</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-2)' }}>前置依赖</span>
                 <Button
                   type="text"
                   size="small"
@@ -1820,7 +1820,7 @@ const ProjectDetail: React.FC = () => {
                 </Button>
               </div>
               {formDeps.length === 0 ? (
-                <div style={{ color: '#c2c7d0', fontSize: 13, padding: '4px 0' }}>无前置依赖</div>
+                <div style={{ color: 'var(--color-text-4)', fontSize: 13, padding: '4px 0' }}>无前置依赖</div>
               ) : (
                 formDeps.map((dep, idx) => (
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
@@ -1885,12 +1885,12 @@ const ProjectDetail: React.FC = () => {
             </div>
 
             {formDeps.some((d) => d.id) && (
-              <div style={{ background: '#e8f3ff', border: '1px solid #bedaff', borderRadius: 4, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#165dff' }}>
+              <div style={{ background: 'var(--color-primary-light-1)', border: '1px solid var(--info-border)', borderRadius: 4, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--info-color)' }}>
                 已设置前置依赖，计划开始/结束日期将由系统根据依赖关系自动计算。可设置工期辅助推算。
               </div>
             )}
 
-            <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969', marginBottom: 8, display: 'block' }}>时间</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-2)', marginBottom: 8, display: 'block' }}>时间</span>
             {/* 计划时间：开始 + 结束 + 工期 三方联动 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 12 }}>
               <Form.Item label="计划开始" field="planStart">
@@ -1963,7 +1963,7 @@ const ProjectDetail: React.FC = () => {
           style={{ maxWidth: 480 }}
         >
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: '#86909c', marginBottom: 8 }}>添加协作者</div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>添加协作者</div>
             <Select
               placeholder="搜索并选择用户"
               showSearch
@@ -1992,11 +1992,11 @@ const ProjectDetail: React.FC = () => {
             </Select>
           </div>
           <div>
-            <div style={{ fontSize: 13, color: '#86909c', marginBottom: 8 }}>当前协作者</div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>当前协作者</div>
             {project?.members && project.members.length > 0 ? (
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 {project.members.map((m) => (
-                  <div key={m.user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f2f3f5' }}>
+                  <div key={m.user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--color-fill-2)' }}>
                     <span>{m.user.realName} ({m.user.username})</span>
                     <Button
                       type="text"
@@ -2023,12 +2023,12 @@ const ProjectDetail: React.FC = () => {
           visible={archiveDrawerVisible}
           onCancel={() => { setArchiveDrawerVisible(false); setExpandedArchiveId(null); setArchiveDetail(null); }}
           footer={null}
-          headerStyle={{ borderBottom: '1px solid #e5e6eb' }}
+          headerStyle={{ borderBottom: '1px solid var(--color-border)' }}
           bodyStyle={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '16px 20px' }}
         >
           {/* 顶部操作栏 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
-            <span style={{ fontSize: 13, color: '#86909c' }}>
+            <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
               共 {archiveList.length} 个归档
             </span>
             {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
@@ -2051,7 +2051,7 @@ const ProjectDetail: React.FC = () => {
           ) : (
             <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
               {/* 左侧归档列表 */}
-              <div style={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid #e5e6eb', paddingRight: 12 }}>
+              <div style={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid var(--color-border)', paddingRight: 12 }}>
                 {archiveList.map(arc => {
                   const isSelected = expandedArchiveId === arc.id;
                   const canManage = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
@@ -2060,15 +2060,15 @@ const ProjectDetail: React.FC = () => {
                       key={arc.id}
                       style={{
                         padding: '10px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
-                        background: isSelected ? '#e8f3ff' : undefined,
-                        border: isSelected ? '1px solid #bedaff' : '1px solid transparent',
+                        background: isSelected ? 'var(--color-primary-light-1)' : undefined,
+                        border: isSelected ? '1px solid var(--info-border)' : '1px solid transparent',
                       }}
                       onClick={() => handleExpandArchive(arc.id)}
                     >
-                      <div style={{ fontSize: 13, fontWeight: isSelected ? 500 : 400, color: isSelected ? '#165DFF' : '#1d2129' }}>
+                      <div style={{ fontSize: 13, fontWeight: isSelected ? 500 : 400, color: isSelected ? 'rgb(var(--primary-6))' : 'var(--color-text-1)' }}>
                         {dayjs(arc.createdAt).format('YYYY-MM-DD')}
                       </div>
-                      <div style={{ fontSize: 12, color: '#86909c', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
                         {dayjs(arc.createdAt).format('HH:mm')}
                         <span style={{ marginLeft: 6 }}>{arc.count} 个活动</span>
                       </div>
@@ -2089,7 +2089,7 @@ const ProjectDetail: React.FC = () => {
               {/* 右侧详情区域 */}
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
                 {!expandedArchiveId ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c2c7d0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-4)' }}>
                     <span style={{ fontSize: 14 }}>点击左侧归档查看详情</span>
                   </div>
                 ) : archiveDetailLoading ? (
@@ -2097,7 +2097,7 @@ const ProjectDetail: React.FC = () => {
                 ) : archiveDetail?.snapshot?.length ? (
                   <Table
                     columns={[
-                      { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: '#86909c', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
+                      { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
                       { title: '阶段', width: 70, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
                       { title: '活动名称', width: 180, dataIndex: 'name', render: (v: string) => (
                         <Tooltip content={v} position="tl"><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span></Tooltip>

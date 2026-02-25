@@ -143,12 +143,12 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
     };
 
     return (
-      <div ref={containerRef} style={{ border: '1px solid #e5e6eb', borderRadius: 4, overflow: 'hidden' }}>
+      <div ref={containerRef} style={{ border: '1px solid var(--color-border)', borderRadius: 4, overflow: 'hidden' }}>
         <Toolbar
           editor={editor}
           defaultConfig={toolbarConfig}
           mode="simple"
-          style={{ borderBottom: '1px solid #e5e6eb' }}
+          style={{ borderBottom: '1px solid var(--color-border)' }}
         />
         <Editor
           defaultConfig={editorConfig}

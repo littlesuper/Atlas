@@ -57,7 +57,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             alignItems: 'center',
             height: '100vh',
             fontSize: '16px',
-            color: '#8c8ca1',
+            color: 'var(--color-text-3)',
           }}
         >
           <div style={{ textAlign: 'center' }}>
@@ -202,7 +202,7 @@ const App: React.FC = () => {
                   alignItems: 'center',
                   height: '100vh',
                   fontSize: '16px',
-                  color: '#8c8ca1',
+                  color: 'var(--color-text-3)',
                 }}
               >
                 <div style={{ textAlign: 'center' }}>

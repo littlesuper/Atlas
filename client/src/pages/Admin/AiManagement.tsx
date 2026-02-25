@@ -317,14 +317,14 @@ const AiManagement: React.FC = () => {
       dataIndex: 'apiUrl',
       width: 260,
       render: (url: string) =>
-        url || <span style={{ color: '#86909c' }}>未配置</span>,
+        url || <span style={{ color: 'var(--color-text-3)' }}>未配置</span>,
     },
     {
       title: 'API Key',
       dataIndex: 'apiKey',
       width: 140,
       render: (key: string) =>
-        key || <span style={{ color: '#86909c' }}>未配置</span>,
+        key || <span style={{ color: 'var(--color-text-3)' }}>未配置</span>,
     },
     {
       title: '模型',
@@ -336,7 +336,7 @@ const AiManagement: React.FC = () => {
       dataIndex: 'features',
       width: 200,
       render: (features: string) => {
-        if (!features) return <span style={{ color: '#86909c' }}>无</span>;
+        if (!features) return <span style={{ color: 'var(--color-text-3)' }}>无</span>;
         return (
           <Space wrap>
             {features
@@ -445,7 +445,7 @@ const AiManagement: React.FC = () => {
           pagination={false}
           scroll={{ x: 1000 }}
           noDataElement={
-            <div style={{ padding: 40, color: '#86909c', textAlign: 'center' }}>
+            <div style={{ padding: 40, color: 'var(--color-text-3)', textAlign: 'center' }}>
               暂无AI配置，点击"新建配置"添加
             </div>
           }
@@ -477,7 +477,7 @@ const AiManagement: React.FC = () => {
           pagination={{ pageSize: 10, showTotal: true }}
           scroll={{ x: 900 }}
           noDataElement={
-            <div style={{ padding: 40, color: '#86909c', textAlign: 'center' }}>暂无调用记录</div>
+            <div style={{ padding: 40, color: 'var(--color-text-3)', textAlign: 'center' }}>暂无调用记录</div>
           }
         />
       </Card>

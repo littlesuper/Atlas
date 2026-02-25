@@ -126,7 +126,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
                 alignItems: 'center',
                 gap: 4,
                 padding: '2px 8px',
-                background: '#f7f8fa',
+                background: 'var(--color-fill-1)',
                 borderRadius: 4,
                 fontSize: 13,
                 maxWidth: 260,
@@ -140,7 +140,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
               <span
                 onClick={() => handleClick(att)}
                 style={{
-                  color: '#1d2129',
+                  color: 'var(--color-text-1)',
                   cursor: 'pointer',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -209,7 +209,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
           border: dragging ? '2px dashed #4080ff' : '2px dashed transparent',
           borderRadius: 6,
           padding: dragging ? 10 : 0,
-          background: dragging ? '#f0f5ff' : 'transparent',
+          background: dragging ? 'var(--color-primary-light-1)' : 'transparent',
           transition: 'all 0.2s',
         }}
         onDragEnter={handleDragEnter}
@@ -235,7 +235,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
                   alignItems: 'center',
                   gap: 4,
                   padding: '2px 8px',
-                  background: '#f7f8fa',
+                  background: 'var(--color-fill-1)',
                   borderRadius: 4,
                   fontSize: 13,
                   maxWidth: 260,
@@ -249,7 +249,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
                 <span
                   onClick={() => handleClick(att)}
                   style={{
-                    color: '#1d2129',
+                    color: 'var(--color-text-1)',
                     cursor: 'pointer',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -296,12 +296,12 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
               size="small"
               icon={<IconUpload />}
               loading={uploading}
-              style={{ color: '#86909c', fontSize: 12 }}
+              style={{ color: 'var(--color-text-3)', fontSize: 12 }}
             >
               上传附件
             </Button>
           </Upload>
-          <span style={{ color: '#c2c7d0', fontSize: 11 }}>点击上传 / 拖拽 / 在输入框内粘贴文件</span>
+          <span style={{ color: 'var(--color-text-4)', fontSize: 11 }}>点击上传 / 拖拽 / 在输入框内粘贴文件</span>
         </Space>
       </div>
 

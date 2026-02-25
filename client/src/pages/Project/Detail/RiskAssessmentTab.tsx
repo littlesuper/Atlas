@@ -18,11 +18,11 @@ interface Props {
   projectId: string;
 }
 
-const RISK_LEVEL_CONFIG: Record<string, { color: string; bg: string }> = {
-  LOW:      { color: '#00b42a', bg: '#e8ffea' },
-  MEDIUM:   { color: '#ff7d00', bg: '#fff7e8' },
-  HIGH:     { color: '#f53f3f', bg: '#ffece8' },
-  CRITICAL: { color: '#cb2634', bg: '#ffece8' },
+const RISK_LEVEL_CONFIG: Record<string, { color: string; bgVar: string }> = {
+  LOW:      { color: '#00b42a', bgVar: 'var(--risk-low-bg)' },
+  MEDIUM:   { color: '#ff7d00', bgVar: 'var(--risk-medium-bg)' },
+  HIGH:     { color: '#f53f3f', bgVar: 'var(--risk-high-bg)' },
+  CRITICAL: { color: '#cb2634', bgVar: 'var(--risk-high-bg)' },
 };
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -76,7 +76,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
     <div>
       {/* 操作栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: '#86909c' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
           {assessments.length > 0
             ? `共 ${assessments.length} 次评估记录`
             : '暂无评估记录'}
@@ -98,7 +98,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
           {/* 历史记录 */}
           {history.length > 0 && (
             <div style={{ marginTop: 24 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: '#4e5969' }}>历史记录</div>
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: 'var(--color-text-2)' }}>历史记录</div>
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 {history.map((a) => (
                   <RiskCard key={a.id} assessment={a} />
@@ -118,7 +118,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
   assessment,
   isLatest,
 }) => {
-  const cfg = RISK_LEVEL_CONFIG[assessment.riskLevel] || { color: '#86909c', bg: '#f7f8fa' };
+  const cfg = RISK_LEVEL_CONFIG[assessment.riskLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
 
   return (
     <Card
@@ -132,11 +132,11 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isLatest ? 16 : 12 }}>
         <Space size={12}>
           {isLatest && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#1d2129' }}>最新评估</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-1)' }}>最新评估</span>
           )}
           <Tag
             style={{
-              background: cfg.bg,
+              background: cfg.bgVar,
               color: cfg.color,
               border: `1px solid ${cfg.color}`,
               fontWeight: 600,
@@ -147,7 +147,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
             {RISK_LEVEL_MAP[assessment.riskLevel as keyof typeof RISK_LEVEL_MAP]?.label ?? assessment.riskLevel}
           </Tag>
         </Space>
-        <span style={{ fontSize: 12, color: '#86909c' }}>
+        <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
           {dayjs(assessment.assessedAt).format('YYYY-MM-DD HH:mm')}
         </span>
       </div>
@@ -155,7 +155,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
       {/* 风险因素 */}
       {assessment.riskFactors && assessment.riskFactors.length > 0 && (
         <div style={{ marginBottom: isLatest ? 16 : 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#4e5969' }}>风险因素</div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>风险因素</div>
           <Space direction="vertical" size={6} style={{ width: '100%' }}>
             {assessment.riskFactors.map((f, i) => (
               <div
@@ -165,7 +165,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
                   alignItems: 'flex-start',
                   gap: 8,
                   padding: '8px 12px',
-                  background: '#f7f8fa',
+                  background: 'var(--color-fill-1)',
                   borderRadius: 6,
                 }}
               >
@@ -174,7 +174,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
                 </Tag>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 13 }}>{f.factor}</div>
-                  <div style={{ fontSize: 12, color: '#86909c', marginTop: 2 }}>{f.description}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>{f.description}</div>
                 </div>
               </div>
             ))}
@@ -185,10 +185,10 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
       {/* 改进建议 */}
       {assessment.suggestions && assessment.suggestions.length > 0 && (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#4e5969' }}>改进建议</div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>改进建议</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {assessment.suggestions.map((s, i) => (
-              <li key={i} style={{ fontSize: 13, color: '#4e5969', lineHeight: 1.8 }}>{s}</li>
+              <li key={i} style={{ fontSize: 13, color: 'var(--color-text-2)', lineHeight: 1.8 }}>{s}</li>
             ))}
           </ul>
         </div>

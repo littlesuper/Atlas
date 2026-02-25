@@ -52,12 +52,12 @@ const StatCard: React.FC<StatCardProps> = ({ title, count, color, selected, onCl
       style={{
         height: 88,
         cursor: 'pointer',
-        border: selected ? `2px solid ${color}` : '1px solid #e4e6ef',
+        border: selected ? `2px solid ${color}` : '1px solid var(--color-border-2)',
         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-        <div style={{ fontSize: 12, color: '#8c8ca1', marginBottom: 8 }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>{title}</div>
         <div style={{ fontSize: 28, fontWeight: 600, color: color }}>{count}</div>
       </div>
     </Card>
@@ -264,7 +264,7 @@ const ProjectList: React.FC = () => {
       render: (name: string, record: Project) => (
         <a
           onClick={() => navigate(`/projects/${record.id}`)}
-          style={{ color: '#4f7cff', fontWeight: 500, cursor: 'pointer' }}
+          style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
         >
           {name}
         </a>

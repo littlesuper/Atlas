@@ -81,7 +81,7 @@ const WecomQrLogin: React.FC<WecomQrLoginProps> = ({ onSuccess }) => {
     return (
       <div style={{ textAlign: 'center', padding: '40px 0' }}>
         <Spin size={32} />
-        <div style={{ marginTop: 16, color: '#8c8ca1' }}>企业微信登录中...</div>
+        <div style={{ marginTop: 16, color: 'var(--color-text-3)' }}>企业微信登录中...</div>
       </div>
     );
   }
@@ -91,11 +91,11 @@ const WecomQrLogin: React.FC<WecomQrLoginProps> = ({ onSuccess }) => {
       {loading && (
         <div style={{ padding: '40px 0' }}>
           <Spin size={32} />
-          <div style={{ marginTop: 16, color: '#8c8ca1' }}>加载中...</div>
+          <div style={{ marginTop: 16, color: 'var(--color-text-3)' }}>加载中...</div>
         </div>
       )}
       {error && (
-        <div style={{ padding: '40px 0', color: '#8c8ca1' }}>{error}</div>
+        <div style={{ padding: '40px 0', color: 'var(--color-text-3)' }}>{error}</div>
       )}
       <div
         id="wecom-qr-container"

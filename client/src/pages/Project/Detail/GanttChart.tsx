@@ -229,7 +229,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
     fs: number,
     bg?: string,
   ) => (
-    <div style={{ display: 'flex', height: h, borderBottom: '1px solid #e4e6ef', background: bg }}>
+    <div style={{ display: 'flex', height: h, borderBottom: '1px solid var(--color-border-2)', background: bg }}>
       {groups.map((g, i) => (
         <div
           key={i}
@@ -237,10 +237,10 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
             width: g.days * dayWidth,
             minWidth: g.days * dayWidth,
             flexShrink: 0,
-            borderRight: '1px solid #e4e6ef',
+            borderRight: '1px solid var(--color-border-2)',
             paddingLeft: 6,
             fontSize: fs,
-            color: '#4e5969',
+            color: 'var(--color-text-2)',
             overflow: 'hidden',
             whiteSpace: 'nowrap',
             display: 'flex',
@@ -270,7 +270,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
         const weekGroups  = getWeekGroups(rangeStart, rangeEnd);
         return (
           <>
-            {renderGroupRow(monthGroups, HEADER_TOP, 10, '#f7f8ff')}
+            {renderGroupRow(monthGroups, HEADER_TOP, 10, 'var(--color-primary-light-1)')}
             {renderGroupRow(weekGroups, HEADER_H, 11)}
           </>
         );
@@ -282,8 +282,8 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
         for (let i = 0; i < totalDays; i++) days.push(rangeStart.add(i, 'day'));
         return (
           <>
-            {renderGroupRow(monthGroups, HEADER_TOP, 10, '#f7f8ff')}
-            <div style={{ display: 'flex', height: HEADER_H, borderBottom: '1px solid #e4e6ef' }}>
+            {renderGroupRow(monthGroups, HEADER_TOP, 10, 'var(--color-primary-light-1)')}
+            <div style={{ display: 'flex', height: HEADER_H, borderBottom: '1px solid var(--color-border-2)' }}>
               {days.map((d, i) => {
                 const isWeekend = d.day() === 0 || d.day() === 6;
                 const isToday   = d.isSame(dayjs(), 'day');
@@ -293,10 +293,10 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                     style={{
                       width: dayWidth, minWidth: dayWidth, flexShrink: 0,
                       textAlign: 'center', fontSize: 11,
-                      color: isToday ? TODAY_COLOR : isWeekend ? '#c2c7d0' : '#4e5969',
-                      borderRight: '1px solid #f0f0f0',
+                      color: isToday ? TODAY_COLOR : isWeekend ? 'var(--color-text-4)' : 'var(--color-text-2)',
+                      borderRight: '1px solid var(--color-border-3)',
                       fontWeight: isToday ? 700 : undefined,
-                      background: isWeekend ? '#fafafa' : undefined,
+                      background: isWeekend ? 'var(--color-fill-1)' : undefined,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
@@ -313,7 +313,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
 
   if (activities.length === 0) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#86909c' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-3)' }}>
         暂无活动数据，请先创建活动
       </div>
     );
@@ -353,18 +353,18 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
       {/* 图例 */}
       <div style={{ display: 'flex', gap: 12, paddingBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {LEGEND_ITEMS.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: item.color || '#86909c' }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: item.color || 'var(--color-text-3)' }}>
             {item.icon}<span>{item.label}</span>
           </div>
         ))}
       </div>
       {/* 时间轴表头行 */}
-      <div style={{ display: 'flex', border: '1px solid #e4e6ef', borderBottom: 'none', borderRadius: isFixed ? 0 : '6px 6px 0 0', background: '#fafafa' }}>
-        <div style={{ width: LABEL_COL_W, minWidth: LABEL_COL_W, flexShrink: 0, height: headerHeight, borderRight: '1px solid #e4e6ef', display: 'flex', alignItems: 'center', paddingLeft: 12, fontWeight: 600, fontSize: 13 }}>
+      <div style={{ display: 'flex', border: '1px solid var(--color-border-2)', borderBottom: 'none', borderRadius: isFixed ? 0 : '6px 6px 0 0', background: 'var(--color-fill-1)' }}>
+        <div style={{ width: LABEL_COL_W, minWidth: LABEL_COL_W, flexShrink: 0, height: headerHeight, borderRight: '1px solid var(--color-border-2)', display: 'flex', alignItems: 'center', paddingLeft: 12, fontWeight: 600, fontSize: 13 }}>
           活动名称
         </div>
         <div ref={scrollRef} style={{ overflow: 'hidden', flex: 1 }}>
-          <div style={{ width: totalWidth, minWidth: '100%', background: '#fafafa' }}>{renderHeader()}</div>
+          <div style={{ width: totalWidth, minWidth: '100%', background: 'var(--color-fill-1)' }}>{renderHeader()}</div>
         </div>
       </div>
     </>
@@ -373,7 +373,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
   return (
     <div ref={outerRef}>
       {/* ===== 普通流表头：始终保留空间，未固定时可见 ===== */}
-      <div style={{ visibility: headerFixed ? 'hidden' : 'visible', background: '#fff' }}>
+      <div style={{ visibility: headerFixed ? 'hidden' : 'visible', background: 'var(--color-bg-1)' }}>
         {renderHeaderBlock(headerScrollRef)}
       </div>
 
@@ -385,8 +385,8 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
           left: fixedPos.left,
           width: fixedPos.width,
           zIndex: 1000,
-          background: '#fff',
-          borderBottom: '1px solid #e4e6ef',
+          background: 'var(--color-bg-1)',
+          borderBottom: '1px solid var(--color-border-2)',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
         }}>
           {renderHeaderBlock(fixedScrollRef, true)}
@@ -395,10 +395,10 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
       )}
 
       {/* ===== 活动行区域（自然高度，跟随页面滚动） ===== */}
-      <div style={{ display: 'flex', border: '1px solid #e4e6ef', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
+      <div style={{ display: 'flex', border: '1px solid var(--color-border-2)', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
 
         {/* 左侧标签列（横向固定，无独立滚动） */}
-        <div style={{ width: LABEL_COL_W, minWidth: LABEL_COL_W, flexShrink: 0, borderRight: '1px solid #e4e6ef', background: '#fff', position: 'relative', zIndex: 2 }}>
+        <div style={{ width: LABEL_COL_W, minWidth: LABEL_COL_W, flexShrink: 0, borderRight: '1px solid var(--color-border-2)', background: 'var(--color-bg-1)', position: 'relative', zIndex: 2 }}>
           {activities.map((a, idx) => {
             const statusCfg = ACTIVITY_STATUS_MAP[a.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: a.status, color: 'default' };
             return (
@@ -408,14 +408,14 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                   height: ROW_H,
                   display: 'flex', alignItems: 'center',
                   paddingLeft: 12, paddingRight: 8,
-                  borderBottom: '1px solid #f2f3f5',
-                  background: hoveredId === a.id ? '#f7f8ff' : (idx % 2 === 0 ? '#fff' : '#fafafa'),
+                  borderBottom: '1px solid var(--color-fill-2)',
+                  background: hoveredId === a.id ? 'var(--color-primary-light-1)' : (idx % 2 === 0 ? 'var(--color-bg-1)' : 'var(--color-fill-1)'),
                   fontSize: 12, gap: 6, overflow: 'hidden',
                 }}
                 onMouseEnter={() => setHoveredId(a.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
-                <span style={{ color: '#86909c', fontFamily: 'monospace', fontSize: 11 }}>
+                <span style={{ color: 'var(--color-text-3)', fontFamily: 'monospace', fontSize: 11 }}>
                   {String(idx + 1).padStart(3, '0')}
                 </span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
@@ -475,8 +475,8 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                   <div
                     style={{
                       height: ROW_H, position: 'relative',
-                      borderBottom: '1px solid #f2f3f5',
-                      background: hoveredId === a.id ? '#f7f8ff' : (idx % 2 === 0 ? '#fff' : '#fafafa'),
+                      borderBottom: '1px solid var(--color-fill-2)',
+                      background: hoveredId === a.id ? 'var(--color-primary-light-1)' : (idx % 2 === 0 ? 'var(--color-bg-1)' : 'var(--color-fill-1)'),
                     }}
                     onMouseEnter={() => setHoveredId(a.id)}
                     onMouseLeave={() => setHoveredId(null)}
@@ -502,7 +502,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                           position: 'absolute',
                           left: actualBar.x, top: BAR_Y_ACT,
                           width: actualBar.w, height: BAR_H_ACT,
-                          background: '#e8e8e8',
+                          background: 'var(--color-fill-3)',
                           borderRadius: 3, overflow: 'hidden',
                         }}
                       >

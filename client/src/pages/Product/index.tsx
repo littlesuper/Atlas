@@ -655,12 +655,12 @@ const ProductPage: React.FC = () => {
               hoverable
               style={{
                 cursor: 'pointer',
-                border: selectedStatus === card.status ? '2px solid #165DFF' : '1px solid #e5e6eb',
+                border: selectedStatus === card.status ? '2px solid rgb(var(--primary-6))' : '1px solid var(--color-border)',
               }}
               bodyStyle={{ padding: '12px 16px' }}
               onClick={() => handleStatClick(card.status)}
             >
-              <div style={{ fontSize: 12, color: '#86909c', marginBottom: 4 }}>{card.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 4 }}>{card.label}</div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>{card.value}</div>
             </Card>
           ))}
@@ -1038,12 +1038,12 @@ const ProductPage: React.FC = () => {
                              log.action === 'DELETE' ? '删除' :
                              log.action === 'COPY' ? '复制' : log.action}
                           </Tag>
-                          <span style={{ color: '#86909c', marginLeft: 8 }}>
+                          <span style={{ color: 'var(--color-text-3)', marginLeft: 8 }}>
                             {new Date(log.createdAt).toLocaleString('zh-CN')}
                           </span>
                         </div>
                         {log.changes && Object.keys(log.changes).length > 0 && (
-                          <div style={{ fontSize: 12, color: '#4e5969', marginTop: 4 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginTop: 4 }}>
                             {Object.entries(log.changes).map(([field, change]) => (
                               <div key={field}>
                                 {field}: {String(change.from || '-')} → {String(change.to || '-')}
@@ -1055,7 +1055,7 @@ const ProductPage: React.FC = () => {
                     ))}
                   </Timeline>
                 ) : (
-                  <div style={{ color: '#86909c', padding: '8px 0' }}>暂无变更记录</div>
+                  <div style={{ color: 'var(--color-text-3)', padding: '8px 0' }}>暂无变更记录</div>
                 )}
               </Collapse.Item>
             </Collapse>
@@ -1099,7 +1099,7 @@ const ProductPage: React.FC = () => {
               render: (field: string) => (
                 <span style={{
                   fontWeight: field.startsWith('---') ? 600 : 400,
-                  color: field.startsWith('---') ? '#165DFF' : undefined,
+                  color: field.startsWith('---') ? 'rgb(var(--primary-6))' : undefined,
                 }}>
                   {field.replace(/---/g, '').trim() || field}
                 </span>
@@ -1115,7 +1115,7 @@ const ProductPage: React.FC = () => {
                 const allSame = record.values.every((v) => v === record.values[0]);
                 return (
                   <span style={{
-                    background: !allSame && !record.field.startsWith('---') ? '#fff7e6' : undefined,
+                    background: !allSame && !record.field.startsWith('---') ? 'var(--highlight-bg)' : undefined,
                     padding: !allSame ? '2px 4px' : undefined,
                     borderRadius: 2,
                   }}>
