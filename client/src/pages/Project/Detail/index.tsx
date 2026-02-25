@@ -2015,7 +2015,7 @@ const ProjectDetail: React.FC = () => {
 
         {/* 归档管理抽屉 */}
         <Drawer
-          width={500}
+          width={960}
           title="归档管理"
           visible={archiveDrawerVisible}
           onCancel={() => { setArchiveDrawerVisible(false); setExpandedArchiveId(null); setArchiveDetail(null); }}
@@ -2077,31 +2077,32 @@ const ProjectDetail: React.FC = () => {
                         {archiveDetailLoading ? (
                           <div style={{ textAlign: 'center', padding: '16px 0' }}><Spin /></div>
                         ) : archiveDetail?.snapshot?.length ? (
-                          <div style={{ background: '#fafafa', borderRadius: 6, padding: '8px 12px', maxHeight: 400, overflowY: 'auto' }}>
-                            {archiveDetail.snapshot.map((a: Activity) => {
-                              const stCfg = ACTIVITY_STATUS_MAP[a.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: a.status, color: 'default' };
-                              return (
-                                <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                  <div style={{ fontSize: 13, fontWeight: 500 }}>{a.name}</div>
-                                  <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                                    <Tag size="small" color={stCfg.color}>{stCfg.label}</Tag>
-                                    {a.phase && <Tag size="small" color={PHASE_COLOR[a.phase] || 'default'}>{a.phase}</Tag>}
-                                    {a.assignees && a.assignees.length > 0 && (
-                                      <span style={{ fontSize: 12, color: '#86909c' }}>
-                                        {a.assignees.map(u => u.realName).join(', ')}
-                                      </span>
-                                    )}
-                                    {a.planStartDate && (
-                                      <span style={{ fontSize: 12, color: '#86909c' }}>
-                                        {dayjs(a.planStartDate).format('MM-DD')}
-                                        {a.planEndDate ? ` ~ ${dayjs(a.planEndDate).format('MM-DD')}` : ''}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          <Table
+                            columns={[
+                              { title: 'ID', width: 50, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: '#86909c', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
+                              { title: '阶段', width: 60, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
+                              { title: '活动名称', dataIndex: 'name', width: 160, ellipsis: true },
+                              { title: '类型', width: 70, dataIndex: 'type', render: (v: string) => { const cfg = ACTIVITY_TYPE_MAP[v as keyof typeof ACTIVITY_TYPE_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
+                              { title: '状态', width: 80, dataIndex: 'status', render: (v: string) => { const cfg = ACTIVITY_STATUS_MAP[v as keyof typeof ACTIVITY_STATUS_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
+                              { title: '负责人', width: 90, dataIndex: 'assignees', render: (v: Array<{realName: string}>) => v?.length ? v.map(u => u.realName).join(', ') : '-' },
+                              { title: '计划工期', width: 70, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
+                              { title: '计划时间', width: 150, render: (_: unknown, r: Activity) => r.planStartDate ? `${dayjs(r.planStartDate).format('MM-DD')}${r.planEndDate ? ' ~ ' + dayjs(r.planEndDate).format('MM-DD') : ''}` : '-' },
+                              { title: '实际时间', width: 150, render: (_: unknown, r: Activity) => {
+                                if (!r.startDate) return '-';
+                                const text = `${dayjs(r.startDate).format('MM-DD')}${r.endDate ? ' ~ ' + dayjs(r.endDate).format('MM-DD') : ''}`;
+                                const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
+                                return <span style={overdue ? { color: '#f53f3f' } : undefined}>{text}</span>;
+                              }},
+                              { title: '备注', width: 120, dataIndex: 'notes', ellipsis: true, render: (v: string | null) => v || '-' },
+                            ]}
+                            data={archiveDetail.snapshot}
+                            rowKey="id"
+                            pagination={false}
+                            size="small"
+                            scroll={{ x: 1060, y: 360 }}
+                            style={{ background: '#fafafa', borderRadius: 6 }}
+                            border={{ bodyCell: true }}
+                          />
                         ) : (
                           <Empty description="该归档无活动数据" style={{ padding: '12px 0' }} />
                         )}
