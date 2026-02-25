@@ -81,6 +81,7 @@ const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
   { key: 'type', label: '类型', removable: true },
   { key: 'status', label: '状态', removable: true },
 { key: 'assignee', label: '负责人', removable: true },
+  { key: 'planDuration', label: '计划工期', removable: true },
   { key: 'planDates', label: '计划时间', removable: true },
   { key: 'actualDates', label: '实际时间', removable: true },
   { key: 'notes', label: '备注', removable: true },
@@ -103,6 +104,7 @@ const COLUMN_WIDTH_MAP: Record<string, number> = {
   type: 80,
   status: 100,
   assignee: 100,
+  planDuration: 70,
   planDates: 170,
   actualDates: 170,
   notes: 140,
@@ -958,6 +960,15 @@ const ProjectDetail: React.FC = () => {
             {names}
           </span>
         );
+      },
+    },
+    planDuration: {
+      title: '计划工期',
+      width: 70,
+      render: (_: unknown, record: Activity) => {
+        if (!record.planStartDate || !record.planEndDate) return <span style={{ color: '#c2c7d0' }}>-</span>;
+        const days = calcWorkdays(dayjs(record.planStartDate), dayjs(record.planEndDate));
+        return <span>{days}天</span>;
       },
     },
     planDates: {
