@@ -5,6 +5,7 @@ import { requirePermission, canManageProject, sanitizePagination } from '../midd
 import { calculateWorkdays } from '../utils/workday';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
 import { updateProjectProgress } from '../utils/projectProgress';
+import { auditLog, diffFields } from '../utils/auditLog';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -301,7 +302,6 @@ router.post(
         description,
         type,
         phase,
-        assigneeId,
         assigneeIds,
         status,
         priority,
@@ -349,8 +349,8 @@ router.post(
         }
       }
 
-      // 解析负责人列表（兼容 assigneeId 单值和 assigneeIds 数组）
-      const resolvedAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : assigneeId ? [assigneeId] : [];
+      // 解析负责人列表
+      const resolvedAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
 
       // 根据依赖关系自动计算计划日期
       let resolvedPlanStart = planStartDate ? new Date(planStartDate) : null;
@@ -385,7 +385,6 @@ router.post(
           description,
           type: type || ActivityType.TASK,
           phase,
-          assigneeId: resolvedAssigneeIds[0] || null,
           assignees: resolvedAssigneeIds.length > 0 ? { connect: resolvedAssigneeIds.map((uid: string) => ({ id: uid })) } : undefined,
           status: status || 'NOT_STARTED',
           priority,
@@ -412,6 +411,8 @@ router.post(
 
       // 自动更新项目进度
       await updateProjectProgress(projectId);
+
+      auditLog({ req, action: 'CREATE', resourceType: 'activity', resourceId: activity.id, resourceName: activity.name });
 
       res.status(201).json(activity);
     } catch (error) {
@@ -443,11 +444,13 @@ router.post('/project/:projectId/archives', authenticate, requirePermission('act
       },
     });
 
+    const { label } = req.body || {};
+
     const archive = await prisma.activityArchive.create({
-      data: { projectId, snapshot: activities as any },
+      data: { projectId, label: label || null, snapshot: activities as any },
     });
 
-    res.status(201).json({ id: archive.id, createdAt: archive.createdAt, count: activities.length });
+    res.status(201).json({ id: archive.id, label: archive.label, createdAt: archive.createdAt, count: activities.length });
   } catch (error) {
     console.error('创建归档错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
@@ -465,11 +468,12 @@ router.get('/project/:projectId/archives', authenticate, async (req: Request, re
     const archives = await prisma.activityArchive.findMany({
       where: { projectId },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, createdAt: true, snapshot: true },
+      select: { id: true, label: true, createdAt: true, snapshot: true },
     });
 
     const result = archives.map(a => ({
       id: a.id,
+      label: a.label,
       createdAt: a.createdAt,
       count: Array.isArray(a.snapshot) ? (a.snapshot as any[]).length : 0,
     }));
@@ -531,7 +535,6 @@ router.put(
         description,
         type,
         phase,
-        assigneeId,
         assigneeIds,
         status,
         priority,
@@ -573,14 +576,10 @@ router.put(
       if (type !== undefined) updateData.type = type;
       if (phase !== undefined) updateData.phase = phase;
 
-      // 处理负责人多选（兼容 assigneeIds 数组和旧的 assigneeId 单值）
+      // 处理负责人多选
       if (assigneeIds !== undefined) {
         const ids: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
         updateData.assignees = { set: ids.map((uid: string) => ({ id: uid })) };
-        updateData.assigneeId = ids[0] || null;
-      } else if (assigneeId !== undefined) {
-        updateData.assigneeId = assigneeId || null;
-        updateData.assignees = assigneeId ? { set: [{ id: assigneeId }] } : { set: [] };
       }
       if (status !== undefined) updateData.status = status;
       if (priority !== undefined) updateData.priority = priority;
@@ -692,6 +691,9 @@ router.put(
       // 自动更新项目进度
       await updateProjectProgress(existingActivity.projectId);
 
+      const changes = diffFields(existingActivity as any, activity as any, ['name', 'status', 'type', 'phase', 'planStartDate', 'planEndDate', 'startDate', 'endDate']);
+      auditLog({ req, action: 'UPDATE', resourceType: 'activity', resourceId: activity.id, resourceName: activity.name, changes });
+
       res.json(activity);
     } catch (error) {
       console.error('更新活动错误:', error);
@@ -742,6 +744,8 @@ router.delete(
 
       // 自动更新项目进度
       await updateProjectProgress(projectId);
+
+      auditLog({ req, action: 'DELETE', resourceType: 'activity', resourceId: id, resourceName: existingActivity.name });
 
       res.json({ success: true });
     } catch (error) {
@@ -797,6 +801,305 @@ router.put('/project/:projectId/reorder', authenticate, requirePermission('activ
     res.json({ success: true });
   } catch (error) {
     console.error('批量排序错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * POST /api/activities/archives/compare
+ * 对比两个归档（或归档 vs 当前活动）
+ */
+router.post('/archives/compare', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { archiveId1, archiveId2, projectId } = req.body;
+    if (!archiveId1 || !projectId) {
+      res.status(400).json({ error: '参数不完整' }); return;
+    }
+
+    // 获取归档1
+    const archive1 = await prisma.activityArchive.findUnique({ where: { id: archiveId1 } });
+    if (!archive1) { res.status(404).json({ error: '归档1不存在' }); return; }
+    const snap1 = Array.isArray(archive1.snapshot) ? archive1.snapshot as any[] : [];
+
+    // 获取归档2或当前活动
+    let snap2: any[];
+    if (archiveId2 === 'current') {
+      const currentActivities = await prisma.activity.findMany({
+        where: { projectId },
+        orderBy: { sortOrder: 'asc' },
+        include: { assignees: { select: { id: true, realName: true } } },
+      });
+      snap2 = currentActivities;
+    } else {
+      const archive2 = await prisma.activityArchive.findUnique({ where: { id: archiveId2 } });
+      if (!archive2) { res.status(404).json({ error: '归档2不存在' }); return; }
+      snap2 = Array.isArray(archive2.snapshot) ? archive2.snapshot as any[] : [];
+    }
+
+    // 按活动名称匹配计算差异
+    const map1 = new Map(snap1.map((a: any) => [a.name, a]));
+    const map2 = new Map(snap2.map((a: any) => [a.name, a]));
+
+    const diffs: any[] = [];
+
+    // 检查 snap2 中的活动
+    for (const [name, a2] of map2) {
+      const a1 = map1.get(name);
+      if (!a1) {
+        diffs.push({ name, type: 'added', current: a2 });
+      } else {
+        // 比较关键字段
+        const changes: string[] = [];
+        if (a1.status !== a2.status) changes.push('status');
+        if (a1.phase !== a2.phase) changes.push('phase');
+        if (JSON.stringify(a1.planStartDate) !== JSON.stringify(a2.planStartDate)) changes.push('planStartDate');
+        if (JSON.stringify(a1.planEndDate) !== JSON.stringify(a2.planEndDate)) changes.push('planEndDate');
+        if (a1.planDuration !== a2.planDuration) changes.push('planDuration');
+        if (changes.length > 0) {
+          diffs.push({ name, type: 'changed', changes, before: a1, current: a2 });
+        } else {
+          diffs.push({ name, type: 'unchanged' });
+        }
+      }
+    }
+
+    // 检查 snap1 中已删除的活动
+    for (const [name, a1] of map1) {
+      if (!map2.has(name)) {
+        diffs.push({ name, type: 'deleted', before: a1 });
+      }
+    }
+
+    res.json({ diffs });
+  } catch (error) {
+    console.error('对比归档错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * PUT /api/activities/batch-update
+ * 批量更新活动
+ */
+router.put('/batch-update', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { ids, updates } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: '请选择活动' }); return;
+    }
+
+    // 验证所有活动属于同一项目
+    const activities = await prisma.activity.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, projectId: true },
+    });
+    const projectIds = [...new Set(activities.map(a => a.projectId))];
+    if (projectIds.length !== 1) {
+      res.status(400).json({ error: '批量操作仅支持同一项目的活动' }); return;
+    }
+
+    const projectId = projectIds[0];
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { managerId: true } });
+    if (!canManageProject(req, project?.managerId ?? '', projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    for (const actId of ids) {
+      const updateData: any = {};
+      if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.phase !== undefined) updateData.phase = updates.phase;
+      if (updates.assigneeIds !== undefined) {
+        updateData.assignees = { set: updates.assigneeIds.map((uid: string) => ({ id: uid })) };
+      }
+      await prisma.activity.update({ where: { id: actId }, data: updateData });
+    }
+
+    await updateProjectProgress(projectId);
+    res.json({ success: true, count: ids.length });
+  } catch (error) {
+    console.error('批量更新错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * DELETE /api/activities/batch-delete
+ * 批量删除活动
+ */
+router.delete('/batch-delete', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: '请选择活动' }); return;
+    }
+
+    const activities = await prisma.activity.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, projectId: true },
+    });
+    const projectIds = [...new Set(activities.map(a => a.projectId))];
+    if (projectIds.length !== 1) {
+      res.status(400).json({ error: '批量操作仅支持同一项目的活动' }); return;
+    }
+
+    const projectId = projectIds[0];
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { managerId: true } });
+    if (!canManageProject(req, project?.managerId ?? '', projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    await prisma.activity.deleteMany({ where: { id: { in: ids } } });
+    await updateProjectProgress(projectId);
+    res.json({ success: true, count: ids.length });
+  } catch (error) {
+    console.error('批量删除错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * GET /api/activities/project/:projectId/critical-path
+ * 计算关键路径
+ */
+router.get('/project/:projectId/critical-path', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const activities = await prisma.activity.findMany({
+      where: { projectId },
+      select: { id: true, planStartDate: true, planEndDate: true, planDuration: true, dependencies: true },
+    });
+
+    if (activities.length === 0) {
+      res.json({ criticalActivityIds: [] }); return;
+    }
+
+    // Build dependency graph
+    const actMap = new Map(activities.map(a => [a.id, a]));
+    const successors = new Map<string, string[]>();
+    const predecessors = new Map<string, string[]>();
+
+    for (const a of activities) {
+      if (!a.dependencies || !Array.isArray(a.dependencies)) continue;
+      for (const dep of a.dependencies as any[]) {
+        if (!actMap.has(dep.id)) continue;
+        const succ = successors.get(dep.id);
+        if (succ) succ.push(a.id);
+        else successors.set(dep.id, [a.id]);
+        const pred = predecessors.get(a.id);
+        if (pred) pred.push(dep.id);
+        else predecessors.set(a.id, [dep.id]);
+      }
+    }
+
+    // Forward pass: Early Start (ES) and Early Finish (EF)
+    const es = new Map<string, number>();
+    const ef = new Map<string, number>();
+    const duration = new Map<string, number>();
+
+    for (const a of activities) {
+      duration.set(a.id, a.planDuration || 1);
+    }
+
+    // Topological sort
+    const inDegree = new Map<string, number>();
+    for (const a of activities) {
+      inDegree.set(a.id, (predecessors.get(a.id) || []).length);
+    }
+    const queue: string[] = [];
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const topoOrder: string[] = [];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      topoOrder.push(id);
+      for (const succId of (successors.get(id) || [])) {
+        const newDeg = (inDegree.get(succId) || 1) - 1;
+        inDegree.set(succId, newDeg);
+        if (newDeg === 0) queue.push(succId);
+      }
+    }
+
+    // Forward pass
+    for (const id of topoOrder) {
+      const preds = predecessors.get(id) || [];
+      const earlyStart = preds.length > 0 ? Math.max(...preds.map(p => ef.get(p) || 0)) : 0;
+      es.set(id, earlyStart);
+      ef.set(id, earlyStart + (duration.get(id) || 1));
+    }
+
+    // Backward pass: Late Start (LS) and Late Finish (LF)
+    const projectEnd = Math.max(...activities.map(a => ef.get(a.id) || 0));
+    const ls = new Map<string, number>();
+    const lf = new Map<string, number>();
+
+    for (const id of topoOrder.slice().reverse()) {
+      const succs = successors.get(id) || [];
+      const lateFinish = succs.length > 0 ? Math.min(...succs.map(s => ls.get(s) || projectEnd)) : projectEnd;
+      lf.set(id, lateFinish);
+      ls.set(id, lateFinish - (duration.get(id) || 1));
+    }
+
+    // Critical path: float = 0
+    const criticalActivityIds = activities
+      .filter(a => {
+        const float = (ls.get(a.id) || 0) - (es.get(a.id) || 0);
+        return float === 0;
+      })
+      .map(a => a.id);
+
+    res.json({ criticalActivityIds });
+  } catch (error) {
+    console.error('计算关键路径错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * GET /api/activities/workload
+ * 资源负载统计
+ */
+router.get('/workload', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.query;
+
+    const where: any = {};
+    if (projectId) where.projectId = projectId;
+
+    const activities = await prisma.activity.findMany({
+      where,
+      include: {
+        assignees: { select: { id: true, realName: true, username: true } },
+      },
+    });
+
+    // Aggregate by assignee
+    const userMap = new Map<string, {
+      userId: string; realName: string; username: string;
+      totalActivities: number; inProgress: number; overdue: number; totalDuration: number;
+    }>();
+
+    const now = new Date();
+    for (const a of activities) {
+      for (const u of a.assignees) {
+        let entry = userMap.get(u.id);
+        if (!entry) {
+          entry = { userId: u.id, realName: u.realName, username: u.username, totalActivities: 0, inProgress: 0, overdue: 0, totalDuration: 0 };
+          userMap.set(u.id, entry);
+        }
+        entry.totalActivities++;
+        if (a.status === 'IN_PROGRESS') entry.inProgress++;
+        if (a.planEndDate && a.planEndDate < now && a.status !== 'COMPLETED' && a.status !== 'CANCELLED') {
+          entry.overdue++;
+        }
+        entry.totalDuration += a.planDuration || 0;
+      }
+    }
+
+    res.json(Array.from(userMap.values()));
+  } catch (error) {
+    console.error('获取资源负载错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

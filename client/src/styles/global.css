@@ -377,6 +377,11 @@ tr.drag-insert-below td:first-child::before {
   background: rgba(79, 124, 255, 0.1);
 }
 
+/* ============ 归档对比差异行 ============ */
+tr.row-diff-added td { background: rgba(0, 180, 42, 0.08) !important; }
+tr.row-diff-deleted td { background: rgba(245, 63, 63, 0.08) !important; }
+tr.row-diff-changed td { background: rgba(255, 165, 0, 0.08) !important; }
+
 /* ============ 主题切换按钮 ============ */
 .theme-toggle-btn {
   display: flex;

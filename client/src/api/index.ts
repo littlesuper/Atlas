@@ -6,6 +6,8 @@ import {
   Project,
   Activity,
   ActivityArchive,
+  ActivityComment,
+  Notification,
   Product,
   ProductChangeLog,
   WeeklyReport,
@@ -206,17 +208,39 @@ export const activitiesApi = {
     request.put(`/activities/project/${projectId}/reorder`, { items }),
 
   // 归档快照 CRUD
-  createArchive: (projectId: string) =>
-    request.post<{ id: string; createdAt: string; count: number }>(`/activities/project/${projectId}/archives`),
+  createArchive: (projectId: string, label?: string) =>
+    request.post<{ id: string; label?: string; createdAt: string; count: number }>(`/activities/project/${projectId}/archives`, { label }),
 
   listArchives: (projectId: string) =>
-    request.get<Array<{ id: string; createdAt: string; count: number }>>(`/activities/project/${projectId}/archives`),
+    request.get<Array<{ id: string; label?: string; createdAt: string; count: number }>>(`/activities/project/${projectId}/archives`),
 
   getArchive: (archiveId: string) =>
     request.get<ActivityArchive>(`/activities/archives/${archiveId}`),
 
   deleteArchive: (archiveId: string) =>
     request.delete(`/activities/archives/${archiveId}`),
+
+  // 归档对比
+  compareArchives: (archiveId1: string, archiveId2: string, projectId: string) =>
+    request.post<{ diffs: Array<{ name: string; type: string; changes?: string[]; before?: any; current?: any }> }>('/activities/archives/compare', { archiveId1, archiveId2, projectId }),
+
+  // 批量操作
+  batchUpdate: (ids: string[], updates: { status?: string; assigneeIds?: string[]; phase?: string }) =>
+    request.put<{ success: boolean; count: number }>('/activities/batch-update', { ids, updates }),
+
+  batchDelete: (ids: string[]) =>
+    request.delete<{ success: boolean; count: number }>('/activities/batch-delete', { data: { ids } }),
+
+  // 关键路径
+  getCriticalPath: (projectId: string) =>
+    request.get<{ criticalActivityIds: string[] }>(`/activities/project/${projectId}/critical-path`),
+
+  // 资源负载
+  getWorkload: (params?: { projectId?: string }) =>
+    request.get<Array<{
+      userId: string; realName: string; username: string;
+      totalActivities: number; inProgress: number; overdue: number; totalDuration: number;
+    }>>('/activities/workload', { params }),
 };
 
 // ============ 产品管理 API ============
@@ -302,15 +326,8 @@ export const auditLogsApi = {
 
 // ============ 风险评估 API ============
 export const riskApi = {
-  getHistory: (projectId: string) =>
-    request.get<Array<{
-      id: string;
-      projectId: string;
-      riskLevel: string;
-      riskFactors: Array<{ factor: string; severity: string; description: string }>;
-      suggestions: string[];
-      assessedAt: string;
-    }>>(`/risk/project/${projectId}`),
+  getHistory: (projectId: string, params?: { page?: number; pageSize?: number }) =>
+    request.get<any>(`/risk/project/${projectId}`, { params }),
 
   assess: (projectId: string) =>
     request.post<{
@@ -320,6 +337,12 @@ export const riskApi = {
       suggestions: string[];
       assessedAt: string;
     }>(`/risk/project/${projectId}/assess`),
+
+  delete: (id: string) =>
+    request.delete(`/risk/${id}`),
+
+  getSummary: () =>
+    request.get<Array<{ projectId: string; projectName: string; riskLevel: string; assessedAt: string }>>('/risk/summary'),
 };
 
 // ============ 周报管理 API ============
@@ -403,6 +426,36 @@ export const wecomConfigApi = {
 
   update: (data: { corpId?: string; agentId?: string; secret?: string; redirectUri?: string }) =>
     request.put<WecomConfig>('/wecom-config', data),
+};
+
+// ============ 活动评论 API ============
+export const activityCommentsApi = {
+  list: (activityId: string, params?: { page?: number; pageSize?: number }) =>
+    request.get<PaginatedResponse<ActivityComment>>(`/activity-comments/activity/${activityId}`, { params }),
+
+  create: (data: { activityId: string; content: string }) =>
+    request.post<ActivityComment>('/activity-comments', data),
+
+  delete: (id: string) =>
+    request.delete(`/activity-comments/${id}`),
+};
+
+// ============ 通知 API ============
+export const notificationsApi = {
+  list: (params?: { page?: number; pageSize?: number }) =>
+    request.get<PaginatedResponse<Notification> & { unreadCount: number }>('/notifications', { params }),
+
+  markRead: (id: string) =>
+    request.put(`/notifications/${id}/read`),
+
+  markAllRead: () =>
+    request.put('/notifications/read-all'),
+
+  delete: (id: string) =>
+    request.delete(`/notifications/${id}`),
+
+  generate: () =>
+    request.post<{ success: boolean; generatedCount: number }>('/notifications/generate'),
 };
 
 // ============ AI 配置管理 API ============

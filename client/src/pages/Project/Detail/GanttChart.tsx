@@ -4,6 +4,7 @@ import { Button, DatePicker, Space, Tag, Tooltip } from '@arco-design/web-react'
 import { IconRefresh } from '@arco-design/web-react/icon';
 import { Activity } from '../../../types';
 import { ACTIVITY_STATUS_MAP } from '../../../utils/constants';
+import GanttArrows, { DEP_TYPE_COLOR, DEP_TYPE_LABEL } from './GanttArrows';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
@@ -120,13 +121,20 @@ const LEGEND_ITEMS = [
   { icon: <div style={{ width: 10, height: 10, background: 'var(--status-not-started)', borderRadius: 2 }} />, label: '未开始' },
   { icon: <div style={{ width: 10, height: 10, background: 'var(--status-warning)', transform: 'rotate(45deg)' }} />, label: '里程碑' },
   { icon: <div style={{ width: 2, height: 12, background: TODAY_COLOR }} />, label: '今天', color: TODAY_COLOR },
+  { icon: <div style={{ width: 10, height: 10, border: '2px solid red', borderRadius: 2 }} />, label: '关键路径' },
+  ...Object.entries(DEP_TYPE_LABEL).map(([type, label]) => ({
+    icon: <div style={{ width: 16, height: 2, background: DEP_TYPE_COLOR[type] }} />,
+    label: `${label}依赖`,
+  })),
 ];
 
 interface GanttProps {
   activities: Activity[];
+  criticalActivityIds?: string[];
 }
 
-const GanttChart: React.FC<GanttProps> = ({ activities }) => {
+const GanttChart: React.FC<GanttProps> = ({ activities, criticalActivityIds = [] }) => {
+  const criticalSet = React.useMemo(() => new Set(criticalActivityIds), [criticalActivityIds]);
   const [viewMode, setViewMode]     = useState<ViewMode>('month');
   const [customRange, setCustomRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [hoveredId, setHoveredId]   = useState<string | null>(null);
@@ -436,6 +444,8 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
           style={{ flex: 1, overflowX: 'auto', overflowY: 'visible' }}
         >
           <div style={{ width: totalWidth, minWidth: '100%', position: 'relative' }}>
+            {/* 依赖箭头 */}
+            <GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={dayWidth} />
             {/* 今天竖线 */}
             {todayX >= 0 && todayX <= totalWidth && (
               <div
@@ -467,7 +477,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                         <div>实际：{dayjs(a.startDate).format('MM-DD')} ~ {a.endDate ? dayjs(a.endDate).format('MM-DD') : '进行中'} ({a.duration || '-'}工作日)</div>
                       )}
                       <div>状态：{ACTIVITY_STATUS_MAP[a.status as keyof typeof ACTIVITY_STATUS_MAP]?.label || a.status}</div>
-                      {(a.assignees?.length ? <div>负责人：{a.assignees.map((u) => u.realName).join(', ')}</div> : a.assignee && <div>负责人：{a.assignee.realName}</div>)}
+                      {a.assignees?.length ? <div>负责人：{a.assignees.map((u) => u.realName).join(', ')}</div> : null}
                     </div>
                   }
                   position="right"
@@ -504,6 +514,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                           width: actualBar.w, height: BAR_H_ACT,
                           background: 'var(--color-fill-3)',
                           borderRadius: 3, overflow: 'hidden',
+                          border: criticalSet.has(a.id) ? '2px solid red' : undefined,
                         }}
                       >
                         <div

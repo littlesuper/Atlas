@@ -17,6 +17,8 @@ import uploadsRoutes from './routes/uploads';
 import aiConfigRoutes from './routes/aiConfig';
 import auditLogsRoutes from './routes/auditLogs';
 import wecomConfigRoutes from './routes/wecomConfig';
+import activityCommentsRoutes from './routes/activityComments';
+import notificationsRoutes from './routes/notifications';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -109,6 +111,12 @@ app.use('/api/audit-logs', auditLogsRoutes);
 
 // 企微配置路由
 app.use('/api/wecom-config', wecomConfigRoutes);
+
+// 活动评论路由
+app.use('/api/activity-comments', activityCommentsRoutes);
+
+// 通知路由
+app.use('/api/notifications', notificationsRoutes);
 
 // ==================== 错误处理中间件 ====================
 

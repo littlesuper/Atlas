@@ -7,8 +7,10 @@ import {
   Empty,
   Message,
   Spin,
+  Pagination,
+  Modal,
 } from '@arco-design/web-react';
-import { IconThunderbolt } from '@arco-design/web-react/icon';
+import { IconThunderbolt, IconDelete } from '@arco-design/web-react/icon';
 import { riskApi } from '../../../api';
 import { RiskAssessment } from '../../../types';
 import { RISK_LEVEL_MAP } from '../../../utils/constants';
@@ -33,14 +35,25 @@ const SEVERITY_COLOR: Record<string, string> = {
 
 const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
   const [loading, setLoading] = useState(false);
   const [assessing, setAssessing] = useState(false);
 
-  const load = async () => {
+  const load = async (p = page) => {
     setLoading(true);
     try {
-      const res = await riskApi.getHistory(projectId);
-      setAssessments(res.data || []);
+      const res = await riskApi.getHistory(projectId, { page: p, pageSize });
+      const data = res.data;
+      if (Array.isArray(data)) {
+        // Backward compat: old format returns array
+        setAssessments(data);
+        setTotal(data.length);
+      } else {
+        setAssessments(data.data || []);
+        setTotal(data.total || 0);
+      }
     } catch {
       Message.error('加载风险评估历史失败');
     } finally {
@@ -49,8 +62,25 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
   };
 
   useEffect(() => {
-    load();
+    load(1);
+    setPage(1);
   }, [projectId]);
+
+  const handleDelete = (assessmentId: string) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除该评估记录吗？此操作不可恢复。',
+      onOk: async () => {
+        try {
+          await riskApi.delete(assessmentId);
+          Message.success('已删除');
+          load();
+        } catch {
+          Message.error('删除失败');
+        }
+      },
+    });
+  };
 
   const handleAssess = async () => {
     setAssessing(true);
@@ -101,9 +131,21 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
               <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: 'var(--color-text-2)' }}>历史记录</div>
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 {history.map((a) => (
-                  <RiskCard key={a.id} assessment={a} />
+                  <RiskCard key={a.id} assessment={a} onDelete={() => handleDelete(a.id)} />
                 ))}
               </Space>
+              {total > pageSize && (
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                  <Pagination
+                    current={page}
+                    pageSize={pageSize}
+                    total={total}
+                    onChange={(p) => { setPage(p); load(p); }}
+                    showTotal
+                    size="small"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -114,9 +156,10 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
   );
 };
 
-const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = ({
+const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDelete?: () => void }> = ({
   assessment,
   isLatest,
+  onDelete,
 }) => {
   const cfg = RISK_LEVEL_CONFIG[assessment.riskLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
 
@@ -147,9 +190,14 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean }> = (
             {RISK_LEVEL_MAP[assessment.riskLevel as keyof typeof RISK_LEVEL_MAP]?.label ?? assessment.riskLevel}
           </Tag>
         </Space>
-        <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
-          {dayjs(assessment.assessedAt).format('YYYY-MM-DD HH:mm')}
-        </span>
+        <Space size={8}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+            {dayjs(assessment.assessedAt).format('YYYY-MM-DD HH:mm')}
+          </span>
+          {onDelete && (
+            <Button type="text" size="mini" status="danger" icon={<IconDelete />} onClick={onDelete} />
+          )}
+        </Space>
       </div>
 
       {/* 风险因素 */}

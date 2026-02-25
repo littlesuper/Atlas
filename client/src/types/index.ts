@@ -104,8 +104,6 @@ export interface Activity {
   description?: string;
   type: ActivityType;
   phase?: string; // EVT | DVT | PVT | MP
-  assigneeId?: string | null;
-  assignee?: Pick<User, 'id' | 'realName'> | null;
   assigneeIds?: string[];
   assignees?: Pick<User, 'id' | 'realName'>[];
   status: ActivityStatus;
@@ -127,7 +125,29 @@ export interface Activity {
 export interface ActivityArchive {
   id: string;
   projectId: string;
+  label?: string | null;
   snapshot: Activity[];
+  createdAt: string;
+}
+
+export interface ActivityComment {
+  id: string;
+  activityId: string;
+  userId: string;
+  content: string;
+  user?: Pick<User, 'id' | 'realName' | 'username'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: string; // ACTIVITY_DUE | REPORT_REMINDER | MILESTONE_APPROACHING
+  title: string;
+  content: string;
+  relatedId?: string | null;
+  isRead: boolean;
   createdAt: string;
 }
 
@@ -199,12 +219,9 @@ export interface WeeklyReport {
   weekEnd: string;
   year: number;
   weekNumber: number;
-  changeOverview?: string;
-  demandAnalysis?: string;
   keyProgress?: string;
   nextWeekPlan?: string;
   riskWarning?: string;
-  risks?: unknown[];
   phaseProgress?: Record<string, PhaseProgressItem>;
   attachments?: ReportAttachment[];
   status: string; // DRAFT | SUBMITTED | ARCHIVED

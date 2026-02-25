@@ -13,6 +13,7 @@ const ProductManagement = React.lazy(() => import('./pages/Product'));
 const AdminManagement = React.lazy(() => import('./pages/Admin'));
 const WeeklyReportsSummary = React.lazy(() => import('./pages/WeeklyReports'));
 const WeeklyReportForm = React.lazy(() => import('./pages/WeeklyReports/Form'));
+const WorkloadPage = React.lazy(() => import('./pages/Workload'));
 
 // 受保护的路由组件
 interface ProtectedRouteProps {
@@ -187,6 +188,16 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <WeeklyReportForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 资源负载 */}
+          <Route
+            path="/workload"
+            element={
+              <ProtectedRoute>
+                <WorkloadPage />
               </ProtectedRoute>
             }
           />

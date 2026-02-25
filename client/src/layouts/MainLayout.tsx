@@ -4,6 +4,7 @@ import { Layout, Dropdown, Menu, Avatar, Modal, Tooltip } from '@arco-design/web
 import { IconUser, IconPoweroff, IconSun, IconMoon } from '@arco-design/web-react/icon';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import NotificationBell from '../components/NotificationBell';
 import '../styles/global.css';
 
 const { Header, Content } = Layout;
@@ -34,6 +35,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       key: '/products',
       label: '产品管理',
       path: '/products',
+    },
+    {
+      key: '/workload',
+      label: '资源负载',
+      path: '/workload',
     },
     {
       key: '/admin',
@@ -110,6 +116,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </div>
             ))}
           </div>
+
+          {/* 通知铃铛 */}
+          <NotificationBell />
 
           {/* 主题切换 */}
           <Tooltip content={theme === 'light' ? '切换为暗色模式' : '切换为明亮模式'}>

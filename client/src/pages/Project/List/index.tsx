@@ -23,7 +23,7 @@ import {
   IconDelete,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, usersApi } from '../../../api';
+import { projectsApi, usersApi, riskApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
 import { Project, User } from '../../../types';
 import {
@@ -80,6 +80,10 @@ const ProjectList: React.FC = () => {
 
   // 表单联动：追踪当前选中的项目经理
   const [selectedManagerId, setSelectedManagerId] = useState<string>('');
+
+  // 风险概览
+  const [riskSummary, setRiskSummary] = useState<Array<{ projectId: string; projectName: string; riskLevel: string; assessedAt: string }>>([]);
+  const [riskOverviewVisible, setRiskOverviewVisible] = useState(false);
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
@@ -145,6 +149,7 @@ const ProjectList: React.FC = () => {
 
   useEffect(() => {
     loadUsers();
+    riskApi.getSummary().then(res => setRiskSummary(res.data || [])).catch(() => {});
   }, []);
 
   // 统计数据（来自服务端）
@@ -404,6 +409,59 @@ const ProjectList: React.FC = () => {
             onClick={() => setSelectedStatus('ON_HOLD')}
           />
         </div>
+
+        {/* 风险概览 */}
+        {riskSummary.length > 0 && (() => {
+          const counts: Record<string, number> = {};
+          const highRisk: typeof riskSummary = [];
+          riskSummary.forEach(r => {
+            counts[r.riskLevel] = (counts[r.riskLevel] || 0) + 1;
+            if (r.riskLevel === 'HIGH' || r.riskLevel === 'CRITICAL') highRisk.push(r);
+          });
+          const levelCfg: Record<string, { label: string; color: string }> = {
+            LOW: { label: '低风险', color: 'green' },
+            MEDIUM: { label: '中风险', color: 'orange' },
+            HIGH: { label: '高风险', color: 'red' },
+            CRITICAL: { label: '严重', color: 'magenta' },
+          };
+          return (
+            <Card style={{ marginBottom: 16 }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                onClick={() => setRiskOverviewVisible(!riskOverviewVisible)}
+              >
+                <Space size={12}>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>风险概览</span>
+                  {Object.entries(levelCfg).map(([level, cfg]) => (
+                    counts[level] ? (
+                      <Tag key={level} color={cfg.color}>{cfg.label}: {counts[level]}</Tag>
+                    ) : null
+                  ))}
+                </Space>
+                <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+                  {riskOverviewVisible ? '收起' : '展开'}
+                </span>
+              </div>
+              {riskOverviewVisible && highRisk.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border-2)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>需关注项目</div>
+                  <Space wrap size={8}>
+                    {highRisk.map(r => (
+                      <Tag
+                        key={r.projectId}
+                        color={r.riskLevel === 'CRITICAL' ? 'magenta' : 'red'}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/projects/${r.projectId}?tab=risk`); }}
+                      >
+                        {r.projectName}
+                      </Tag>
+                    ))}
+                  </Space>
+                </div>
+              )}
+            </Card>
+          );
+        })()}
 
         {/* 表格卡片 */}
         <Card>

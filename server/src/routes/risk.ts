@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { assessProjectRisk } from '../utils/riskEngine';
 import { callAi } from '../utils/aiClient';
 
@@ -8,12 +9,49 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 /**
+ * GET /api/risk/summary
+ * 风险概览：每个项目的最新风险评估
+ */
+router.get('/summary', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const projects = await prisma.project.findMany({
+      where: { status: 'IN_PROGRESS' },
+      select: { id: true, name: true },
+    });
+
+    const summaries: Array<{ projectId: string; projectName: string; riskLevel: string; assessedAt: Date }> = [];
+
+    for (const p of projects) {
+      const latest = await prisma.riskAssessment.findFirst({
+        where: { projectId: p.id },
+        orderBy: { assessedAt: 'desc' },
+        select: { riskLevel: true, assessedAt: true },
+      });
+      if (latest) {
+        summaries.push({
+          projectId: p.id,
+          projectName: p.name,
+          riskLevel: latest.riskLevel,
+          assessedAt: latest.assessedAt,
+        });
+      }
+    }
+
+    res.json(summaries);
+  } catch (error) {
+    console.error('获取风险概览错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * GET /api/risk/project/:projectId
- * 获取评估历史（最近10条）
+ * 获取评估历史（分页）
  */
 router.get('/project/:projectId', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
+    const { page, pageSize } = req.query;
 
     // 检查项目是否存在
     const project = await prisma.project.findUnique({
@@ -25,7 +63,26 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
       return;
     }
 
-    // 获取最近10条评估记录
+    // 分页模式
+    if (page !== undefined || pageSize !== undefined) {
+      const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
+      const skip = (pageNum - 1) * pageSizeNum;
+
+      const [assessments, total] = await Promise.all([
+        prisma.riskAssessment.findMany({
+          where: { projectId },
+          orderBy: { assessedAt: 'desc' },
+          skip,
+          take: pageSizeNum,
+        }),
+        prisma.riskAssessment.count({ where: { projectId } }),
+      ]);
+
+      res.json({ data: assessments, total, page: pageNum, pageSize: pageSizeNum });
+      return;
+    }
+
+    // 向后兼容：不传分页参数时返回最近10条
     const assessments = await prisma.riskAssessment.findMany({
       where: { projectId },
       orderBy: { assessedAt: 'desc' },
@@ -40,21 +97,36 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
 });
 
 /**
+ * DELETE /api/risk/:id
+ * 删除风险评估记录
+ */
+router.delete('/:id', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const assessment = await prisma.riskAssessment.findUnique({ where: { id } });
+    if (!assessment) {
+      res.status(404).json({ error: '评估记录不存在' });
+      return;
+    }
+    await prisma.riskAssessment.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除评估记录错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * POST /api/risk/project/:projectId/assess
  * 发起风险评估
- * 支持AI API调用（如配置了AI_API_KEY和AI_API_URL）
- * 回退到内置规则引擎
  */
 router.post('/project/:projectId/assess', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
 
-    // 检查项目是否存在
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: {
-        activities: true,
-      },
+      include: { activities: true },
     });
 
     if (!project) {
@@ -66,7 +138,6 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
     let riskFactors: any[];
     let suggestions: string[];
 
-    // 准备分析数据
     const analysisData = {
       project: {
         name: project.name,
@@ -110,14 +181,8 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
       suggestions = result.suggestions;
     }
 
-    // 保存评估结果
     const assessment = await prisma.riskAssessment.create({
-      data: {
-        projectId,
-        riskLevel,
-        riskFactors,
-        suggestions,
-      },
+      data: { projectId, riskLevel, riskFactors, suggestions },
     });
 
     res.json(assessment);

@@ -34,9 +34,10 @@ model User {
   userRoles              UserRole[]
   managedProjects        Project[]        @relation("ProjectManager")
   collaboratingProjects  ProjectMember[]
-  assignedActivitiesOld  Activity[]       @relation("ActivityAssignee")
   assignedActivities     Activity[]       @relation("ActivityAssignees")
   createdReports         WeeklyReport[]   @relation("ReportCreator")
+  activityComments       ActivityComment[]
+  notifications          Notification[]
 
   @@map("users")
 }
@@ -169,7 +170,6 @@ model Activity {
   description   String?
   type          ActivityType   @default(TASK)
   phase         String?
-  assigneeId    String?        // deprecated, kept for migration compat
   status        ActivityStatus @default(NOT_STARTED)
   priority      Priority       @default(MEDIUM)
   planStartDate DateTime?
@@ -185,14 +185,13 @@ model Activity {
   updatedAt     DateTime       @updatedAt
 
   // 关联关系
-  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parent   Activity?  @relation("ActivityHierarchy", fields: [parentId], references: [id])
-  children Activity[] @relation("ActivityHierarchy")
-  assignee  User?      @relation("ActivityAssignee", fields: [assigneeId], references: [id])
-  assignees User[]     @relation("ActivityAssignees")
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent     Activity?         @relation("ActivityHierarchy", fields: [parentId], references: [id])
+  children   Activity[]        @relation("ActivityHierarchy")
+  assignees  User[]            @relation("ActivityAssignees")
+  comments   ActivityComment[]
 
   @@index([projectId])
-  @@index([assigneeId])
   @@index([parentId])
   @@map("activities")
 }
@@ -200,6 +199,7 @@ model Activity {
 model ActivityArchive {
   id        String   @id @default(uuid())
   projectId String
+  label     String?
   snapshot  Json     // 活动数组快照（含 assignees 等完整数据）
   createdAt DateTime @default(now())
 
@@ -242,12 +242,9 @@ model WeeklyReport {
   weekEnd         DateTime
   year            Int
   weekNumber      Int
-  changeOverview  String?
-  demandAnalysis  String?
   keyProgress     String?
   nextWeekPlan    String?
   riskWarning     String?
-  risks           Json?
   phaseProgress   Json?
   attachments     Json?
   status          ReportStatus   @default(DRAFT)
@@ -356,6 +353,41 @@ model WecomConfig {
   updatedAt   DateTime @updatedAt
 
   @@map("wecom_configs")
+}
+
+// ==================== 活动评论 ====================
+
+model ActivityComment {
+  id         String   @id @default(uuid())
+  activityId String
+  userId     String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([activityId])
+  @@map("activity_comments")
+}
+
+// ==================== 通知系统 ====================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // ACTIVITY_DUE | REPORT_REMINDER | MILESTONE_APPROACHING
+  title     String
+  content   String
+  relatedId String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }
 
 // ==================== 操作审计 ====================

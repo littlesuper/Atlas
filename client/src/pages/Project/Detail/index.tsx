@@ -37,6 +37,7 @@ import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
 import GanttChart from './GanttChart';
 import RiskAssessmentTab from './RiskAssessmentTab';
 import ProductsTab from './ProductsTab';
+import ActivityComments from './ActivityComments';
 import { Project, Activity, ActivityArchive, User } from '../../../types';
 import {
   STATUS_MAP,
@@ -187,7 +188,7 @@ const ProjectDetail: React.FC = () => {
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [archiveDrawerVisible, setArchiveDrawerVisible] = useState(false);
-  const [archiveList, setArchiveList] = useState<Array<{ id: string; createdAt: string; count: number }>>([]);
+  const [archiveList, setArchiveList] = useState<Array<{ id: string; createdAt: string; count: number; label?: string }>>([]);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [expandedArchiveId, setExpandedArchiveId] = useState<string | null>(null);
   const [archiveDetail, setArchiveDetail] = useState<ActivityArchive | null>(null);
@@ -196,6 +197,19 @@ const ProjectDetail: React.FC = () => {
 
   // 列偏好设置
   const [columnPrefs, setColumnPrefs] = useState<ColumnPrefs>(DEFAULT_COLUMN_PREFS);
+
+  // 批量操作
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // 关键路径
+  const [criticalActivityIds, setCriticalActivityIds] = useState<string[]>([]);
+  const [criticalPathFilter, setCriticalPathFilter] = useState(false);
+  // 归档标签 & 对比
+  const [archiveLabelInput, setArchiveLabelInput] = useState('');
+  const [archiveLabelModalVisible, setArchiveLabelModalVisible] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareSelections, setCompareSelections] = useState<[string | null, string | null]>([null, null]);
+  const [compareDiffs, setCompareDiffs] = useState<any[] | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   // 表单中计划/实际工期
   const [planDuration, setPlanDuration] = useState<number | null>(null);
@@ -315,11 +329,20 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  const loadCriticalPath = async () => {
+    if (!id) return;
+    try {
+      const res = await activitiesApi.getCriticalPath(id);
+      setCriticalActivityIds(res.data.criticalActivityIds || []);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     loadProject();
     loadActivities();
     loadUsers();
     loadColumnPrefs();
+    loadCriticalPath();
   }, [id]);
 
   // ===== 活动列表表头吸顶：滚动检测 =====
@@ -404,7 +427,7 @@ const ProjectDetail: React.FC = () => {
         planEnd: activity.planEndDate ? dayjs(activity.planEndDate) : undefined,
         actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
         actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
-        assigneeIds: activity.assignees?.map((a) => a.id) ?? (activity.assigneeId ? [activity.assigneeId] : []),
+        assigneeIds: activity.assignees?.map((a) => a.id) ?? [],
         notes: activity.notes,
       });
       // Load dependencies
@@ -541,10 +564,10 @@ const ProjectDetail: React.FC = () => {
     setArchiveLoading(false);
   };
 
-  const handleCreateArchive = async () => {
+  const handleCreateArchive = async (label?: string) => {
     if (!id) return;
     try {
-      await activitiesApi.createArchive(id);
+      await activitiesApi.createArchive(id, label || undefined);
       Message.success('归档创建成功');
       loadArchives();
     } catch {
@@ -720,6 +743,66 @@ const ProjectDetail: React.FC = () => {
     } catch {
       Message.error('更新失败');
     }
+  };
+
+  // ========== 批量操作 ==========
+  const handleBatchStatusUpdate = async (status: string) => {
+    if (selectedIds.size === 0) return;
+    try {
+      await activitiesApi.batchUpdate(Array.from(selectedIds), { status });
+      Message.success(`已更新 ${selectedIds.size} 个活动状态`);
+      setSelectedIds(new Set());
+      loadActivities();
+      loadProject();
+    } catch { Message.error('批量更新失败'); }
+  };
+
+  const handleBatchPhaseUpdate = async (phase: string) => {
+    if (selectedIds.size === 0) return;
+    try {
+      await activitiesApi.batchUpdate(Array.from(selectedIds), { phase });
+      Message.success(`已更新 ${selectedIds.size} 个活动阶段`);
+      setSelectedIds(new Set());
+      loadActivities();
+    } catch { Message.error('批量更新失败'); }
+  };
+
+  const handleBatchAssigneeUpdate = async (assigneeIds: string[]) => {
+    if (selectedIds.size === 0) return;
+    try {
+      await activitiesApi.batchUpdate(Array.from(selectedIds), { assigneeIds });
+      Message.success(`已更新 ${selectedIds.size} 个活动负责人`);
+      setSelectedIds(new Set());
+      loadActivities();
+    } catch { Message.error('批量更新失败'); }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedIds.size} 个活动吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await activitiesApi.batchDelete(Array.from(selectedIds));
+          Message.success(`已删除 ${selectedIds.size} 个活动`);
+          setSelectedIds(new Set());
+          loadActivities();
+          loadProject();
+        } catch { Message.error('批量删除失败'); }
+      },
+    });
+  };
+
+  // 归档对比
+  const handleCompare = async () => {
+    if (!id || !compareSelections[0] || !compareSelections[1]) return;
+    setCompareLoading(true);
+    try {
+      const res = await activitiesApi.compareArchives(compareSelections[0], compareSelections[1], id);
+      setCompareDiffs(res.data.diffs || []);
+    } catch { Message.error('对比失败'); }
+    setCompareLoading(false);
   };
 
   // 活动 ID → 序号映射（O(1) 查找替代 O(n) findIndex）
@@ -961,10 +1044,13 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ fontWeight: 500, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ fontWeight: 500, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 4 }}
             onDoubleClick={() => startInlineEdit(record.id, 'name', name)}
           >
             {name}
+            {criticalActivityIds.includes(record.id) && (
+              <Tag size="small" color="red" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>CP</Tag>
+            )}
           </span>
         );
       },
@@ -1042,7 +1128,7 @@ const ProjectDetail: React.FC = () => {
               size="small"
               allowClear
               style={{ width: 160 }}
-              value={record.assignees?.map((a) => a.id) ?? (record.assigneeId ? [record.assigneeId] : [])}
+              value={record.assignees?.map((a) => a.id) ?? []}
               onDismiss={() => {
                 setInlineEditing(null);
               }}
@@ -1060,7 +1146,7 @@ const ProjectDetail: React.FC = () => {
             </AutoOpenSelect>
           );
         }
-        const names = record.assignees?.map((a) => a.realName).join(', ') || record.assignee?.realName || '-';
+        const names = record.assignees?.map((a) => a.realName).join(', ') || '-';
         return (
           <span
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
@@ -1209,11 +1295,47 @@ const ProjectDetail: React.FC = () => {
     },
   }), [inlineEditing, inlineValue, users, project, activities, activitySeqMap]);
 
+  // 关键路径 O(1) 查找
+  const criticalSet = useMemo(() => new Set(criticalActivityIds), [criticalActivityIds]);
+
   // 根据偏好生成最终列数组
   const activityColumns = useMemo(() => {
     // 始终存在的拖拽手柄列
     const canManage = hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id);
     const canCreate = hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id);
+
+    // 批量选择列（有管理权限时显示）
+    const checkCol = canManage ? {
+      title: (
+        <input
+          type="checkbox"
+          checked={activities.length > 0 && selectedIds.size === activities.length}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedIds(new Set(activities.map(a => a.id)));
+            } else {
+              setSelectedIds(new Set());
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+        />
+      ),
+      width: 36,
+      render: (_: unknown, record: Activity) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(record.id)}
+          onChange={(e) => {
+            const next = new Set(selectedIds);
+            if (e.target.checked) next.add(record.id);
+            else next.delete(record.id);
+            setSelectedIds(next);
+          }}
+          style={{ cursor: 'pointer' }}
+        />
+      ),
+    } : null;
+
     const dragCol = {
       title: '',
       dataIndex: 'id',
@@ -1268,8 +1390,8 @@ const ProjectDetail: React.FC = () => {
       .filter((key) => visibleSet.has(key) && columnMap[key])
       .map((key) => columnMap[key]);
 
-    return [dragCol, ...middleCols, actionsCol];
-  }, [columnMap, columnPrefs, project]);
+    return [...(checkCol ? [checkCol] : []), dragCol, ...middleCols, actionsCol];
+  }, [columnMap, columnPrefs, project, activities, selectedIds, criticalSet]);
 
   // 动态计算 scroll.x
   const scrollX = useMemo(() => {
@@ -1394,6 +1516,19 @@ const ProjectDetail: React.FC = () => {
                       进行中 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
                     </span>
                   </span>
+                  {criticalActivityIds.length > 0 && (
+                    <span
+                      style={{
+                        cursor: 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 12,
+                        background: criticalPathFilter ? 'var(--color-danger-light-1)' : undefined,
+                        color: criticalPathFilter ? 'rgb(var(--danger-6))' : 'var(--color-text-3)',
+                        border: criticalPathFilter ? '1px solid var(--color-danger-light-3)' : '1px solid transparent',
+                      }}
+                      onClick={() => setCriticalPathFilter(prev => !prev)}
+                    >
+                      关键路径 <span style={{ fontWeight: 500 }}>{criticalActivityIds.length}</span>
+                    </span>
+                  )}
                   {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
                     <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
                   )}
@@ -1419,6 +1554,59 @@ const ProjectDetail: React.FC = () => {
                 </Space>
               </div>
 
+              {/* 批量操作工具栏 */}
+              {selectedIds.size > 0 && (
+                <div style={{
+                  padding: '8px 12px', marginBottom: 8, borderRadius: 6,
+                  background: 'var(--color-primary-light-1)', border: '1px solid var(--info-border)',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'rgb(var(--primary-6))' }}>
+                    已选 {selectedIds.size} 项
+                  </span>
+                  <Select
+                    size="small"
+                    placeholder="批量修改状态"
+                    style={{ width: 140 }}
+                    onChange={(v) => { if (v) handleBatchStatusUpdate(v); }}
+                    value={undefined}
+                  >
+                    {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
+                      <Select.Option key={k} value={k}>{v.label}</Select.Option>
+                    ))}
+                  </Select>
+                  <Select
+                    size="small"
+                    placeholder="批量修改阶段"
+                    style={{ width: 120 }}
+                    onChange={(v) => { if (v) handleBatchPhaseUpdate(v); }}
+                    value={undefined}
+                  >
+                    {PHASE_OPTIONS.map((p) => (
+                      <Select.Option key={p} value={p}>{p}</Select.Option>
+                    ))}
+                  </Select>
+                  <Select
+                    size="small"
+                    mode="multiple"
+                    placeholder="批量修改负责人"
+                    style={{ width: 180 }}
+                    onChange={(v: string[]) => { if (v && v.length > 0) handleBatchAssigneeUpdate(v); }}
+                    value={undefined}
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                    }
+                  >
+                    {users.map((u) => (
+                      <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
+                    ))}
+                  </Select>
+                  <Button size="small" status="danger" onClick={handleBatchDelete}>批量删除</Button>
+                  <Button size="small" type="text" onClick={() => setSelectedIds(new Set())}>取消选择</Button>
+                </div>
+              )}
+
               <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
                 {/* 自定义表格行（支持拖拽） */}
                 <Table
@@ -1426,6 +1614,7 @@ const ProjectDetail: React.FC = () => {
                   data={(() => {
                     let list = [...activities];
                     if (statusFilter) list = list.filter(a => a.status === statusFilter);
+                    if (criticalPathFilter) list = list.filter(a => criticalSet.has(a.id));
                     return list;
                   })()}
                   loading={activitiesLoading}
@@ -1576,7 +1765,7 @@ const ProjectDetail: React.FC = () => {
                         const above = idx % 2 === 0;
                         const color = statusColor[m.status] || 'var(--gantt-milestone-pending)';
                         const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
-                        const names = m.assignees?.map(a => a.realName).join('、') || m.assignee?.realName || '-';
+                        const names = m.assignees?.map(a => a.realName).join('、') || '-';
                         const dateStr = getMsDate(m)!.format('YYYY-MM-DD');
                         const cardTop = above ? axisY - stemLen - cardH : axisY + stemLen;
 
@@ -1687,7 +1876,7 @@ const ProjectDetail: React.FC = () => {
 
             {/* 甘特图 */}
             <Tabs.TabPane key="gantt" title="甘特图">
-              <GanttChart activities={activities} />
+              <GanttChart activities={activities} criticalActivityIds={criticalActivityIds} />
             </Tabs.TabPane>
 
             {/* AI 风险评估 */}
@@ -1952,6 +2141,13 @@ const ProjectDetail: React.FC = () => {
               <Input.TextArea placeholder="请输入备注" rows={3} maxLength={500} showWordLimit />
             </Form.Item>
           </Form>
+
+          {/* 评论 & 变更历史 */}
+          {editingActivity && (
+            <div style={{ marginTop: 16, borderTop: '1px solid var(--color-border-2)', paddingTop: 16 }}>
+              <ActivityComments activityId={editingActivity.id} />
+            </div>
+          )}
         </Drawer>
 
         {/* 协作者管理 Modal */}
@@ -2016,6 +2212,29 @@ const ProjectDetail: React.FC = () => {
           </div>
         </Modal>
 
+        {/* 归档标签输入 Modal */}
+        <Modal
+          title="创建归档"
+          visible={archiveLabelModalVisible}
+          onCancel={() => setArchiveLabelModalVisible(false)}
+          onOk={() => {
+            setArchiveLabelModalVisible(false);
+            handleCreateArchive(archiveLabelInput || undefined);
+          }}
+          okText="创建"
+          style={{ maxWidth: 420 }}
+        >
+          <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--color-text-3)' }}>
+            为归档添加一个可选标签，方便后续识别
+          </div>
+          <Input
+            placeholder="归档标签（可选）"
+            value={archiveLabelInput}
+            onChange={setArchiveLabelInput}
+            maxLength={50}
+          />
+        </Modal>
+
         {/* 归档管理抽屉 */}
         <Drawer
           width="85vw"
@@ -2031,16 +2250,25 @@ const ProjectDetail: React.FC = () => {
             <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
               共 {archiveList.length} 个归档
             </span>
-            {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+            <Space>
+              {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => { setArchiveLabelInput(''); setArchiveLabelModalVisible(true); }}
+                  disabled={activities.length === 0}
+                >
+                  创建归档
+                </Button>
+              )}
               <Button
                 size="small"
-                type="primary"
-                onClick={handleCreateArchive}
-                disabled={activities.length === 0}
+                type={compareMode ? 'primary' : 'secondary'}
+                onClick={() => { setCompareMode(!compareMode); setCompareSelections([null, null]); setCompareDiffs(null); }}
               >
-                创建归档
+                {compareMode ? '退出对比' : '对比模式'}
               </Button>
-            )}
+            </Space>
           </div>
 
           {/* 左右分栏：左侧归档列表 + 右侧详情表格 */}
@@ -2054,25 +2282,48 @@ const ProjectDetail: React.FC = () => {
               <div style={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid var(--color-border)', paddingRight: 12 }}>
                 {archiveList.map(arc => {
                   const isSelected = expandedArchiveId === arc.id;
-                  const canManage = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
+                  const canManageArc = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
+                  const isCompareSelected = compareSelections.includes(arc.id);
                   return (
                     <div
                       key={arc.id}
                       style={{
                         padding: '10px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
-                        background: isSelected ? 'var(--color-primary-light-1)' : undefined,
-                        border: isSelected ? '1px solid var(--info-border)' : '1px solid transparent',
+                        background: isSelected ? 'var(--color-primary-light-1)' : isCompareSelected ? 'var(--color-warning-light-1)' : undefined,
+                        border: isSelected ? '1px solid var(--info-border)' : isCompareSelected ? '1px solid var(--color-warning-light-3)' : '1px solid transparent',
                       }}
-                      onClick={() => handleExpandArchive(arc.id)}
+                      onClick={() => {
+                        if (compareMode) {
+                          setCompareSelections(prev => {
+                            if (prev[0] === arc.id) return [null, prev[1]];
+                            if (prev[1] === arc.id) return [prev[0], null];
+                            if (!prev[0]) return [arc.id, prev[1]];
+                            if (!prev[1]) return [prev[0], arc.id];
+                            return [arc.id, prev[1]];
+                          });
+                        } else {
+                          handleExpandArchive(arc.id);
+                        }
+                      }}
                     >
                       <div style={{ fontSize: 13, fontWeight: isSelected ? 500 : 400, color: isSelected ? 'rgb(var(--primary-6))' : 'var(--color-text-1)' }}>
-                        {dayjs(arc.createdAt).format('YYYY-MM-DD')}
+                        {arc.label || dayjs(arc.createdAt).format('YYYY-MM-DD')}
                       </div>
+                      {arc.label && (
+                        <div style={{ fontSize: 11, color: 'var(--color-text-4)', marginTop: 1 }}>
+                          {dayjs(arc.createdAt).format('YYYY-MM-DD')}
+                        </div>
+                      )}
                       <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
                         {dayjs(arc.createdAt).format('HH:mm')}
                         <span style={{ marginLeft: 6 }}>{arc.count} 个活动</span>
+                        {compareMode && isCompareSelected && (
+                          <Tag size="small" color="orangered" style={{ marginLeft: 6 }}>
+                            {compareSelections[0] === arc.id ? 'A' : 'B'}
+                          </Tag>
+                        )}
                       </div>
-                      {canManage && (
+                      {canManageArc && !compareMode && (
                         <Button
                           type="text" size="mini" status="danger"
                           style={{ marginTop: 4, padding: '0 4px', height: 20, fontSize: 12 }}
@@ -2084,11 +2335,101 @@ const ProjectDetail: React.FC = () => {
                     </div>
                   );
                 })}
+                {/* 对比模式：当前版本选项 */}
+                {compareMode && (
+                  <div
+                    style={{
+                      padding: '10px 12px', marginTop: 8, borderRadius: 6, cursor: 'pointer',
+                      background: compareSelections.includes('current') ? 'var(--color-warning-light-1)' : 'var(--color-fill-1)',
+                      border: compareSelections.includes('current') ? '1px solid var(--color-warning-light-3)' : '1px dashed var(--color-border)',
+                    }}
+                    onClick={() => {
+                      setCompareSelections(prev => {
+                        if (prev[0] === 'current') return [null, prev[1]];
+                        if (prev[1] === 'current') return [prev[0], null];
+                        if (!prev[0]) return ['current', prev[1]];
+                        if (!prev[1]) return [prev[0], 'current'];
+                        return ['current', prev[1]];
+                      });
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>当前版本</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
+                      {activities.length} 个活动
+                      {compareSelections.includes('current') && (
+                        <Tag size="small" color="orangered" style={{ marginLeft: 6 }}>
+                          {compareSelections[0] === 'current' ? 'A' : 'B'}
+                        </Tag>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 右侧详情区域 */}
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
-                {!expandedArchiveId ? (
+                {/* 对比模式 */}
+                {compareMode ? (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
+                        {compareSelections[0] && compareSelections[1]
+                          ? '选择了两个版本进行对比'
+                          : `请在左侧选择${compareSelections[0] ? '第二个' : '两个'}版本`}
+                      </span>
+                      {compareSelections[0] && compareSelections[1] && (
+                        <Button size="small" type="primary" loading={compareLoading} onClick={handleCompare}>
+                          开始对比
+                        </Button>
+                      )}
+                    </div>
+                    {compareDiffs && (
+                      <Table
+                        columns={[
+                          { title: '活动名称', dataIndex: 'name', width: 200 },
+                          {
+                            title: '变更类型', dataIndex: 'changeType', width: 100,
+                            render: (v: string) => {
+                              const cfg: Record<string, { label: string; color: string }> = {
+                                added: { label: '新增', color: 'green' },
+                                deleted: { label: '删除', color: 'red' },
+                                changed: { label: '变更', color: 'orangered' },
+                                unchanged: { label: '无变化', color: 'default' },
+                              };
+                              const c = cfg[v] || { label: v, color: 'default' };
+                              return <Tag color={c.color}>{c.label}</Tag>;
+                            },
+                          },
+                          {
+                            title: '差异详情', dataIndex: 'changes',
+                            render: (changes: Array<{ field: string; from: unknown; to: unknown }>) => {
+                              if (!changes || changes.length === 0) return '-';
+                              return changes.map((c, i) => (
+                                <div key={i} style={{ fontSize: 12, marginBottom: 2 }}>
+                                  <span style={{ color: 'var(--color-text-3)' }}>{c.field}:</span>{' '}
+                                  <span style={{ textDecoration: 'line-through', color: 'var(--status-danger)' }}>{String(c.from ?? '-')}</span>
+                                  {' → '}
+                                  <span style={{ color: 'var(--status-success)' }}>{String(c.to ?? '-')}</span>
+                                </div>
+                              ));
+                            },
+                          },
+                        ]}
+                        data={compareDiffs}
+                        rowKey="name"
+                        pagination={false}
+                        size="small"
+                        scroll={{ x: 600 }}
+                        rowClassName={(record: any) => {
+                          if (record.changeType === 'added') return 'row-diff-added';
+                          if (record.changeType === 'deleted') return 'row-diff-deleted';
+                          if (record.changeType === 'changed') return 'row-diff-changed';
+                          return '';
+                        }}
+                      />
+                    )}
+                  </div>
+                ) : !expandedArchiveId ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-4)' }}>
                     <span style={{ fontSize: 14 }}>点击左侧归档查看详情</span>
                   </div>
