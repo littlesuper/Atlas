@@ -2021,9 +2021,10 @@ const ProjectDetail: React.FC = () => {
           onCancel={() => { setArchiveDrawerVisible(false); setExpandedArchiveId(null); setArchiveDetail(null); }}
           footer={null}
           headerStyle={{ borderBottom: '1px solid #e5e6eb' }}
+          bodyStyle={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '16px 20px' }}
         >
           {/* 顶部操作栏 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
             <span style={{ fontSize: 13, color: '#86909c' }}>
               共 {archiveList.length} 个归档
             </span>
@@ -2045,7 +2046,7 @@ const ProjectDetail: React.FC = () => {
           ) : archiveList.length === 0 ? (
             <Empty description="暂无归档记录" style={{ padding: '40px 0' }} />
           ) : (
-            <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 200px)', minHeight: 400 }}>
+            <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
               {/* 左侧归档列表 */}
               <div style={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid #e5e6eb', paddingRight: 12 }}>
                 {archiveList.map(arc => {
@@ -2083,7 +2084,7 @@ const ProjectDetail: React.FC = () => {
               </div>
 
               {/* 右侧详情区域 */}
-              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
                 {!expandedArchiveId ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c2c7d0' }}>
                     <span style={{ fontSize: 14 }}>点击左侧归档查看详情</span>
@@ -2095,11 +2096,16 @@ const ProjectDetail: React.FC = () => {
                     columns={[
                       { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: '#86909c', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
                       { title: '阶段', width: 70, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
-                      { title: '活动名称', dataIndex: 'name', ellipsis: true },
+                      { title: '活动名称', width: 180, dataIndex: 'name', render: (v: string) => (
+                        <Tooltip content={v} position="tl"><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span></Tooltip>
+                      )},
                       { title: '类型', width: 80, dataIndex: 'type', render: (v: string) => { const cfg = ACTIVITY_TYPE_MAP[v as keyof typeof ACTIVITY_TYPE_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
                       { title: '状态', width: 90, dataIndex: 'status', render: (v: string) => { const cfg = ACTIVITY_STATUS_MAP[v as keyof typeof ACTIVITY_STATUS_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
-                      { title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{realName: string}>) => v?.length ? v.map(u => u.realName).join(', ') : '-' },
-                      { title: '计划工期', width: 80, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
+                      { title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{realName: string}>) => {
+                        const text = v?.length ? v.map(u => u.realName).join(', ') : '-';
+                        return <Tooltip content={text}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span></Tooltip>;
+                      }},
+                      { title: '计划工期', width: 90, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
                       { title: '计划时间', width: 170, render: (_: unknown, r: Activity) => r.planStartDate ? `${dayjs(r.planStartDate).format('YYYY-MM-DD')}${r.planEndDate ? ' ~ ' + dayjs(r.planEndDate).format('MM-DD') : ''}` : '-' },
                       { title: '实际时间', width: 170, render: (_: unknown, r: Activity) => {
                         if (!r.startDate) return '-';
@@ -2107,13 +2113,18 @@ const ProjectDetail: React.FC = () => {
                         const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
                         return <span style={overdue ? { color: '#f53f3f' } : undefined}>{text}</span>;
                       }},
-                      { title: '备注', width: 160, dataIndex: 'notes', ellipsis: true, render: (v: string | null) => v || '-' },
+                      { title: '备注', width: 200, dataIndex: 'notes', render: (v: string | null) => {
+                        if (!v) return '-';
+                        return <Tooltip content={<div style={{ maxWidth: 360, whiteSpace: 'pre-wrap' }}>{v}</div>} position="tl">
+                          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
+                        </Tooltip>;
+                      }},
                     ]}
                     data={archiveDetail.snapshot}
                     rowKey="id"
                     pagination={false}
                     size="small"
-                    scroll={{ y: 'calc(100vh - 280px)' }}
+                    scroll={{ x: 1216 }}
                     border={{ bodyCell: true }}
                   />
                 ) : (
