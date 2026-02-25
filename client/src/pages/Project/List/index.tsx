@@ -481,7 +481,7 @@ const ProjectList: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{
-              status: 'PLANNING',
+              status: 'IN_PROGRESS',
               priority: 'MEDIUM',
               productLine: 'DANDELION',
             }}

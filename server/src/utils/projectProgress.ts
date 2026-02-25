@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
  * 进度计算规则：
  * - COMPLETED（已完成）= 100%
  * - IN_PROGRESS（进行中）= 50%
- * - 其他状态（未开始/已延期/已取消）= 0%
+ * - 其他状态（未开始/已取消）= 0%
  *
  * 优化：使用 Prisma count 查询替代加载所有记录到内存
  *

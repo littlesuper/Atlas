@@ -39,7 +39,6 @@ export interface Permission {
 // ============ 项目相关类型 ============
 
 export enum ProjectStatus {
-  PLANNING = 'PLANNING',
   IN_PROGRESS = 'IN_PROGRESS',
   ON_HOLD = 'ON_HOLD',
   COMPLETED = 'COMPLETED',
@@ -88,7 +87,6 @@ export enum ActivityStatus {
   NOT_STARTED = 'NOT_STARTED',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
-  DELAYED = 'DELAYED',
   CANCELLED = 'CANCELLED',
 }
 

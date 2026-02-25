@@ -791,9 +791,11 @@ const ProjectDetail: React.FC = () => {
     const start = startD.format('MM-DD');
     const endD = activity.endDate ? dayjs(activity.endDate) : null;
     const end = endD ? endD.format('MM-DD') : '进行中';
-    const isOverdue = activity.planEndDate && !activity.endDate &&
-      dayjs(activity.planEndDate).isBefore(dayjs(), 'day') &&
-      activity.status !== 'COMPLETED';
+    // 实际结束晚于计划结束，或未完成且已超过计划结束日期
+    const isOverdue = activity.planEndDate && (
+      (endD && endD.isAfter(dayjs(activity.planEndDate), 'day')) ||
+      (!endD && dayjs(activity.planEndDate).isBefore(dayjs(), 'day') && activity.status !== 'COMPLETED')
+    );
     const days = endD
       ? calcWorkdays(startD, endD)
       : calcWorkdays(startD, dayjs());
@@ -1312,6 +1314,11 @@ const ProjectDetail: React.FC = () => {
                   {saving ? '保存排序中...' : ''}
                 </span>
                 <Space>
+                  <span style={{ fontSize: 12, color: '#86909c' }}>
+                    未开始 <span style={{ color: '#86909c', fontWeight: 500 }}>{activities.filter(a => a.status === 'NOT_STARTED').length}</span>
+                    <span style={{ margin: '0 6px', color: '#e5e6eb' }}>|</span>
+                    进行中 <span style={{ color: '#165DFF', fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
+                  </span>
                   <ColumnSettings
                     columnDefs={ACTIVITY_COLUMN_DEFS}
                     prefs={columnPrefs}
@@ -1373,7 +1380,7 @@ const ProjectDetail: React.FC = () => {
 
                 const statusColor: Record<string, string> = {
                   COMPLETED: '#52c41a', IN_PROGRESS: '#1890ff',
-                  NOT_STARTED: '#d9d9d9', DELAYED: '#ff4d4f', CANCELLED: '#bfbfbf',
+                  NOT_STARTED: '#d9d9d9', CANCELLED: '#bfbfbf',
                 };
 
                 // 取里程碑日期（优先 planEndDate）

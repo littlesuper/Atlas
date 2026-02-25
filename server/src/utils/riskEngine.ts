@@ -92,29 +92,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     }
   }
 
-  // 2. 评估任务延期情况
-  const delayedActivities = allActivities.filter((a) => a.status === ActivityStatus.DELAYED);
-  const delayedRate = (delayedActivities.length / totalActivities) * 100;
-
-  if (delayedRate > 30) {
-    riskScore += 3;
-    riskFactors.push({
-      factor: '大量任务延期',
-      severity: 'HIGH',
-      description: `${delayedActivities.length}个任务延期，延期率${delayedRate.toFixed(0)}%`,
-    });
-    suggestions.push('优先处理延期任务，重新评估项目时间线');
-  } else if (delayedRate > 10) {
-    riskScore += 1;
-    riskFactors.push({
-      factor: '部分任务延期',
-      severity: 'LOW',
-      description: `${delayedActivities.length}个任务延期，延期率${delayedRate.toFixed(0)}%`,
-    });
-    suggestions.push('关注延期任务，避免影响扩大');
-  }
-
-  // 3. 评估逾期未完成任务
+  // 2. 评估逾期未完成任务
   const overdueActivities = allActivities.filter(
     (a) =>
       a.planEndDate &&

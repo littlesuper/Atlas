@@ -393,7 +393,7 @@ async function main() {
 
   await prisma.activity.deleteMany({ where: { projectId: project2.id } });
 
-  type AStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'DELAYED' | 'CANCELLED';
+  type AStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   type APriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   type AType = 'TASK' | 'MILESTONE' | 'PHASE';
 
@@ -590,7 +590,7 @@ async function main() {
       name: '远程控制器 RC-Pro',
       description: '面向向日葵远控场景的专用遥控硬件，低延迟、高帧率，内置向日葵 SDK',
       productLine: 'SUNFLOWER',
-      status: 'PLANNING',
+      status: 'IN_PROGRESS',
       priority: 'MEDIUM',
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-12-31'),

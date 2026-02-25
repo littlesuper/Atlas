@@ -1,9 +1,5 @@
 // ============ 项目状态映射 ============
 export const STATUS_MAP = {
-  PLANNING: {
-    label: '规划中',
-    color: 'blue',
-  },
   IN_PROGRESS: {
     label: '进行中',
     color: 'green',
@@ -51,10 +47,6 @@ export const ACTIVITY_STATUS_MAP = {
   COMPLETED: {
     label: '已完成',
     color: 'green',
-  },
-  DELAYED: {
-    label: '延期',
-    color: 'red',
   },
   CANCELLED: {
     label: '已取消',

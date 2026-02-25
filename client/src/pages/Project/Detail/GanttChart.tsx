@@ -30,7 +30,6 @@ const STATUS_BAR_COLOR: Record<string, string> = {
   COMPLETED:  '#00b42a',
   IN_PROGRESS: '#4f7cff',
   NOT_STARTED: '#86909c',
-  DELAYED:    '#f53f3f',
   CANCELLED:  '#4e5969',
 };
 
@@ -119,7 +118,6 @@ const LEGEND_ITEMS = [
   { icon: <div style={{ width: 10, height: 10, background: '#4f7cff', borderRadius: 2 }} />, label: '进行中' },
   { icon: <div style={{ width: 10, height: 10, background: '#00b42a', borderRadius: 2 }} />, label: '已完成' },
   { icon: <div style={{ width: 10, height: 10, background: '#86909c', borderRadius: 2 }} />, label: '未开始' },
-  { icon: <div style={{ width: 10, height: 10, background: '#f53f3f', borderRadius: 2 }} />, label: '已延期' },
   { icon: <div style={{ width: 10, height: 10, background: '#ff7d00', transform: 'rotate(45deg)' }} />, label: '里程碑' },
   { icon: <div style={{ width: 2, height: 12, background: TODAY_COLOR }} />, label: '今天', color: TODAY_COLOR },
 ];

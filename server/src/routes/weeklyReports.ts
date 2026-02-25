@@ -712,9 +712,6 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
     // 未开始的活动
     const notStartedActivities = allActivities.filter((a) => a.status === ActivityStatus.NOT_STARTED);
 
-    // 延期的活动
-    const delayedActivities = allActivities.filter((a) => a.status === ActivityStatus.DELAYED);
-
     // 逾期未完成的活动
     const overdueActivities = allActivities.filter(
       (a) =>
@@ -740,10 +737,6 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
           assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
         notStarted: notStartedActivities.map((a) => ({
-          name: a.name,
-          assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
-        })),
-        delayed: delayedActivities.map((a) => ({
           name: a.name,
           assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
@@ -820,10 +813,6 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
           riskWarning += `等`;
         }
         riskWarning += '</li>';
-        riskWarning += '</ul>';
-      } else if (delayedActivities.length > 0) {
-        riskWarning = '<ul>';
-        riskWarning += `<li><span style="color: #faad14;">⚠️ 存在${delayedActivities.length}个延期任务</span></li>`;
         riskWarning += '</ul>';
       } else {
         riskWarning = '';

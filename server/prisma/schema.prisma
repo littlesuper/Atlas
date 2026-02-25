@@ -95,7 +95,6 @@ model RolePermission {
 // ==================== 项目管理 ====================
 
 enum ProjectStatus {
-  PLANNING
   IN_PROGRESS
   COMPLETED
   ON_HOLD
@@ -113,7 +112,7 @@ model Project {
   name        String
   description String?
   productLine String?
-  status      ProjectStatus @default(PLANNING)
+  status      ProjectStatus @default(IN_PROGRESS)
   priority    Priority      @default(MEDIUM)
   startDate   DateTime?
   endDate     DateTime?
@@ -158,7 +157,6 @@ enum ActivityStatus {
   NOT_STARTED
   IN_PROGRESS
   COMPLETED
-  DELAYED
   CANCELLED
 }
 
