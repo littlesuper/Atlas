@@ -115,6 +115,36 @@ function formatSeq(n: number): string {
   return String(n).padStart(3, '0');
 }
 
+// 自动展开的 Select 包装：mount 后自动 click 触发下拉展开
+const AutoOpenSelect: React.FC<React.ComponentProps<typeof Select> & { onDismiss: () => void }> = ({ onDismiss, children, ...props }) => {
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    // 延迟一帧后模拟点击 Select 输入框，触发 popup 弹出
+    const timer = setTimeout(() => {
+      const input = wrapRef.current?.querySelector('.arco-select-view') as HTMLElement;
+      input?.click();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+  React.useEffect(() => {
+    // 点击外部关闭
+    const handler = (e: MouseEvent) => {
+      // 忽略弹出层内的点击（Select popup 渲染到 body）
+      const popup = document.querySelector('.arco-select-popup');
+      if (wrapRef.current?.contains(e.target as Node)) return;
+      if (popup?.contains(e.target as Node)) return;
+      onDismiss();
+    };
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
+  }, [onDismiss]);
+  return (
+    <div ref={wrapRef} style={{ display: 'inline-block' }}>
+      <Select {...props}>{children}</Select>
+    </div>
+  );
+};
+
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -778,20 +808,19 @@ const ProjectDetail: React.FC = () => {
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'phase') {
           return (
-            <Select
+            <AutoOpenSelect
               size="small"
               style={{ width: 80 }}
               value={record.phase || undefined}
               allowClear
               placeholder="阶段"
-              defaultPopupVisible
-              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
+              onDismiss={() => setInlineEditing(null)}
               onChange={(v) => commitSelectEdit(record, 'phase', v || '')}
             >
               {PHASE_OPTIONS.map((p) => (
                 <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
               ))}
-            </Select>
+            </AutoOpenSelect>
           );
         }
         return (
@@ -837,18 +866,17 @@ const ProjectDetail: React.FC = () => {
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'type') {
           return (
-            <Select
+            <AutoOpenSelect
               size="small"
               style={{ width: 90 }}
               value={record.type}
-              defaultPopupVisible
-              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
+              onDismiss={() => setInlineEditing(null)}
               onChange={(v) => commitSelectEdit(record, 'type', v)}
             >
               {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
                 <Select.Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Select.Option>
               ))}
-            </Select>
+            </AutoOpenSelect>
           );
         }
         const cfg = ACTIVITY_TYPE_MAP[record.type as keyof typeof ACTIVITY_TYPE_MAP] ?? { label: record.type, color: 'default' };
@@ -869,18 +897,17 @@ const ProjectDetail: React.FC = () => {
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'status') {
           return (
-            <Select
+            <AutoOpenSelect
               size="small"
               style={{ width: 100 }}
               value={record.status}
-              defaultPopupVisible
-              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
+              onDismiss={() => setInlineEditing(null)}
               onChange={(v) => commitSelectEdit(record, 'status', v)}
             >
               {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
                 <Select.Option key={k} value={k}>{v.label}</Select.Option>
               ))}
-            </Select>
+            </AutoOpenSelect>
           );
         }
         const cfg = ACTIVITY_STATUS_MAP[record.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: record.status, color: 'default' };
@@ -909,14 +936,15 @@ const ProjectDetail: React.FC = () => {
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeIds') {
           return (
-            <Select
+            <AutoOpenSelect
               mode="multiple"
               size="small"
               allowClear
               style={{ width: 160 }}
               value={record.assignees?.map((a) => a.id) ?? (record.assigneeId ? [record.assigneeId] : [])}
-              defaultPopupVisible
-              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
+              onDismiss={() => {
+                setInlineEditing(null);
+              }}
               onChange={(v: string[]) => {
                 setInlineEditing(null);
                 activitiesApi.update(record.id, { assigneeIds: v }).then(() => {
@@ -928,7 +956,7 @@ const ProjectDetail: React.FC = () => {
               {users.map((u) => (
                 <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
               ))}
-            </Select>
+            </AutoOpenSelect>
           );
         }
         const names = record.assignees?.map((a) => a.realName).join(', ') || record.assignee?.realName || '-';
