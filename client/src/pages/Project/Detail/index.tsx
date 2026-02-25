@@ -104,7 +104,7 @@ const COLUMN_WIDTH_MAP: Record<string, number> = {
   type: 80,
   status: 100,
   assignee: 100,
-  planDuration: 70,
+  planDuration: 90,
   planDates: 170,
   actualDates: 170,
   notes: 140,
@@ -718,7 +718,7 @@ const ProjectDetail: React.FC = () => {
     const payload: Record<string, unknown> = { planDuration: newDur };
     // 有计划开始日期时，用 开始日期 + 工期 推算结束日期
     if (activity.planStartDate) {
-      const endDate = addWorkdays(dayjs(activity.planStartDate), newDur - 1);
+      const endDate = addWorkdays(dayjs(activity.planStartDate), newDur);
       payload.planEndDate = endDate.format('YYYY-MM-DD');
     }
     try {
@@ -752,18 +752,9 @@ const ProjectDetail: React.FC = () => {
   // 计划日期显示（含工作日数）
   const renderPlanDates = (activity: Activity) => {
     if (!activity.planStartDate) return '-';
-    const startD = dayjs(activity.planStartDate);
-    const start = startD.format('MM-DD');
+    const start = dayjs(activity.planStartDate).format('MM-DD');
     const end = activity.planEndDate ? dayjs(activity.planEndDate).format('MM-DD') : '';
-    const days = activity.planEndDate
-      ? calcWorkdays(startD, dayjs(activity.planEndDate))
-      : null;
-    return (
-      <span>
-        {start}{end ? ' ~ ' + end : ''}
-        {days !== null && <span style={{ color: '#86909c', fontSize: 12, marginLeft: 4 }}>({days}天)</span>}
-      </span>
-    );
+    return <span>{start}{end ? ' ~ ' + end : ''}</span>;
   };
 
   // 实际日期显示（含工作日数，超期显示红色）
@@ -988,7 +979,7 @@ const ProjectDetail: React.FC = () => {
     },
     planDuration: {
       title: '计划工期',
-      width: 70,
+      width: 90,
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planDuration') {
           return (
