@@ -251,9 +251,13 @@ const ProjectDetail: React.FC = () => {
           if (!visible.includes(key)) visible.push(key);
         }
 
-        // Append any new keys not yet in order
+        // Append any new keys not yet in saved prefs (default visible & in order)
+        const savedOrderSet = new Set(saved.order || []);
         for (const key of DEFAULT_COLUMN_ORDER) {
+          const isNew = !savedOrderSet.has(key);
           if (!order.includes(key)) order.push(key);
+          // New column unknown to user's saved prefs → auto-visible
+          if (isNew && !visible.includes(key)) visible.push(key);
         }
 
         setColumnPrefs({ visible, order });
