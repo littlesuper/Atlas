@@ -183,6 +183,7 @@ const ProjectDetail: React.FC = () => {
 
   // 双击内联编辑
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [inlineValue, setInlineValue] = useState<string>('');
 
   // 列偏好设置
@@ -1314,10 +1315,20 @@ const ProjectDetail: React.FC = () => {
                   {saving ? '保存排序中...' : ''}
                 </span>
                 <Space>
-                  <span style={{ fontSize: 12, color: '#86909c' }}>
-                    未开始 <span style={{ color: '#86909c', fontWeight: 500 }}>{activities.filter(a => a.status === 'NOT_STARTED').length}</span>
-                    <span style={{ margin: '0 6px', color: '#e5e6eb' }}>|</span>
-                    进行中 <span style={{ color: '#165DFF', fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
+                  <span style={{ fontSize: 12 }}>
+                    <span
+                      style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'NOT_STARTED' ? '#f2f3f5' : undefined, color: statusFilter === 'NOT_STARTED' ? '#1d2129' : '#86909c' }}
+                      onClick={() => setStatusFilter(prev => prev === 'NOT_STARTED' ? null : 'NOT_STARTED')}
+                    >
+                      未开始 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'NOT_STARTED').length}</span>
+                    </span>
+                    <span style={{ margin: '0 2px', color: '#e5e6eb' }}>|</span>
+                    <span
+                      style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'IN_PROGRESS' ? '#e8f3ff' : undefined, color: statusFilter === 'IN_PROGRESS' ? '#165DFF' : '#86909c' }}
+                      onClick={() => setStatusFilter(prev => prev === 'IN_PROGRESS' ? null : 'IN_PROGRESS')}
+                    >
+                      进行中 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
+                    </span>
                   </span>
                   <ColumnSettings
                     columnDefs={ACTIVITY_COLUMN_DEFS}
@@ -1335,7 +1346,7 @@ const ProjectDetail: React.FC = () => {
                 {/* 自定义表格行（支持拖拽） */}
                 <Table
                   columns={activityColumns}
-                  data={activities}
+                  data={statusFilter ? activities.filter(a => a.status === statusFilter) : activities}
                   loading={activitiesLoading}
                   rowKey="id"
                   pagination={false}
