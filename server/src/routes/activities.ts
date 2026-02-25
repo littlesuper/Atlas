@@ -3,6 +3,7 @@ import { PrismaClient, ActivityType } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, canManageProject, sanitizePagination } from '../middleware/permission';
 import { calculateWorkdays } from '../utils/workday';
+import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
 import { updateProjectProgress } from '../utils/projectProgress';
 
 const router = express.Router();
@@ -34,6 +35,102 @@ function buildActivityTree(activities: any[]): any[] {
   });
 
   return rootActivities;
+}
+
+/**
+ * 查询前置活动并调用调度器计算日期
+ */
+async function computeDatesFromDeps(
+  deps: DependencyInput[],
+  selfDuration?: number | null
+): Promise<{ planStartDate?: Date; planEndDate?: Date; planDuration?: number }> {
+  if (!deps || deps.length === 0) return {};
+
+  const predIds = deps.map((d) => d.id);
+  const predActivities = await prisma.activity.findMany({
+    where: { id: { in: predIds } },
+    select: { id: true, planStartDate: true, planEndDate: true, planDuration: true },
+  });
+
+  const predecessors: PredecessorData[] = predActivities.map((a) => ({
+    id: a.id,
+    planStartDate: a.planStartDate,
+    planEndDate: a.planEndDate,
+    planDuration: a.planDuration,
+  }));
+
+  return resolveActivityDates(deps, predecessors, selfDuration);
+}
+
+/**
+ * 级联更新下游依赖任务的日期
+ * 当前置活动日期变更后，BFS 遍历所有下游任务重新计算日期
+ */
+async function cascadeUpdateDependents(
+  projectId: string,
+  changedActivityId: string
+): Promise<void> {
+  // 一次性查询所有活动，构建反向依赖图：predecessorId → dependentId[]
+  const allActivities = await prisma.activity.findMany({
+    where: { projectId },
+    select: { id: true, dependencies: true },
+  });
+
+  const reverseDeps = new Map<string, string[]>();
+  for (const a of allActivities) {
+    if (!a.dependencies || !Array.isArray(a.dependencies)) continue;
+    for (const dep of a.dependencies as any[]) {
+      const list = reverseDeps.get(dep.id);
+      if (list) list.push(a.id);
+      else reverseDeps.set(dep.id, [a.id]);
+    }
+  }
+
+  const visited = new Set<string>();
+  const queue = [changedActivityId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
+
+    const dependentIds = reverseDeps.get(currentId);
+    if (!dependentIds) continue;
+
+    for (const depId of dependentIds) {
+      // 每次取最新数据（前面的级联可能已更新了它的前置活动）
+      const depActivity = await prisma.activity.findUnique({
+        where: { id: depId },
+        select: { id: true, dependencies: true, planStartDate: true, planEndDate: true, planDuration: true },
+      });
+      if (!depActivity || !depActivity.dependencies) continue;
+
+      const deps = depActivity.dependencies as unknown as DependencyInput[];
+      const resolved = await computeDatesFromDeps(deps, depActivity.planDuration);
+
+      if (!resolved.planStartDate && !resolved.planEndDate) continue;
+
+      // 检查日期是否真的变了
+      const startChanged = resolved.planStartDate &&
+        (!depActivity.planStartDate || resolved.planStartDate.getTime() !== depActivity.planStartDate.getTime());
+      const endChanged = resolved.planEndDate &&
+        (!depActivity.planEndDate || resolved.planEndDate.getTime() !== depActivity.planEndDate.getTime());
+
+      if (!startChanged && !endChanged) continue;
+
+      const cascadeData: any = {};
+      if (resolved.planStartDate) cascadeData.planStartDate = resolved.planStartDate;
+      if (resolved.planEndDate) cascadeData.planEndDate = resolved.planEndDate;
+      if (resolved.planDuration !== undefined) cascadeData.planDuration = resolved.planDuration;
+
+      await prisma.activity.update({
+        where: { id: depId },
+        data: cascadeData,
+      });
+
+      queue.push(depId);
+    }
+  }
 }
 
 /**
@@ -263,12 +360,24 @@ router.post(
         }
       }
 
+      // 根据依赖关系自动计算计划日期
+      let resolvedPlanStart = planStartDate ? new Date(planStartDate) : null;
+      let resolvedPlanEnd = planEndDate ? new Date(planEndDate) : null;
+      let resolvedPlanDuration = planDuration;
+
+      if (dependencies && Array.isArray(dependencies) && dependencies.length > 0) {
+        const resolved = await computeDatesFromDeps(dependencies, planDuration);
+        if (resolved.planStartDate) resolvedPlanStart = resolved.planStartDate;
+        if (resolved.planEndDate) resolvedPlanEnd = resolved.planEndDate;
+        if (resolved.planDuration !== undefined) resolvedPlanDuration = resolved.planDuration;
+      }
+
       // 自动计算工期
-      let finalPlanDuration = planDuration;
+      let finalPlanDuration = resolvedPlanDuration;
       let finalDuration = duration;
 
-      if (planStartDate && planEndDate && !planDuration) {
-        finalPlanDuration = calculateWorkdays(new Date(planStartDate), new Date(planEndDate));
+      if (resolvedPlanStart && resolvedPlanEnd && !finalPlanDuration) {
+        finalPlanDuration = calculateWorkdays(resolvedPlanStart, resolvedPlanEnd);
       }
 
       if (startDate && endDate && !duration) {
@@ -287,8 +396,8 @@ router.post(
           assigneeId: assigneeId || null,
           status,
           priority,
-          planStartDate: planStartDate ? new Date(planStartDate) : null,
-          planEndDate: planEndDate ? new Date(planEndDate) : null,
+          planStartDate: resolvedPlanStart,
+          planEndDate: resolvedPlanEnd,
           planDuration: finalPlanDuration,
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
@@ -406,6 +515,15 @@ router.put(
         updateData.planDuration = planDuration;
       }
 
+      // 根据依赖关系自动计算计划日期（当 dependencies 被更新时）
+      if (dependencies !== undefined && Array.isArray(dependencies) && dependencies.length > 0) {
+        const selfDuration = planDuration ?? existingActivity.planDuration;
+        const resolved = await computeDatesFromDeps(dependencies, selfDuration);
+        if (resolved.planStartDate) updateData.planStartDate = resolved.planStartDate;
+        if (resolved.planEndDate) updateData.planEndDate = resolved.planEndDate;
+        if (resolved.planDuration !== undefined) updateData.planDuration = resolved.planDuration;
+      }
+
       // 自动计算计划工期
       if (
         updateData.planStartDate &&
@@ -461,6 +579,10 @@ router.put(
         }
       }
 
+      // 记录原始日期用于判断是否需要级联
+      const oldPlanStart = existingActivity.planStartDate?.getTime();
+      const oldPlanEnd = existingActivity.planEndDate?.getTime();
+
       // 更新活动
       const activity = await prisma.activity.update({
         where: { id },
@@ -475,6 +597,13 @@ router.put(
           },
         },
       });
+
+      // 级联更新下游依赖任务（当计划日期发生变更时）
+      const newPlanStart = activity.planStartDate?.getTime();
+      const newPlanEnd = activity.planEndDate?.getTime();
+      if (oldPlanStart !== newPlanStart || oldPlanEnd !== newPlanEnd) {
+        await cascadeUpdateDependents(existingActivity.projectId, id);
+      }
 
       // 自动更新项目进度
       await updateProjectProgress(existingActivity.projectId);
