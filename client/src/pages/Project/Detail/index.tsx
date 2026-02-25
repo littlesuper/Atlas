@@ -139,7 +139,6 @@ const ProjectDetail: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   // 行间快速插入
-  const [insertHoverIndex, setInsertHoverIndex] = useState<number | null>(null);
   const insertAtIndexRef = useRef<number | null>(null);
 
   // 活动列表表头吸顶
@@ -359,7 +358,7 @@ const ProjectDetail: React.FC = () => {
         planEnd: activity.planEndDate ? dayjs(activity.planEndDate) : undefined,
         actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
         actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
-        assigneeId: activity.assigneeId,
+        assigneeIds: activity.assignees?.map((a) => a.id) ?? (activity.assigneeId ? [activity.assigneeId] : []),
         notes: activity.notes,
       });
       // Load dependencies
@@ -431,7 +430,7 @@ const ProjectDetail: React.FC = () => {
         startDate: values.actualStart ? dayjs(values.actualStart).format('YYYY-MM-DD') : undefined,
         endDate: values.actualEnd ? dayjs(values.actualEnd).format('YYYY-MM-DD') : undefined,
         duration: actualDuration ?? undefined,
-        assigneeId: values.assigneeId,
+        assigneeIds: values.assigneeIds || [],
         parentId: values.parentId,
         notes: values.notes,
         sortOrder: editingActivity
@@ -566,9 +565,9 @@ const ProjectDetail: React.FC = () => {
   // ========== 行间快速插入 ==========
   const handleInsertActivity = (atIndex: number) => {
     insertAtIndexRef.current = atIndex;
-    setInsertHoverIndex(null);
     handleOpenDrawer();
   };
+
 
   // ========== 双击内联编辑 ==========
   const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
@@ -768,17 +767,24 @@ const ProjectDetail: React.FC = () => {
     },
     assignee: {
       title: '负责人',
-      width: 100,
+      width: 120,
       render: (_: unknown, record: Activity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeId') {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeIds') {
           return (
             <Select
+              mode="multiple"
               size="small"
               allowClear
-              style={{ width: 100 }}
-              value={record.assigneeId ?? undefined}
+              style={{ width: 160 }}
+              value={record.assignees?.map((a) => a.id) ?? (record.assigneeId ? [record.assigneeId] : [])}
               onBlur={() => setInlineEditing(null)}
-              onChange={(v) => commitSelectEdit(record, 'assigneeId', v ?? '')}
+              onChange={(v: string[]) => {
+                setInlineEditing(null);
+                activitiesApi.update(record.id, { assigneeIds: v }).then(() => {
+                  loadActivities();
+                  Message.success('更新成功');
+                }).catch(() => Message.error('更新失败'));
+              }}
             >
               {users.map((u) => (
                 <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
@@ -786,12 +792,13 @@ const ProjectDetail: React.FC = () => {
             </Select>
           );
         }
+        const names = record.assignees?.map((a) => a.realName).join(', ') || record.assignee?.realName || '-';
         return (
           <span
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeId' })}
+            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
           >
-            {record.assignee?.realName || '-'}
+            {names}
           </span>
         );
       },
@@ -848,19 +855,33 @@ const ProjectDetail: React.FC = () => {
   // 根据偏好生成最终列数组
   const activityColumns = useMemo(() => {
     // 始终存在的拖拽手柄列
+    const canManage = hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id);
+    const canCreate = hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id);
     const dragCol = {
       title: '',
       dataIndex: 'id',
       width: 50,
-      render: (_: unknown, _record: Activity, index: number) =>
-        hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
-          <div
-            className="drag-handle"
-            onMouseDown={(e: React.MouseEvent) => handleMouseDown(e, index)}
-          >
-            <IconDragDotVertical style={{ color: '#86909c', fontSize: 20 }} />
-          </div>
-        ) : null,
+      render: (_: unknown, _record: Activity, index: number) => (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
+          {canManage && (
+            <div
+              className="drag-handle"
+              onMouseDown={(e: React.MouseEvent) => handleMouseDown(e, index)}
+            >
+              <IconDragDotVertical />
+            </div>
+          )}
+          {canCreate && (
+            <div
+              className="row-insert-trigger"
+              onClick={() => handleInsertActivity(index + 1)}
+              title="在下方插入活动"
+            >
+              <IconPlus />
+            </div>
+          )}
+        </div>
+      ),
     };
 
     // 始终存在的操作列
@@ -1012,7 +1033,7 @@ const ProjectDetail: React.FC = () => {
                 </Space>
               </div>
 
-              <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0, position: 'relative' }}>
+              <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
                 {/* 自定义表格行（支持拖拽） */}
                 <Table
                   columns={activityColumns}
@@ -1038,23 +1059,7 @@ const ProjectDetail: React.FC = () => {
                           <tr
                             {...rest}
                             className={cls}
-                            onMouseMove={(e) => {
-                              handleMouseMove(e, index);
-                              if (!isDraggingRef.current && dragIndexRef.current === -1) {
-                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                const bottomZone = rect.bottom - 12;
-                                if (e.clientY >= bottomZone) {
-                                  setInsertHoverIndex(index);
-                                } else if (insertHoverIndex === index) {
-                                  setInsertHoverIndex(null);
-                                }
-                              }
-                            }}
-                            onMouseLeave={() => {
-                              if (insertHoverIndex === index) {
-                                setInsertHoverIndex(null);
-                              }
-                            }}
+                            onMouseMove={(e) => handleMouseMove(e, index)}
                             onMouseUp={(e) => handleMouseUp(e, index)}
                           >
                             {children}
@@ -1064,30 +1069,6 @@ const ProjectDetail: React.FC = () => {
                     },
                   }}
                 />
-                {/* 行间快速插入指示器 */}
-                {insertHoverIndex !== null && !isDraggingRef.current && hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (() => {
-                  const rows = tableWrapRef.current?.querySelectorAll('.arco-table-body tbody tr');
-                  const row = rows?.[insertHoverIndex] as HTMLElement | undefined;
-                  if (!row || !tableWrapRef.current) return null;
-                  const rowRect = row.getBoundingClientRect();
-                  const wrapRect = tableWrapRef.current.getBoundingClientRect();
-                  const top = rowRect.bottom - wrapRect.top;
-                  return (
-                    <div
-                      className="row-insert-zone"
-                      style={{ top }}
-                      onMouseEnter={() => setInsertHoverIndex(insertHoverIndex)}
-                      onMouseLeave={() => setInsertHoverIndex(null)}
-                    >
-                      <div className="row-insert-line" />
-                      <button
-                        className="row-insert-btn"
-                        onClick={() => handleInsertActivity(insertHoverIndex + 1)}
-                        title="在此处插入活动"
-                      >+</button>
-                    </div>
-                  );
-                })()}
               </div>{/* tableWrapRef */}
             </Tabs.TabPane>
 
@@ -1185,8 +1166,8 @@ const ProjectDetail: React.FC = () => {
                   ))}
                 </Select>
               </Form.Item>
-              <Form.Item label="负责人" field="assigneeId">
-                <Select placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
+              <Form.Item label="负责人" field="assigneeIds">
+                <Select mode="multiple" placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
                   (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
                 }>
                   {users.map((u) => (

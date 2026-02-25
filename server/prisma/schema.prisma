@@ -34,7 +34,8 @@ model User {
   userRoles              UserRole[]
   managedProjects        Project[]        @relation("ProjectManager")
   collaboratingProjects  ProjectMember[]
-  assignedActivities     Activity[]       @relation("ActivityAssignee")
+  assignedActivitiesOld  Activity[]       @relation("ActivityAssignee")
+  assignedActivities     Activity[]       @relation("ActivityAssignees")
   createdReports         WeeklyReport[]   @relation("ReportCreator")
 
   @@map("users")
@@ -169,7 +170,7 @@ model Activity {
   description   String?
   type          ActivityType   @default(TASK)
   phase         String?
-  assigneeId    String?
+  assigneeId    String?        // deprecated, kept for migration compat
   status        ActivityStatus @default(NOT_STARTED)
   priority      Priority       @default(MEDIUM)
   planStartDate DateTime?
@@ -188,7 +189,8 @@ model Activity {
   project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent   Activity?  @relation("ActivityHierarchy", fields: [parentId], references: [id])
   children Activity[] @relation("ActivityHierarchy")
-  assignee User?      @relation("ActivityAssignee", fields: [assigneeId], references: [id])
+  assignee  User?      @relation("ActivityAssignee", fields: [assigneeId], references: [id])
+  assignees User[]     @relation("ActivityAssignees")
 
   @@index([projectId])
   @@index([assigneeId])

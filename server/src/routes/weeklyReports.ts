@@ -689,7 +689,7 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
     const allActivities = await prisma.activity.findMany({
       where: { projectId },
       include: {
-        assignee: {
+        assignees: {
           select: {
             realName: true,
           },
@@ -733,23 +733,23 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
       const analysisData = {
         completedThisWeek: completedThisWeek.map((a) => ({
           name: a.name,
-          assignee: a.assignee?.realName,
+          assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
         inProgress: inProgressActivities.map((a) => ({
           name: a.name,
-          assignee: a.assignee?.realName,
+          assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
         notStarted: notStartedActivities.map((a) => ({
           name: a.name,
-          assignee: a.assignee?.realName,
+          assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
         delayed: delayedActivities.map((a) => ({
           name: a.name,
-          assignee: a.assignee?.realName,
+          assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
         overdue: overdueActivities.map((a) => ({
           name: a.name,
-          assignee: a.assignee?.realName,
+          assignee: (a as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配',
         })),
       };
 
@@ -781,13 +781,13 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
       if (completedThisWeek.length > 0) {
         keyProgress = '<ul>';
         completedThisWeek.forEach((activity) => {
-          const assignee = activity.assignee?.realName || '未分配';
+          const assignee = (activity as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配';
           keyProgress += `<li><strong>${activity.name}</strong>已完成（负责人：${assignee}）</li>`;
         });
         if (inProgressActivities.length > 0) {
           const top3 = inProgressActivities.slice(0, 3);
           top3.forEach((activity) => {
-            const assignee = activity.assignee?.realName || '未分配';
+            const assignee = (activity as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配';
             keyProgress += `<li>正在推进<strong>${activity.name}</strong>（负责人：${assignee}）</li>`;
           });
         }
@@ -801,7 +801,7 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
       if (planActivities.length > 0) {
         nextWeekPlan = '<ul>';
         planActivities.forEach((activity) => {
-          const assignee = activity.assignee?.realName || '未分配';
+          const assignee = (activity as any).assignees?.map((u: any) => u.realName).join(', ') || '未分配';
           const action = activity.status === ActivityStatus.IN_PROGRESS ? '继续推进' : '计划启动';
           nextWeekPlan += `<li>${action}<strong>${activity.name}</strong>（负责人：${assignee}）</li>`;
         });

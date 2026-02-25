@@ -168,6 +168,7 @@ export const activitiesApi = {
     endDate?: string;
     duration?: number;
     assigneeId?: string;
+    assigneeIds?: string[];
     parentId?: string;
     notes?: string;
     sortOrder?: number;
@@ -189,6 +190,7 @@ export const activitiesApi = {
     endDate?: string;
     duration?: number;
     assigneeId?: string | null;
+    assigneeIds?: string[];
     parentId?: string | null;
     notes?: string | null;
     dependencies?: Array<{ id: string; type: string; lag?: number }> | null;

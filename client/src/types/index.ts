@@ -108,6 +108,8 @@ export interface Activity {
   phase?: string; // EVT | DVT | PVT | MP
   assigneeId?: string | null;
   assignee?: Pick<User, 'id' | 'realName'> | null;
+  assigneeIds?: string[];
+  assignees?: Pick<User, 'id' | 'realName'>[];
   status: ActivityStatus;
   priority: Priority;
   planStartDate?: string | null;

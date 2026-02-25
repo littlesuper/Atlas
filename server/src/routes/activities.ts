@@ -157,7 +157,7 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
     }
 
     const includeAssignee = {
-      assignee: {
+      assignees: {
         select: {
           id: true,
           realName: true,
@@ -225,7 +225,7 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
       where: { projectId },
       orderBy: { sortOrder: 'asc' },
       include: {
-        assignee: {
+        assignees: {
           select: {
             id: true,
             realName: true,
@@ -255,7 +255,7 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
         duration: activity.duration,
         parent: activity.parentId || '0',
         type,
-        assignee: activity.assignee?.realName || '',
+        assignee: (activity as any).assignees?.map((u: any) => u.realName).join(', ') || '',
         status: activity.status,
         priority: activity.priority,
       };
@@ -302,6 +302,7 @@ router.post(
         type,
         phase,
         assigneeId,
+        assigneeIds,
         status,
         priority,
         planStartDate,
@@ -348,17 +349,8 @@ router.post(
         }
       }
 
-      // 验证负责人是否存在
-      if (assigneeId) {
-        const assignee = await prisma.user.findUnique({
-          where: { id: assigneeId },
-        });
-
-        if (!assignee) {
-          res.status(400).json({ error: '负责人不存在' });
-          return;
-        }
-      }
+      // 解析负责人列表（兼容 assigneeId 单值和 assigneeIds 数组）
+      const resolvedAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : assigneeId ? [assigneeId] : [];
 
       // 根据依赖关系自动计算计划日期
       let resolvedPlanStart = planStartDate ? new Date(planStartDate) : null;
@@ -393,7 +385,8 @@ router.post(
           description,
           type: type || ActivityType.TASK,
           phase,
-          assigneeId: assigneeId || null,
+          assigneeId: resolvedAssigneeIds[0] || null,
+          assignees: resolvedAssigneeIds.length > 0 ? { connect: resolvedAssigneeIds.map((uid: string) => ({ id: uid })) } : undefined,
           status: status || 'NOT_STARTED',
           priority,
           planStartDate: resolvedPlanStart,
@@ -407,7 +400,7 @@ router.post(
           sortOrder: sortOrder || 0,
         },
         include: {
-          assignee: {
+          assignees: {
             select: {
               id: true,
               realName: true,
@@ -446,6 +439,7 @@ router.put(
         type,
         phase,
         assigneeId,
+        assigneeIds,
         status,
         priority,
         planStartDate,
@@ -479,25 +473,22 @@ router.put(
         return;
       }
 
-      // 验证负责人是否存在
-      if (assigneeId) {
-        const assignee = await prisma.user.findUnique({
-          where: { id: assigneeId },
-        });
-
-        if (!assignee) {
-          res.status(400).json({ error: '负责人不存在' });
-          return;
-        }
-      }
-
       // 构建更新数据
       const updateData: any = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
       if (type !== undefined) updateData.type = type;
       if (phase !== undefined) updateData.phase = phase;
-      if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
+
+      // 处理负责人多选（兼容 assigneeIds 数组和旧的 assigneeId 单值）
+      if (assigneeIds !== undefined) {
+        const ids: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
+        updateData.assignees = { set: ids.map((uid: string) => ({ id: uid })) };
+        updateData.assigneeId = ids[0] || null;
+      } else if (assigneeId !== undefined) {
+        updateData.assigneeId = assigneeId || null;
+        updateData.assignees = assigneeId ? { set: [{ id: assigneeId }] } : { set: [] };
+      }
       if (status !== undefined) updateData.status = status;
       if (priority !== undefined) updateData.priority = priority;
       if (dependencies !== undefined) updateData.dependencies = dependencies;
@@ -588,7 +579,7 @@ router.put(
         where: { id },
         data: updateData,
         include: {
-          assignee: {
+          assignees: {
             select: {
               id: true,
               realName: true,

@@ -469,7 +469,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities }) => {
                         <div>实际：{dayjs(a.startDate).format('MM-DD')} ~ {a.endDate ? dayjs(a.endDate).format('MM-DD') : '进行中'} ({a.duration || '-'}工作日)</div>
                       )}
                       <div>状态：{ACTIVITY_STATUS_MAP[a.status as keyof typeof ACTIVITY_STATUS_MAP]?.label || a.status}</div>
-                      {a.assignee && <div>负责人：{a.assignee.realName}</div>}
+                      {(a.assignees?.length ? <div>负责人：{a.assignees.map((u) => u.realName).join(', ')}</div> : a.assignee && <div>负责人：{a.assignee.realName}</div>)}
                     </div>
                   }
                   position="right"
