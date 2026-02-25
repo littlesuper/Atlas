@@ -138,6 +138,10 @@ const ProjectDetail: React.FC = () => {
   const dragIndexRef = useRef<number>(-1);
   const [saving, setSaving] = useState(false);
 
+  // 行间快速插入
+  const [insertHoverIndex, setInsertHoverIndex] = useState<number | null>(null);
+  const insertAtIndexRef = useRef<number | null>(null);
+
   // 活动列表表头吸顶
   const tableWrapRef    = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
@@ -430,7 +434,16 @@ const ProjectDetail: React.FC = () => {
         assigneeId: values.assigneeId,
         parentId: values.parentId,
         notes: values.notes,
-        sortOrder: editingActivity ? editingActivity.sortOrder : (activities.length + 1) * 10,
+        sortOrder: editingActivity
+          ? editingActivity.sortOrder
+          : insertAtIndexRef.current !== null
+            ? (() => {
+                const idx = insertAtIndexRef.current!;
+                const prev = idx > 0 ? activities[idx - 1].sortOrder : 0;
+                const next = idx < activities.length ? activities[idx].sortOrder : prev + 20;
+                return Math.floor((prev + next) / 2);
+              })()
+            : (activities.length + 1) * 10,
         dependencies: formDeps.filter((d) => d.id).map((d) => ({
           id: d.id,
           type: d.type,
@@ -445,6 +458,7 @@ const ProjectDetail: React.FC = () => {
         await activitiesApi.create(data);
         Message.success('活动创建成功');
       }
+      insertAtIndexRef.current = null;
       setDrawerVisible(false);
       loadActivities();
       loadProject(); // 刷新进度
@@ -548,6 +562,13 @@ const ProjectDetail: React.FC = () => {
     window.addEventListener('mouseup', cleanup);
     return () => window.removeEventListener('mouseup', cleanup);
   }, []);
+
+  // ========== 行间快速插入 ==========
+  const handleInsertActivity = (atIndex: number) => {
+    insertAtIndexRef.current = atIndex;
+    setInsertHoverIndex(null);
+    handleOpenDrawer();
+  };
 
   // ========== 双击内联编辑 ==========
   const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
@@ -991,7 +1012,7 @@ const ProjectDetail: React.FC = () => {
                 </Space>
               </div>
 
-              <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
+              <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0, position: 'relative' }}>
                 {/* 自定义表格行（支持拖拽） */}
                 <Table
                   columns={activityColumns}
@@ -1017,7 +1038,23 @@ const ProjectDetail: React.FC = () => {
                           <tr
                             {...rest}
                             className={cls}
-                            onMouseMove={(e) => handleMouseMove(e, index)}
+                            onMouseMove={(e) => {
+                              handleMouseMove(e, index);
+                              if (!isDraggingRef.current && dragIndexRef.current === -1) {
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                const bottomZone = rect.bottom - 12;
+                                if (e.clientY >= bottomZone) {
+                                  setInsertHoverIndex(index);
+                                } else if (insertHoverIndex === index) {
+                                  setInsertHoverIndex(null);
+                                }
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              if (insertHoverIndex === index) {
+                                setInsertHoverIndex(null);
+                              }
+                            }}
                             onMouseUp={(e) => handleMouseUp(e, index)}
                           >
                             {children}
@@ -1027,6 +1064,30 @@ const ProjectDetail: React.FC = () => {
                     },
                   }}
                 />
+                {/* 行间快速插入指示器 */}
+                {insertHoverIndex !== null && !isDraggingRef.current && hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (() => {
+                  const rows = tableWrapRef.current?.querySelectorAll('.arco-table-body tbody tr');
+                  const row = rows?.[insertHoverIndex] as HTMLElement | undefined;
+                  if (!row || !tableWrapRef.current) return null;
+                  const rowRect = row.getBoundingClientRect();
+                  const wrapRect = tableWrapRef.current.getBoundingClientRect();
+                  const top = rowRect.bottom - wrapRect.top;
+                  return (
+                    <div
+                      className="row-insert-zone"
+                      style={{ top }}
+                      onMouseEnter={() => setInsertHoverIndex(insertHoverIndex)}
+                      onMouseLeave={() => setInsertHoverIndex(null)}
+                    >
+                      <div className="row-insert-line" />
+                      <button
+                        className="row-insert-btn"
+                        onClick={() => handleInsertActivity(insertHoverIndex + 1)}
+                        title="在此处插入活动"
+                      >+</button>
+                    </div>
+                  );
+                })()}
               </div>{/* tableWrapRef */}
             </Tabs.TabPane>
 
@@ -1057,7 +1118,7 @@ const ProjectDetail: React.FC = () => {
           width={700}
           title={editingActivity ? '编辑活动' : '新建活动'}
           visible={drawerVisible}
-          onCancel={() => setDrawerVisible(false)}
+          onCancel={() => { insertAtIndexRef.current = null; setDrawerVisible(false); }}
           footer={
             <div style={{ textAlign: 'right' }}>
               <Space>

@@ -318,6 +318,56 @@ tr.drag-insert-below td:first-child::before {
   pointer-events: none;
 }
 
+/* ============ 行间快速插入指示器 ============ */
+.row-insert-zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 16px;
+  transform: translateY(-8px);
+  z-index: 10;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.row-insert-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: #4f7cff;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.row-insert-btn {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #4f7cff;
+  background: #fff;
+  color: #4f7cff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+  z-index: 1;
+}
+
+.row-insert-btn:hover {
+  background: #4f7cff;
+  color: #fff;
+}
+
 /* ============ 响应式布局 ============ */
 @media (max-width: 768px) {
   .page-content {
