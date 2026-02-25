@@ -2039,78 +2039,87 @@ const ProjectDetail: React.FC = () => {
             )}
           </div>
 
-          {/* 归档列表 */}
+          {/* 左右分栏：左侧归档列表 + 右侧详情表格 */}
           {archiveLoading ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}><Spin /></div>
           ) : archiveList.length === 0 ? (
             <Empty description="暂无归档记录" style={{ padding: '40px 0' }} />
           ) : (
-            <div>
-              {archiveList.map(arc => {
-                const isExpanded = expandedArchiveId === arc.id;
-                const canManage = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
-                return (
-                  <div key={arc.id} style={{ borderBottom: '1px solid #f2f3f5' }}>
+            <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 200px)', minHeight: 400 }}>
+              {/* 左侧归档列表 */}
+              <div style={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid #e5e6eb', paddingRight: 12 }}>
+                {archiveList.map(arc => {
+                  const isSelected = expandedArchiveId === arc.id;
+                  const canManage = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
+                  return (
                     <div
+                      key={arc.id}
                       style={{
-                        display: 'flex', alignItems: 'center', padding: '12px 0', gap: 8, cursor: 'pointer',
+                        padding: '10px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
+                        background: isSelected ? '#e8f3ff' : undefined,
+                        border: isSelected ? '1px solid #bedaff' : '1px solid transparent',
                       }}
                       onClick={() => handleExpandArchive(arc.id)}
                     >
-                      <span style={{ fontSize: 13, color: isExpanded ? '#165DFF' : '#1d2129', flex: 1 }}>
-                        {dayjs(arc.createdAt).format('YYYY-MM-DD HH:mm')}
-                        <span style={{ color: '#86909c', marginLeft: 8 }}>{arc.count} 个活动</span>
-                      </span>
+                      <div style={{ fontSize: 13, fontWeight: isSelected ? 500 : 400, color: isSelected ? '#165DFF' : '#1d2129' }}>
+                        {dayjs(arc.createdAt).format('YYYY-MM-DD')}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#86909c', marginTop: 2 }}>
+                        {dayjs(arc.createdAt).format('HH:mm')}
+                        <span style={{ marginLeft: 6 }}>{arc.count} 个活动</span>
+                      </div>
                       {canManage && (
                         <Button
-                          type="text"
-                          size="mini"
-                          status="danger"
+                          type="text" size="mini" status="danger"
+                          style={{ marginTop: 4, padding: '0 4px', height: 20, fontSize: 12 }}
                           onClick={(e) => { e.stopPropagation(); handleDeleteArchive(arc.id); }}
                         >
                           删除
                         </Button>
                       )}
                     </div>
-                    {isExpanded && (
-                      <div style={{ paddingBottom: 12 }}>
-                        {archiveDetailLoading ? (
-                          <div style={{ textAlign: 'center', padding: '16px 0' }}><Spin /></div>
-                        ) : archiveDetail?.snapshot?.length ? (
-                          <Table
-                            columns={[
-                              { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: '#86909c', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
-                              { title: '阶段', width: 70, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
-                              { title: '活动名称', dataIndex: 'name', ellipsis: true },
-                              { title: '类型', width: 80, dataIndex: 'type', render: (v: string) => { const cfg = ACTIVITY_TYPE_MAP[v as keyof typeof ACTIVITY_TYPE_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
-                              { title: '状态', width: 90, dataIndex: 'status', render: (v: string) => { const cfg = ACTIVITY_STATUS_MAP[v as keyof typeof ACTIVITY_STATUS_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
-                              { title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{realName: string}>) => v?.length ? v.map(u => u.realName).join(', ') : '-' },
-                              { title: '计划工期', width: 80, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
-                              { title: '计划时间', width: 170, render: (_: unknown, r: Activity) => r.planStartDate ? `${dayjs(r.planStartDate).format('YYYY-MM-DD')}${r.planEndDate ? ' ~ ' + dayjs(r.planEndDate).format('MM-DD') : ''}` : '-' },
-                              { title: '实际时间', width: 170, render: (_: unknown, r: Activity) => {
-                                if (!r.startDate) return '-';
-                                const text = `${dayjs(r.startDate).format('YYYY-MM-DD')}${r.endDate ? ' ~ ' + dayjs(r.endDate).format('MM-DD') : ''}`;
-                                const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
-                                return <span style={overdue ? { color: '#f53f3f' } : undefined}>{text}</span>;
-                              }},
-                              { title: '备注', width: 160, dataIndex: 'notes', ellipsis: true, render: (v: string | null) => v || '-' },
-                            ]}
-                            data={archiveDetail.snapshot}
-                            rowKey="id"
-                            pagination={false}
-                            size="small"
-                            scroll={{ y: 400 }}
-                            style={{ background: '#fafafa', borderRadius: 6 }}
-                            border={{ bodyCell: true }}
-                          />
-                        ) : (
-                          <Empty description="该归档无活动数据" style={{ padding: '12px 0' }} />
-                        )}
-                      </div>
-                    )}
+                  );
+                })}
+              </div>
+
+              {/* 右侧详情区域 */}
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                {!expandedArchiveId ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c2c7d0' }}>
+                    <span style={{ fontSize: 14 }}>点击左侧归档查看详情</span>
                   </div>
-                );
-              })}
+                ) : archiveDetailLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><Spin /></div>
+                ) : archiveDetail?.snapshot?.length ? (
+                  <Table
+                    columns={[
+                      { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: '#86909c', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
+                      { title: '阶段', width: 70, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
+                      { title: '活动名称', dataIndex: 'name', ellipsis: true },
+                      { title: '类型', width: 80, dataIndex: 'type', render: (v: string) => { const cfg = ACTIVITY_TYPE_MAP[v as keyof typeof ACTIVITY_TYPE_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
+                      { title: '状态', width: 90, dataIndex: 'status', render: (v: string) => { const cfg = ACTIVITY_STATUS_MAP[v as keyof typeof ACTIVITY_STATUS_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
+                      { title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{realName: string}>) => v?.length ? v.map(u => u.realName).join(', ') : '-' },
+                      { title: '计划工期', width: 80, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
+                      { title: '计划时间', width: 170, render: (_: unknown, r: Activity) => r.planStartDate ? `${dayjs(r.planStartDate).format('YYYY-MM-DD')}${r.planEndDate ? ' ~ ' + dayjs(r.planEndDate).format('MM-DD') : ''}` : '-' },
+                      { title: '实际时间', width: 170, render: (_: unknown, r: Activity) => {
+                        if (!r.startDate) return '-';
+                        const text = `${dayjs(r.startDate).format('YYYY-MM-DD')}${r.endDate ? ' ~ ' + dayjs(r.endDate).format('MM-DD') : ''}`;
+                        const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
+                        return <span style={overdue ? { color: '#f53f3f' } : undefined}>{text}</span>;
+                      }},
+                      { title: '备注', width: 160, dataIndex: 'notes', ellipsis: true, render: (v: string | null) => v || '-' },
+                    ]}
+                    data={archiveDetail.snapshot}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    scroll={{ y: 'calc(100vh - 280px)' }}
+                    border={{ bodyCell: true }}
+                  />
+                ) : (
+                  <Empty description="该归档无活动数据" style={{ padding: '40px 0' }} />
+                )}
+              </div>
             </div>
           )}
         </Drawer>
