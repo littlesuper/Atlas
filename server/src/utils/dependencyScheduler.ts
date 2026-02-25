@@ -62,9 +62,10 @@ export function resolveActivityDates(
     const type = dep.type;
 
     if (type === '0') {
-      // FS: successor start = offsetWorkdays(pred.planEndDate, 1 + lag)
+      // FS: successor start = offsetWorkdays(pred.planEndDate, lag || 1)
+      // lag=0 → 下一个工作日; lag>0 → 完成后第 lag 个工作日; lag<0 → 提前
       if (!pred.planEndDate) continue;
-      startConstraints.push(offsetWorkdays(pred.planEndDate, 1 + lag));
+      startConstraints.push(offsetWorkdays(pred.planEndDate, lag || 1));
     } else if (type === '1') {
       // SS: successor start = offsetWorkdays(pred.planStartDate, lag)
       if (!pred.planStartDate) continue;
