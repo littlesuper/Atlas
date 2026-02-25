@@ -706,6 +706,30 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  // 提交计划工期内联编辑
+  const commitPlanDurationEdit = async (activity: Activity) => {
+    setInlineEditing(null);
+    const newDur = parseInt(inlineValue, 10);
+    if (!newDur || newDur <= 0) return;
+    const oldDur = activity.planStartDate && activity.planEndDate
+      ? calcWorkdays(dayjs(activity.planStartDate), dayjs(activity.planEndDate))
+      : activity.planDuration;
+    if (newDur === oldDur) return;
+    const payload: Record<string, unknown> = { planDuration: newDur };
+    // 有计划开始日期时，用 开始日期 + 工期 推算结束日期
+    if (activity.planStartDate) {
+      const endDate = addWorkdays(dayjs(activity.planStartDate), newDur - 1);
+      payload.planEndDate = endDate.format('YYYY-MM-DD');
+    }
+    try {
+      await activitiesApi.update(activity.id, payload);
+      loadActivities();
+      Message.success('更新成功');
+    } catch {
+      Message.error('更新失败');
+    }
+  };
+
   // 提交前置依赖内联编辑
   const commitPredecessorEdit = async (activity: Activity) => {
     setInlineEditing(null);
@@ -966,9 +990,33 @@ const ProjectDetail: React.FC = () => {
       title: '计划工期',
       width: 70,
       render: (_: unknown, record: Activity) => {
-        if (!record.planStartDate || !record.planEndDate) return <span style={{ color: '#c2c7d0' }}>-</span>;
-        const days = calcWorkdays(dayjs(record.planStartDate), dayjs(record.planEndDate));
-        return <span>{days}天</span>;
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'planDuration') {
+          return (
+            <InputNumber
+              autoFocus
+              size="small"
+              style={{ width: 60 }}
+              min={1}
+              precision={0}
+              suffix="天"
+              value={inlineValue ? parseInt(inlineValue, 10) : undefined}
+              onChange={(v) => setInlineValue(v != null ? String(v) : '')}
+              onBlur={() => commitPlanDurationEdit(record)}
+              onKeyDown={(e) => { if ((e as unknown as React.KeyboardEvent).key === 'Enter') commitPlanDurationEdit(record); }}
+            />
+          );
+        }
+        const days = record.planStartDate && record.planEndDate
+          ? calcWorkdays(dayjs(record.planStartDate), dayjs(record.planEndDate))
+          : record.planDuration;
+        return (
+          <span
+            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
+          >
+            {days != null ? `${days}天` : <span style={{ color: '#c2c7d0' }}>-</span>}
+          </span>
+        );
       },
     },
     planDates: {
