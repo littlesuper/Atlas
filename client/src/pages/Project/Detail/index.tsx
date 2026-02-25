@@ -1184,8 +1184,8 @@ const ProjectDetail: React.FC = () => {
               )}
             </div>
 
-            {/* 类型 / 状态 / 优先级 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            {/* 类型 / 状态 / 优先级 / 负责人 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
               <Form.Item label="类型" field="type" rules={[{ required: true }]}>
                 <Select placeholder="类型">
                   {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
@@ -1195,7 +1195,7 @@ const ProjectDetail: React.FC = () => {
                   ))}
                 </Select>
               </Form.Item>
-              <Form.Item label="状态" field="status" rules={[{ required: true }]}>
+              <Form.Item label="状态" field="status">
                 <Select placeholder="状态">
                   {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
                     <Select.Option key={k} value={k}>
@@ -1209,6 +1209,17 @@ const ProjectDetail: React.FC = () => {
                   {Object.entries(PRIORITY_MAP).map(([k, v]) => (
                     <Select.Option key={k} value={k}>
                       <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="负责人" field="assigneeId">
+                <Select placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
+                  (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                }>
+                  {users.map((u) => (
+                    <Select.Option key={u.id} value={u.id}>
+                      {u.realName} ({u.username})
                     </Select.Option>
                   ))}
                 </Select>
@@ -1281,19 +1292,6 @@ const ProjectDetail: React.FC = () => {
                 />
               </Form.Item>
             </div>
-
-            {/* 负责人 */}
-            <Form.Item label="负责人" field="assigneeId">
-              <Select placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
-                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }>
-                {users.map((u) => (
-                  <Select.Option key={u.id} value={u.id}>
-                    {u.realName} ({u.username})
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
 
             {/* 备注 */}
             <Form.Item label="备注" field="notes">
