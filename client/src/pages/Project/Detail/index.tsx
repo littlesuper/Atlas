@@ -957,7 +957,7 @@ const ProjectDetail: React.FC = () => {
                 const parsed: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = dates && dates[0] && dates[1] ? [dayjs(dates[0]), dayjs(dates[1])] : null;
                 commitDateRangeEdit(record, 'planStartDate', 'planEndDate', parsed);
               }}
-              onBlur={() => setInlineEditing(null)}
+              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
             />
           );
         }
@@ -992,7 +992,7 @@ const ProjectDetail: React.FC = () => {
                 const parsed: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = dates && dates[0] && dates[1] ? [dayjs(dates[0]), dayjs(dates[1])] : dates && dates[0] ? [dayjs(dates[0]), null] : null;
                 commitDateRangeEdit(record, 'startDate', 'endDate', parsed);
               }}
-              onBlur={() => setInlineEditing(null)}
+              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
             />
           );
         }
