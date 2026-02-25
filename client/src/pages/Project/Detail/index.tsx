@@ -97,7 +97,7 @@ const DEFAULT_COLUMN_PREFS: ColumnPrefs = {
   order: DEFAULT_COLUMN_ORDER,
 };
 
-// 列宽映射
+// 列宽映射（必须与 columnMap 中的 width 保持一致）
 const COLUMN_WIDTH_MAP: Record<string, number> = {
   id: 60,
   predecessor: 100,
@@ -105,10 +105,10 @@ const COLUMN_WIDTH_MAP: Record<string, number> = {
   name: 200,
   type: 80,
   status: 100,
-  assignee: 100,
+  assignee: 120,
   planDuration: 90,
-  planDates: 170,
-  actualDates: 170,
+  planDates: 200,
+  actualDates: 200,
   notes: 140,
 };
 
@@ -357,12 +357,15 @@ const ProjectDetail: React.FC = () => {
       return;
     }
 
-    // 克隆整张 table，隐藏 tbody（保留 colgroup + thead 以保证列宽一致）
+    // 克隆整张 table，移除 tbody（保留 colgroup + thead 以保证列宽一致）
     const originalTable = wrap.querySelector('table') as HTMLElement | null;
     if (!originalTable) return;
     const cloned = originalTable.cloneNode(true) as HTMLElement;
-    const clonedTbody = cloned.querySelector('tbody') as HTMLElement | null;
-    if (clonedTbody) clonedTbody.style.display = 'none';
+    const clonedTbody = cloned.querySelector('tbody');
+    if (clonedTbody) clonedTbody.remove();
+    // 使用 table-layout: fixed 确保列宽仅由 colgroup 决定，不受内容影响
+    cloned.style.tableLayout = 'fixed';
+    cloned.style.width = originalTable.scrollWidth + 'px';
     stickyDiv.innerHTML = '';
     stickyDiv.appendChild(cloned);
 
@@ -375,7 +378,7 @@ const ProjectDetail: React.FC = () => {
     };
     scrollEl.addEventListener('scroll', onHScroll, { passive: true });
     return () => scrollEl.removeEventListener('scroll', onHScroll);
-  }, [theadFixed, theadFixedPos]);
+  }, [theadFixed, theadFixedPos, columnPrefs]);
 
   // 打开创建/编辑抽屉
   const handleOpenDrawer = (activity?: Activity) => {
