@@ -67,7 +67,7 @@ const WORKDAY_OVERRIDES: Set<string> = new Set([
 /**
  * 判断某天是否为工作日（考虑中国法定节假日和调休）
  */
-export function isWorkday(date: Date): boolean {
+function isWorkday(date: Date): boolean {
   const dateStr = date.toISOString().split('T')[0];
   const dayOfWeek = date.getDay();
 
@@ -81,36 +81,6 @@ export function isWorkday(date: Date): boolean {
   if (dayOfWeek === 0 || dayOfWeek === 6) return false;
 
   return true;
-}
-
-/**
- * 从基准日期偏移指定工作日数
- * @param baseDate 基准日期
- * @param offsetDays 偏移工作日数（正数向未来，负数向过去，0 返回最近工作日）
- * @returns 偏移后的日期
- */
-export function offsetWorkdays(baseDate: Date, offsetDays: number): Date {
-  const result = new Date(baseDate);
-
-  if (offsetDays === 0) {
-    // 若非工作日，向未来找最近的工作日
-    while (!isWorkday(result)) {
-      result.setDate(result.getDate() + 1);
-    }
-    return result;
-  }
-
-  const direction = offsetDays > 0 ? 1 : -1;
-  let remaining = Math.abs(offsetDays);
-
-  while (remaining > 0) {
-    result.setDate(result.getDate() + direction);
-    if (isWorkday(result)) {
-      remaining--;
-    }
-  }
-
-  return result;
 }
 
 /**
