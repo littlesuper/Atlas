@@ -785,7 +785,7 @@ const ProjectDetail: React.FC = () => {
               allowClear
               placeholder="阶段"
               defaultPopupVisible
-              onBlur={() => setInlineEditing(null)}
+              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
               onChange={(v) => commitSelectEdit(record, 'phase', v || '')}
             >
               {PHASE_OPTIONS.map((p) => (
@@ -842,7 +842,7 @@ const ProjectDetail: React.FC = () => {
               style={{ width: 90 }}
               value={record.type}
               defaultPopupVisible
-              onBlur={() => setInlineEditing(null)}
+              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
               onChange={(v) => commitSelectEdit(record, 'type', v)}
             >
               {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
@@ -873,7 +873,8 @@ const ProjectDetail: React.FC = () => {
               size="small"
               style={{ width: 100 }}
               value={record.status}
-              onBlur={() => setInlineEditing(null)}
+              defaultPopupVisible
+              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
               onChange={(v) => commitSelectEdit(record, 'status', v)}
             >
               {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
@@ -914,7 +915,8 @@ const ProjectDetail: React.FC = () => {
               allowClear
               style={{ width: 160 }}
               value={record.assignees?.map((a) => a.id) ?? (record.assigneeId ? [record.assigneeId] : [])}
-              onBlur={() => setInlineEditing(null)}
+              defaultPopupVisible
+              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
               onChange={(v: string[]) => {
                 setInlineEditing(null);
                 activitiesApi.update(record.id, { assigneeIds: v }).then(() => {

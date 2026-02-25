@@ -1,0 +1,79 @@
+# 活动列表内联编辑 — 需求文档
+
+## 1. 概述
+
+项目详情页的「活动列表」Tab 支持双击单元格进行内联编辑，无需打开抽屉即可快速修改活动属性。所有编辑操作受权限控制，仅具备 `activity:update` 权限且为项目经理的用户可执行。
+
+## 2. 支持内联编辑的字段
+
+| # | 字段 | 列标题 | 编辑器类型 | 提交方式 | 取消方式 |
+|---|------|--------|-----------|---------|---------|
+| 1 | predecessor | 前置 | Input 文本框 | 回车 / 失焦 | 失焦自动提交 |
+| 2 | phase | 阶段 | Select 下拉 | 选择即提交 | 点击空白关闭 |
+| 3 | name | 活动名称 | Input 文本框 | 回车 / 失焦 | 失焦自动提交 |
+| 4 | type | 类型 | Select 下拉 | 选择即提交 | 点击空白关闭 |
+| 5 | status | 状态 | Select 下拉 | 选择即提交 | 点击空白关闭 |
+| 6 | assignee | 负责人 | Select 多选下拉 | 选择即提交 | 点击空白关闭 |
+| 7 | planDates | 计划时间 | DatePicker.RangePicker | 选完日期范围自动提交 | 点击空白关闭 |
+| 8 | actualDates | 实际时间 | DatePicker.RangePicker | 选完日期范围自动提交 | 点击空白关闭 |
+| 9 | notes | 备注 | Input 文本框 | 回车 / 失焦 | 失焦自动提交 |
+
+## 3. 交互规范
+
+### 3.1 触发编辑
+- **触发方式**：双击单元格内容
+- **权限检查**：双击前检查 `hasPermission('activity', 'update') && isProjectManager()`，无权限时不响应
+- **互斥**：同一时刻只有一个单元格处于编辑态（`inlineEditing` state 为单例）
+
+### 3.2 编辑器行为
+
+#### Input 类（predecessor、name、notes）
+- 双击后显示 `<Input autoFocus />` 并预填当前值
+- 按 Enter 或失焦时提交修改
+- 空值提交时清除该字段
+
+#### Select 类（phase、type、status、assignee）
+- 双击后显示 `<Select defaultPopupVisible />` 并自动展开下拉列表
+- 选择选项后立即提交（`onChange`）
+- 点击空白处关闭下拉列表（`onVisibleChange(false)` → 退出编辑态）
+- 负责人为多选模式，关闭下拉列表时提交已选值
+
+#### DatePicker.RangePicker 类（planDates、actualDates）
+- 双击后显示 `<RangePicker defaultPopupVisible />` 并自动弹出日历面板
+- 选完开始和结束日期后自动提交
+- 点击空白处关闭日历面板（`onVisibleChange(false)` → 退出编辑态）
+
+### 3.3 特殊规则
+
+| 规则 | 描述 |
+|------|------|
+| **前置依赖锁定计划时间** | 当活动设置了前置依赖（`dependencies` 非空），双击计划时间列时显示提示 `"已设置前置依赖，计划时间由系统自动计算"` 而非进入编辑 |
+| **前置依赖文本格式** | 格式为 `{序号}[类型][±延迟]`，多个用逗号分隔，如 `3FS+2, 5`。类型默认 FS，延迟默认 0 |
+| **前置依赖级联** | 修改前置依赖后触发 `loadActivities()` 重新加载，因为后端会级联更新下游任务日期 |
+| **计划时间自算工期** | 修改计划开始/结束日期后自动计算工期 `planDuration = calcWorkdays(start, end)` |
+
+## 4. 数据流
+
+```
+双击 → setInlineEditing({ id, field })
+  → 渲染编辑器组件（Input / Select / RangePicker）
+    → 用户操作（输入/选择/选日期）
+      → commit 函数调用 activitiesApi.update()
+        → 成功: 更新本地 state 或 loadActivities()
+        → 失败: Message.error('更新失败')
+  → 退出编辑态: setInlineEditing(null)
+```
+
+## 5. 权限模型
+
+- 检查函数: `hasPermission('activity', 'update') && isProjectManager(project?.managerId, project?.id)`
+- 无权限时：单元格 cursor 为 default，双击不响应
+- 有权限时：单元格 cursor 为 pointer，双击进入编辑态
+
+## 6. 不支持内联编辑的字段
+
+| 字段 | 原因 |
+|------|------|
+| ID（序号） | 系统自动生成 |
+| 优先级 | 暂未实现 |
+| 操作列 | 按钮区域，非数据字段 |
