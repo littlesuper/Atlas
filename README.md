@@ -72,9 +72,41 @@ npm run dev
 HWSystem/
 ├── client/          # 前端应用
 ├── server/          # 后端应用
+├── e2e/             # Playwright 端到端测试
+│   ├── fixtures/    # 测试数据与认证 fixture
+│   ├── helpers/     # Arco Design UI 交互工具函数
+│   └── specs/       # 测试用例
 ├── specs/           # 模块规格说明书
 └── package.json     # monorepo 根配置
 ```
+
+## 测试
+
+### 单元测试
+
+```bash
+cd client && npm test        # 前端单元测试 (Vitest)
+```
+
+### 端到端测试 (E2E)
+
+使用 Playwright 进行端到端测试，覆盖认证、导航、项目管理、活动管理、产品管理、系统管理和项目周报等完整用户流程。
+
+```bash
+# 安装浏览器（首次）
+npx playwright install chromium
+
+# 运行全部 E2E 测试（需先启动前后端服务）
+npx playwright test
+
+# 带界面运行（调试用）
+npx playwright test --headed
+
+# 运行单个测试文件
+npx playwright test e2e/specs/projects.spec.ts
+```
+
+测试配置见 `playwright.config.ts`，会自动启动前后端开发服务器。
 
 ## 功能模块
 

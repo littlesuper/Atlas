@@ -211,8 +211,8 @@ const ProjectList: React.FC = () => {
         productLine: values.productLine,
         status: values.status,
         priority: values.priority,
-        startDate: values.dateRange[0].format('YYYY-MM-DD'),
-        endDate: values.dateRange[1] ? values.dateRange[1].format('YYYY-MM-DD') : undefined,
+        startDate: dayjs(values.dateRange[0]).format('YYYY-MM-DD'),
+        endDate: values.dateRange[1] ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
         managerId: values.managerId,
       };
       const memberIds: string[] = values.memberIds || [];

@@ -147,7 +147,13 @@ HWSystem/
 │   │   └── index.ts         # Express 入口
 │   └── uploads/             # 上传文件存储目录
 │
-└── specs/           # 需求规格文档
+├── e2e/             # Playwright 端到端测试
+│   ├── fixtures/            # 测试 fixture 与数据
+│   ├── helpers/             # UI 交互工具函数
+│   └── specs/               # 测试用例
+│
+├── specs/           # 需求规格文档
+└── playwright.config.ts     # Playwright 配置
 ```
 
 ### 技术栈
@@ -181,6 +187,7 @@ npm run start            # 启动生产服务器
 cd client
 npm run dev              # 启动前端开发服务器
 npm run build            # 构建前端生产版本
+npm test                 # 运行单元测试 (Vitest)
 
 # 后端目录
 cd server
@@ -189,7 +196,39 @@ npm run build            # 编译 TypeScript
 npm run start            # 启动编译后的服务器
 npx prisma studio        # 打开 Prisma Studio(数据库 GUI)
 npx prisma migrate dev   # 创建新的数据库迁移
+
+# E2E 测试(根目录)
+npx playwright install chromium   # 首次安装浏览器
+npx playwright test               # 运行全部端到端测试
+npx playwright test --headed      # 带浏览器界面运行(调试)
 ```
+
+### 端到端测试 (E2E)
+
+项目使用 Playwright 进行端到端测试，测试文件位于 `e2e/` 目录。
+
+```
+e2e/
+├── auth.setup.ts        # 登录并缓存认证状态（只执行一次）
+├── fixtures/
+│   ├── auth.ts          # authedPage fixture（已登录页面）
+│   └── test-data.ts     # 测试数据常量
+├── helpers/
+│   └── arco.ts          # Arco Design UI 交互工具函数
+└── specs/
+    ├── auth.spec.ts          # 登录、登出、未认证重定向
+    ├── navigation.spec.ts    # 侧边栏导航、Tab 切换
+    ├── projects.spec.ts      # 项目 CRUD
+    ├── activities.spec.ts    # 活动 CRUD
+    ├── products.spec.ts      # 产品 CRUD
+    ├── admin.spec.ts         # 系统管理（AI、用户、角色、日志）
+    └── weekly-reports.spec.ts # 项目周报
+```
+
+**运行要求：**
+- 前后端服务会由 `playwright.config.ts` 自动启动
+- 测试使用 `storageState` 缓存登录态，避免触发服务端登录限流
+- 测试串行执行（单 worker），兼容 SQLite 并发限制
 
 ## 🎯 后续扩展建议
 
