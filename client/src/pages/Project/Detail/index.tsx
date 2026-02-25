@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -28,7 +28,8 @@ import {
   IconDragDotVertical,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, activitiesApi, usersApi } from '../../../api';
+import { projectsApi, activitiesApi, usersApi, authApi } from '../../../api';
+import ColumnSettings, { ColumnDef, ColumnPrefs } from './ColumnSettings';
 import { useAuthStore } from '../../../store/authStore';
 import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
 import GanttChart from './GanttChart';
@@ -70,6 +71,45 @@ const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'pu
 
 import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/workday';
 
+// 活动列配置定义
+const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
+  // drag handle 不出现在设置面板中，始终存在
+  { key: 'id', label: 'ID', removable: true },
+  { key: 'predecessor', label: '前置', removable: true },
+  { key: 'phase', label: '阶段', removable: true },
+  { key: 'name', label: '活动名称', removable: false },
+  { key: 'type', label: '类型', removable: true },
+  { key: 'status', label: '状态', removable: true },
+  { key: 'priority', label: '优先级', removable: true },
+  { key: 'assignee', label: '负责人', removable: true },
+  { key: 'planDates', label: '计划时间', removable: true },
+  { key: 'actualDates', label: '实际时间', removable: true },
+  { key: 'notes', label: '备注', removable: true },
+  // actions 列不出现在设置面板中，始终存在
+];
+
+const DEFAULT_COLUMN_ORDER = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
+const DEFAULT_COLUMN_VISIBLE = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
+const DEFAULT_COLUMN_PREFS: ColumnPrefs = {
+  visible: DEFAULT_COLUMN_VISIBLE,
+  order: DEFAULT_COLUMN_ORDER,
+};
+
+// 列宽映射
+const COLUMN_WIDTH_MAP: Record<string, number> = {
+  id: 60,
+  predecessor: 100,
+  phase: 70,
+  name: 200,
+  type: 80,
+  status: 100,
+  priority: 80,
+  assignee: 100,
+  planDates: 170,
+  actualDates: 170,
+  notes: 140,
+};
+
 // 格式化3位序号
 function formatSeq(n: number): string {
   return String(n).padStart(3, '0');
@@ -96,7 +136,6 @@ const ProjectDetail: React.FC = () => {
 
   // 拖拽排序状态
   const dragIndexRef = useRef<number>(-1);
-  const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
   const [saving, setSaving] = useState(false);
 
   // 活动列表表头吸顶
@@ -112,6 +151,9 @@ const ProjectDetail: React.FC = () => {
   // 双击内联编辑
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [inlineValue, setInlineValue] = useState<string>('');
+
+  // 列偏好设置
+  const [columnPrefs, setColumnPrefs] = useState<ColumnPrefs>(DEFAULT_COLUMN_PREFS);
 
   // 表单中计划/实际工期
   const [planDuration, setPlanDuration] = useState<number | null>(null);
@@ -157,6 +199,47 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  // 加载列偏好设置
+  const loadColumnPrefs = async () => {
+    try {
+      const res = await authApi.getPreferences();
+      const prefs = res.data as Record<string, unknown>;
+      if (prefs?.activityColumns) {
+        const saved = prefs.activityColumns as { visible?: string[]; order?: string[] };
+        const validKeys = new Set(ACTIVITY_COLUMN_DEFS.map((d) => d.key));
+        const nonRemovableKeys = ACTIVITY_COLUMN_DEFS.filter((d) => !d.removable).map((d) => d.key);
+
+        // Filter out keys that no longer exist
+        let visible = (saved.visible || DEFAULT_COLUMN_VISIBLE).filter((k) => validKeys.has(k));
+        let order = (saved.order || DEFAULT_COLUMN_ORDER).filter((k) => validKeys.has(k));
+
+        // Ensure non-removable columns are always visible
+        for (const key of nonRemovableKeys) {
+          if (!visible.includes(key)) visible.push(key);
+        }
+
+        // Append any new keys not yet in order
+        for (const key of DEFAULT_COLUMN_ORDER) {
+          if (!order.includes(key)) order.push(key);
+        }
+
+        setColumnPrefs({ visible, order });
+      }
+    } catch {
+      // Silently use default config on failure
+    }
+  };
+
+  // 保存列偏好设置
+  const saveColumnPrefs = useCallback(async (prefs: ColumnPrefs) => {
+    setColumnPrefs(prefs);
+    try {
+      await authApi.updatePreferences({ activityColumns: prefs });
+    } catch {
+      Message.error('保存列设置失败');
+    }
+  }, []);
+
   const handleAddMember = async (userId: string) => {
     if (!id) return;
     setMembersLoading(true);
@@ -190,6 +273,7 @@ const ProjectDetail: React.FC = () => {
     loadProject();
     loadActivities();
     loadUsers();
+    loadColumnPrefs();
   }, [id]);
 
   // ===== 活动列表表头吸顶：滚动检测 =====
@@ -564,43 +648,30 @@ const ProjectDetail: React.FC = () => {
     );
   };
 
-  // 表格列配置
-  const activityColumns = [
-    {
-      title: '',
-      dataIndex: 'id',
-      width: 50,
-      render: (_: unknown, record: Activity, index: number) =>
-        hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
-          <div
-            className="drag-handle"
-            onMouseDown={(e) => handleMouseDown(e, index)}
-          >
-            <IconDragDotVertical style={{ color: '#86909c', fontSize: 20 }} />
-          </div>
-        ) : null,
-    },
-    {
+  // 表格列配置（keyed map）
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const columnMap = useMemo<Record<string, { title: string; width?: number; dataIndex?: string; fixed?: 'right'; render?: (...args: any[]) => React.ReactNode }>>(() => ({
+    id: {
       title: 'ID',
       width: 60,
       render: (_: unknown, record: Activity) => (
         <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getSeq(record)}</span>
       ),
     },
-    {
+    predecessor: {
       title: '前置',
       width: 100,
       render: (_: unknown, record: Activity) => (
         <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getPredecessorSeq(record)}</span>
       ),
     },
-    {
+    phase: {
       title: '阶段',
       width: 70,
       render: (_: unknown, record: Activity) =>
         record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: '#c2c7d0' }}>-</span>,
     },
-    {
+    name: {
       title: '活动名称',
       dataIndex: 'name',
       width: 200,
@@ -627,7 +698,7 @@ const ProjectDetail: React.FC = () => {
         );
       },
     },
-    {
+    type: {
       title: '类型',
       width: 80,
       render: (_: unknown, record: Activity) => {
@@ -635,7 +706,7 @@ const ProjectDetail: React.FC = () => {
         return <Tag color={cfg.color}>{cfg.label}</Tag>;
       },
     },
-    {
+    status: {
       title: '状态',
       width: 100,
       render: (_: unknown, record: Activity) => {
@@ -666,7 +737,7 @@ const ProjectDetail: React.FC = () => {
         );
       },
     },
-    {
+    priority: {
       title: '优先级',
       width: 80,
       render: (_: unknown, record: Activity) => {
@@ -674,7 +745,7 @@ const ProjectDetail: React.FC = () => {
         return <Tag color={cfg.color}>{cfg.label}</Tag>;
       },
     },
-    {
+    assignee: {
       title: '负责人',
       width: 100,
       render: (_: unknown, record: Activity) => {
@@ -704,19 +775,20 @@ const ProjectDetail: React.FC = () => {
         );
       },
     },
-    {
+    planDates: {
       title: '计划时间',
       width: 170,
       render: (_: unknown, record: Activity) => renderPlanDates(record),
     },
-    {
+    actualDates: {
       title: '实际时间',
       width: 170,
       render: (_: unknown, record: Activity) => renderActualDates(record),
     },
-    {
+    notes: {
       title: '备注',
       dataIndex: 'notes',
+      width: 140,
       render: (notes: string | null, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
           return (
@@ -750,7 +822,28 @@ const ProjectDetail: React.FC = () => {
         );
       },
     },
-    {
+  }), [inlineEditing, inlineValue, users, project, activities, activitySeqMap]);
+
+  // 根据偏好生成最终列数组
+  const activityColumns = useMemo(() => {
+    // 始终存在的拖拽手柄列
+    const dragCol = {
+      title: '',
+      dataIndex: 'id',
+      width: 50,
+      render: (_: unknown, _record: Activity, index: number) =>
+        hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
+          <div
+            className="drag-handle"
+            onMouseDown={(e: React.MouseEvent) => handleMouseDown(e, index)}
+          >
+            <IconDragDotVertical style={{ color: '#86909c', fontSize: 20 }} />
+          </div>
+        ) : null,
+    };
+
+    // 始终存在的操作列
+    const actionsCol = {
       title: '操作',
       width: 100,
       fixed: 'right' as const,
@@ -768,8 +861,25 @@ const ProjectDetail: React.FC = () => {
           )}
         </Space>
       ),
-    },
-  ];
+    };
+
+    // 按 order 排序，按 visible 过滤
+    const visibleSet = new Set(columnPrefs.visible);
+    const middleCols = columnPrefs.order
+      .filter((key) => visibleSet.has(key) && columnMap[key])
+      .map((key) => columnMap[key]);
+
+    return [dragCol, ...middleCols, actionsCol];
+  }, [columnMap, columnPrefs, project]);
+
+  // 动态计算 scroll.x
+  const scrollX = useMemo(() => {
+    const visibleSet = new Set(columnPrefs.visible);
+    const dynamicWidth = columnPrefs.order
+      .filter((key) => visibleSet.has(key))
+      .reduce((sum, key) => sum + (COLUMN_WIDTH_MAP[key] || 100), 0);
+    return dynamicWidth + 50 + 100; // drag(50) + actions(100)
+  }, [columnPrefs]);
 
   if (loading || !project) {
     return <MainLayout>加载中...</MainLayout>;
@@ -868,9 +978,17 @@ const ProjectDetail: React.FC = () => {
                 <span style={{ fontSize: 12, color: '#86909c' }}>
                   {saving ? '保存排序中...' : ''}
                 </span>
-                {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                  <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
-                )}
+                <Space>
+                  <ColumnSettings
+                    columnDefs={ACTIVITY_COLUMN_DEFS}
+                    prefs={columnPrefs}
+                    onChange={saveColumnPrefs}
+                    defaultPrefs={DEFAULT_COLUMN_PREFS}
+                  />
+                  {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                    <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
+                  )}
+                </Space>
               </div>
 
               <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
@@ -881,7 +999,7 @@ const ProjectDetail: React.FC = () => {
                   loading={activitiesLoading}
                   rowKey="id"
                   pagination={false}
-                  scroll={{ x: 1300 }}
+                  scroll={{ x: scrollX }}
                   components={{
                     body: {
                       row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number; [key: string]: unknown }) => {

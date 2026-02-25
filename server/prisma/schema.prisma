@@ -26,6 +26,7 @@ model User {
   phone       String?
   wecomUserId String?    @unique
   status      UserStatus @default(ACTIVE)
+  preferences Json?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 

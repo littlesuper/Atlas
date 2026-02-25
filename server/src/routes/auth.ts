@@ -361,6 +361,69 @@ router.post('/change-password', authenticate, async (req: Request, res: Response
   }
 });
 
+// ==================== 用户偏好设置 ====================
+
+/**
+ * GET /api/auth/preferences
+ * 获取当前用户的偏好设置
+ */
+router.get('/preferences', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: '未认证' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { preferences: true },
+    });
+
+    res.json(user?.preferences || {});
+  } catch (error) {
+    console.error('获取偏好设置错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * PUT /api/auth/preferences
+ * 更新当前用户的偏好设置（浅合并）
+ */
+router.put('/preferences', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: '未认证' });
+      return;
+    }
+
+    const { preferences } = req.body;
+    if (!preferences || typeof preferences !== 'object') {
+      res.status(400).json({ error: '偏好设置格式不正确' });
+      return;
+    }
+
+    // 获取现有偏好设置
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { preferences: true },
+    });
+
+    const existing = (user?.preferences as Record<string, unknown>) || {};
+    const merged = { ...existing, ...preferences };
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { preferences: merged },
+    });
+
+    res.json(merged);
+  } catch (error) {
+    console.error('更新偏好设置错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
 // ==================== 企业微信扫码登录 ====================
 
 /**

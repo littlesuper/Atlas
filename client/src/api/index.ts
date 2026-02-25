@@ -44,6 +44,12 @@ export const authApi = {
 
   wecomLogin: (data: { code: string }) =>
     request.post<{ accessToken: string; refreshToken: string; user: User }>('/auth/wecom/login', data),
+
+  getPreferences: () =>
+    request.get<Record<string, unknown>>('/auth/preferences'),
+
+  updatePreferences: (preferences: Record<string, unknown>) =>
+    request.put<Record<string, unknown>>('/auth/preferences', { preferences }),
 };
 
 // ============ 用户管理 API ============
