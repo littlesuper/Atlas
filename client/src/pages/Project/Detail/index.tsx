@@ -652,6 +652,30 @@ const ProjectDetail: React.FC = () => {
     return result;
   };
 
+  // 提交日期范围内联编辑
+  const commitDateRangeEdit = async (
+    activity: Activity,
+    startField: string,
+    endField: string,
+    dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null,
+  ) => {
+    setInlineEditing(null);
+    const startVal = dates?.[0]?.format('YYYY-MM-DD') || null;
+    const endVal = dates?.[1]?.format('YYYY-MM-DD') || null;
+    const payload: Record<string, unknown> = { [startField]: startVal, [endField]: endVal };
+    // 计划时间自动算工期
+    if (startField === 'planStartDate' && startVal && endVal) {
+      payload.planDuration = calcWorkdays(dayjs(startVal), dayjs(endVal));
+    }
+    try {
+      await activitiesApi.update(activity.id, payload);
+      loadActivities();
+      Message.success('更新成功');
+    } catch {
+      Message.error('更新失败');
+    }
+  };
+
   // 提交前置依赖内联编辑
   const commitPredecessorEdit = async (activity: Activity) => {
     setInlineEditing(null);
@@ -751,8 +775,34 @@ const ProjectDetail: React.FC = () => {
     phase: {
       title: '阶段',
       width: 70,
-      render: (_: unknown, record: Activity) =>
-        record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: '#c2c7d0' }}>-</span>,
+      render: (_: unknown, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'phase') {
+          return (
+            <Select
+              size="small"
+              style={{ width: 80 }}
+              value={record.phase || undefined}
+              allowClear
+              placeholder="阶段"
+              defaultPopupVisible
+              onBlur={() => setInlineEditing(null)}
+              onChange={(v) => commitSelectEdit(record, 'phase', v || '')}
+            >
+              {PHASE_OPTIONS.map((p) => (
+                <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
+              ))}
+            </Select>
+          );
+        }
+        return (
+          <span
+            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'phase' })}
+          >
+            {record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: '#c2c7d0' }}>-</span>}
+          </span>
+        );
+      },
     },
     name: {
       title: '活动名称',
@@ -785,8 +835,32 @@ const ProjectDetail: React.FC = () => {
       title: '类型',
       width: 80,
       render: (_: unknown, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'type') {
+          return (
+            <Select
+              size="small"
+              style={{ width: 90 }}
+              value={record.type}
+              defaultPopupVisible
+              onBlur={() => setInlineEditing(null)}
+              onChange={(v) => commitSelectEdit(record, 'type', v)}
+            >
+              {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
+                <Select.Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Select.Option>
+              ))}
+            </Select>
+          );
+        }
         const cfg = ACTIVITY_TYPE_MAP[record.type as keyof typeof ACTIVITY_TYPE_MAP] ?? { label: record.type, color: 'default' };
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+        return (
+          <Tag
+            color={cfg.color}
+            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'type' })}
+          >
+            {cfg.label}
+          </Tag>
+        );
       },
     },
     status: {
@@ -868,13 +942,69 @@ const ProjectDetail: React.FC = () => {
     },
     planDates: {
       title: '计划时间',
-      width: 170,
-      render: (_: unknown, record: Activity) => renderPlanDates(record),
+      width: 200,
+      render: (_: unknown, record: Activity) => {
+        const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'planDates') {
+          return (
+            <DatePicker.RangePicker
+              size="small"
+              style={{ width: 220 }}
+              format="YYYY-MM-DD"
+              {...{ defaultPopupVisible: true } as any}
+              value={record.planStartDate && record.planEndDate ? [dayjs(record.planStartDate), dayjs(record.planEndDate)] as [dayjs.Dayjs, dayjs.Dayjs] : undefined}
+              onChange={(_, dates) => {
+                const parsed: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = dates && dates[0] && dates[1] ? [dayjs(dates[0]), dayjs(dates[1])] : null;
+                commitDateRangeEdit(record, 'planStartDate', 'planEndDate', parsed);
+              }}
+              onBlur={() => setInlineEditing(null)}
+            />
+          );
+        }
+        return (
+          <span
+            style={{ cursor: !hasDeps && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => {
+              if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
+              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id)) {
+                setInlineEditing({ id: record.id, field: 'planDates' });
+              }
+            }}
+          >
+            {renderPlanDates(record)}
+          </span>
+        );
+      },
     },
     actualDates: {
       title: '实际时间',
-      width: 170,
-      render: (_: unknown, record: Activity) => renderActualDates(record),
+      width: 200,
+      render: (_: unknown, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'actualDates') {
+          return (
+            <DatePicker.RangePicker
+              size="small"
+              style={{ width: 220 }}
+              format="YYYY-MM-DD"
+              {...{ defaultPopupVisible: true } as any}
+              value={record.startDate && record.endDate ? [dayjs(record.startDate), dayjs(record.endDate)] as [dayjs.Dayjs, dayjs.Dayjs] : record.startDate ? [dayjs(record.startDate), dayjs(record.startDate)] as [dayjs.Dayjs, dayjs.Dayjs] : undefined}
+              onChange={(_, dates) => {
+                const parsed: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = dates && dates[0] && dates[1] ? [dayjs(dates[0]), dayjs(dates[1])] : dates && dates[0] ? [dayjs(dates[0]), null] : null;
+                commitDateRangeEdit(record, 'startDate', 'endDate', parsed);
+              }}
+              onBlur={() => setInlineEditing(null)}
+            />
+          );
+        }
+        return (
+          <span
+            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'actualDates' })}
+          >
+            {renderActualDates(record)}
+          </span>
+        );
+      },
     },
     notes: {
       title: '备注',
