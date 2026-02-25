@@ -1,24 +1,27 @@
-# 硬件管理系统 (Atlas)
+# Atlas — 硬件项目管理平台
 
-一套面向硬件团队的 Web 管理平台,包含项目管理和产品管理两大核心模块,支持多用户协作和基于角色的权限控制。
+一套面向硬件团队的 Web 管理平台，涵盖项目全生命周期管理、产品管理、周报协作与 AI 辅助风险评估，支持多用户协作、基于角色的权限控制以及明亮/暗色主题切换。
 
 ## 技术栈
 
 ### 前端
 - React 18 + TypeScript
 - Vite 7
-- Arco Design (UI 组件库)
-- Zustand (状态管理)
+- Arco Design（UI 组件库）
+- Zustand（状态管理）
 - React Router 7
-- Axios
-- Day.js
+- Axios、Day.js、TipTap（富文本编辑器）
 
 ### 后端
 - Express 4 + TypeScript
-- Prisma 6 (ORM)
+- Prisma 6（ORM）
 - PostgreSQL 17
-- JWT (认证)
-- bcryptjs (密码加密)
+- JWT 双令牌认证 + bcryptjs 密码加密
+- Multer（文件上传）
+
+### 测试
+- Vitest（前端单元测试）
+- Playwright（端到端测试，35+ 用例）
 
 ## 快速开始
 
@@ -30,7 +33,7 @@ npm install
 
 ### 2. 配置环境变量
 
-在 `server` 目录下创建 `.env` 文件:
+在 `server` 目录下创建 `.env` 文件：
 
 ```env
 DATABASE_URL="postgresql://littlesuper@localhost:5432/hwsystem"
@@ -55,8 +58,8 @@ cd ..
 npm run dev
 ```
 
-- 前端: http://localhost:5173
-- 后端: http://localhost:3000
+- 前端：http://localhost:5173
+- 后端：http://localhost:3000
 
 ## 默认账号
 
@@ -69,16 +72,90 @@ npm run dev
 ## 项目结构
 
 ```
-HWSystem/
-├── client/          # 前端应用
-├── server/          # 后端应用
-├── e2e/             # Playwright 端到端测试
-│   ├── fixtures/    # 测试数据与认证 fixture
-│   ├── helpers/     # Arco Design UI 交互工具函数
-│   └── specs/       # 测试用例
-├── specs/           # 模块规格说明书
-└── package.json     # monorepo 根配置
+Atlas/
+├── client/                # 前端应用
+│   ├── src/
+│   │   ├── api/           # API 请求封装
+│   │   ├── components/    # 通用组件（SafeHtml、AttachmentList 等）
+│   │   ├── hooks/         # 自定义 Hooks（权限、拖拽排序等）
+│   │   ├── layouts/       # 布局组件（MainLayout）
+│   │   ├── pages/         # 页面模块
+│   │   │   ├── Auth/      # 登录页
+│   │   │   ├── Project/   # 项目管理（列表、详情、甘特图、风险评估）
+│   │   │   ├── Product/   # 产品管理
+│   │   │   ├── WeeklyReports/ # 项目周报
+│   │   │   └── Admin/     # 系统管理（用户、角色、权限）
+│   │   ├── store/         # Zustand 状态管理（auth、theme）
+│   │   ├── styles/        # 全局样式与主题变量
+│   │   ├── types/         # TypeScript 类型定义
+│   │   └── utils/         # 工具函数与常量
+│   └── vite.config.ts
+├── server/                # 后端应用
+│   ├── src/
+│   │   ├── routes/        # Express 路由
+│   │   ├── middleware/    # 认证、权限中间件
+│   │   ├── prisma/        # Prisma schema 与种子数据
+│   │   └── utils/         # 工具函数
+│   └── tsconfig.json
+├── e2e/                   # Playwright 端到端测试
+│   ├── fixtures/          # 测试数据与认证 fixture
+│   ├── helpers/           # Arco Design UI 交互工具函数
+│   └── specs/             # 测试用例
+├── specs/                 # 模块规格说明书
+└── package.json           # monorepo 根配置
 ```
+
+## 功能模块
+
+### 认证与权限
+- JWT 双令牌机制（access + refresh），自动静默刷新
+- 基于角色的访问控制（RBAC）：系统管理员、项目经理、产品经理等
+- 用户偏好持久化（列设置、主题偏好等）
+
+### 项目管理
+- 项目全生命周期管理：EVT → DVT → PVT → MP 阶段流转
+- 活动/任务树：支持多级嵌套、拖拽排序、批量操作
+- 自定义列显示：用户可拖拽调整列顺序与可见性，偏好自动保存
+- 里程碑管理：可视化时间线，状态跟踪（待开始、进行中、已完成、逾期）
+- 项目归档：归档快照保留完整历史数据
+
+### 甘特图
+- 基于活动数据的可视化甘特图
+- 按 EVT/DVT/PVT/MP 阶段分组展示
+- 状态色彩编码：未开始（灰）、进行中（蓝）、已完成（绿）
+- 里程碑菱形标记、今日标线
+- 响应式缩放与自动列宽
+
+### AI 风险评估
+- 基于项目活动数据自动生成风险分析
+- 风险等级分类：高、中、低
+- 影响范围与建议措施
+- 服务端 AI 接口集成
+
+### 项目周报
+- 周报创建与编辑（TipTap 富文本编辑器）
+- 分阶段进展填写（EVT/DVT/PVT/MP 各阶段独立记录）
+- 进展状态标记：顺利进行 / 轻度阻碍 / 严重阻碍
+- 附件上传（支持按区块关联：进展、计划、风险预警）
+- 草稿/已提交状态流转
+- 汇总视图：跨项目按周次查看所有周报，支持产品线筛选
+
+### 产品管理
+- 硬件产品信息管理
+- 规格参数与性能指标录入
+- 产品线分类
+
+### 系统管理
+- 用户管理：创建、编辑、禁用
+- 角色管理：自定义角色与权限分配
+- 权限矩阵：细粒度的功能权限控制
+
+### 明亮/暗色主题
+- 右上角一键切换明亮与暗色模式
+- 基于 Arco Design 暗色主题，额外优化色彩柔和度
+- 覆盖 Arco 内置色板（arcoblue、red、orange、green）降低饱和度与亮度
+- 自定义 CSS 变量体系，全部组件统一适配
+- 主题偏好自动保存（localStorage + 服务端同步）
 
 ## 测试
 
@@ -107,13 +184,6 @@ npx playwright test e2e/specs/projects.spec.ts
 ```
 
 测试配置见 `playwright.config.ts`，会自动启动前后端开发服务器。
-
-## 功能模块
-
-- **认证模块**: JWT 双令牌机制,支持自动刷新
-- **权限管理**: 基于角色的访问控制 (RBAC)
-- **项目管理**: 项目全生命周期管理,活动/任务树,甘特图,AI 风险评估,项目周报
-- **产品管理**: 硬件产品信息管理,规格参数,性能指标
 
 ## 许可证
 
