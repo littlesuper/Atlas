@@ -146,13 +146,20 @@ test.describe.serial('Activity Archive Management', () => {
     const archiveDrawer = page.locator('.arco-drawer').filter({ hasText: '归档管理' });
     await expect(archiveDrawer).toBeVisible({ timeout: 5_000 });
 
-    // Click "创建归档"
+    // Click "创建归档" to open the creation modal
+    await archiveDrawer.getByRole('button', { name: '创建归档' }).click();
+
+    // Wait for the modal to appear
+    const modal = page.locator('.arco-modal').filter({ hasText: '创建归档' });
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+
+    // Click "创建" in the modal to submit
     const createResp = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/archives') && r.request().method() === 'POST',
         { timeout: 15_000 },
       ),
-      archiveDrawer.getByRole('button', { name: '创建归档' }).click(),
+      modal.getByRole('button', { name: '创建' }).click(),
     ]).then(([r]) => r);
     expect(createResp.status()).toBeLessThan(400);
 
@@ -268,13 +275,18 @@ test.describe.serial('Activity Archive Management', () => {
     const archiveDrawer = page.locator('.arco-drawer').filter({ hasText: '归档管理' });
     await expect(archiveDrawer).toBeVisible({ timeout: 5_000 });
 
-    // Create a second archive
+    // Create a second archive — click button to open modal first
+    await archiveDrawer.getByRole('button', { name: '创建归档' }).click();
+
+    const modal = page.locator('.arco-modal').filter({ hasText: '创建归档' });
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+
     const createResp = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/archives') && r.request().method() === 'POST',
         { timeout: 15_000 },
       ),
-      archiveDrawer.getByRole('button', { name: '创建归档' }).click(),
+      modal.getByRole('button', { name: '创建' }).click(),
     ]).then(([r]) => r);
     expect(createResp.status()).toBeLessThan(400);
 
