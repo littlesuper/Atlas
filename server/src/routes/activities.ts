@@ -394,7 +394,7 @@ router.post(
           type: type || ActivityType.TASK,
           phase,
           assigneeId: assigneeId || null,
-          status,
+          status: status || 'NOT_STARTED',
           priority,
           planStartDate: resolvedPlanStart,
           planEndDate: resolvedPlanEnd,
