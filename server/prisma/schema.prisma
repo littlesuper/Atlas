@@ -125,6 +125,7 @@ model Project {
   manager          User              @relation("ProjectManager", fields: [managerId], references: [id])
   members          ProjectMember[]
   activities       Activity[]
+  activityArchives ActivityArchive[]
   products         Product[]
   riskAssessments  RiskAssessment[]
   weeklyReports    WeeklyReport[]
@@ -194,6 +195,18 @@ model Activity {
   @@index([assigneeId])
   @@index([parentId])
   @@map("activities")
+}
+
+model ActivityArchive {
+  id        String   @id @default(uuid())
+  projectId String
+  snapshot  Json     // 活动数组快照（含 assignees 等完整数据）
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("activity_archives")
 }
 
 model RiskAssessment {

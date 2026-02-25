@@ -5,6 +5,7 @@ import {
   Permission,
   Project,
   Activity,
+  ActivityArchive,
   Product,
   ProductChangeLog,
   WeeklyReport,
@@ -203,6 +204,19 @@ export const activitiesApi = {
   // 批量排序
   reorder: (projectId: string, items: { id: string; sortOrder: number; parentId?: string | null }[]) =>
     request.put(`/activities/project/${projectId}/reorder`, { items }),
+
+  // 归档快照 CRUD
+  createArchive: (projectId: string) =>
+    request.post<{ id: string; createdAt: string; count: number }>(`/activities/project/${projectId}/archives`),
+
+  listArchives: (projectId: string) =>
+    request.get<Array<{ id: string; createdAt: string; count: number }>>(`/activities/project/${projectId}/archives`),
+
+  getArchive: (archiveId: string) =>
+    request.get<ActivityArchive>(`/activities/archives/${archiveId}`),
+
+  deleteArchive: (archiveId: string) =>
+    request.delete(`/activities/archives/${archiveId}`),
 };
 
 // ============ 产品管理 API ============

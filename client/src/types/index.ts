@@ -124,6 +124,13 @@ export interface Activity {
   updatedAt: string;
 }
 
+export interface ActivityArchive {
+  id: string;
+  projectId: string;
+  snapshot: Activity[];
+  createdAt: string;
+}
+
 // ============ 产品相关类型 ============
 
 export interface ProductImage {

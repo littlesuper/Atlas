@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Button, Popover, Checkbox, Message } from '@arco-design/web-react';
-import { IconSettings, IconDragDotVertical, IconRefresh } from '@arco-design/web-react/icon';
+import { IconMoreVertical, IconDragDotVertical, IconRefresh } from '@arco-design/web-react/icon';
 
 export interface ColumnDef {
   key: string;
@@ -18,9 +18,10 @@ interface ColumnSettingsProps {
   prefs: ColumnPrefs;
   onChange: (prefs: ColumnPrefs) => void;
   defaultPrefs: ColumnPrefs;
+  extraActions?: React.ReactNode;
 }
 
-const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onChange, defaultPrefs }) => {
+const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onChange, defaultPrefs, extraActions }) => {
   const [popoverVisible, setPopoverVisible] = useState(false);
 
   // Drag state
@@ -154,7 +155,7 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
           );
         })}
       </div>
-      <div style={{ borderTop: '1px solid #e5e6eb', marginTop: 8, paddingTop: 8 }}>
+      <div style={{ borderTop: '1px solid #e5e6eb', marginTop: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Button
           size="small"
           type="text"
@@ -164,6 +165,7 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
         >
           恢复默认
         </Button>
+        {extraActions}
       </div>
     </div>
   );
@@ -176,7 +178,7 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
       popupVisible={popoverVisible}
       onVisibleChange={setPopoverVisible}
     >
-      <Button icon={<IconSettings />}>列设置</Button>
+      <Button icon={<IconMoreVertical />} />
     </Popover>
   );
 };

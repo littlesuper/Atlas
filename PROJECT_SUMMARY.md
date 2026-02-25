@@ -112,6 +112,10 @@
 - `PUT /api/activities/:id` - 更新活动
 - `DELETE /api/activities/:id` - 删除活动
 - `PUT /api/activities/project/:projectId/reorder` - 批量排序
+- `POST /api/activities/project/:projectId/archives` - 创建归档快照
+- `GET /api/activities/project/:projectId/archives` - 获取归档列表
+- `GET /api/activities/archives/:id` - 获取归档详情
+- `DELETE /api/activities/archives/:id` - 删除归档
 - `GET /api/risk/project/:projectId` - 获取风险评估历史
 - `POST /api/risk/project/:projectId/assess` - 发起风险评估
 - `GET /api/weekly-reports` - 获取周报列表
@@ -121,6 +125,7 @@
 **数据模型:**
 - Project(项目): id, name, description, productLine, status, priority, startDate, endDate, progress, managerId
 - Activity(活动): id, projectId, parentId, name, type, phase, assigneeId, status, priority, planStartDate/EndDate, startDate/endDate, duration, dependencies, notes, sortOrder
+- ActivityArchive(活动归档快照): id, projectId, snapshot(JSON), createdAt
 - RiskAssessment(风险评估): id, projectId, riskLevel, riskFactors, suggestions, assessedAt
 - WeeklyReport(周报): id, projectId, weekStart, weekEnd, year, weekNumber, keyProgress, nextWeekPlan, riskWarning, phaseProgress, status, progressStatus
 
@@ -240,7 +245,7 @@ Atlas/
 │   │   │   ├── riskEngine.ts  # 风险评估引擎
 │   │   │   └── weekNumber.ts  # 周数计算
 │   │   ├── prisma/            # Prisma ORM
-│   │   │   ├── schema.prisma  # 数据库模型(10个表)
+│   │   │   ├── schema.prisma  # 数据库模型(11个表)
 │   │   │   └── seed.ts        # 种子数据
 │   │   └── index.ts           # Express 入口
 │   ├── uploads/               # 上传文件存储
@@ -340,7 +345,7 @@ Atlas/
 
 - **总文件数:** 100+
 - **代码行数:** 15000+ (不含注释)
-- **数据表:** 10 个
+- **数据表:** 11 个
 - **API 接口:** 50+
 - **前端页面:** 6 个主页面
 - **权限数:** 21 个预设权限

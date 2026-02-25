@@ -422,6 +422,99 @@ router.post(
 );
 
 /**
+ * POST /api/activities/project/:projectId/archives
+ * 创建归档快照
+ */
+router.post('/project/:projectId/archives', authenticate, requirePermission('activity', 'create'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const projectId = req.params.projectId as string;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) { res.status(404).json({ error: '项目不存在' }); return; }
+    if (!canManageProject(req, project.managerId, projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    const activities = await prisma.activity.findMany({
+      where: { projectId },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        assignees: { select: { id: true, realName: true, username: true } },
+      },
+    });
+
+    const archive = await prisma.activityArchive.create({
+      data: { projectId, snapshot: activities as any },
+    });
+
+    res.status(201).json({ id: archive.id, createdAt: archive.createdAt, count: activities.length });
+  } catch (error) {
+    console.error('创建归档错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * GET /api/activities/project/:projectId/archives
+ * 获取项目归档列表（不含 snapshot）
+ */
+router.get('/project/:projectId/archives', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const projectId = req.params.projectId as string;
+
+    const archives = await prisma.activityArchive.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, snapshot: true },
+    });
+
+    const result = archives.map(a => ({
+      id: a.id,
+      createdAt: a.createdAt,
+      count: Array.isArray(a.snapshot) ? (a.snapshot as any[]).length : 0,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('获取归档列表错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * GET /api/activities/archives/:id
+ * 获取归档详情（含 snapshot）
+ */
+router.get('/archives/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const archiveId = req.params.id as string;
+    const archive = await prisma.activityArchive.findUnique({ where: { id: archiveId } });
+    if (!archive) { res.status(404).json({ error: '归档不存在' }); return; }
+    res.json(archive);
+  } catch (error) {
+    console.error('获取归档详情错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * DELETE /api/activities/archives/:id
+ * 删除归档
+ */
+router.delete('/archives/:id', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const archiveId = req.params.id as string;
+    const archive = await prisma.activityArchive.findUnique({ where: { id: archiveId } });
+    if (!archive) { res.status(404).json({ error: '归档不存在' }); return; }
+    await prisma.activityArchive.delete({ where: { id: archiveId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除归档错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * PUT /api/activities/:id
  * 更新活动
  * 权限：activity:update

@@ -74,6 +74,19 @@
 - **反向调整：** 前端支持手动修改工期数值时，自动调整对应时间范围的结束日期
 - **节假日数据：** 前端内置中国法定节假日及调休数据（2026年），可按年度更新
 
+### ActivityArchive（活动归档快照表 `activity_archives`）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | UUID | PK | 归档唯一标识 |
+| projectId | UUID | FK → projects.id, CASCADE | 所属项目 |
+| snapshot | JSON | NOT NULL | 活动数组快照（含 assignees 等完整数据） |
+| createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
+
+**索引：** `[projectId]`
+
+**说明：** 每次"创建归档"将项目当前所有活动的完整数据保存为一份只读快照。一个项目可以多次归档，形成历史版本列表。snapshot 字段存储创建归档时刻的活动数组，包含每个活动的全部字段及 assignees 关联数据。
+
 ### RiskAssessment（风险评估表 `risk_assessments`）
 
 | 字段 | 类型 | 约束 | 说明 |
@@ -124,7 +137,6 @@
 **ProjectStatus：**
 | 值 | 说明 |
 |----|------|
-| PLANNING | 计划中 |
 | IN_PROGRESS | 进行中 |
 | COMPLETED | 已完成 |
 | ON_HOLD | 已搁置 |
@@ -142,7 +154,6 @@
 | NOT_STARTED | 未开始 |
 | IN_PROGRESS | 进行中 |
 | COMPLETED | 已完成 |
-| DELAYED | 已延期 |
 | CANCELLED | 已取消 |
 
 **Priority：**
@@ -535,7 +546,72 @@ PUT /api/activities/project/:projectId/reorder
 }
 ```
 
-### 3.4 AI 风险评估
+### 3.4 活动归档快照
+
+#### 创建归档快照
+```
+POST /api/activities/project/:projectId/archives
+```
+**认证：** Bearer Token
+**权限：** `activity:create` + 项目管理权限
+
+**操作：** 查询项目所有活动（含 assignees），将完整数据存入 snapshot JSON 字段。
+
+**响应（201）：**
+```json
+{
+  "id": "uuid",
+  "createdAt": "2026-02-25T10:00:00.000Z",
+  "count": 15
+}
+```
+
+#### 获取项目归档列表
+```
+GET /api/activities/project/:projectId/archives
+```
+**认证：** Bearer Token
+
+**响应（200）：** 按创建时间倒序，不含 snapshot 详情
+```json
+[
+  { "id": "uuid", "createdAt": "2026-02-25T10:00:00.000Z", "count": 15 },
+  { "id": "uuid", "createdAt": "2026-02-20T08:30:00.000Z", "count": 12 }
+]
+```
+
+#### 获取归档详情
+```
+GET /api/activities/archives/:id
+```
+**认证：** Bearer Token
+
+**响应（200）：** 含完整 snapshot 数据
+```json
+{
+  "id": "uuid",
+  "projectId": "uuid",
+  "snapshot": [
+    {
+      "id": "uuid", "name": "原理图设计", "status": "COMPLETED",
+      "phase": "EVT", "assignees": [{ "id": "uuid", "realName": "张三" }],
+      "planStartDate": "2026-02-10T00:00:00.000Z",
+      "planEndDate": "2026-02-28T00:00:00.000Z"
+    }
+  ],
+  "createdAt": "2026-02-25T10:00:00.000Z"
+}
+```
+
+#### 删除归档
+```
+DELETE /api/activities/archives/:id
+```
+**认证：** Bearer Token
+**权限：** `activity:delete`
+**响应：** `{ "success": true }`
+
+### 3.5 AI 风险评估
 
 #### 获取评估历史
 ```
@@ -590,7 +666,7 @@ POST /api/risk/project/:projectId/assess
 }
 ```
 
-### 3.5 项目周报
+### 3.6 项目周报
 
 #### 获取周报列表
 ```
@@ -752,7 +828,7 @@ POST /api/weekly-reports/project/:projectId/ai-suggestions
 }
 ```
 
-### 3.6 文件上传
+### 3.7 文件上传
 
 #### 上传文件
 ```
@@ -850,6 +926,17 @@ DELETE /api/uploads/:filename
     - **本地更新：** 保存后直接更新本地状态，无页面刷新，保持编辑位置和滚动状态
     - **权限检查：** 需要 `activity:update` 权限，有权限的字段鼠标悬停显示 pointer 光标
     - **自动计算：** 修改时间时自动计算工期，更新时同步更新工期字段
+
+    **归档管理：**
+    - **入口：** 活动列表右上角列设置 Popover 底部"归档管理"按钮（IconStorage 图标），点击打开归档管理抽屉
+    - **归档管理抽屉（Drawer，宽度 500px）：**
+      - 顶部：归档数量统计 + "创建归档"按钮（右侧，需 `activity:create` 权限 + 项目管理权限）
+      - 主体：归档历史列表，按创建时间倒序。每条显示创建时间（YYYY-MM-DD HH:mm）+ 活动数量
+      - 点击某条归档 → 展开该快照的活动详情列表（只读，灰色背景圆角区域，最大高度 400px 可滚动）。每个活动显示名称、状态 Tag、阶段 Tag、负责人、计划时间
+      - 再次点击同一条归档 → 收起详情
+      - 每条归档右侧显示"删除"按钮（需 `activity:delete` 权限 + 项目管理权限）
+    - **快照概念：** 创建归档时，系统将项目当前所有活动的完整数据保存为一份只读快照。一个项目可多次归档，形成历史版本列表
+
   - **甘特图：** 横向时间轴，支持多视图模式。每个任务显示双条：上方细虚线条为计划时间，下方粗实线条为实际时间（带进度填充和状态颜色）。里程碑用渐变菱形标记，红色竖线标记今天。
     - **图例显示：**
       - 计划条：浅灰色虚线框

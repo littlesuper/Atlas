@@ -19,6 +19,7 @@ import {
   Empty,
   Progress,
   InputNumber,
+  Spin,
 } from '@arco-design/web-react';
 import {
   IconLeft,
@@ -26,6 +27,7 @@ import {
   IconEdit,
   IconDelete,
   IconDragDotVertical,
+  IconStorage,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, activitiesApi, usersApi, authApi } from '../../../api';
@@ -35,7 +37,7 @@ import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
 import GanttChart from './GanttChart';
 import RiskAssessmentTab from './RiskAssessmentTab';
 import ProductsTab from './ProductsTab';
-import { Project, Activity, User } from '../../../types';
+import { Project, Activity, ActivityArchive, User } from '../../../types';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
@@ -184,6 +186,12 @@ const ProjectDetail: React.FC = () => {
   // 双击内联编辑
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [archiveDrawerVisible, setArchiveDrawerVisible] = useState(false);
+  const [archiveList, setArchiveList] = useState<Array<{ id: string; createdAt: string; count: number }>>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [expandedArchiveId, setExpandedArchiveId] = useState<string | null>(null);
+  const [archiveDetail, setArchiveDetail] = useState<ActivityArchive | null>(null);
+  const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
   const [inlineValue, setInlineValue] = useState<string>('');
 
   // 列偏好设置
@@ -517,6 +525,59 @@ const ProjectDetail: React.FC = () => {
         }
       },
     });
+  };
+
+  // ========== 归档快照操作 ==========
+  const loadArchives = async () => {
+    if (!id) return;
+    setArchiveLoading(true);
+    try {
+      const res = await activitiesApi.listArchives(id);
+      setArchiveList(res.data);
+    } catch { /* ignore */ }
+    setArchiveLoading(false);
+  };
+
+  const handleCreateArchive = async () => {
+    if (!id) return;
+    try {
+      await activitiesApi.createArchive(id);
+      Message.success('归档创建成功');
+      loadArchives();
+    } catch {
+      Message.error('创建归档失败');
+    }
+  };
+
+  const handleDeleteArchive = async (archiveId: string) => {
+    try {
+      await activitiesApi.deleteArchive(archiveId);
+      Message.success('已删除归档');
+      if (expandedArchiveId === archiveId) {
+        setExpandedArchiveId(null);
+        setArchiveDetail(null);
+      }
+      loadArchives();
+    } catch {
+      Message.error('删除归档失败');
+    }
+  };
+
+  const handleExpandArchive = async (archiveId: string) => {
+    if (expandedArchiveId === archiveId) {
+      setExpandedArchiveId(null);
+      setArchiveDetail(null);
+      return;
+    }
+    setExpandedArchiveId(archiveId);
+    setArchiveDetailLoading(true);
+    try {
+      const res = await activitiesApi.getArchive(archiveId);
+      setArchiveDetail(res.data);
+    } catch {
+      Message.error('获取归档详情失败');
+    }
+    setArchiveDetailLoading(false);
   };
 
   // ========== 拖拽排序 ==========
@@ -1330,15 +1391,28 @@ const ProjectDetail: React.FC = () => {
                       进行中 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
                     </span>
                   </span>
+                  {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                    <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
+                  )}
                   <ColumnSettings
                     columnDefs={ACTIVITY_COLUMN_DEFS}
                     prefs={columnPrefs}
                     onChange={saveColumnPrefs}
                     defaultPrefs={DEFAULT_COLUMN_PREFS}
+                    extraActions={
+                      hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<IconStorage />}
+                          onClick={() => { setArchiveDrawerVisible(true); loadArchives(); }}
+                          style={{ width: '100%' }}
+                        >
+                          归档管理
+                        </Button>
+                      ) : undefined
+                    }
                   />
-                  {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                    <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
-                  )}
                 </Space>
               </div>
 
@@ -1346,7 +1420,11 @@ const ProjectDetail: React.FC = () => {
                 {/* 自定义表格行（支持拖拽） */}
                 <Table
                   columns={activityColumns}
-                  data={statusFilter ? activities.filter(a => a.status === statusFilter) : activities}
+                  data={(() => {
+                    let list = [...activities];
+                    if (statusFilter) list = list.filter(a => a.status === statusFilter);
+                    return list;
+                  })()}
                   loading={activitiesLoading}
                   rowKey="id"
                   pagination={false}
@@ -1934,6 +2012,107 @@ const ProjectDetail: React.FC = () => {
             )}
           </div>
         </Modal>
+
+        {/* 归档管理抽屉 */}
+        <Drawer
+          width={500}
+          title="归档管理"
+          visible={archiveDrawerVisible}
+          onCancel={() => { setArchiveDrawerVisible(false); setExpandedArchiveId(null); setArchiveDetail(null); }}
+          footer={null}
+          headerStyle={{ borderBottom: '1px solid #e5e6eb' }}
+        >
+          {/* 顶部操作栏 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: '#86909c' }}>
+              共 {archiveList.length} 个归档
+            </span>
+            {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+              <Button
+                size="small"
+                type="primary"
+                onClick={handleCreateArchive}
+                disabled={activities.length === 0}
+              >
+                创建归档
+              </Button>
+            )}
+          </div>
+
+          {/* 归档列表 */}
+          {archiveLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}><Spin /></div>
+          ) : archiveList.length === 0 ? (
+            <Empty description="暂无归档记录" style={{ padding: '40px 0' }} />
+          ) : (
+            <div>
+              {archiveList.map(arc => {
+                const isExpanded = expandedArchiveId === arc.id;
+                const canManage = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
+                return (
+                  <div key={arc.id} style={{ borderBottom: '1px solid #f2f3f5' }}>
+                    <div
+                      style={{
+                        display: 'flex', alignItems: 'center', padding: '12px 0', gap: 8, cursor: 'pointer',
+                      }}
+                      onClick={() => handleExpandArchive(arc.id)}
+                    >
+                      <span style={{ fontSize: 13, color: isExpanded ? '#165DFF' : '#1d2129', flex: 1 }}>
+                        {dayjs(arc.createdAt).format('YYYY-MM-DD HH:mm')}
+                        <span style={{ color: '#86909c', marginLeft: 8 }}>{arc.count} 个活动</span>
+                      </span>
+                      {canManage && (
+                        <Button
+                          type="text"
+                          size="mini"
+                          status="danger"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteArchive(arc.id); }}
+                        >
+                          删除
+                        </Button>
+                      )}
+                    </div>
+                    {isExpanded && (
+                      <div style={{ paddingBottom: 12 }}>
+                        {archiveDetailLoading ? (
+                          <div style={{ textAlign: 'center', padding: '16px 0' }}><Spin /></div>
+                        ) : archiveDetail?.snapshot?.length ? (
+                          <div style={{ background: '#fafafa', borderRadius: 6, padding: '8px 12px', maxHeight: 400, overflowY: 'auto' }}>
+                            {archiveDetail.snapshot.map((a: Activity) => {
+                              const stCfg = ACTIVITY_STATUS_MAP[a.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: a.status, color: 'default' };
+                              return (
+                                <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                  <div style={{ fontSize: 13, fontWeight: 500 }}>{a.name}</div>
+                                  <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <Tag size="small" color={stCfg.color}>{stCfg.label}</Tag>
+                                    {a.phase && <Tag size="small" color={PHASE_COLOR[a.phase] || 'default'}>{a.phase}</Tag>}
+                                    {a.assignees && a.assignees.length > 0 && (
+                                      <span style={{ fontSize: 12, color: '#86909c' }}>
+                                        {a.assignees.map(u => u.realName).join(', ')}
+                                      </span>
+                                    )}
+                                    {a.planStartDate && (
+                                      <span style={{ fontSize: 12, color: '#86909c' }}>
+                                        {dayjs(a.planStartDate).format('MM-DD')}
+                                        {a.planEndDate ? ` ~ ${dayjs(a.planEndDate).format('MM-DD')}` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <Empty description="该归档无活动数据" style={{ padding: '12px 0' }} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Drawer>
       </div>
     </MainLayout>
   );
