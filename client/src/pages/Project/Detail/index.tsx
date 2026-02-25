@@ -80,8 +80,7 @@ const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
   { key: 'name', label: '活动名称', removable: false },
   { key: 'type', label: '类型', removable: true },
   { key: 'status', label: '状态', removable: true },
-  { key: 'priority', label: '优先级', removable: true },
-  { key: 'assignee', label: '负责人', removable: true },
+{ key: 'assignee', label: '负责人', removable: true },
   { key: 'planDates', label: '计划时间', removable: true },
   { key: 'actualDates', label: '实际时间', removable: true },
   { key: 'notes', label: '备注', removable: true },
@@ -103,7 +102,6 @@ const COLUMN_WIDTH_MAP: Record<string, number> = {
   name: 200,
   type: 80,
   status: 100,
-  priority: 80,
   assignee: 100,
   planDates: 170,
   actualDates: 170,
@@ -920,14 +918,6 @@ const ProjectDetail: React.FC = () => {
             {cfg.label}
           </Tag>
         );
-      },
-    },
-    priority: {
-      title: '优先级',
-      width: 80,
-      render: (_: unknown, record: Activity) => {
-        const cfg = PRIORITY_MAP[record.priority as keyof typeof PRIORITY_MAP] ?? { label: record.priority, color: 'default' };
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
       },
     },
     assignee: {
