@@ -1012,7 +1012,8 @@ const ProjectDetail: React.FC = () => {
           <Tabs
           activeTab={activeTab}
           onChange={setActiveTab}
-          tabBarStyle={{ position: 'sticky', top: 0, zIndex: 15, background: '#fff', marginBottom: 0 }}
+          style={{ '--tab-bar-style': 'sticky' } as React.CSSProperties}
+          {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: '#fff', marginBottom: 0 } } as any}
         >
             {/* 活动列表 */}
             <Tabs.TabPane key="activities" title="活动列表">
@@ -1070,6 +1071,229 @@ const ProjectDetail: React.FC = () => {
                   }}
                 />
               </div>{/* tableWrapRef */}
+            </Tabs.TabPane>
+
+            {/* 里程碑 */}
+            <Tabs.TabPane key="milestones" title="里程碑">
+              {(() => {
+                const milestones = activities.filter(a => a.type === 'MILESTONE');
+                if (milestones.length === 0) {
+                  return <Empty description="暂无里程碑" />;
+                }
+
+                const statusColor: Record<string, string> = {
+                  COMPLETED: '#52c41a', IN_PROGRESS: '#1890ff',
+                  NOT_STARTED: '#d9d9d9', DELAYED: '#ff4d4f', CANCELLED: '#bfbfbf',
+                };
+
+                // 取里程碑日期（优先 planEndDate）
+                const getMsDate = (m: Activity) => {
+                  const d = m.planEndDate || m.planStartDate;
+                  return d ? dayjs(d) : null;
+                };
+
+                // 分为有日期和无日期
+                const dated = milestones.filter(m => getMsDate(m)).sort((a, b) => getMsDate(a)!.valueOf() - getMsDate(b)!.valueOf());
+                const undated = milestones.filter(m => !getMsDate(m));
+
+                // 时间轴尺寸常量
+                const cardW = 190;
+                const minGap = 30;
+                const nodeSpacing = cardW + minGap; // 每节点最小间距
+                const padX = cardW / 2 + 20; // 左右留白
+                const axisY = 190; // 时间轴纵向位置
+                const cardH = 100;
+                const stemLen = 28; // 连线长度
+
+                // — 计算每个节点 x 坐标（按日期比例，但保证最小间距）—
+                let positions: number[] = [];
+                if (dated.length === 1) {
+                  positions = [padX];
+                } else if (dated.length > 1) {
+                  const tMin = getMsDate(dated[0])!.valueOf();
+                  const tMax = getMsDate(dated[dated.length - 1])!.valueOf();
+                  const span = tMax - tMin || 1;
+                  const naturalW = Math.max((dated.length - 1) * nodeSpacing, 600);
+                  // 按比例分配
+                  positions = dated.map(m => {
+                    const t = getMsDate(m)!.valueOf();
+                    return padX + ((t - tMin) / span) * naturalW;
+                  });
+                  // 保证最小间距：从左到右推挤
+                  for (let i = 1; i < positions.length; i++) {
+                    if (positions[i] - positions[i - 1] < nodeSpacing) {
+                      positions[i] = positions[i - 1] + nodeSpacing;
+                    }
+                  }
+                }
+
+                const totalW = (positions.length > 0 ? positions[positions.length - 1] + padX : 400);
+                const totalH = axisY + stemLen + cardH + 40;
+
+                // — 月份刻度 —
+                const monthTicks: { label: string; x: number }[] = [];
+                if (dated.length >= 2) {
+                  const dMin = getMsDate(dated[0])!.startOf('month');
+                  const dMax = getMsDate(dated[dated.length - 1])!.endOf('month');
+                  const tMin = getMsDate(dated[0])!.valueOf();
+                  const tMax = getMsDate(dated[dated.length - 1])!.valueOf();
+                  const span = tMax - tMin || 1;
+                  const naturalW = positions[positions.length - 1] - positions[0];
+                  let cur = dMin.clone();
+                  while (cur.isBefore(dMax) || cur.isSame(dMax, 'month')) {
+                    const ratio = (cur.valueOf() - tMin) / span;
+                    monthTicks.push({
+                      label: cur.format('YYYY-MM'),
+                      x: positions[0] + ratio * naturalW,
+                    });
+                    cur = cur.add(1, 'month');
+                  }
+                }
+
+                return (
+                  <div style={{ overflowX: 'auto', padding: '8px 0' }}>
+                    <div style={{ position: 'relative', width: totalW, height: totalH, minWidth: '100%' }}>
+
+                      {/* 月份刻度线和标签 */}
+                      {monthTicks.map((tick, i) => (
+                        <React.Fragment key={i}>
+                          <div style={{
+                            position: 'absolute', left: tick.x, top: 24, bottom: 20,
+                            width: 1, background: '#f2f3f5', zIndex: 0,
+                          }} />
+                          <div style={{
+                            position: 'absolute', left: tick.x, top: axisY + 10,
+                            transform: 'translateX(-50%)', fontSize: 10, color: '#b5b8bf',
+                            whiteSpace: 'nowrap', zIndex: 0,
+                          }}>
+                            {tick.label}
+                          </div>
+                        </React.Fragment>
+                      ))}
+
+                      {/* 主时间轴横线 */}
+                      {positions.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          left: positions[0] - 16,
+                          width: positions[positions.length - 1] - positions[0] + 32,
+                          top: axisY, height: 3, background: '#c9cdd4', borderRadius: 2,
+                        }} />
+                      )}
+
+                      {/* 里程碑节点 */}
+                      {dated.map((m, idx) => {
+                        const x = positions[idx];
+                        const above = idx % 2 === 0;
+                        const color = statusColor[m.status] || '#d9d9d9';
+                        const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
+                        const names = m.assignees?.map(a => a.realName).join('、') || m.assignee?.realName || '-';
+                        const dateStr = getMsDate(m)!.format('YYYY-MM-DD');
+                        const cardTop = above ? axisY - stemLen - cardH : axisY + stemLen;
+
+                        return (
+                          <React.Fragment key={m.id}>
+                            {/* 连接竖线 */}
+                            <div style={{
+                              position: 'absolute', left: x, width: 2,
+                              top: above ? cardTop + cardH : axisY + 6,
+                              height: above ? axisY - cardTop - cardH - 6 : cardTop - axisY - 6,
+                              background: color, transform: 'translateX(-1px)', zIndex: 1,
+                            }} />
+
+                            {/* 菱形标记 */}
+                            <div style={{
+                              position: 'absolute', left: x - 7, top: axisY - 5,
+                              width: 13, height: 13, background: color,
+                              transform: 'rotate(45deg)',
+                              border: '2px solid #fff', boxShadow: `0 0 0 1px ${color}`,
+                              zIndex: 3,
+                            }} />
+
+                            {/* 日期标签（菱形下/上方） */}
+                            <div style={{
+                              position: 'absolute', left: x, top: above ? axisY + 10 : axisY - 18,
+                              transform: 'translateX(-50%)', fontSize: 10, color: '#86909c',
+                              whiteSpace: 'nowrap', zIndex: 2,
+                            }}>
+                              {dateStr}
+                            </div>
+
+                            {/* 卡片 */}
+                            <div
+                              style={{
+                                position: 'absolute', left: x - cardW / 2, top: cardTop,
+                                width: cardW, background: '#fff',
+                                border: `1px solid #e5e6eb`, borderLeft: `3px solid ${color}`,
+                                borderRadius: 8, padding: '8px 12px',
+                                cursor: 'pointer', transition: 'box-shadow .2s, transform .15s',
+                                zIndex: 1,
+                              }}
+                              onClick={() => handleOpenDrawer(m)}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.boxShadow = `0 4px 14px ${color}30`;
+                                e.currentTarget.style.transform = 'translateY(' + (above ? '-2px' : '2px') + ')';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.boxShadow = 'none';
+                                e.currentTarget.style.transform = 'none';
+                              }}
+                            >
+                              <div style={{
+                                fontWeight: 600, fontSize: 13, marginBottom: 4,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}>
+                                {m.name}
+                              </div>
+                              <div style={{ display: 'flex', gap: 4, marginBottom: 4, flexWrap: 'wrap' }}>
+                                {m.phase && <Tag size="small" color={PHASE_COLOR[m.phase] || 'default'}>{m.phase}</Tag>}
+                                {stInfo && <Tag size="small" color={stInfo.color}>{stInfo.label}</Tag>}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#86909c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                负责人: {names}
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+
+                    {/* 无日期的里程碑 */}
+                    {undated.length > 0 && (
+                      <div style={{ marginTop: 16, padding: '0 8px' }}>
+                        <div style={{ fontSize: 13, color: '#86909c', marginBottom: 8 }}>未设定日期</div>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          {undated.map(m => {
+                            const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
+                            const color = statusColor[m.status] || '#d9d9d9';
+                            return (
+                              <div
+                                key={m.id}
+                                style={{
+                                  background: '#fff', border: '1px solid #e5e6eb', borderLeft: `3px solid ${color}`,
+                                  borderRadius: 8, padding: '8px 12px', width: 190, cursor: 'pointer',
+                                  transition: 'box-shadow .2s',
+                                }}
+                                onClick={() => handleOpenDrawer(m)}
+                                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,.1)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
+                              >
+                                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {m.name}
+                                </div>
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                  {m.phase && <Tag size="small" color={PHASE_COLOR[m.phase] || 'default'}>{m.phase}</Tag>}
+                                  {stInfo && <Tag size="small" color={stInfo.color}>{stInfo.label}</Tag>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </Tabs.TabPane>
 
             {/* 甘特图 */}
