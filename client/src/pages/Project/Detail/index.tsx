@@ -1095,6 +1095,51 @@ const ProjectDetail: React.FC = () => {
               <Input.TextArea placeholder="请输入描述" rows={3} maxLength={500} showWordLimit />
             </Form.Item>
 
+            {/* 类型 / 状态 / 优先级 / 负责人 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 100px 100px 1fr', gap: 12 }}>
+              <Form.Item label="类型" field="type" rules={[{ required: true }]}>
+                <Select placeholder="类型">
+                  {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
+                    <Select.Option key={k} value={k}>
+                      <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="状态" field="status">
+                <Select placeholder="状态">
+                  {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
+                    <Select.Option key={k} value={k}>
+                      <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="优先级" field="priority" rules={[{ required: true }]}>
+                <Select placeholder="优先级">
+                  {Object.entries(PRIORITY_MAP).map(([k, v]) => (
+                    <Select.Option key={k} value={k}>
+                      <Tag color={v.color}>{v.label}</Tag>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="负责人" field="assigneeId">
+                <Select placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
+                  (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                }>
+                  {users.map((u) => (
+                    <Select.Option key={u.id} value={u.id}>
+                      {u.realName} ({u.username})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </div>
+
+            {/* 分隔线 */}
+            <div style={{ borderTop: '1px solid #e4e6ef', margin: '4px 0 16px' }} />
+
             {/* 父活动 */}
             <Form.Item label="父活动" field="parentId">
               <Select placeholder="请选择父活动（可选）" allowClear>
@@ -1184,59 +1229,13 @@ const ProjectDetail: React.FC = () => {
               )}
             </div>
 
-            {/* 类型 / 状态 / 优先级 / 负责人 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
-              <Form.Item label="类型" field="type" rules={[{ required: true }]}>
-                <Select placeholder="类型">
-                  {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
-                    <Select.Option key={k} value={k}>
-                      <Tag color={v.color}>{v.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item label="状态" field="status">
-                <Select placeholder="状态">
-                  {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
-                    <Select.Option key={k} value={k}>
-                      <Tag color={v.color}>{v.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item label="优先级" field="priority" rules={[{ required: true }]}>
-                <Select placeholder="优先级">
-                  {Object.entries(PRIORITY_MAP).map(([k, v]) => (
-                    <Select.Option key={k} value={k}>
-                      <Tag color={v.color}>{v.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item label="负责人" field="assigneeId">
-                <Select placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
-                  (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-                }>
-                  {users.map((u) => (
-                    <Select.Option key={u.id} value={u.id}>
-                      {u.realName} ({u.username})
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </div>
-
-            {/* 时间分隔 */}
-            <div style={{ borderTop: '1px solid #e4e6ef', margin: '4px 0 16px', paddingTop: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969' }}>时间</span>
-            </div>
-
             {formDeps.some((d) => d.id) && (
               <div style={{ background: '#e8f3ff', border: '1px solid #bedaff', borderRadius: 4, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#165dff' }}>
                 已设置前置依赖，计划开始/结束日期将由系统根据依赖关系自动计算。可设置工期辅助推算。
               </div>
             )}
 
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#4e5969', marginBottom: 8, display: 'block' }}>时间</span>
             {/* 计划时间：开始 + 结束 + 工期 三方联动 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 12 }}>
               <Form.Item label="计划开始" field="planStart">
