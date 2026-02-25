@@ -614,12 +614,12 @@ const ProjectDetail: React.FC = () => {
 
   // 获取前置任务序号显示 — MS Project 格式: {seq}{type}±{lag}
   const getPredecessorSeq = (activity: Activity): string => {
-    if (!activity.dependencies) return '-';
+    if (!activity.dependencies) return '';
     const rawDeps = activity.dependencies;
     const deps = Array.isArray(rawDeps)
       ? rawDeps
       : (() => { try { return JSON.parse(rawDeps as unknown as string) as typeof rawDeps; } catch { return []; } })();
-    if (!deps || deps.length === 0) return '-';
+    if (!deps || deps.length === 0) return '';
     return deps.map((dep) => {
       const idx = activitySeqMap.get(dep.id);
       const seq = idx ? String(idx) : '?';
@@ -628,6 +628,47 @@ const ProjectDetail: React.FC = () => {
       const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
       return `${seq}${typeLabel}${lagStr}`;
     }).join(', ');
+  };
+
+  // 将 "3FS+2, 5" 文本解析为 ActivityDependency[]
+  const TYPE_LABEL_TO_CODE: Record<string, string> = { FS: '0', SS: '1', FF: '2', SF: '3' };
+  const parsePredecessorText = (text: string, selfId: string): { id: string; type: string; lag: number }[] | null => {
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+    const seqToId = new Map<number, string>();
+    activities.forEach((a, i) => seqToId.set(i + 1, a.id));
+    const parts = trimmed.split(/[,，;；\s]+/).filter(Boolean);
+    const result: { id: string; type: string; lag: number }[] = [];
+    for (const part of parts) {
+      const m = part.match(/^(\d+)\s*(FS|SS|FF|SF)?\s*([+-]\d+)?$/i);
+      if (!m) return null; // 解析失败
+      const seq = parseInt(m[1], 10);
+      const typeLabel = (m[2] || 'FS').toUpperCase();
+      const lag = m[3] ? parseInt(m[3], 10) : 0;
+      const targetId = seqToId.get(seq);
+      if (!targetId || targetId === selfId) return null; // 无效序号或自引用
+      result.push({ id: targetId, type: TYPE_LABEL_TO_CODE[typeLabel] || '0', lag });
+    }
+    return result;
+  };
+
+  // 提交前置依赖内联编辑
+  const commitPredecessorEdit = async (activity: Activity) => {
+    setInlineEditing(null);
+    const oldText = getPredecessorSeq(activity);
+    if (inlineValue.trim() === oldText.trim()) return;
+    const deps = parsePredecessorText(inlineValue, activity.id);
+    if (deps === null) {
+      Message.error('格式错误，示例: 3FS+2, 5');
+      return;
+    }
+    try {
+      await activitiesApi.update(activity.id, { dependencies: deps.length > 0 ? deps : null });
+      Message.success('更新成功');
+      loadActivities(); // 依赖变更会触发日期级联，需重新加载
+    } catch {
+      Message.error('更新失败');
+    }
   };
 
   // 计划日期显示（含工作日数）
@@ -681,9 +722,31 @@ const ProjectDetail: React.FC = () => {
     predecessor: {
       title: '前置',
       width: 100,
-      render: (_: unknown, record: Activity) => (
-        <span style={{ fontFamily: 'monospace', color: '#86909c' }}>{getPredecessorSeq(record)}</span>
-      ),
+      render: (_: unknown, record: Activity) => {
+        if (inlineEditing?.id === record.id && inlineEditing.field === 'predecessor') {
+          return (
+            <Input
+              autoFocus
+              size="small"
+              value={inlineValue}
+              placeholder="如: 3FS+2, 5"
+              style={{ fontFamily: 'monospace', fontSize: 12 }}
+              onChange={setInlineValue}
+              onBlur={() => commitPredecessorEdit(record)}
+              onPressEnter={() => commitPredecessorEdit(record)}
+            />
+          );
+        }
+        const text = getPredecessorSeq(record);
+        return (
+          <span
+            style={{ fontFamily: 'monospace', color: '#86909c', cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
+            onDoubleClick={() => startInlineEdit(record.id, 'predecessor', text)}
+          >
+            {text || '-'}
+          </span>
+        );
+      },
     },
     phase: {
       title: '阶段',
