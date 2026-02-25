@@ -202,7 +202,6 @@ const ProjectDetail: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // 关键路径
   const [criticalActivityIds, setCriticalActivityIds] = useState<string[]>([]);
-  const [criticalPathFilter, setCriticalPathFilter] = useState(false);
   // 归档标签 & 对比
   const [archiveLabelInput, setArchiveLabelInput] = useState('');
   const [archiveLabelModalVisible, setArchiveLabelModalVisible] = useState(false);
@@ -1295,9 +1294,6 @@ const ProjectDetail: React.FC = () => {
     },
   }), [inlineEditing, inlineValue, users, project, activities, activitySeqMap]);
 
-  // 关键路径 O(1) 查找
-  const criticalSet = useMemo(() => new Set(criticalActivityIds), [criticalActivityIds]);
-
   // 根据偏好生成最终列数组
   const activityColumns = useMemo(() => {
     // 始终存在的拖拽手柄列
@@ -1391,7 +1387,7 @@ const ProjectDetail: React.FC = () => {
       .map((key) => columnMap[key]);
 
     return [...(checkCol ? [checkCol] : []), dragCol, ...middleCols, actionsCol];
-  }, [columnMap, columnPrefs, project, activities, selectedIds, criticalSet]);
+  }, [columnMap, columnPrefs, project, activities, selectedIds]);
 
   // 动态计算 scroll.x
   const scrollX = useMemo(() => {
@@ -1516,19 +1512,6 @@ const ProjectDetail: React.FC = () => {
                       进行中 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
                     </span>
                   </span>
-                  {criticalActivityIds.length > 0 && (
-                    <span
-                      style={{
-                        cursor: 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 12,
-                        background: criticalPathFilter ? 'var(--color-danger-light-1)' : undefined,
-                        color: criticalPathFilter ? 'rgb(var(--danger-6))' : 'var(--color-text-3)',
-                        border: criticalPathFilter ? '1px solid var(--color-danger-light-3)' : '1px solid transparent',
-                      }}
-                      onClick={() => setCriticalPathFilter(prev => !prev)}
-                    >
-                      关键路径 <span style={{ fontWeight: 500 }}>{criticalActivityIds.length}</span>
-                    </span>
-                  )}
                   {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
                     <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
                   )}
@@ -1614,7 +1597,6 @@ const ProjectDetail: React.FC = () => {
                   data={(() => {
                     let list = [...activities];
                     if (statusFilter) list = list.filter(a => a.status === statusFilter);
-                    if (criticalPathFilter) list = list.filter(a => criticalSet.has(a.id));
                     return list;
                   })()}
                   loading={activitiesLoading}
