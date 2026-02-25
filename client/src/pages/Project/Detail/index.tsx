@@ -592,10 +592,33 @@ const ProjectDetail: React.FC = () => {
     return () => window.removeEventListener('mouseup', cleanup);
   }, []);
 
-  // ========== 行间快速插入 ==========
-  const handleInsertActivity = (atIndex: number) => {
-    insertAtIndexRef.current = atIndex;
-    handleOpenDrawer();
+  // ========== 行间快速插入（内联创建） ==========
+  const handleInsertActivity = async (atIndex: number) => {
+    if (!id) return;
+    // 计算插入位置的 sortOrder
+    const prev = atIndex > 0 ? activities[atIndex - 1].sortOrder : 0;
+    const next = atIndex < activities.length ? activities[atIndex].sortOrder : prev + 20;
+    const sortOrder = Math.floor((prev + next) / 2);
+
+    try {
+      const resp = await activitiesApi.create({
+        projectId: id,
+        name: '新活动',
+        type: 'TASK',
+        status: 'NOT_STARTED',
+        sortOrder,
+      });
+      const newId = (resp as { data?: { id?: string } }).data?.id ?? (resp as unknown as Activity).id;
+      // 重新加载活动列表
+      await loadActivities();
+      // 进入新行的名称内联编辑
+      if (newId) {
+        setInlineEditing({ id: newId, field: 'name' });
+        setInlineValue('新活动');
+      }
+    } catch {
+      Message.error('创建活动失败');
+    }
   };
 
 
