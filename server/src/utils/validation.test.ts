@@ -10,7 +10,7 @@ import {
 } from './validation';
 
 describe('isValidProjectStatus', () => {
-  it.each(['PLANNING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD'])(
+  it.each(['IN_PROGRESS', 'COMPLETED', 'ON_HOLD'])(
     '接受有效值 %s',
     (status) => {
       expect(isValidProjectStatus(status)).toBe(true);

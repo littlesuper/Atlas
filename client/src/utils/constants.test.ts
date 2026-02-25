@@ -24,10 +24,10 @@ function assertMapEntry(map: Record<string, { label: string; color: string }>, k
 // ============ STATUS_MAP（项目状态）============
 
 describe('STATUS_MAP', () => {
-  const keys = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED'] as const;
+  const keys = ['IN_PROGRESS', 'ON_HOLD', 'COMPLETED'] as const;
 
-  it('包含所有 4 个项目状态', () => {
-    expect(Object.keys(STATUS_MAP)).toHaveLength(4);
+  it('包含所有 3 个项目状态', () => {
+    expect(Object.keys(STATUS_MAP)).toHaveLength(3);
   });
 
   keys.forEach((key) => {
@@ -36,8 +36,8 @@ describe('STATUS_MAP', () => {
     });
   });
 
-  it('PLANNING 标签为"规划中"', () => {
-    expect(STATUS_MAP.PLANNING.label).toBe('规划中');
+  it('IN_PROGRESS 标签为"进行中"', () => {
+    expect(STATUS_MAP.IN_PROGRESS.label).toBe('进行中');
   });
 
   it('IN_PROGRESS 颜色为 green', () => {
@@ -76,10 +76,10 @@ describe('PRIORITY_MAP', () => {
 // ============ ACTIVITY_STATUS_MAP（活动状态）============
 
 describe('ACTIVITY_STATUS_MAP', () => {
-  const keys = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'CANCELLED'] as const;
+  const keys = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 
-  it('包含所有 5 个活动状态', () => {
-    expect(Object.keys(ACTIVITY_STATUS_MAP)).toHaveLength(5);
+  it('包含所有 4 个活动状态', () => {
+    expect(Object.keys(ACTIVITY_STATUS_MAP)).toHaveLength(4);
   });
 
   keys.forEach((key) => {
@@ -92,8 +92,8 @@ describe('ACTIVITY_STATUS_MAP', () => {
     expect(ACTIVITY_STATUS_MAP.COMPLETED.color).toBe('green');
   });
 
-  it('DELAYED 颜色为 red', () => {
-    expect(ACTIVITY_STATUS_MAP.DELAYED.color).toBe('red');
+  it('CANCELLED 颜色为 default', () => {
+    expect(ACTIVITY_STATUS_MAP.CANCELLED.color).toBe('default');
   });
 });
 

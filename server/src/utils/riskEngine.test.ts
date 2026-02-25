@@ -79,27 +79,29 @@ describe('assessProjectRisk', () => {
     expect(progressFactor?.severity).toBe('HIGH');
   });
 
-  it('延期率 >30% → 高风险因子"大量任务延期"', async () => {
+  it('多个逾期任务 → 高风险因子"存在逾期任务"', async () => {
     mockFindUnique.mockResolvedValue(makeProject({ progress: 50 }));
+    const past = new Date('2020-01-01');
     const acts = [
-      ...Array(4).fill(null).map(() => makeActivity({ status: 'DELAYED' })),
+      ...Array(4).fill(null).map(() => makeActivity({ status: 'IN_PROGRESS', planEndDate: past })),
       ...Array(6).fill(null).map(() => makeActivity({ status: 'NOT_STARTED' })),
     ];
     mockActivityFindMany.mockResolvedValue(acts);
     const result = await assessProjectRisk('proj-001');
-    const f = result.riskFactors.find((r) => r.factor.includes('大量'));
+    const f = result.riskFactors.find((r) => r.factor.includes('逾期'));
     expect(f?.severity).toBe('HIGH');
   });
 
-  it('延期率 10-30% → 低风险因子"部分任务延期"', async () => {
+  it('少量逾期任务 → 低风险因子"存在逾期任务"', async () => {
     mockFindUnique.mockResolvedValue(makeProject({ progress: 50 }));
+    const past = new Date('2020-01-01');
     const acts = [
-      ...Array(2).fill(null).map(() => makeActivity({ status: 'DELAYED' })),
+      ...Array(1).fill(null).map(() => makeActivity({ status: 'IN_PROGRESS', planEndDate: past })),
       ...Array(8).fill(null).map(() => makeActivity({ status: 'NOT_STARTED' })),
     ];
     mockActivityFindMany.mockResolvedValue(acts);
     const result = await assessProjectRisk('proj-001');
-    const f = result.riskFactors.find((r) => r.factor.includes('部分'));
+    const f = result.riskFactors.find((r) => r.factor.includes('逾期'));
     expect(f?.severity).toBe('LOW');
   });
 

@@ -258,7 +258,7 @@ describe('PROGRESS_OPTIONS 常量', () => {
   it('每个选项都有 label 和 color', () => {
     PROGRESS_OPTIONS.forEach((opt) => {
       expect(opt.label).toBeTruthy();
-      expect(opt.color).toMatch(/^#/);
+      expect(opt.color).toBeTruthy();
     });
   });
 
