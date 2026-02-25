@@ -404,6 +404,38 @@ tr.drag-insert-below td:first-child::before {
  * 调整为更柔和的深灰蓝色调，降低视觉疲劳
  */
 body[arco-theme='dark'] {
+  /*
+   * ===== Arco 内置色板覆盖 =====
+   * Arco 默认暗色的主色（arcoblue-6 = 60,126,255）仍然很亮
+   * 降低饱和度，让链接/按钮/Tag 等全局组件一起变柔和
+   * 注意：Arco 用 RGB 三元组（不含 #），搭配 rgb() 使用
+   */
+  --arcoblue-1: 10,18,56;
+  --arcoblue-2: 15,30,90;
+  --arcoblue-3: 25,52,130;
+  --arcoblue-4: 40,80,175;
+  --arcoblue-5: 65,115,215;
+  --arcoblue-6: 100,150,235;
+  --arcoblue-7: 135,175,240;
+  --arcoblue-8: 170,200,245;
+  --arcoblue-9: 205,220,250;
+  --arcoblue-10: 235,242,255;
+
+  /* 红色系：柔和的暗色红 */
+  --red-5: 210,90,90;
+  --red-6: 220,115,110;
+  --red-7: 230,145,140;
+
+  /* 橙色系：柔和的暗色橙 */
+  --orange-5: 215,135,55;
+  --orange-6: 225,150,70;
+  --orange-7: 235,170,100;
+
+  /* 绿色系：柔和的暗色绿 */
+  --green-5: 50,165,80;
+  --green-6: 70,180,95;
+  --green-7: 100,200,120;
+
   /* 基底背景：偏暖的深灰，避免纯黑 */
   --color-bg-1: #1e1f25;
   --color-bg-2: #252630;
@@ -412,10 +444,10 @@ body[arco-theme='dark'] {
   --color-bg-5: #3c3d4e;
 
   /* 文字层级：降低最亮一级，拉开层次 */
-  --color-text-1: rgba(220, 224, 232, 0.85);
-  --color-text-2: rgba(185, 192, 205, 0.7);
-  --color-text-3: rgba(145, 152, 168, 0.55);
-  --color-text-4: rgba(115, 122, 140, 0.4);
+  --color-text-1: rgba(210, 215, 225, 0.85);
+  --color-text-2: rgba(175, 182, 198, 0.68);
+  --color-text-3: rgba(140, 148, 165, 0.52);
+  --color-text-4: rgba(110, 118, 135, 0.38);
 
   /* 填充层级：使用透明叠加，与 Arco 保持一致 */
   --color-fill-1: rgba(255, 255, 255, 0.04);
@@ -423,33 +455,33 @@ body[arco-theme='dark'] {
   --color-fill-3: rgba(255, 255, 255, 0.12);
   --color-fill-4: rgba(255, 255, 255, 0.16);
 
-  /* 边框：低对比度，不扎眼 */
+  /* 边框：低对比度 */
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-2: rgba(255, 255, 255, 0.06);
   --color-border-3: rgba(255, 255, 255, 0.04);
 
   /* 主色调微调 */
-  --color-primary-light-1: rgba(var(--primary-6), 0.15);
+  --color-primary-light-1: rgba(var(--arcoblue-6), 0.12);
 
   /* 自定义变量 */
   --page-bg: #1a1b22;
-  --risk-low-bg: rgba(34, 195, 94, 0.08);
-  --risk-medium-bg: rgba(255, 152, 40, 0.08);
-  --risk-high-bg: rgba(240, 80, 80, 0.08);
-  --info-bg: rgba(79, 124, 255, 0.08);
-  --info-border: rgba(79, 124, 255, 0.15);
-  --info-color: #6b9aff;
-  --highlight-bg: rgba(255, 152, 40, 0.08);
+  --risk-low-bg: rgba(70, 180, 95, 0.08);
+  --risk-medium-bg: rgba(225, 150, 70, 0.08);
+  --risk-high-bg: rgba(220, 115, 110, 0.08);
+  --info-bg: rgba(100, 150, 235, 0.08);
+  --info-border: rgba(100, 150, 235, 0.15);
+  --info-color: #7eaaff;
+  --highlight-bg: rgba(225, 150, 70, 0.08);
   --gantt-label-bg: var(--color-bg-1);
 
   /* 语义状态色：暗色模式降低饱和度、提升明度 */
-  --status-success: #63d98b;
-  --status-warning: #ffb357;
-  --status-danger: #ff8c8c;
-  --status-danger-dark: #ff7875;
-  --status-info: #7eaaff;
-  --status-on-track: #63d98b;
-  --status-in-progress: #7eaaff;
+  --status-success: #5cc080;
+  --status-warning: #e0a050;
+  --status-danger: #dc7878;
+  --status-danger-dark: #d06868;
+  --status-info: #7ea8e8;
+  --status-on-track: #5cc080;
+  --status-in-progress: #7ea8e8;
   --status-not-started: #6b7280;
 
   /* 分隔线 / 浅背景 */
@@ -459,11 +491,11 @@ body[arco-theme='dark'] {
 
   /* 甘特图 */
   --gantt-not-started: #4b5563;
-  --gantt-completed: #63d98b;
-  --gantt-today: #ff8c8c;
+  --gantt-completed: #5cc080;
+  --gantt-today: #dc7878;
   --gantt-milestone-pending: #4b5563;
-  --gantt-milestone-in-progress: #7eaaff;
-  --gantt-milestone-completed: #63d98b;
+  --gantt-milestone-in-progress: #7ea8e8;
+  --gantt-milestone-completed: #5cc080;
   --gantt-milestone-overdue: #6b7280;
   --gantt-grid-line: rgba(255, 255, 255, 0.06);
   --gantt-dashed-border: #6b7280;
@@ -531,8 +563,35 @@ body[arco-theme='dark'] .w-e-bar-item button:hover {
 
 /* Tag 标签在暗色模式下降低饱和度 */
 body[arco-theme='dark'] .arco-tag {
-  --tw-saturate: saturate(0.8);
-  filter: var(--tw-saturate);
+  filter: saturate(0.75) brightness(0.95);
+}
+
+/* 表格：整体柔化 */
+body[arco-theme='dark'] .arco-table-th {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+body[arco-theme='dark'] .arco-table-tr:hover .arco-table-td {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* 输入框 / 选择器 */
+body[arco-theme='dark'] .arco-input,
+body[arco-theme='dark'] .arco-textarea,
+body[arco-theme='dark'] .arco-select-view,
+body[arco-theme='dark'] .arco-picker {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 进度条背景柔化 */
+body[arco-theme='dark'] .arco-progress-line-bar-bg {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Tab 底线颜色降低亮度 */
+body[arco-theme='dark'] .arco-tabs-header-ink {
+  background-color: rgb(var(--arcoblue-6));
 }
 
 /* ============ 响应式布局 ============ */
