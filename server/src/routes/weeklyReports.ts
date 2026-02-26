@@ -101,7 +101,7 @@ router.get('/latest-status', authenticate, async (_req: Request, res: Response):
     const map: Record<string, string> = {};
     await Promise.all(projects.map(async (p) => {
       const report = await prisma.weeklyReport.findFirst({
-        where: { projectId: p.id },
+        where: { projectId: p.id, status: { in: ['SUBMITTED', 'ARCHIVED'] } },
         orderBy: [{ year: 'desc' }, { weekNumber: 'desc' }],
         select: { progressStatus: true },
       });

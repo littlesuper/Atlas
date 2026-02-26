@@ -262,35 +262,34 @@ const ProjectList: React.FC = () => {
   // 表格列配置
   const columns = [
     {
+      title: '',
+      width: 32,
+      render: (_: unknown, record: Project) => {
+        const ps = latestStatus[record.id] as keyof typeof PROGRESS_STATUS_MAP | undefined;
+        if (!ps) return null;
+        const cfg = PROGRESS_STATUS_MAP[ps];
+        const ICON: Record<string, string> = { ON_TRACK: '✓', MINOR_ISSUE: '⚠️', MAJOR_ISSUE: '✕' };
+        const COLOR: Record<string, string> = { ON_TRACK: 'var(--status-success)', MINOR_ISSUE: 'var(--status-warning)', MAJOR_ISSUE: 'var(--status-danger)' };
+        return (
+          <Tooltip content={`周报状态：${cfg.label}`}>
+            <span style={{ color: COLOR[ps], fontWeight: 600, cursor: 'default' }}>{ICON[ps]}</span>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: '项目名称',
       dataIndex: 'name',
       width: 250,
       sorter: (a: Project, b: Project) => a.name.localeCompare(b.name),
-      render: (name: string, record: Project) => {
-        const hasAnyStatus = Object.keys(latestStatus).length > 0;
-        const ps = latestStatus[record.id] as keyof typeof PROGRESS_STATUS_MAP | undefined;
-        const cfg = ps ? PROGRESS_STATUS_MAP[ps] : null;
-        const ICON_MAP: Record<string, string> = { ON_TRACK: '●', MINOR_ISSUE: '▲', MAJOR_ISSUE: '■' };
-        return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: hasAnyStatus ? 6 : 0 }}>
-            {hasAnyStatus && (
-              cfg ? (
-                <Tooltip content={`周报状态：${cfg.label}`}>
-                  <span style={{ width: 10, textAlign: 'center', color: `rgb(var(--${cfg.color}-6))`, fontSize: 10, lineHeight: 1, flexShrink: 0 }}>{ICON_MAP[ps!]}</span>
-                </Tooltip>
-              ) : (
-                <span style={{ width: 10, flexShrink: 0 }} />
-              )
-            )}
-            <a
-              onClick={() => navigate(`/projects/${record.id}`)}
-              style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
-            >
-              {name}
-            </a>
-          </span>
-        );
-      },
+      render: (name: string, record: Project) => (
+        <a
+          onClick={() => navigate(`/projects/${record.id}`)}
+          style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
+        >
+          {name}
+        </a>
+      ),
     },
     {
       title: '产品线',
