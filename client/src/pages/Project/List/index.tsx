@@ -23,9 +23,9 @@ import {
   IconDelete,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, usersApi, weeklyReportsApi } from '../../../api';
+import { projectsApi, usersApi, weeklyReportsApi, templatesApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
-import { Project, User } from '../../../types';
+import { Project, User, ProjectTemplate } from '../../../types';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
@@ -84,6 +84,9 @@ const ProjectList: React.FC = () => {
 
   // 最新周报进展状态
   const [latestStatus, setLatestStatus] = useState<Record<string, string>>({});
+
+  // 模板列表
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
@@ -150,6 +153,7 @@ const ProjectList: React.FC = () => {
   useEffect(() => {
     loadUsers();
     weeklyReportsApi.getLatestStatus().then(res => setLatestStatus(res.data || {})).catch(() => {});
+    templatesApi.list().then(res => setTemplates(res.data || [])).catch(() => {});
   }, []);
 
   // 统计数据（来自服务端）
@@ -232,7 +236,21 @@ const ProjectList: React.FC = () => {
         if (memberIds.length > 0) {
           await syncMembers(res.data.id, memberIds, []);
         }
-        Message.success('项目创建成功');
+        // If a template was selected, instantiate it
+        const templateId = values.templateId;
+        if (templateId) {
+          try {
+            const instRes = await templatesApi.instantiate(templateId, {
+              projectId: res.data.id,
+              startDate: data.startDate,
+            });
+            Message.success(`项目创建成功，已从模板生成 ${instRes.data.count} 个活动`);
+          } catch {
+            Message.warning('项目已创建，但模板实例化失败');
+          }
+        } else {
+          Message.success('项目创建成功');
+        }
       }
 
       setDrawerVisible(false);
@@ -525,6 +543,24 @@ const ProjectList: React.FC = () => {
                 maxLength={500}
               />
             </Form.Item>
+
+            {/* 项目模板（仅新建时显示） */}
+            {!editingProject && templates.length > 0 && (
+              <Form.Item
+                label="项目模板"
+                field="templateId"
+                extra="选择模板后，创建项目时将自动生成活动计划"
+              >
+                <Select placeholder="选择模板（可选）" allowClear>
+                  {templates.map((t) => (
+                    <Select.Option key={t.id} value={t.id}>
+                      {t.name}
+                      {t._count?.activities ? ` (${t._count.activities} 个活动)` : ''}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            )}
 
             {/* 产品线 / 状态 / 优先级 — 一行三列 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>

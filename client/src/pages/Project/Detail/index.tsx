@@ -38,6 +38,7 @@ import GanttChart from './GanttChart';
 import RiskAssessmentTab from './RiskAssessmentTab';
 import ProductsTab from './ProductsTab';
 import ActivityComments from './ActivityComments';
+import SchedulingTools from './SchedulingTools';
 import { Project, Activity, ActivityArchive, User } from '../../../types';
 import {
   STATUS_MAP,
@@ -1891,6 +1892,17 @@ const ProjectDetail: React.FC = () => {
             {/* 项目周报 */}
             <Tabs.TabPane key="weekly" title="项目周报">
               {id && <ProjectWeeklyTab projectId={id} managerId={project?.managerId} />}
+            </Tabs.TabPane>
+
+            {/* 排期工具 */}
+            <Tabs.TabPane key="scheduling" title="排期工具">
+              {id && (
+                <SchedulingTools
+                  projectId={id}
+                  activities={activities}
+                  onRefresh={loadActivities}
+                />
+              )}
             </Tabs.TabPane>
           </Tabs>
         </Card>

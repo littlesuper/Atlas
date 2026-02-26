@@ -45,6 +45,9 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     if (status) {
       where.status = status;
+    } else {
+      // 默认排除草稿，只返回已提交和已归档的周报
+      where.status = { in: ['SUBMITTED', 'ARCHIVED'] };
     }
 
     if (productLine) {
@@ -110,6 +113,43 @@ router.get('/latest-status', authenticate, async (_req: Request, res: Response):
     res.json(map);
   } catch (error) {
     console.error('获取最新周报状态错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * GET /api/weekly-reports/drafts
+ * 获取当前用户的草稿列表
+ */
+router.get('/drafts', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const reports = await prisma.weeklyReport.findMany({
+      where: {
+        status: 'DRAFT',
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            productLine: true,
+            managerId: true,
+          },
+        },
+        creator: {
+          select: {
+            id: true,
+            realName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    res.json(reports);
+  } catch (error) {
+    console.error('获取草稿列表错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -195,6 +235,64 @@ router.get('/project/:projectId/latest', authenticate, async (req: Request, res:
     res.json(report);
   } catch (error) {
     console.error('获取最新周报错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * GET /api/weekly-reports/project/:projectId/previous
+ * 获取指定项目、指定周次之前最近一份已提交的周报
+ */
+router.get('/project/:projectId/previous', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const { year, weekNumber } = req.query;
+
+    if (!year || !weekNumber) {
+      res.status(400).json({ error: '年份和周次不能为空' });
+      return;
+    }
+
+    const yearNum = parseInt(year as string);
+    const weekNum = parseInt(weekNumber as string);
+
+    // 查找 year+weekNumber 小于指定值的最近一份已提交/已归档周报
+    const report = await prisma.weeklyReport.findFirst({
+      where: {
+        projectId,
+        status: { in: ['SUBMITTED', 'ARCHIVED'] },
+        OR: [
+          { year: { lt: yearNum } },
+          { year: yearNum, weekNumber: { lt: weekNum } },
+        ],
+      },
+      orderBy: [{ year: 'desc' }, { weekNumber: 'desc' }],
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            productLine: true,
+          },
+        },
+        creator: {
+          select: {
+            id: true,
+            realName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    if (!report) {
+      res.status(404).json({ error: '暂无历史周报' });
+      return;
+    }
+
+    res.json(report);
+  } catch (error) {
+    console.error('获取上一周次周报错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

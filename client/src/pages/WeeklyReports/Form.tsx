@@ -19,7 +19,7 @@ import {
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi, projectsApi, uploadApi } from '../../api';
-import { Project, ReportAttachment } from '../../types';
+import { Project, ReportAttachment, WeeklyReport } from '../../types';
 import RichTextEditor, { RichTextEditorRef } from '../../components/RichTextEditor';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
@@ -45,6 +45,48 @@ const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: string; color: str
   { value: 'MINOR_ISSUE', label: '⚠️ 轻度阻碍', color: 'var(--status-warning)' },
   { value: 'MAJOR_ISSUE', label: '✕ 严重阻碍', color: 'var(--status-danger)' },
 ];
+
+/** 上周参考折叠区 */
+const PrevReferenceBlock: React.FC<{
+  items: Array<{ label: string; html?: string }>;
+  weekNumber: number;
+}> = ({ items, weekNumber }) => {
+  const hasContent = items.some((item) => item.html);
+  if (!hasContent) return null;
+  return (
+    <Collapse defaultActiveKey={['ref']} bordered={false} style={{ marginBottom: 8 }}>
+      <Collapse.Item
+        header={
+          <span style={{ fontSize: 12, color: 'var(--color-text-4)' }}>
+            上周参考（第 {weekNumber} 周）
+          </span>
+        }
+        name="ref"
+      >
+        <div style={{
+          background: 'var(--color-fill-1)',
+          borderRadius: 4,
+          padding: '8px 12px',
+        }}>
+          {items.map((item, idx) => (
+            item.html ? (
+              <div key={idx} style={{ marginBottom: idx < items.length - 1 ? 8 : 0 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-4)', marginBottom: 2, fontWeight: 500 }}>
+                  {item.label}
+                </div>
+                <SafeHtml
+                  className="html-content"
+                  style={{ fontSize: 12, color: 'var(--color-text-4)', lineHeight: 1.6 }}
+                  html={item.html}
+                />
+              </div>
+            ) : null
+          ))}
+        </div>
+      </Collapse.Item>
+    </Collapse>
+  );
+};
 
 const WeeklyReportForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -80,6 +122,9 @@ const WeeklyReportForm: React.FC = () => {
   const keyProgressRef = useRef<RichTextEditorRef>(null);
   const nextWeekPlanRef = useRef<RichTextEditorRef>(null);
   const riskWarningRef = useRef<RichTextEditorRef>(null);
+
+  // 上周参考
+  const [prevReport, setPrevReport] = useState<WeeklyReport | null>(null);
 
   // AI 建议
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -140,6 +185,19 @@ const WeeklyReportForm: React.FC = () => {
       projectsApi.get(projectId).then((res) => setProject(res.data)).catch(() => { Message.warning('加载项目信息失败'); });
     }
   }, [id, isEdit, projectId]);
+
+  // 创建模式：加载上一周次的周报作为参考
+  useEffect(() => {
+    if (isEdit || !projectId) {
+      setPrevReport(null);
+      return;
+    }
+    const curYear = weekDate.isoWeekYear();
+    const curWeek = weekDate.isoWeek();
+    weeklyReportsApi.getPreviousReport(projectId, curYear, curWeek)
+      .then((res) => setPrevReport(res.data))
+      .catch(() => setPrevReport(null));
+  }, [isEdit, projectId, weekDate]);
 
   const buildData = () => ({
     projectId,
@@ -392,6 +450,15 @@ const WeeklyReportForm: React.FC = () => {
                   </div>
                 )}
               </div>
+              {prevReport && (
+                <PrevReferenceBlock
+                  weekNumber={prevReport.weekNumber}
+                  items={[
+                    { label: '上周计划', html: prevReport.nextWeekPlan },
+                    { label: '上周进展', html: prevReport.keyProgress },
+                  ]}
+                />
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: aiSuggestions?.keyProgress ? '1fr 400px' : '1fr', gap: 12, alignItems: 'stretch' }}>
                 <div>
                   <RichTextEditor
@@ -430,6 +497,14 @@ const WeeklyReportForm: React.FC = () => {
                   </div>
                 )}
               </div>
+              {prevReport && (
+                <PrevReferenceBlock
+                  weekNumber={prevReport.weekNumber}
+                  items={[
+                    { label: '上周计划', html: prevReport.nextWeekPlan },
+                  ]}
+                />
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: aiSuggestions?.nextWeekPlan ? '1fr 400px' : '1fr', gap: 12, alignItems: 'stretch' }}>
                 <div>
                   <RichTextEditor
@@ -468,6 +543,14 @@ const WeeklyReportForm: React.FC = () => {
                   </div>
                 )}
               </div>
+              {prevReport && (
+                <PrevReferenceBlock
+                  weekNumber={prevReport.weekNumber}
+                  items={[
+                    { label: '上周风险', html: prevReport.riskWarning },
+                  ]}
+                />
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: aiSuggestions?.riskWarning !== undefined ? '1fr 400px' : '1fr', gap: 12, alignItems: 'stretch' }}>
                 <div>
                   <RichTextEditor

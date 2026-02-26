@@ -118,7 +118,9 @@
 - `DELETE /api/activities/archives/:id` - 删除归档
 - `GET /api/risk/project/:projectId` - 获取风险评估历史
 - `POST /api/risk/project/:projectId/assess` - 发起风险评估
-- `GET /api/weekly-reports` - 获取周报列表
+- `GET /api/weekly-reports` - 获取周报列表（默认排除草稿）
+- `GET /api/weekly-reports/drafts` - 获取草稿列表
+- `GET /api/weekly-reports/project/:projectId/previous` - 获取上周参考周报
 - `POST /api/weekly-reports` - 创建周报
 - `POST /api/weekly-reports/project/:projectId/ai-suggestions` - AI 智能建议
 
@@ -128,6 +130,46 @@
 - ActivityArchive(活动归档快照): id, projectId, snapshot(JSON), createdAt
 - RiskAssessment(风险评估): id, projectId, riskLevel, riskFactors, suggestions, assessedAt
 - WeeklyReport(周报): id, projectId, weekStart, weekEnd, year, weekNumber, keyProgress, nextWeekPlan, riskWarning, phaseProgress, status, progressStatus
+
+---
+
+### 3.5 项目模板与排期工具 ✅
+
+**后端实现:**
+- ✅ 项目模板 CRUD（含活动树整体替换）
+- ✅ 模板实例化：拓扑排序解析依赖链，推算所有活动日期
+- ✅ 资源冲突检测：跨项目检测同一人员的时间重叠
+- ✅ What-If 模拟：BFS 级联计算延期影响，不修改数据
+- ✅ 一键重排：从基准日期重新计算未完成活动时间
+- ✅ AI 排期建议：基于历史数据 + AI 分析推荐工期和风险
+
+**前端实现:**
+- ✅ 模板管理页面（Admin → 项目模板 Tab）
+  - 模板列表表格（名称、产品线、描述、活动数、操作）
+  - 模板创建/编辑抽屉（活动内联编辑表格）
+  - 模板复制功能（自动映射依赖 ID）
+- ✅ 项目创建时模板选择（自动实例化生成活动）
+- ✅ 排期工具 Tab（项目详情 → 排期工具）
+  - 资源冲突检测面板
+  - What-If 模拟面板（选择活动 + 延期天数 → 查看影响）
+  - 一键重排面板（选择基准日期 → 确认执行）
+  - AI 排期建议面板（工期建议表 + 风险提示表）
+
+**API 接口:**
+- `GET /api/templates` - 获取模板列表
+- `GET /api/templates/:id` - 获取模板详情（含活动树）
+- `POST /api/templates` - 创建模板
+- `PUT /api/templates/:id` - 更新模板
+- `DELETE /api/templates/:id` - 删除模板
+- `POST /api/templates/:id/instantiate` - 模板实例化到项目
+- `GET /api/activities/resource-conflicts` - 资源冲突检测
+- `POST /api/activities/project/:projectId/what-if` - What-If 模拟
+- `POST /api/activities/project/:projectId/reschedule` - 一键重排
+- `POST /api/activities/project/:projectId/ai-schedule` - AI 排期建议
+
+**数据模型:**
+- ProjectTemplate(项目模板): id, name, description, productLine, phases(JSON)
+- TemplateActivity(模板活动): id, templateId, parentId, name, type, phase, priority, planDuration, dependencies(JSON), notes, sortOrder
 
 ---
 
@@ -203,10 +245,11 @@ Atlas/
 │   │   ├── pages/             # 页面组件
 │   │   │   ├── Login/         # 登录页
 │   │   │   ├── Project/       # 项目管理
-│   │   │   │   ├── List/      # 项目列表
-│   │   │   │   └── Detail/    # 项目详情
+│   │   │   │   ├── List/      # 项目列表（含模板选择）
+│   │   │   │   └── Detail/    # 项目详情（含排期工具 Tab）
 │   │   │   ├── Product/       # 产品管理
-│   │   │   └── Admin/         # 账号管理
+│   │   │   ├── WeeklyReports/ # 周报管理（按周分组、草稿箱、上周参考）
+│   │   │   └── Admin/         # 系统管理（含项目模板管理）
 │   │   ├── store/             # Zustand 状态管理
 │   │   │   └── authStore.ts   # 认证状态
 │   │   ├── styles/            # 全局样式
@@ -234,10 +277,11 @@ Atlas/
 │   │   │   ├── users.ts       # 用户管理
 │   │   │   ├── roles.ts       # 角色管理
 │   │   │   ├── projects.ts    # 项目管理
-│   │   │   ├── activities.ts  # 活动管理
+│   │   │   ├── activities.ts  # 活动管理（含冲突检测、What-If、重排、AI 排期）
 │   │   │   ├── products.ts    # 产品管理
 │   │   │   ├── risk.ts        # 风险评估
-│   │   │   ├── weeklyReports.ts # 周报管理
+│   │   │   ├── weeklyReports.ts # 周报管理（含草稿、上周参考）
+│   │   │   ├── templates.ts   # 项目模板 CRUD + 实例化
 │   │   │   └── uploads.ts     # 文件上传
 │   │   ├── utils/             # 工具函数
 │   │   │   ├── workday.ts     # 工作日计算
@@ -245,7 +289,7 @@ Atlas/
 │   │   │   ├── riskEngine.ts  # 风险评估引擎
 │   │   │   └── weekNumber.ts  # 周数计算
 │   │   ├── prisma/            # Prisma ORM
-│   │   │   ├── schema.prisma  # 数据库模型(11个表)
+│   │   │   ├── schema.prisma  # 数据库模型(13个表)
 │   │   │   └── seed.ts        # 种子数据
 │   │   └── index.ts           # Express 入口
 │   ├── uploads/               # 上传文件存储
@@ -323,8 +367,11 @@ Atlas/
 ### 4. 智能化功能
 - AI 风险评估(支持外部 AI API)
 - AI 周报智能建议
+- AI 排期建议(基于历史数据推荐工期和风险)
 - 规则引擎回退机制
 - 工作日自动计算
+- What-If 模拟(延期影响分析)
+- 资源冲突检测(跨项目人员重叠)
 
 ### 5. 现代化 UI/UX
 - Arco Design 组件库
@@ -345,9 +392,9 @@ Atlas/
 
 - **总文件数:** 100+
 - **代码行数:** 15000+ (不含注释)
-- **数据表:** 11 个
-- **API 接口:** 50+
-- **前端页面:** 6 个主页面
+- **数据表:** 13 个（含 ProjectTemplate、TemplateActivity）
+- **API 接口:** 60+
+- **前端页面:** 7 个主页面
 - **权限数:** 21 个预设权限
 - **角色数:** 4 个预设角色
 - **用户数:** 3 个预设用户
@@ -388,42 +435,38 @@ npm run dev
 
 ### 高优先级
 
-1. **甘特图可视化** (后端接口已实现)
-   - 使用 `dhtmlx-gantt` 或 `frappe-gantt`
-   - 实现拖拽调整时间
-   - 依赖关系可视化
+1. ~~**甘特图可视化**~~ ✅ 已实现
+   - 自定义 SVG 甘特图，按阶段分组展示
+   - 依赖关系箭头可视化
 
-2. **活动拖拽排序** (后端接口已实现)
-   - 使用 `@dnd-kit/core`
-   - 实现树形结构拖拽
-   - 自动保存排序
+2. ~~**活动拖拽排序**~~ ✅ 已实现
+   - 树形结构拖拽排序，自动保存
 
-3. **周报管理前端页面**
-   - 富文本编辑器(Tiptap)
+3. ~~**周报管理前端页面**~~ ✅ 已实现
+   - TipTap 富文本编辑器
    - AI 智能建议集成
    - 附件上传功能
+   - 按周次分组展示 + 草稿箱 + 上周参考
 
-4. **双击快速编辑**
-   - 表格单元格双击编辑
-   - 内联编辑器
-   - 撤销/重做功能
+4. ~~**双击快速编辑**~~ ✅ 已实现
+   - 活动列表内联编辑（10 个可编辑字段）
 
 ### 中优先级
 
 5. **数据可视化**
    - 项目进度仪表盘
    - 趋势图表(ECharts/Recharts)
-   - 团队工作负载统计
+   - ~~团队工作负载统计~~ → 已有资源冲突检测
 
 6. **导入导出**
    - Excel 批量导入
    - PDF 报告导出
-   - 数据模板下载
+   - ~~数据模板下载~~ → 已有项目模板系统
 
-7. **消息通知**
-   - 任务到期提醒
-   - 项目风险预警
-   - WebSocket 实时通知
+7. ~~**消息通知**~~ ✅ 已实现
+   - 任务到期提醒、里程碑临近提醒
+   - 周报提交提醒
+   - 通知面板（标记已读/全部已读）
 
 ### 低优先级
 
@@ -500,6 +543,6 @@ npm run dev
 
 ---
 
-**最后更新:** 2026年2月17日
-**版本:** 1.0.0
+**最后更新:** 2026年2月26日
+**版本:** 1.1.0
 **状态:** ✅ 生产就绪

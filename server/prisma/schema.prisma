@@ -209,6 +209,46 @@ model ActivityArchive {
   @@map("activity_archives")
 }
 
+// ==================== 项目模板 ====================
+
+model ProjectTemplate {
+  id          String             @id @default(uuid())
+  name        String
+  description String?
+  productLine String?
+  phases      Json?              // 模板包含的阶段列表，如 ["EVT","DVT","PVT","MP"]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  // 关联关系
+  activities TemplateActivity[]
+
+  @@map("project_templates")
+}
+
+model TemplateActivity {
+  id           String       @id @default(uuid())
+  templateId   String
+  parentId     String?
+  name         String
+  type         ActivityType @default(TASK)
+  phase        String?
+  priority     Priority     @default(MEDIUM)
+  planDuration Int?         // 预估工期（工作日）
+  dependencies Json?        // 模板内依赖 [{id, type, lag}]，id 为同模板内的 TemplateActivity.id
+  notes        String?
+  sortOrder    Int          @default(0)
+
+  // 关联关系
+  template ProjectTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  parent   TemplateActivity? @relation("TemplateHierarchy", fields: [parentId], references: [id])
+  children TemplateActivity[] @relation("TemplateHierarchy")
+
+  @@index([templateId])
+  @@index([parentId])
+  @@map("template_activities")
+}
+
 model RiskAssessment {
   id           String   @id @default(uuid())
   projectId    String

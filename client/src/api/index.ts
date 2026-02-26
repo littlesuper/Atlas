@@ -16,6 +16,11 @@ import {
   AiUsageStats,
   AuditLog,
   WecomConfig,
+  ProjectTemplate,
+  TemplateActivity,
+  ResourceConflict,
+  WhatIfResult,
+  AiScheduleSuggestion,
 } from '../types';
 
 // 分页响应结构
@@ -241,6 +246,52 @@ export const activitiesApi = {
       userId: string; realName: string; username: string;
       totalActivities: number; inProgress: number; overdue: number; totalDuration: number;
     }>>('/activities/workload', { params }),
+
+  // 资源冲突检测
+  getResourceConflicts: (params?: { projectId?: string }) =>
+    request.get<ResourceConflict[]>('/activities/resource-conflicts', { params }),
+
+  // What-if 模拟
+  whatIf: (projectId: string, activityId: string, delayDays: number) =>
+    request.post<WhatIfResult>(`/activities/project/${projectId}/what-if`, { activityId, delayDays }),
+
+  // 一键重排
+  reschedule: (projectId: string, baseDate?: string) =>
+    request.post<{ success: boolean; updatedCount: number }>(`/activities/project/${projectId}/reschedule`, { baseDate }),
+
+  // AI 排计划建议
+  getAiSchedule: (projectId: string) =>
+    request.post<AiScheduleSuggestion>(`/activities/project/${projectId}/ai-schedule`),
+};
+
+// ============ 项目模板 API ============
+export const templatesApi = {
+  list: () => request.get<ProjectTemplate[]>('/templates'),
+
+  get: (id: string) => request.get<ProjectTemplate>(`/templates/${id}`),
+
+  create: (data: {
+    name: string;
+    description?: string;
+    productLine?: string;
+    phases?: string[];
+    activities?: Array<Partial<TemplateActivity> & { id: string; name: string }>;
+  }) => request.post<ProjectTemplate>('/templates', data),
+
+  update: (id: string, data: {
+    name?: string;
+    description?: string;
+    productLine?: string;
+    phases?: string[];
+    activities?: Array<Partial<TemplateActivity> & { id: string; name: string }>;
+  }) => request.put<ProjectTemplate>(`/templates/${id}`, data),
+
+  delete: (id: string) => request.delete(`/templates/${id}`),
+
+  instantiate: (id: string, data: { projectId: string; startDate: string }) =>
+    request.post<{ success: boolean; count: number; activities: Activity[] }>(
+      `/templates/${id}/instantiate`, data
+    ),
 };
 
 // ============ 产品管理 API ============
@@ -358,6 +409,12 @@ export const weeklyReportsApi = {
 
   getLatestStatus: () =>
     request.get<Record<string, string>>('/weekly-reports/latest-status', { _silent: true } as never),
+
+  getDrafts: () =>
+    request.get<WeeklyReport[]>('/weekly-reports/drafts'),
+
+  getPreviousReport: (projectId: string, year: number, weekNumber: number) =>
+    request.get<WeeklyReport>(`/weekly-reports/project/${projectId}/previous`, { params: { year, weekNumber }, _silent: true } as never),
 
   get: (id: string) => request.get<WeeklyReport>(`/weekly-reports/${id}`),
 

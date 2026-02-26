@@ -151,6 +151,67 @@ export interface Notification {
   createdAt: string;
 }
 
+// ============ 项目模板相关类型 ============
+
+export interface TemplateActivity {
+  id: string;
+  templateId: string;
+  parentId?: string | null;
+  name: string;
+  type: ActivityType;
+  phase?: string | null;
+  priority: Priority;
+  planDuration?: number | null;
+  dependencies?: ActivityDependency[] | null;
+  notes?: string | null;
+  sortOrder: number;
+}
+
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  productLine?: string | null;
+  phases?: string[] | null;
+  activities?: TemplateActivity[];
+  _count?: { activities: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResourceConflict {
+  userId: string;
+  realName: string;
+  activities: Array<{
+    id: string;
+    name: string;
+    projectId: string;
+    projectName: string;
+    planStartDate: string;
+    planEndDate: string;
+  }>;
+}
+
+export interface WhatIfResult {
+  affectedCount: number;
+  affected: Array<{
+    id: string;
+    name: string;
+    originalStart: string | null;
+    originalEnd: string | null;
+    newStart: string | null;
+    newEnd: string | null;
+  }>;
+  projectEndDateBefore: string | null;
+  projectEndDateAfter: string | null;
+}
+
+export interface AiScheduleSuggestion {
+  suggestions: Array<{ name: string; suggestedDuration: number; reason: string }>;
+  risks: Array<{ activity: string; risk: string; severity: string }>;
+  summary: string;
+}
+
 // ============ 产品相关类型 ============
 
 export interface ProductImage {

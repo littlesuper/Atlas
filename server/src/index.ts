@@ -19,6 +19,7 @@ import auditLogsRoutes from './routes/auditLogs';
 import wecomConfigRoutes from './routes/wecomConfig';
 import activityCommentsRoutes from './routes/activityComments';
 import notificationsRoutes from './routes/notifications';
+import templatesRoutes from './routes/templates';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -117,6 +118,9 @@ app.use('/api/activity-comments', activityCommentsRoutes);
 
 // 通知路由
 app.use('/api/notifications', notificationsRoutes);
+
+// 项目模板路由
+app.use('/api/templates', templatesRoutes);
 
 // ==================== 错误处理中间件 ====================
 
