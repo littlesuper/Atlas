@@ -92,6 +92,29 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 });
 
 /**
+ * GET /api/weekly-reports/latest-status
+ * 批量获取所有项目的最新周报进展状态
+ */
+router.get('/latest-status', authenticate, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const projects = await prisma.project.findMany({ select: { id: true } });
+    const map: Record<string, string> = {};
+    await Promise.all(projects.map(async (p) => {
+      const report = await prisma.weeklyReport.findFirst({
+        where: { projectId: p.id },
+        orderBy: [{ year: 'desc' }, { weekNumber: 'desc' }],
+        select: { progressStatus: true },
+      });
+      if (report) map[p.id] = report.progressStatus;
+    }));
+    res.json(map);
+  } catch (error) {
+    console.error('获取最新周报状态错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * GET /api/weekly-reports/project/:projectId
  * 获取项目所有周报
  */

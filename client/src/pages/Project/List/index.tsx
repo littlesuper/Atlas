@@ -23,13 +23,14 @@ import {
   IconDelete,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, usersApi, riskApi } from '../../../api';
+import { projectsApi, usersApi, weeklyReportsApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
 import { Project, User } from '../../../types';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
   PRODUCT_LINE_MAP,
+  PROGRESS_STATUS_MAP,
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
@@ -81,9 +82,8 @@ const ProjectList: React.FC = () => {
   // 表单联动：追踪当前选中的项目经理
   const [selectedManagerId, setSelectedManagerId] = useState<string>('');
 
-  // 风险概览
-  const [riskSummary, setRiskSummary] = useState<Array<{ projectId: string; projectName: string; riskLevel: string; assessedAt: string }>>([]);
-  const [riskOverviewVisible, setRiskOverviewVisible] = useState(false);
+  // 最新周报进展状态
+  const [latestStatus, setLatestStatus] = useState<Record<string, string>>({});
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
@@ -149,7 +149,7 @@ const ProjectList: React.FC = () => {
 
   useEffect(() => {
     loadUsers();
-    riskApi.getSummary().then(res => setRiskSummary(res.data || [])).catch(() => {});
+    weeklyReportsApi.getLatestStatus().then(res => setLatestStatus(res.data || {})).catch(() => {});
   }, []);
 
   // 统计数据（来自服务端）
@@ -266,14 +266,31 @@ const ProjectList: React.FC = () => {
       dataIndex: 'name',
       width: 250,
       sorter: (a: Project, b: Project) => a.name.localeCompare(b.name),
-      render: (name: string, record: Project) => (
-        <a
-          onClick={() => navigate(`/projects/${record.id}`)}
-          style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
-        >
-          {name}
-        </a>
-      ),
+      render: (name: string, record: Project) => {
+        const hasAnyStatus = Object.keys(latestStatus).length > 0;
+        const ps = latestStatus[record.id] as keyof typeof PROGRESS_STATUS_MAP | undefined;
+        const cfg = ps ? PROGRESS_STATUS_MAP[ps] : null;
+        const ICON_MAP: Record<string, string> = { ON_TRACK: '●', MINOR_ISSUE: '▲', MAJOR_ISSUE: '■' };
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: hasAnyStatus ? 6 : 0 }}>
+            {hasAnyStatus && (
+              cfg ? (
+                <Tooltip content={`周报状态：${cfg.label}`}>
+                  <span style={{ width: 10, textAlign: 'center', color: `rgb(var(--${cfg.color}-6))`, fontSize: 10, lineHeight: 1, flexShrink: 0 }}>{ICON_MAP[ps!]}</span>
+                </Tooltip>
+              ) : (
+                <span style={{ width: 10, flexShrink: 0 }} />
+              )
+            )}
+            <a
+              onClick={() => navigate(`/projects/${record.id}`)}
+              style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
+            >
+              {name}
+            </a>
+          </span>
+        );
+      },
     },
     {
       title: '产品线',
@@ -409,59 +426,6 @@ const ProjectList: React.FC = () => {
             onClick={() => setSelectedStatus('ON_HOLD')}
           />
         </div>
-
-        {/* 风险概览 */}
-        {riskSummary.length > 0 && (() => {
-          const counts: Record<string, number> = {};
-          const highRisk: typeof riskSummary = [];
-          riskSummary.forEach(r => {
-            counts[r.riskLevel] = (counts[r.riskLevel] || 0) + 1;
-            if (r.riskLevel === 'HIGH' || r.riskLevel === 'CRITICAL') highRisk.push(r);
-          });
-          const levelCfg: Record<string, { label: string; color: string }> = {
-            LOW: { label: '低风险', color: 'green' },
-            MEDIUM: { label: '中风险', color: 'orange' },
-            HIGH: { label: '高风险', color: 'red' },
-            CRITICAL: { label: '严重', color: 'magenta' },
-          };
-          return (
-            <Card style={{ marginBottom: 16 }}>
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                onClick={() => setRiskOverviewVisible(!riskOverviewVisible)}
-              >
-                <Space size={12}>
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>风险概览</span>
-                  {Object.entries(levelCfg).map(([level, cfg]) => (
-                    counts[level] ? (
-                      <Tag key={level} color={cfg.color}>{cfg.label}: {counts[level]}</Tag>
-                    ) : null
-                  ))}
-                </Space>
-                <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
-                  {riskOverviewVisible ? '收起' : '展开'}
-                </span>
-              </div>
-              {riskOverviewVisible && highRisk.length > 0 && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border-2)' }}>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>需关注项目</div>
-                  <Space wrap size={8}>
-                    {highRisk.map(r => (
-                      <Tag
-                        key={r.projectId}
-                        color={r.riskLevel === 'CRITICAL' ? 'magenta' : 'red'}
-                        style={{ cursor: 'pointer' }}
-                        onClick={(e) => { e.stopPropagation(); navigate(`/projects/${r.projectId}?tab=risk`); }}
-                      >
-                        {r.projectName}
-                      </Tag>
-                    ))}
-                  </Space>
-                </div>
-              )}
-            </Card>
-          );
-        })()}
 
         {/* 表格卡片 */}
         <Card>

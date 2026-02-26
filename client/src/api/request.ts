@@ -126,9 +126,11 @@ request.interceptors.response.use(
       }
     }
 
-    // 其他错误处理：显示错误提示
-    const errorMessage = getErrorMessage(error);
-    Message.error(errorMessage);
+    // 其他错误处理：显示错误提示（除非请求标记了 _silent）
+    if (!(originalRequest as InternalAxiosRequestConfig & { _silent?: boolean })._silent) {
+      const errorMessage = getErrorMessage(error);
+      Message.error(errorMessage);
+    }
 
     return Promise.reject(error);
   }

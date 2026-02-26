@@ -385,7 +385,24 @@ const ProjectDetail: React.FC = () => {
     const cloned = originalTable.cloneNode(true) as HTMLElement;
     const clonedTbody = cloned.querySelector('tbody');
     if (clonedTbody) clonedTbody.remove();
-    // 使用 table-layout: fixed 确保列宽仅由 colgroup 决定，不受内容影响
+
+    // 从原始 th 读取实际渲染宽度，锁定克隆表头每列的精确宽度
+    const origThs = originalTable.querySelectorAll('thead th');
+    const clonedCols = cloned.querySelectorAll('colgroup col');
+    const clonedThs = cloned.querySelectorAll('thead th');
+    origThs.forEach((th, i) => {
+      const w = (th as HTMLElement).getBoundingClientRect().width;
+      if (clonedCols[i]) {
+        (clonedCols[i] as HTMLElement).style.width = w + 'px';
+        (clonedCols[i] as HTMLElement).style.minWidth = w + 'px';
+      }
+      if (clonedThs[i]) {
+        (clonedThs[i] as HTMLElement).style.width = w + 'px';
+        (clonedThs[i] as HTMLElement).style.minWidth = w + 'px';
+        (clonedThs[i] as HTMLElement).style.maxWidth = w + 'px';
+        (clonedThs[i] as HTMLElement).style.boxSizing = 'border-box';
+      }
+    });
     cloned.style.tableLayout = 'fixed';
     cloned.style.width = originalTable.scrollWidth + 'px';
     stickyDiv.innerHTML = '';

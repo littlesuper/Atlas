@@ -356,6 +356,9 @@ export const weeklyReportsApi = {
   getLatest: (projectId: string) =>
     request.get<WeeklyReport>(`/weekly-reports/project/${projectId}/latest`),
 
+  getLatestStatus: () =>
+    request.get<Record<string, string>>('/weekly-reports/latest-status', { _silent: true } as never),
+
   get: (id: string) => request.get<WeeklyReport>(`/weekly-reports/${id}`),
 
   getByWeek: (year: number, weekNumber: number, params?: { productLine?: string }) =>
