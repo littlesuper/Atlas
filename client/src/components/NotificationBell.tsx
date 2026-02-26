@@ -99,7 +99,7 @@ const NotificationBell: React.FC = () => {
   };
 
   return (
-    <div ref={panelRef} style={{ position: 'relative' }}>
+    <div ref={panelRef} style={{ position: 'relative', zIndex: 1050 }}>
       <Badge count={unreadCount} dot={unreadCount > 0}>
         <div
           style={{
