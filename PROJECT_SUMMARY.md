@@ -1,62 +1,67 @@
-# 贝锐硬件管理系统 - 项目完成总结
+# Atlas 硬件项目管理平台 - 项目完成总结
 
-## 🎉 项目概览
+## 项目概览
 
-贝锐硬件管理系统(HWSystem)是一套完整的硬件项目管理平台,为项目经理和产品经理提供项目全生命周期管理、产品信息管理、团队协作和权限控制等功能。
+Atlas 是一套完整的硬件项目管理平台，为项目经理和产品经理提供项目全生命周期管理、产品信息管理、团队协作和权限控制等功能。
 
-**开发时间:** 2026年2月
 **项目规模:** 100+ 文件, 15000+ 行代码
-**技术栈:** React + TypeScript + Arco Design + Express + Prisma + PostgreSQL
+**技术栈:** React + TypeScript + Arco Design + Express + Prisma + SQLite/PostgreSQL
 
 ---
 
-## ✅ 已完成的功能模块
+## 已完成的功能模块
 
-### 1. 认证与授权系统 ✅
+### 1. 认证与授权系统
 
 **后端实现:**
-- ✅ JWT 双令牌认证机制(Access Token 8小时 + Refresh Token 7天)
-- ✅ bcrypt 密码加密(salt rounds: 10)
-- ✅ 自动 token 刷新机制
-- ✅ 基于角色的访问控制(RBAC)
-- ✅ 权限中间件(支持通配符 `*:*`, `resource:*`, `*:action`)
-- ✅ 用户状态管理(ACTIVE/DISABLED)
+- JWT 双令牌认证机制（Access Token 8 小时 + Refresh Token 7 天）
+- bcrypt 密码加密（salt rounds: 10）
+- 自动 token 刷新机制
+- 基于角色的访问控制（RBAC）
+- 权限中间件（支持通配符 `*:*`, `resource:*`, `*:action`）
+- 用户状态管理（ACTIVE/DISABLED）
+- 企业微信 OAuth 扫码登录
 
 **前端实现:**
-- ✅ 登录页面(深色渐变背景 + 毛玻璃卡片)
-- ✅ Zustand 全局状态管理
-- ✅ Axios 请求拦截器(自动添加 token)
-- ✅ Axios 响应拦截器(401 自动刷新)
-- ✅ ProtectedRoute 路由守卫
-- ✅ 权限检查 Hook
+- 登录页面（深色渐变背景 + 毛玻璃卡片）
+- 企微扫码登录组件
+- Zustand 全局状态管理
+- Axios 请求拦截器（自动添加 token）
+- Axios 响应拦截器（401 自动刷新 + 请求队列防重复刷新）
+- ProtectedRoute 路由守卫
 
 **API 接口:**
 - `POST /api/auth/login` - 用户登录
 - `POST /api/auth/refresh` - 刷新令牌
 - `GET /api/auth/me` - 获取当前用户信息
+- `PUT /api/auth/profile` - 更新个人资料
+- `POST /api/auth/change-password` - 修改密码
+- `GET /api/auth/wecom/config` - 获取企微配置
+- `POST /api/auth/wecom/login` - 企微登录
+- `GET /api/auth/preferences` - 获取用户偏好
+- `PUT /api/auth/preferences` - 更新用户偏好
 
 ---
 
-### 2. 用户与角色管理 ✅
+### 2. 用户与角色管理
 
 **后端实现:**
-- ✅ 用户 CRUD(创建、读取、更新、删除)
-- ✅ 角色 CRUD
-- ✅ 用户-角色多对多关联
-- ✅ 角色-权限多对多关联
-- ✅ 分页查询
-- ✅ 关键词搜索(用户名/姓名/邮箱模糊匹配)
-- ✅ 预设4个角色(系统管理员、项目经理、产品经理、只读成员)
-- ✅ 预设21个权限(5资源 × 4操作 + 全通配)
+- 用户 CRUD（创建、读取、更新、删除）
+- 角色 CRUD
+- 用户-角色多对多关联
+- 角色-权限多对多关联
+- 分页查询、关键词搜索
+- 预设 4 个角色（系统管理员、项目经理、产品经理、只读成员）
+- 预设 21 个权限（5 资源 × 4 操作 + 全通配）
 
 **前端实现:**
-- ✅ 账号管理页面(Tab 切换)
-- ✅ 用户管理表格(搜索、编辑、删除)
-- ✅ 用户创建/编辑 Modal
-- ✅ 角色管理表格
-- ✅ 角色创建/编辑 Modal(权限配置按资源分组)
-- ✅ 权限可视化(Tag 标签展示)
-- ✅ 权限控制(按钮根据权限显示/隐藏)
+- 账号管理页面（Tab 切换）
+- 用户管理表格（搜索、编辑、删除）
+- 用户创建/编辑 Modal
+- 角色管理表格
+- 角色创建/编辑 Modal（权限配置按资源分组）
+- 权限可视化（Tag 标签展示）
+- 权限控制（按钮根据权限显示/隐藏）
 
 **API 接口:**
 - `GET /api/users` - 获取用户列表
@@ -71,85 +76,90 @@
 
 ---
 
-### 3. 项目管理系统 ✅
+### 3. 项目管理系统
 
 **后端实现:**
-- ✅ 项目 CRUD
-- ✅ 活动/任务 CRUD(支持层级结构)
-- ✅ 工作日计算(排除周末)
-- ✅ 项目进度自动计算(基于顶级活动状态)
-- ✅ 批量排序接口
-- ✅ 甘特图数据接口
-- ✅ 产品线筛选(支持逗号分隔多值 + null 值)
-- ✅ 统计数据(全部/进行中/已完成/已暂停)
-- ✅ AI 风险评估(支持 AI API + 规则引擎)
-- ✅ 项目周报管理
-- ✅ 周报 AI 智能建议
+- 项目 CRUD + 成员管理
+- 活动/任务 CRUD（支持层级结构、批量操作）
+- 工作日计算（排除中国法定节假日、周末，含调休）
+- 项目进度自动计算
+- 甘特图数据接口
+- 活动依赖管理（FS/SS/FF/SF 四种类型 + lag）
+- 依赖调度器（BFS 级联计算）
+- 产品线筛选（支持逗号分隔多值 + null 值）
+- 统计数据（全部/进行中/已完成/已暂停）
+- 关键路径计算
+- AI 风险评估（支持 AI API + 规则引擎）
+- 项目周报管理 + AI 智能建议
+- 活动归档快照与对比
+- 活动评论系统
 
 **前端实现:**
-- ✅ 项目列表页(系统首页)
-  - 统计卡片(可点击筛选)
-  - 项目表格(名称、产品线、状态、优先级、进度条、负责人、时间范围、活动数)
-  - 搜索框(300ms 防抖)
+- 项目列表页（系统首页）
+  - 统计卡片（可点击筛选）
+  - 项目表格（名称、产品线、状态、优先级、进度条、负责人、时间范围、活动数、周报状态）
+  - 搜索框（300ms 防抖）
   - 产品线快速筛选 Toggle
-  - 新建/编辑抽屉
-  - 分页(每页20条)
-- ✅ 项目详情页
+  - 新建/编辑抽屉（含模板选择）
+  - 分页（每页 20 条）
+- 项目详情页
   - 返回按钮 + 项目基本信息
-  - Tab 切换(活动列表/甘特图/AI风险评估/项目周报)
-  - 活动列表表格
+  - Tab 切换（活动列表 / 甘特图 / AI 风险评估 / 项目周报 / 产品 / 排期工具）
+  - 活动列表：树形结构、内联编辑（10+ 字段）、拖拽排序
   - 活动创建/编辑抽屉
+  - 活动评论面板
+  - 列设置：可拖拽调整列顺序与可见性
 
 **API 接口:**
-- `GET /api/projects` - 获取项目列表(分页、筛选、搜索、统计)
+- `GET /api/projects` - 获取项目列表（分页、筛选、搜索、统计）
 - `GET /api/projects/:id` - 获取单个项目
 - `POST /api/projects` - 创建项目
 - `PUT /api/projects/:id` - 更新项目
 - `DELETE /api/projects/:id` - 删除项目
-- `GET /api/activities/project/:projectId` - 获取活动列表(树形)
+- `GET /api/projects/:id/members` - 获取项目成员
+- `POST /api/projects/:id/members` - 添加项目成员
+- `DELETE /api/projects/:id/members/:userId` - 移除项目成员
+- `GET /api/activities/project/:projectId` - 获取活动列表（树形）
 - `GET /api/activities/project/:projectId/gantt` - 获取甘特图数据
 - `POST /api/activities` - 创建活动
 - `PUT /api/activities/:id` - 更新活动
 - `DELETE /api/activities/:id` - 删除活动
 - `PUT /api/activities/project/:projectId/reorder` - 批量排序
+- `PUT /api/activities/batch-update` - 批量更新
+- `DELETE /api/activities/batch-delete` - 批量删除
+- `GET /api/activities/project/:projectId/critical-path` - 关键路径
 - `POST /api/activities/project/:projectId/archives` - 创建归档快照
 - `GET /api/activities/project/:projectId/archives` - 获取归档列表
 - `GET /api/activities/archives/:id` - 获取归档详情
 - `DELETE /api/activities/archives/:id` - 删除归档
+- `POST /api/activities/archives/compare` - 对比归档
+- `GET /api/activity-comments/activity/:activityId` - 获取活动评论
+- `POST /api/activity-comments` - 创建评论
+- `DELETE /api/activity-comments/:id` - 删除评论
 - `GET /api/risk/project/:projectId` - 获取风险评估历史
 - `POST /api/risk/project/:projectId/assess` - 发起风险评估
-- `GET /api/weekly-reports` - 获取周报列表（默认排除草稿）
-- `GET /api/weekly-reports/drafts` - 获取草稿列表
-- `GET /api/weekly-reports/project/:projectId/previous` - 获取上周参考周报
-- `POST /api/weekly-reports` - 创建周报
-- `POST /api/weekly-reports/project/:projectId/ai-suggestions` - AI 智能建议
-
-**数据模型:**
-- Project(项目): id, name, description, productLine, status, priority, startDate, endDate, progress, managerId
-- Activity(活动): id, projectId, parentId, name, type, phase, assigneeId, status, priority, planStartDate/EndDate, startDate/endDate, duration, dependencies, notes, sortOrder
-- ActivityArchive(活动归档快照): id, projectId, snapshot(JSON), createdAt
-- RiskAssessment(风险评估): id, projectId, riskLevel, riskFactors, suggestions, assessedAt
-- WeeklyReport(周报): id, projectId, weekStart, weekEnd, year, weekNumber, keyProgress, nextWeekPlan, riskWarning, phaseProgress, status, progressStatus
+- `DELETE /api/risk/:id` - 删除评估
+- `GET /api/risk/summary` - 风险汇总
 
 ---
 
-### 3.5 项目模板与排期工具 ✅
+### 4. 项目模板与排期工具
 
 **后端实现:**
-- ✅ 项目模板 CRUD（含活动树整体替换）
-- ✅ 模板实例化：拓扑排序解析依赖链，推算所有活动日期
-- ✅ 资源冲突检测：跨项目检测同一人员的时间重叠
-- ✅ What-If 模拟：BFS 级联计算延期影响，不修改数据
-- ✅ 一键重排：从基准日期重新计算未完成活动时间
-- ✅ AI 排期建议：基于历史数据 + AI 分析推荐工期和风险
+- 项目模板 CRUD（含活动树整体替换）
+- 模板实例化：拓扑排序解析依赖链，推算所有活动日期
+- 资源冲突检测：跨项目检测同一人员的时间重叠
+- What-If 模拟：BFS 级联计算延期影响，不修改数据
+- 一键重排：从基准日期重新计算未完成活动时间
+- AI 排期建议：基于历史数据 + AI 分析推荐工期和风险
 
 **前端实现:**
-- ✅ 模板管理页面（Admin → 项目模板 Tab）
+- 模板管理页面（Admin → 项目模板 Tab）
   - 模板列表表格（名称、产品线、描述、活动数、操作）
   - 模板创建/编辑抽屉（活动内联编辑表格）
   - 模板复制功能（自动映射依赖 ID）
-- ✅ 项目创建时模板选择（自动实例化生成活动）
-- ✅ 排期工具 Tab（项目详情 → 排期工具）
+- 项目创建时模板选择（自动实例化生成活动）
+- 排期工具 Tab（项目详情 → 排期工具）
   - 资源冲突检测面板
   - What-If 模拟面板（选择活动 + 延期天数 → 查看影响）
   - 一键重排面板（选择基准日期 → 确认执行）
@@ -162,45 +172,66 @@
 - `PUT /api/templates/:id` - 更新模板
 - `DELETE /api/templates/:id` - 删除模板
 - `POST /api/templates/:id/instantiate` - 模板实例化到项目
+- `GET /api/activities/workload` - 资源负载数据
 - `GET /api/activities/resource-conflicts` - 资源冲突检测
 - `POST /api/activities/project/:projectId/what-if` - What-If 模拟
 - `POST /api/activities/project/:projectId/reschedule` - 一键重排
 - `POST /api/activities/project/:projectId/ai-schedule` - AI 排期建议
 
-**数据模型:**
-- ProjectTemplate(项目模板): id, name, description, productLine, phases(JSON)
-- TemplateActivity(模板活动): id, templateId, parentId, name, type, phase, priority, planDuration, dependencies(JSON), notes, sortOrder
+---
+
+### 5. 周报管理系统
+
+**后端实现:**
+- 周报 CRUD + 状态流转（草稿 → 已提交 → 已归档）
+- 按周次分组、按年/周查询
+- 分阶段进展记录
+- 附件关联
+- AI 智能建议
+
+**前端实现:**
+- 周报汇总页（已提交周报按周次分组，最新在上方，产品线筛选）
+- 草稿箱 Tab
+- 周报创建/编辑表单（富文本编辑器）
+- 上周参考内容（可折叠灰色区块）
+- AI 建议面板
+
+**API 接口:**
+- `GET /api/weekly-reports` - 获取周报列表（默认排除草稿）
+- `GET /api/weekly-reports/drafts` - 获取草稿列表
+- `GET /api/weekly-reports/project/:projectId` - 获取项目周报
+- `GET /api/weekly-reports/project/:projectId/latest` - 最新周报
+- `GET /api/weekly-reports/project/:projectId/previous` - 上周参考
+- `GET /api/weekly-reports/latest-status` - 所有项目最新周报状态
+- `GET /api/weekly-reports/:id` - 获取周报详情
+- `GET /api/weekly-reports/week/:year/:weekNumber` - 按周查询
+- `POST /api/weekly-reports` - 创建周报
+- `PUT /api/weekly-reports/:id` - 更新周报
+- `POST /api/weekly-reports/:id/submit` - 提交周报
+- `POST /api/weekly-reports/:id/archive` - 归档周报
+- `DELETE /api/weekly-reports/:id` - 删除周报
+- `POST /api/weekly-reports/project/:projectId/ai-suggestions` - AI 建议
 
 ---
 
-### 4. 产品管理系统 ✅
+### 6. 产品管理系统
 
 **后端实现:**
-- ✅ 产品 CRUD
-- ✅ 规格参数(JSON 键值对)
-- ✅ 性能指标(JSON 键值对)
-- ✅ 项目关联
-- ✅ 分页查询
-- ✅ 状态筛选
-- ✅ 类别筛选
-- ✅ 关键词搜索(名称/型号/描述)
+- 产品 CRUD + 复制功能
+- 规格参数与性能指标（JSON 键值对）
+- 项目关联
+- 变更日志追踪
+- CSV 导出
+- 分页查询 + 状态/类别筛选 + 搜索
 
 **前端实现:**
-- ✅ 产品管理页面
-  - 产品列表表格(名称、型号+版本、类别、状态、关联项目、规格数)
-  - 搜索框(300ms 防抖)
-  - 状态筛选下拉框
-  - 类别筛选下拉框
-  - 新建产品按钮
-  - 分页(每页20条)
-- ✅ 产品创建/编辑抽屉
-  - 基本信息表单
-  - 规格参数编辑器(键值对)
-  - 性能指标编辑器(键值对)
-- ✅ 产品详情抽屉
-  - 基本信息卡片
-  - 规格参数卡片
-  - 性能指标卡片
+- 产品管理页面
+  - 产品列表表格（名称、型号+版本、类别、状态、关联项目、规格数）
+  - 搜索框（300ms 防抖）
+  - 状态/类别筛选下拉框
+  - 分页（每页 20 条）
+- 产品创建/编辑抽屉（基本信息 + 规格参数 + 性能指标）
+- 产品详情抽屉
 
 **API 接口:**
 - `GET /api/products` - 获取产品列表
@@ -208,21 +239,82 @@
 - `POST /api/products` - 创建产品
 - `PUT /api/products/:id` - 更新产品
 - `DELETE /api/products/:id` - 删除产品
-
-**数据模型:**
-- Product(产品): id, name, model, revision, category, description, status, specifications(JSON), performance(JSON), projectId
+- `POST /api/products/:id/copy` - 复制产品
+- `GET /api/products/:id/changelog` - 变更日志
+- `GET /api/products/export` - CSV 导出
 
 ---
 
-### 5. 文件上传系统 ✅
+### 7. 通知系统
 
 **后端实现:**
-- ✅ Multer 文件上传中间件
-- ✅ 文件类型验证(图片/PDF/Word/Excel/ZIP/TXT)
-- ✅ 文件大小限制(10MB)
-- ✅ 唯一文件名生成(timestamp + random)
-- ✅ 文件删除接口
-- ✅ 路径遍历防护(`path.basename`)
+- 通知生成（任务到期、里程碑临近、周报提醒）
+- 标记已读/全部已读
+- 分页查询
+
+**前端实现:**
+- 通知铃铛组件（未读数 Badge）
+- 通知面板（Portal 渲染，避免 z-index 遮挡）
+- 标记已读/全部已读/删除
+
+**API 接口:**
+- `GET /api/notifications` - 获取通知列表
+- `PUT /api/notifications/:id/read` - 标记已读
+- `PUT /api/notifications/read-all` - 全部已读
+- `DELETE /api/notifications/:id` - 删除通知
+- `POST /api/notifications/generate` - 生成通知
+
+---
+
+### 8. 审计日志
+
+**后端实现:**
+- 操作记录追踪（LOGIN、CREATE、UPDATE、DELETE）
+- 变更详情记录（before/after）
+- IP 地址记录
+- 按用户/操作类型/资源类型筛选
+
+**API 接口:**
+- `GET /api/audit-logs` - 获取审计日志（分页、筛选）
+- `GET /api/audit-logs/users` - 获取有操作记录的用户列表
+
+---
+
+### 9. AI 配置管理
+
+**后端实现:**
+- 多 AI 提供商配置管理
+- API 连接测试
+- 模型列表获取
+- 用量统计
+
+**API 接口:**
+- `GET /api/ai-config` - 获取 AI 配置列表
+- `POST /api/ai-config` - 创建配置
+- `PUT /api/ai-config/:id` - 更新配置
+- `DELETE /api/ai-config/:id` - 删除配置
+- `POST /api/ai-config/test-connection` - 测试连接
+- `POST /api/ai-config/fetch-models` - 获取可用模型
+- `GET /api/ai-config/usage-stats` - 用量统计
+
+---
+
+### 10. 企微配置
+
+**API 接口:**
+- `GET /api/wecom-config` - 获取企微配置
+- `PUT /api/wecom-config` - 更新企微配置
+
+---
+
+### 11. 文件上传
+
+**后端实现:**
+- Multer 文件上传中间件
+- 文件类型验证（图片/PDF/Word/Excel/ZIP/TXT）
+- 文件大小限制（10MB）
+- 唯一文件名生成（timestamp + random）
+- 路径遍历防护
 
 **API 接口:**
 - `POST /api/uploads` - 上传文件
@@ -230,319 +322,181 @@
 
 ---
 
-## 📁 项目结构
+## 数据库模型（21 个）
 
-```
-Atlas/
-├── client/                    # 前端应用
-│   ├── src/
-│   │   ├── api/               # API 接口封装(8个模块)
-│   │   │   ├── request.ts     # Axios 配置 + 拦截器
-│   │   │   └── index.ts       # API 接口定义
-│   │   ├── components/        # 通用组件
-│   │   ├── layouts/           # 布局组件
-│   │   │   └── MainLayout.tsx # 主布局(导航栏 + 内容区)
-│   │   ├── pages/             # 页面组件
-│   │   │   ├── Login/         # 登录页
-│   │   │   ├── Project/       # 项目管理
-│   │   │   │   ├── List/      # 项目列表（含模板选择）
-│   │   │   │   └── Detail/    # 项目详情（含排期工具 Tab）
-│   │   │   ├── Product/       # 产品管理
-│   │   │   ├── WeeklyReports/ # 周报管理（按周分组、草稿箱、上周参考）
-│   │   │   └── Admin/         # 系统管理（含项目模板管理）
-│   │   ├── store/             # Zustand 状态管理
-│   │   │   └── authStore.ts   # 认证状态
-│   │   ├── styles/            # 全局样式
-│   │   │   └── global.css     # Arco Design 样式覆盖
-│   │   ├── types/             # TypeScript 类型定义
-│   │   │   └── index.ts       # 全局类型(30+ 类型)
-│   │   ├── utils/             # 工具函数
-│   │   │   └── constants.ts   # 状态映射(10+ 枚举)
-│   │   ├── App.tsx            # 路由配置
-│   │   └── main.tsx           # 应用入口
-│   ├── public/
-│   │   └── logo.svg           # LOGO 图片
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-│
-├── server/                    # 后端应用
-│   ├── src/
-│   │   ├── middleware/        # 中间件
-│   │   │   ├── auth.ts        # JWT 认证中间件
-│   │   │   └── permission.ts  # 权限检查中间件
-│   │   ├── routes/            # 路由处理器
-│   │   │   ├── auth.ts        # 认证路由
-│   │   │   ├── users.ts       # 用户管理
-│   │   │   ├── roles.ts       # 角色管理
-│   │   │   ├── projects.ts    # 项目管理
-│   │   │   ├── activities.ts  # 活动管理（含冲突检测、What-If、重排、AI 排期）
-│   │   │   ├── products.ts    # 产品管理
-│   │   │   ├── risk.ts        # 风险评估
-│   │   │   ├── weeklyReports.ts # 周报管理（含草稿、上周参考）
-│   │   │   ├── templates.ts   # 项目模板 CRUD + 实例化
-│   │   │   └── uploads.ts     # 文件上传
-│   │   ├── utils/             # 工具函数
-│   │   │   ├── workday.ts     # 工作日计算
-│   │   │   ├── projectProgress.ts # 项目进度计算
-│   │   │   ├── riskEngine.ts  # 风险评估引擎
-│   │   │   └── weekNumber.ts  # 周数计算
-│   │   ├── prisma/            # Prisma ORM
-│   │   │   ├── schema.prisma  # 数据库模型(13个表)
-│   │   │   └── seed.ts        # 种子数据
-│   │   └── index.ts           # Express 入口
-│   ├── uploads/               # 上传文件存储
-│   ├── .env                   # 环境变量
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── specs/                     # 需求规格文档(已提供)
-│   ├── system-spec.md
-│   ├── auth-spec.md
-│   ├── permission-spec.md
-│   ├── project-spec.md
-│   └── product-spec.md
-│
-├── package.json               # Monorepo 根配置
-├── .gitignore
-├── README.md                  # 项目说明
-├── GETTING_STARTED.md         # 快速启动指南
-├── DEPLOYMENT.md              # 部署指南
-└── PROJECT_SUMMARY.md         # 本文档
-```
+### 认证与授权
+| 模型 | 说明 |
+|------|------|
+| User | 用户 |
+| Role | 角色 |
+| Permission | 权限 |
+| UserRole | 用户-角色关联（多对多） |
+| RolePermission | 角色-权限关联（多对多） |
+
+### 项目管理
+| 模型 | 说明 |
+|------|------|
+| Project | 项目 |
+| ProjectMember | 项目成员（多对多） |
+| Activity | 活动/任务（自引用层级） |
+| ActivityArchive | 活动归档快照 |
+| ActivityComment | 活动评论 |
+
+### 项目模板
+| 模型 | 说明 |
+|------|------|
+| ProjectTemplate | 项目模板 |
+| TemplateActivity | 模板活动（自引用层级） |
+
+### 评估与报告
+| 模型 | 说明 |
+|------|------|
+| RiskAssessment | 风险评估 |
+| WeeklyReport | 项目周报 |
+
+### 产品管理
+| 模型 | 说明 |
+|------|------|
+| Product | 产品 |
+| ProductChangeLog | 产品变更日志 |
+
+### 系统管理
+| 模型 | 说明 |
+|------|------|
+| AiConfig | AI 配置 |
+| AiUsageLog | AI 用量日志 |
+| WecomConfig | 企微配置 |
+| Notification | 通知 |
+| AuditLog | 审计日志 |
 
 ---
 
-## 📊 技术栈详情
+## 前端路由
 
-### 前端技术栈
+| 路径 | 页面 | 权限要求 |
+|------|------|---------|
+| `/login` | 登录页 | 无 |
+| `/` | 重定向到 `/projects` | 需登录 |
+| `/projects` | 项目列表（首页） | 需登录 |
+| `/projects/:id` | 项目详情 | 需登录 |
+| `/products` | 产品管理 | 需登录 |
+| `/admin` | 系统管理 | 需 `user:read` 权限 |
+| `/weekly-reports` | 周报汇总 | 需登录 |
+| `/weekly-reports/new` | 新建周报 | 需登录 |
+| `/weekly-reports/:id/edit` | 编辑周报 | 需登录 |
+| `/workload` | 资源负载 | 需登录 |
+
+---
+
+## 技术栈详情
+
+### 前端
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | React | 18.3 | UI 框架 |
 | TypeScript | 5.7 | 类型系统 |
-| Vite | 7.0 | 构建工具 |
-| **Arco Design** | **2.66** | **UI 组件库(替代 Ant Design)** |
+| Vite | 7.x | 构建工具 |
+| Arco Design | 2.66 | UI 组件库 |
 | Zustand | 5.0 | 状态管理 |
 | React Router | 7.1 | 路由管理 |
 | Axios | 1.7 | HTTP 客户端 |
 | Day.js | 1.11 | 日期处理 |
+| @wangeditor/editor | 5.1 | 富文本编辑器 |
+| Vitest | 4.0 | 单元测试 |
 
-### 后端技术栈
+### 后端
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Express | 4.21 | Web 框架 |
 | TypeScript | 5.7 | 类型系统 |
-| Prisma | 6.1 | ORM |
-| PostgreSQL | 17.0 | 数据库 |
+| Prisma | 6.x | ORM |
+| SQLite / PostgreSQL | - / 17.0 | 数据库 |
 | JWT | 9.0 | 认证 |
 | bcryptjs | 2.4 | 密码加密 |
 | Multer | 1.4 | 文件上传 |
-| Axios | 1.7 | HTTP 客户端(AI API) |
+| Helmet | 8.1 | 安全响应头 |
+| Morgan | 1.10 | 请求日志 |
+| express-rate-limit | - | 登录限流 |
+
+### 测试
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Playwright | 1.58 | E2E 测试（35+ 用例） |
+| Vitest | 4.0 | 前端单元测试 |
 
 ---
 
-## 🎯 核心特性
-
-### 1. 完整的 TypeScript 支持
-- 前后端 100% TypeScript 编写
-- 30+ 类型定义
-- Prisma 自动生成类型
-- API 接口完整类型覆盖
-
-### 2. 企业级认证系统
-- JWT 双令牌机制
-- 自动 token 刷新
-- 请求队列防止重复刷新
-- 密码加密(bcrypt salt rounds: 10)
-
-### 3. 灵活的权限系统
-- RBAC 模型
-- 权限通配符支持
-- 细粒度权限控制
-- 前端权限守卫
-
-### 4. 智能化功能
-- AI 风险评估(支持外部 AI API)
-- AI 周报智能建议
-- AI 排期建议(基于历史数据推荐工期和风险)
-- 规则引擎回退机制
-- 工作日自动计算
-- What-If 模拟(延期影响分析)
-- 资源冲突检测(跨项目人员重叠)
-
-### 5. 现代化 UI/UX
-- Arco Design 组件库
-- 响应式布局
-- 深色渐变主题
-- 毛玻璃效果
-- 流畅动画过渡
-
-### 6. 性能优化
-- 代码分割(React.lazy)
-- API 请求缓存
-- 表格分页加载
-- 图片懒加载预留
-
----
-
-## 📈 数据统计
+## 数据统计
 
 - **总文件数:** 100+
-- **代码行数:** 15000+ (不含注释)
-- **数据表:** 13 个（含 ProjectTemplate、TemplateActivity）
+- **代码行数:** 15000+（不含注释）
+- **数据模型:** 21 个
 - **API 接口:** 60+
-- **前端页面:** 7 个主页面
+- **前端页面:** 8 个主页面
+- **路由模块:** 15 个后端路由
 - **权限数:** 21 个预设权限
 - **角色数:** 4 个预设角色
-- **用户数:** 3 个预设用户
+- **测试账号:** 3 个
+- **E2E 测试:** 35+ 用例（7 个测试文件）
 
 ---
 
-## 🚀 快速启动
+## 核心特性
 
-详细的启动步骤请查看 [GETTING_STARTED.md](./GETTING_STARTED.md)
+### 架构设计
+- Monorepo 架构（npm workspaces）
+- 前后端完全分离
+- RESTful API 设计
+- 模块化组织
 
-简要步骤:
+### 代码质量
+- 100% TypeScript
+- 30+ 类型定义
+- Prisma 自动生成类型
+- 统一的错误处理
 
-```bash
-# 1. 安装依赖
-npm install
+### 安全性
+- JWT 双令牌认证
+- bcrypt 密码加密
+- RBAC 权限控制
+- Helmet 安全响应头
+- 登录接口限流（20 次/15 分钟）
+- SQL 注入防护（Prisma）
+- XSS 防护（React 自动转义）
+- 文件上传验证 + 路径遍历防护
+- 审计日志全操作记录
 
-# 2. 配置数据库(修改 server/.env)
-# DATABASE_URL="postgresql://用户名@localhost:5432/hwsystem"
+### 智能化
+- AI 风险评估 + 规则引擎回退
+- AI 周报智能建议
+- AI 排期建议（基于历史数据）
+- 工作日自动计算（中国法定节假日）
+- What-If 模拟 + 资源冲突检测
+- 依赖调度器（BFS 级联）
 
-# 3. 初始化数据库
-cd server
-npx prisma generate
-npx prisma migrate dev --name init
-npx tsx src/prisma/seed.ts
-cd ..
-
-# 4. 启动开发服务器
-npm run dev
-```
-
-访问 http://localhost:5173 并使用以下账号登录:
-- 用户名: `admin`
-- 密码: `admin123`
-
----
-
-## 🔮 后续扩展建议
-
-### 高优先级
-
-1. ~~**甘特图可视化**~~ ✅ 已实现
-   - 自定义 SVG 甘特图，按阶段分组展示
-   - 依赖关系箭头可视化
-
-2. ~~**活动拖拽排序**~~ ✅ 已实现
-   - 树形结构拖拽排序，自动保存
-
-3. ~~**周报管理前端页面**~~ ✅ 已实现
-   - TipTap 富文本编辑器
-   - AI 智能建议集成
-   - 附件上传功能
-   - 按周次分组展示 + 草稿箱 + 上周参考
-
-4. ~~**双击快速编辑**~~ ✅ 已实现
-   - 活动列表内联编辑（10 个可编辑字段）
-
-### 中优先级
-
-5. **数据可视化**
-   - 项目进度仪表盘
-   - 趋势图表(ECharts/Recharts)
-   - ~~团队工作负载统计~~ → 已有资源冲突检测
-
-6. **导入导出**
-   - Excel 批量导入
-   - PDF 报告导出
-   - ~~数据模板下载~~ → 已有项目模板系统
-
-7. ~~**消息通知**~~ ✅ 已实现
-   - 任务到期提醒、里程碑临近提醒
-   - 周报提交提醒
-   - 通知面板（标记已读/全部已读）
-
-### 低优先级
-
-8. **移动端适配**
-   - 响应式优化
-   - Touch 事件支持
-   - PWA 支持
-
-9. **国际化**
-   - i18n 多语言支持
-   - 时区处理
-   - 货币格式化
+### 性能优化
+- 代码分割（React.lazy）
+- 分页查询
+- 数据库索引
+- 请求队列防重复
 
 ---
 
-## 🏆 项目亮点
+## 文档清单
 
-### 1. 架构设计
-- ✅ Monorepo 架构(npm workspaces)
-- ✅ 前后端完全分离
-- ✅ RESTful API 设计
-- ✅ 模块化组织
-
-### 2. 代码质量
-- ✅ 100% TypeScript
-- ✅ 完整的类型定义
-- ✅ 统一的错误处理
-- ✅ 代码注释完善
-
-### 3. 安全性
-- ✅ JWT 认证
-- ✅ 密码加密
-- ✅ RBAC 权限控制
-- ✅ 文件上传验证
-- ✅ SQL 注入防护(Prisma)
-- ✅ XSS 防护(React 自动转义)
-
-### 4. 性能优化
-- ✅ 代码分割
-- ✅ 懒加载
-- ✅ 分页查询
-- ✅ 数据库索引
-
-### 5. 开发体验
-- ✅ 热重载(HMR)
-- ✅ 类型提示
-- ✅ 错误提示友好
-- ✅ 详细的文档
+- README.md - 项目说明
+- GETTING_STARTED.md - 快速启动指南
+- DEPLOYMENT.md - 部署指南
+- PROJECT_SUMMARY.md - 项目总结（本文档）
+- CLAUDE.md - Claude Code 项目配置
+- specs/ - 需求规格文档（5 个文件）
+- docs/ - 补充文档
 
 ---
 
-## 📚 文档清单
-
-- ✅ README.md - 项目说明
-- ✅ GETTING_STARTED.md - 快速启动指南
-- ✅ DEPLOYMENT.md - 部署指南
-- ✅ PROJECT_SUMMARY.md - 项目总结(本文档)
-- ✅ specs/ - 需求规格文档(5个文件)
-
----
-
-## 🙏 致谢
-
-感谢您选择贝锐硬件管理系统!
-
-本系统严格按照 specs 目录下的规格文档实现,采用现代化的技术栈和最佳实践,为硬件项目管理提供全面的解决方案。
-
-**技术支持:**
-- 查看文档: `GETTING_STARTED.md` 和 `DEPLOYMENT.md`
-- 查阅规格: `specs/` 目录
-- GitHub Issues: (添加您的仓库地址)
-
-祝使用愉快! 🎉
-
----
-
-**最后更新:** 2026年2月26日
-**版本:** 1.1.0
-**状态:** ✅ 生产就绪
+**最后更新:** 2026 年 2 月 26 日
+**版本:** 1.2.0
+**状态:** 生产就绪

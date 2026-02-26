@@ -1,10 +1,22 @@
-# 贝锐硬件管理系统 - 部署指南
+# Atlas 硬件项目管理平台 - 部署指南
 
-## 📦 生产环境部署
+## 生产环境部署
 
-本指南将帮助您将系统部署到生产环境。
+本指南将帮助您将系统从开发环境（SQLite）部署到生产环境（PostgreSQL）。
 
-## 🎯 部署架构
+## 开发 → 生产环境差异
+
+| 项目 | 开发环境 | 生产环境 |
+|------|---------|---------|
+| 数据库 | SQLite（file:./dev.db） | PostgreSQL 17 |
+| Prisma Provider | sqlite | postgresql |
+| 进程管理 | tsx watch | PM2 cluster |
+| 前端 | Vite dev server | Nginx 静态文件 |
+| CORS | localhost:5173 | 生产域名 |
+
+**注意:** 生产部署前需要将 `server/prisma/schema.prisma` 中的 `provider` 从 `"sqlite"` 改为 `"postgresql"`，并更新 `DATABASE_URL`。
+
+## 部署架构
 
 ```
 ┌─────────────────┐
@@ -26,7 +38,7 @@
           └───────────┘
 ```
 
-## 🚀 部署步骤
+## 部署步骤
 
 ### 1. 准备服务器环境
 
@@ -96,7 +108,15 @@ PORT=3000
 NODE_ENV=production
 AI_API_KEY=""
 AI_API_URL=""
+CORS_ORIGINS="https://your-domain.com"
+WECOM_CORP_ID=""
+WECOM_AGENT_ID=""
+WECOM_SECRET=""
+WECOM_REDIRECT_URI="https://your-domain.com/login"
 EOF
+
+# 将 Prisma provider 改为 postgresql
+sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
 
 # 初始化数据库
 npx prisma generate
@@ -263,7 +283,7 @@ sudo ufw enable
 sudo ufw status
 ```
 
-## 🔒 安全加固
+## 安全加固
 
 ### 1. 修改默认账号
 
@@ -342,7 +362,7 @@ sudo tail -f /var/log/nginx/hwsystem-error.log
 pm2 monit
 ```
 
-## 🔄 更新部署
+## 更新部署
 
 更新应用时:
 
@@ -373,7 +393,7 @@ pm2 restart hwsystem-api
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-## 📊 性能优化
+## 性能优化
 
 ### 1. PostgreSQL 优化
 
@@ -417,7 +437,7 @@ env: {
 }
 ```
 
-## 🐳 Docker 部署(可选)
+## Docker 部署（可选）
 
 创建 `docker-compose.yml`:
 
@@ -464,7 +484,7 @@ volumes:
   postgres_data:
 ```
 
-## ❓ 故障排查
+## 故障排查
 
 ### 应用无法启动
 
@@ -492,7 +512,7 @@ sudo -u postgres psql -c "\l"
 sudo tail -f /var/log/postgresql/postgresql-17-main.log
 ```
 
-## 📞 支持
+## 支持
 
 遇到问题?
 - 查看日志文件
@@ -500,4 +520,4 @@ sudo tail -f /var/log/postgresql/postgresql-17-main.log
 - 确认服务运行状态
 - 查阅 GitHub Issues
 
-祝部署顺利! 🎉
+祝部署顺利!

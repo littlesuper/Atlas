@@ -1,14 +1,13 @@
-# 贝锐硬件管理系统 - 快速启动指南
+# Atlas 硬件项目管理平台 - 快速启动指南
 
-## 📋 前置要求
-
-在开始之前,请确保您的系统已安装以下软件:
+## 前置要求
 
 - **Node.js** >= 18.0.0
 - **npm** >= 9.0.0
-- **PostgreSQL** >= 17.0
 
-## 🚀 快速启动
+开发环境使用 SQLite，无需额外安装数据库。生产环境建议使用 PostgreSQL 17+。
+
+## 快速启动
 
 ### 1. 安装依赖
 
@@ -19,36 +18,9 @@ npm install
 
 这将自动安装根目录、client 和 server 的所有依赖。
 
-### 2. 配置数据库
-
-#### 2.1 创建 PostgreSQL 数据库
+### 2. 初始化数据库
 
 ```bash
-# 使用 psql 命令行或图形化工具创建数据库
-createdb hwsystem
-```
-
-#### 2.2 配置环境变量
-
-server 目录下已有 `.env` 文件,根据您的实际情况修改:
-
-```env
-DATABASE_URL="postgresql://用户名@localhost:5432/hwsystem"
-JWT_SECRET="hw-system-jwt-secret"
-JWT_REFRESH_SECRET="hw-system-refresh-secret"
-PORT=3000
-AI_API_KEY=""
-AI_API_URL=""
-```
-
-**重要提示:**
-- 将 `用户名` 替换为您的 PostgreSQL 用户名
-- 生产环境请务必修改 JWT_SECRET 和 JWT_REFRESH_SECRET
-
-### 3. 初始化数据库
-
-```bash
-# 进入 server 目录
 cd server
 
 # 生成 Prisma Client
@@ -57,130 +29,130 @@ npx prisma generate
 # 执行数据库迁移
 npx prisma migrate dev --name init
 
-# 初始化种子数据
+# 初始化种子数据（3 个测试账号 + 预设角色权限）
 npx tsx src/prisma/seed.ts
 
-# 返回根目录
 cd ..
 ```
 
-### 4. 启动开发服务器
+### 3. 启动开发服务器
 
 ```bash
-# 在项目根目录执行
 npm run dev
 ```
 
-这将同时启动前端和后端服务:
+同时启动前端和后端服务：
 - 前端: http://localhost:5173
 - 后端: http://localhost:3000
+- 健康检查: http://localhost:3000/api/health
 
-## 👤 默认账号
+## 默认账号
 
-系统已预置3个测试账号:
+系统已预置 3 个测试账号：
 
 | 用户名 | 密码 | 角色 | 说明 |
 |--------|------|------|------|
 | admin | admin123 | 系统管理员 | 拥有所有权限 |
 | zhangsan | 123456 | 项目经理 | 可管理项目和活动 |
-| lisi | 123456 | 产品经理 | 可管理产品,查看项目 |
+| lisi | 123456 | 产品经理 | 可管理产品，查看项目 |
 
-## 📚 功能模块
+## 功能模块
 
-### ✅ 已实现的核心功能
+### 认证与权限
+- JWT 双令牌认证（Access Token 8h + Refresh Token 7d）
+- 基于角色的访问控制（RBAC），权限通配符支持
+- 自动 token 刷新
+- 用户管理（创建、编辑、删除、禁用）
+- 角色管理（权限配置、用户分配）
+- 企业微信扫码登录（可选）
 
-#### 1. 认证与权限
-- ✅ JWT 双令牌认证(Access Token + Refresh Token)
-- ✅ 基于角色的访问控制(RBAC)
-- ✅ 自动 token 刷新
-- ✅ 用户管理(创建、编辑、删除、禁用)
-- ✅ 角色管理(权限配置、用户分配)
+### 项目管理
+- 项目列表（筛选、搜索、分页、统计卡片）
+- 项目详情（基本信息、成员管理）
+- 活动/任务管理（创建、编辑、删除、内联编辑、拖拽排序）
+- 工作日计算（排除中国法定节假日与周末）
+- 项目进度自动计算
+- 甘特图可视化（SVG，按阶段分组、依赖箭头、今日标线）
+- 活动归档快照与对比
+- AI 风险评估（支持规则引擎和 AI API）
+- 项目周报管理（按周分组、草稿箱、上周参考、AI 建议）
+- 项目模板（预定义活动树，一键生成活动计划）
+- 排期工具（资源冲突检测、What-If 模拟、一键重排、AI 排期建议）
+- 活动评论与讨论
 
-#### 2. 项目管理
-- ✅ 项目列表(筛选、搜索、分页)
-- ✅ 项目详情(基本信息、统计数据)
-- ✅ 活动/任务管理(创建、编辑、删除、内联编辑)
-- ✅ 工作日计算(排除周末)
-- ✅ 项目进度自动计算
-- ✅ 甘特图可视化(按阶段分组、依赖箭头、今日标线)
-- ✅ 活动拖拽排序(树形结构)
-- ✅ AI 风险评估(支持规则引擎和 AI API)
-- ✅ 项目周报管理(按周分组、草稿箱、上周参考)
-- ✅ 项目模板(预定义活动树，一键生成活动计划)
-- ✅ 排期工具(资源冲突检测、What-If 模拟、一键重排、AI 排期建议)
+### 产品管理
+- 产品列表（筛选、搜索、分页）
+- 规格参数与性能指标管理（键值对）
+- 项目关联
+- 变更日志追踪
+- CSV 导出
 
-#### 3. 产品管理
-- ✅ 产品列表(筛选、搜索、分页)
-- ✅ 产品详情
-- ✅ 规格参数管理(键值对)
-- ✅ 性能指标管理(键值对)
-- ✅ 项目关联
+### 资源负载
+- 跨项目人员工作负载可视化
+- 负载冲突预警
 
-#### 4. 文件上传
-- ✅ 文件上传(图片、文档、压缩包)
-- ✅ 文件删除
-- ✅ 大小限制(10MB)
-- ✅ 类型校验
+### 通知系统
+- 任务到期/里程碑临近/周报提交提醒
+- 通知面板（标记已读/全部已读）
 
-## 🔧 开发说明
+### 系统管理
+- 用户与角色管理
+- AI 配置管理（多提供商、连接测试、用量统计）
+- 项目模板管理
+- 审计日志查询
+- 企微配置
 
-### 项目结构
+### 文件上传
+- 文件上传（图片、文档、压缩包）
+- 文件删除
+- 大小限制（10MB）、类型校验
+
+## 项目结构
 
 ```
-HWSystem/
-├── client/          # 前端应用(Vite + React + Arco Design)
+Atlas/
+├── client/          # 前端应用（Vite + React + Arco Design）
 │   ├── src/
 │   │   ├── api/             # API 接口封装
 │   │   ├── components/      # 通用组件
+│   │   ├── hooks/           # 自定义 Hooks
 │   │   ├── layouts/         # 布局组件
 │   │   ├── pages/           # 页面组件
+│   │   │   ├── Login/       # 登录页（含企微扫码）
+│   │   │   ├── Project/     # 项目管理（列表、详情）
+│   │   │   ├── Product/     # 产品管理
+│   │   │   ├── WeeklyReports/ # 周报管理
+│   │   │   ├── Workload/    # 资源负载
+│   │   │   └── Admin/       # 系统管理
 │   │   ├── store/           # Zustand 状态管理
 │   │   ├── styles/          # 全局样式
 │   │   ├── types/           # TypeScript 类型定义
 │   │   └── utils/           # 工具函数
 │   └── vite.config.ts       # Vite 配置
 │
-├── server/          # 后端应用(Express + Prisma)
+├── server/          # 后端应用（Express + Prisma）
 │   ├── src/
-│   │   ├── middleware/      # 中间件(认证、权限)
-│   │   ├── routes/          # 路由处理
+│   │   ├── middleware/      # 中间件（认证、权限）
+│   │   ├── routes/          # 路由处理（15 个模块）
 │   │   ├── utils/           # 工具函数
-│   │   ├── prisma/          # Prisma Schema 和 Seed
+│   │   ├── prisma/          # Prisma Schema（21 个模型）和 Seed
 │   │   └── index.ts         # Express 入口
 │   └── uploads/             # 上传文件存储目录
 │
 ├── e2e/             # Playwright 端到端测试
 │   ├── fixtures/            # 测试 fixture 与数据
 │   ├── helpers/             # UI 交互工具函数
-│   └── specs/               # 测试用例
+│   └── specs/               # 测试用例（7 个文件）
 │
-├── specs/           # 需求规格文档
+├── specs/           # 需求规格文档（5 个文件）
+├── docs/            # 补充文档
 └── playwright.config.ts     # Playwright 配置
 ```
 
-### 技术栈
-
-**前端:**
-- React 18.3 + TypeScript
-- Vite 7 (构建工具)
-- Arco Design (UI 组件库)
-- Zustand (状态管理)
-- React Router 7 (路由)
-- Axios (HTTP 客户端)
-- Day.js (日期处理)
-
-**后端:**
-- Express 4 + TypeScript
-- Prisma 6 (ORM)
-- PostgreSQL 17 (数据库)
-- JWT (认证)
-- bcryptjs (密码加密)
-- Multer (文件上传)
-
-### 常用命令
+## 常用命令
 
 ```bash
-# 根目录(同时启动前后端)
+# 根目录（同时启动前后端）
 npm run dev              # 启动开发服务器
 npm run build            # 构建生产版本
 npm run start            # 启动生产服务器
@@ -196,16 +168,16 @@ cd server
 npm run dev              # 启动后端开发服务器
 npm run build            # 编译 TypeScript
 npm run start            # 启动编译后的服务器
-npx prisma studio        # 打开 Prisma Studio(数据库 GUI)
+npx prisma studio        # 打开 Prisma Studio（数据库 GUI）
 npx prisma migrate dev   # 创建新的数据库迁移
 
-# E2E 测试(根目录)
+# E2E 测试（根目录）
 npx playwright install chromium   # 首次安装浏览器
 npx playwright test               # 运行全部端到端测试
-npx playwright test --headed      # 带浏览器界面运行(调试)
+npx playwright test --headed      # 带浏览器界面运行（调试）
 ```
 
-### 端到端测试 (E2E)
+## 端到端测试 (E2E)
 
 项目使用 Playwright 进行端到端测试，测试文件位于 `e2e/` 目录。
 
@@ -232,58 +204,35 @@ e2e/
 - 测试使用 `storageState` 缓存登录态，避免触发服务端登录限流
 - 测试串行执行（单 worker），兼容 SQLite 并发限制
 
-## 🎯 后续扩展建议
+## 环境变量
 
-### 高级功能实现
+服务端环境变量位于 `server/.env`：
 
-1. **甘特图可视化**
-   - 建议使用 `dhtmlx-gantt` 或 `frappe-gantt` 库
-   - 后端接口已实现(`/api/activities/project/:projectId/gantt`)
+```env
+DATABASE_URL="file:./dev.db"          # SQLite 开发数据库
+JWT_SECRET="hw-system-jwt-secret"     # 生产环境请更换强密码
+JWT_REFRESH_SECRET="hw-system-refresh-secret"
+PORT=3000
+AI_API_KEY=""                          # 可选，外部 AI API
+AI_API_URL=""                          # 可选，外部 AI API
+CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
+NODE_ENV="development"
+WECOM_CORP_ID=""                       # 可选，企微集成
+WECOM_AGENT_ID=""
+WECOM_SECRET=""
+WECOM_REDIRECT_URI="http://localhost:5173/login"
+```
 
-2. **活动拖拽排序**
-   - 建议使用 `@dnd-kit/core` 库
-   - 后端接口已实现(`PUT /api/activities/project/:projectId/reorder`)
+## 常见问题
 
-3. **富文本编辑器**(用于周报)
-   - 建议使用 `@tiptap/react` 或 `react-quill`
-   - 支持图片粘贴上传
+### 1. Prisma Client 未生成
 
-4. **周报管理前端页面**
-   - 创建/编辑周报
-   - AI 智能建议
-   - 附件上传
-
-### 性能优化
-
-- 实现表格虚拟滚动(大数据量时)
-- 添加 React.memo 优化组件渲染
-- 使用 SWR 或 React Query 实现数据缓存
-- 实现图片懒加载
-
-### 安全加固
-
-- 添加 CSRF 保护
-- 实现请求限流
-- 添加 SQL 注入防护(Prisma 已内置)
-- 启用 HTTPS
-- 添加安全响应头
-
-## ❓ 常见问题
-
-### 1. 数据库连接失败
-
-**问题:** `Error: Can't reach database server`
+**问题:** `Cannot find module '@prisma/client'` 或 `@prisma/client did not initialize yet`
 
 **解决:**
 ```bash
-# 检查 PostgreSQL 是否运行
-pg_isready
-
-# 检查 server/.env 中的 DATABASE_URL 是否正确
-cat server/.env
-
-# 测试连接
-cd server && npx prisma db push
+cd server
+npx prisma generate
 ```
 
 ### 2. 前端无法连接后端
@@ -295,22 +244,32 @@ cd server && npx prisma db push
 - 检查 `client/vite.config.ts` 中的 proxy 配置
 - 查看浏览器控制台网络请求
 
-### 3. Prisma Client 未生成
+### 3. native 模块加载失败（rollup/esbuild）
 
-**问题:** `Cannot find module '@prisma/client'`
+**问题:** `Cannot find module @rollup/rollup-darwin-arm64` 或类似错误
+
+**解决:**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### 4. 数据库迁移冲突
+
+**问题:** 迁移文件与当前数据库不一致
 
 **解决:**
 ```bash
 cd server
-npx prisma generate
+# 重置数据库（开发环境）
+npx prisma migrate reset
+npx tsx src/prisma/seed.ts
 ```
 
-## 📞 技术支持
+## 生产部署
 
-- 规格文档: 查看 `specs/` 目录
-- GitHub Issues: (添加您的仓库地址)
-- Email: (添加您的支持邮箱)
+详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-## 📄 许可证
+## 许可证
 
 MIT License
