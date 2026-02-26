@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Badge, Empty, Spin, Button, Message } from '@arco-design/web-react';
 import { IconNotification, IconCheck, IconDelete } from '@arco-design/web-react/icon';
 import { notificationsApi } from '../api';
@@ -34,13 +35,16 @@ const NotificationBell: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const portalRef = useRef<HTMLDivElement>(null);
+
   // Close panel on outside click
   useEffect(() => {
     if (!visible) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setVisible(false);
-      }
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if (portalRef.current?.contains(target)) return;
+      setVisible(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -98,10 +102,20 @@ const NotificationBell: React.FC = () => {
     REPORT_REMINDER: '📝',
   };
 
+  // 计算面板位置（基于铃铛按钮）
+  const bellRef = useRef<HTMLDivElement>(null);
+  const getPanelPos = () => {
+    const el = bellRef.current;
+    if (!el) return { top: 60, right: 24 };
+    const rect = el.getBoundingClientRect();
+    return { top: rect.bottom + 8, right: window.innerWidth - rect.right };
+  };
+
   return (
-    <div ref={panelRef} style={{ position: 'relative', zIndex: 1050 }}>
+    <div ref={panelRef} style={{ position: 'relative' }}>
       <Badge count={unreadCount} dot={unreadCount > 0}>
         <div
+          ref={bellRef}
           style={{
             cursor: 'pointer',
             padding: '4px 8px',
@@ -121,19 +135,18 @@ const NotificationBell: React.FC = () => {
         </div>
       </Badge>
 
-      {visible && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          right: 0,
-          marginTop: 8,
+      {visible && createPortal(
+        <div ref={portalRef} style={{
+          position: 'fixed',
+          top: getPanelPos().top,
+          right: getPanelPos().right,
           width: 360,
           maxHeight: 480,
           background: 'var(--color-bg-2)',
           border: '1px solid var(--color-border-2)',
           borderRadius: 8,
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 1000,
+          zIndex: 9999,
           overflow: 'hidden',
         }}>
           {/* Header */}
@@ -205,7 +218,8 @@ const NotificationBell: React.FC = () => {
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
