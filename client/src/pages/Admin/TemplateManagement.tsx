@@ -24,6 +24,12 @@ import { ProjectTemplate, TemplateActivity, ActivityType, Priority } from '../..
 import { PRODUCT_LINE_MAP, ACTIVITY_TYPE_MAP, PRIORITY_MAP, PHASE_OPTIONS } from '../../utils/constants';
 import dayjs from 'dayjs';
 
+let _idCounter = 0;
+const genId = (): string =>
+  typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `tmp-${Date.now()}-${++_idCounter}`;
+
 const TemplateManagement: React.FC = () => {
   const [form] = Form.useForm();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
@@ -97,7 +103,7 @@ const TemplateManagement: React.FC = () => {
       const full = res.data;
       const acts = (full.activities || []).map((a) => ({
         ...a,
-        id: crypto.randomUUID(),
+        id: genId(),
       }));
       // Remap parentId and dependency ids
       const idMap = new Map<string, string>();
@@ -174,11 +180,16 @@ const TemplateManagement: React.FC = () => {
     setActivities((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: genId(),
         templateId: editing?.id || '',
+        parentId: null,
         name: '',
         type: 'TASK' as ActivityType,
+        phase: null,
         priority: 'MEDIUM' as Priority,
+        planDuration: null,
+        dependencies: null,
+        notes: null,
         sortOrder: prev.length,
       },
     ]);
