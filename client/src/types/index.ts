@@ -158,7 +158,6 @@ export interface TemplateActivity {
   name: string;
   type: ActivityType;
   phase?: string | null;
-  priority: Priority;
   planDuration?: number | null;
   dependencies?: ActivityDependency[] | null;
   notes?: string | null;
@@ -169,8 +168,6 @@ export interface ProjectTemplate {
   id: string;
   name: string;
   description?: string | null;
-  productLine?: string | null;
-  phases?: string[] | null;
   activities?: TemplateActivity[];
   _count?: { activities: number };
   createdAt: string;

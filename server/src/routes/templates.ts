@@ -66,7 +66,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const { name, description, productLine, phases, activities } = req.body;
+    const { name, description, activities } = req.body;
     if (!name) {
       res.status(400).json({ error: '模板名称不能为空' });
       return;
@@ -76,8 +76,6 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       data: {
         name,
         description,
-        productLine,
-        phases,
         activities: activities?.length
           ? {
               create: activities.map((a: any, idx: number) => ({
@@ -85,7 +83,6 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
                 name: a.name,
                 type: a.type || 'TASK',
                 phase: a.phase || null,
-                priority: a.priority || 'MEDIUM',
                 planDuration: a.planDuration || null,
                 dependencies: a.dependencies || null,
                 notes: a.notes || null,
@@ -118,7 +115,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
     }
 
     const { id } = req.params;
-    const { name, description, productLine, phases, activities } = req.body;
+    const { name, description, activities } = req.body;
 
     const existing = await prisma.projectTemplate.findUnique({ where: { id } });
     if (!existing) {
@@ -134,8 +131,6 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
         data: {
           ...(name !== undefined && { name }),
           ...(description !== undefined && { description }),
-          ...(productLine !== undefined && { productLine }),
-          ...(phases !== undefined && { phases }),
         },
       });
 
@@ -150,7 +145,6 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
               name: a.name,
               type: a.type || 'TASK',
               phase: a.phase || null,
-              priority: a.priority || 'MEDIUM',
               planDuration: a.planDuration || null,
               dependencies: a.dependencies || null,
               notes: a.notes || null,
@@ -317,7 +311,6 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
             name: ta.name,
             type: ta.type,
             phase: ta.phase,
-            priority: ta.priority,
             planStartDate: dates?.planStartDate || null,
             planEndDate: dates?.planEndDate || null,
             planDuration: dates?.planDuration || ta.planDuration || null,

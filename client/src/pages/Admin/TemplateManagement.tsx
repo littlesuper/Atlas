@@ -3,7 +3,6 @@ import {
   Table,
   Button,
   Space,
-  Tag,
   Modal,
   Drawer,
   Form,
@@ -20,8 +19,8 @@ import {
   IconCopy,
 } from '@arco-design/web-react/icon';
 import { templatesApi } from '../../api';
-import { ProjectTemplate, TemplateActivity, ActivityType, Priority } from '../../types';
-import { PRODUCT_LINE_MAP, ACTIVITY_TYPE_MAP, PRIORITY_MAP, PHASE_OPTIONS } from '../../utils/constants';
+import { ProjectTemplate, TemplateActivity, ActivityType } from '../../types';
+import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS } from '../../utils/constants';
 import dayjs from 'dayjs';
 
 let _idCounter = 0;
@@ -65,8 +64,6 @@ const TemplateManagement: React.FC = () => {
         form.setFieldsValue({
           name: full.name,
           description: full.description || '',
-          productLine: full.productLine || undefined,
-          phases: full.phases || [],
         });
         setActivities(full.activities || []);
       } catch {
@@ -121,8 +118,6 @@ const TemplateManagement: React.FC = () => {
       await templatesApi.create({
         name: `${full.name} (副本)`,
         description: full.description || undefined,
-        productLine: full.productLine || undefined,
-        phases: full.phases || undefined,
         activities: remapped as any,
       });
       Message.success('模板复制成功');
@@ -140,14 +135,11 @@ const TemplateManagement: React.FC = () => {
       const data = {
         name: values.name,
         description: values.description || undefined,
-        productLine: values.productLine || undefined,
-        phases: values.phases?.length ? values.phases : undefined,
         activities: activities.map((a, idx) => ({
           id: a.id,
           name: a.name,
           type: a.type || 'TASK',
           phase: a.phase || null,
-          priority: a.priority || 'MEDIUM',
           planDuration: a.planDuration || null,
           dependencies: a.dependencies || null,
           notes: a.notes || null,
@@ -183,7 +175,6 @@ const TemplateManagement: React.FC = () => {
         name: '',
         type: 'TASK' as ActivityType,
         phase: null,
-        priority: 'MEDIUM' as Priority,
         planDuration: null,
         dependencies: null,
         notes: null,
@@ -228,16 +219,6 @@ const TemplateManagement: React.FC = () => {
       dataIndex: 'name',
       width: 200,
       render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span>,
-    },
-    {
-      title: '产品线',
-      dataIndex: 'productLine',
-      width: 120,
-      render: (pl?: string) => {
-        if (!pl) return '-';
-        const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP];
-        return cfg ? <Tag color={cfg.color}>{cfg.label}</Tag> : pl;
-      },
     },
     {
       title: '描述',
@@ -344,22 +325,6 @@ const TemplateManagement: React.FC = () => {
         >
           {PHASE_OPTIONS.map((p) => (
             <Select.Option key={p} value={p}>{p}</Select.Option>
-          ))}
-        </Select>
-      ),
-    },
-    {
-      title: '优先级',
-      dataIndex: 'priority',
-      width: 100,
-      render: (priority: string, record: TemplateActivity) => (
-        <Select
-          size="small"
-          value={priority}
-          onChange={(v) => updateActivity(record.id, 'priority', v)}
-        >
-          {Object.entries(PRIORITY_MAP).map(([k, v]) => (
-            <Select.Option key={k} value={k}>{v.label}</Select.Option>
           ))}
         </Select>
       ),
@@ -494,24 +459,6 @@ const TemplateManagement: React.FC = () => {
           <Form.Item label="描述" field="description">
             <Input.TextArea placeholder="模板描述（选填）" rows={2} />
           </Form.Item>
-
-          <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item label="产品线" field="productLine" style={{ flex: 1 }}>
-              <Select placeholder="选择产品线（选填）" allowClear>
-                {Object.entries(PRODUCT_LINE_MAP).map(([k, v]) => (
-                  <Select.Option key={k} value={k}>{v.label}</Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item label="阶段" field="phases" style={{ flex: 1 }}>
-              <Select mode="multiple" placeholder="选择阶段（选填）" allowClear>
-                {PHASE_OPTIONS.map((p) => (
-                  <Select.Option key={p} value={p}>{p}</Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </div>
         </Form>
 
         <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
