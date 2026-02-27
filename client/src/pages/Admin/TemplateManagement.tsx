@@ -481,7 +481,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '阶段',
       dataIndex: 'phase',
-      width: 90,
+      width: 110,
       render: (_: string | null, record: TemplateActivity) => (
         <Select
           size="small"
