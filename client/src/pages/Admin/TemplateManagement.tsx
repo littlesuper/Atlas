@@ -23,7 +23,7 @@ import {
 import MainLayout from '../../layouts/MainLayout';
 import { templatesApi } from '../../api';
 import { ProjectTemplate, TemplateActivity, ActivityType } from '../../types';
-import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS } from '../../utils/constants';
+import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS, DEPENDENCY_TYPE_MAP } from '../../utils/constants';
 import dayjs from 'dayjs';
 
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
@@ -229,6 +229,55 @@ const TemplateManagement: React.FC = () => {
     });
   };
 
+  // ---- 前置依赖：MS Project 格式 ----
+
+  // id → 1-based seq
+  const activitySeqMap = new Map<string, number>();
+  activities.forEach((a, i) => activitySeqMap.set(a.id, i + 1));
+
+  const LABEL_TO_TYPE = Object.fromEntries(
+    Object.entries(DEPENDENCY_TYPE_MAP).map(([k, v]) => [v.label, k])
+  );
+
+  const getSeq = (record: TemplateActivity): string => {
+    const idx = activitySeqMap.get(record.id);
+    return idx != null ? String(idx) : '?';
+  };
+
+  const getPredecessorSeq = (activity: TemplateActivity): string => {
+    if (!activity.dependencies || activity.dependencies.length === 0) return '';
+    return activity.dependencies.map((dep) => {
+      const seq = activitySeqMap.get(dep.id);
+      const seqStr = seq != null ? String(seq) : '?';
+      const typeLabel = DEPENDENCY_TYPE_MAP[dep.type as keyof typeof DEPENDENCY_TYPE_MAP]?.label || 'FS';
+      const lag = dep.lag ?? 0;
+      const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
+      return `${seqStr}${typeLabel}${lagStr}`;
+    }).join(', ');
+  };
+
+  // seq → id
+  const seqToIdMap = new Map<number, string>();
+  activities.forEach((a, i) => seqToIdMap.set(i + 1, a.id));
+
+  const parsePredecessorText = (text: string, selfId: string): TemplateActivity['dependencies'] => {
+    if (!text.trim()) return null;
+    const parts = text.split(/[,，]\s*/);
+    const deps: { id: string; type: string; lag?: number }[] = [];
+    for (const part of parts) {
+      const m = part.trim().match(/^(\d+)\s*(FS|SS|FF|SF)?\s*([+-]\d+)?$/i);
+      if (!m) continue;
+      const seq = parseInt(m[1], 10);
+      const id = seqToIdMap.get(seq);
+      if (!id || id === selfId) continue;
+      const typeLabel = (m[2] || 'FS').toUpperCase();
+      const type = LABEL_TO_TYPE[typeLabel] || '0';
+      const lag = m[3] ? parseInt(m[3], 10) : 0;
+      deps.push({ id, type, ...(lag !== 0 ? { lag } : {}) });
+    }
+    return deps.length > 0 ? deps : null;
+  };
+
   // ---- 拖拽排序 ----
 
   const handleMouseDown = (e: React.MouseEvent, index: number) => {
@@ -379,6 +428,13 @@ const TemplateManagement: React.FC = () => {
       ),
     },
     {
+      title: 'ID',
+      width: 50,
+      render: (_: unknown, record: TemplateActivity) => (
+        <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
+      ),
+    },
+    {
       title: '活动名称',
       dataIndex: 'name',
       render: (_: string, record: TemplateActivity) => (
@@ -441,32 +497,17 @@ const TemplateManagement: React.FC = () => {
       ),
     },
     {
-      title: '前置依赖',
+      title: '前置',
       dataIndex: 'dependencies',
-      width: 180,
-      render: (deps: TemplateActivity['dependencies'], record: TemplateActivity) => (
-        <Select
+      width: 120,
+      render: (_: TemplateActivity['dependencies'], record: TemplateActivity) => (
+        <Input
           size="small"
-          mode="multiple"
-          value={(deps || []).map((d) => d.id)}
-          allowClear
-          placeholder="选择依赖"
-          onChange={(ids: string[]) => {
-            const newDeps = ids.map((depId) => {
-              const existing = (deps || []).find((d) => d.id === depId);
-              return existing || { id: depId, type: '0' };
-            });
-            updateActivity(record.id, 'dependencies', newDeps.length > 0 ? newDeps : null);
-          }}
-        >
-          {activities
-            .filter((a) => a.id !== record.id)
-            .map((a) => (
-              <Select.Option key={a.id} value={a.id}>
-                {a.name || '(未命名)'}
-              </Select.Option>
-            ))}
-        </Select>
+          value={getPredecessorSeq(record)}
+          placeholder="如: 3FS+2, 5"
+          style={{ fontFamily: 'monospace', fontSize: 12 }}
+          onChange={(v) => updateActivity(record.id, 'dependencies', parsePredecessorText(v, record.id))}
+        />
       ),
     },
     {
