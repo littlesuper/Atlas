@@ -1,5 +1,9 @@
 // ============ 项目状态映射 ============
 export const STATUS_MAP = {
+  PLANNING: {
+    label: '规划中',
+    color: 'blue',
+  },
   IN_PROGRESS: {
     label: '进行中',
     color: 'green',
@@ -86,27 +90,23 @@ export const PRODUCT_LINE_MAP = {
 export const PRODUCT_CATEGORY_MAP = {
   ROUTER: {
     label: '路由器',
-    color: 'arcoblue',
+    color: 'blue',
   },
   GATEWAY: {
     label: '网关',
-    color: 'green',
+    color: 'cyan',
   },
   REMOTE_CONTROL: {
     label: '远控设备',
     color: 'purple',
   },
-  HARDWARE: {
-    label: '硬件',
-    color: 'cyan',
-  },
   ACCESSORY: {
     label: '配件',
-    color: 'orangered',
+    color: 'default',
   },
   OTHER: {
     label: '其他',
-    color: 'gold',
+    color: 'default',
   },
 } as const;
 
@@ -225,6 +225,9 @@ export const USER_STATUS_MAP = {
     color: 'red',
   },
 } as const;
+
+// ============ 阶段选项 ============
+export const PHASE_OPTIONS = ['EVT', 'DVT', 'PVT', 'MP'] as const;
 
 // ============ 依赖类型映射 ============
 export const DEPENDENCY_TYPE_MAP = {

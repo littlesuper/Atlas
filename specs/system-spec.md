@@ -46,13 +46,13 @@ HWSystem/
 │   │   │   └── Admin/         # 用户管理 + 角色管理
 │   │   ├── store/             # authStore.ts (Zustand)
 │   │   ├── types/             # TypeScript 类型定义
-│   │   └── utils/             # constants.ts (状态/优先级/产品线映射), chineseWorkday.ts (中国工作日计算)
+│   │   └── utils/             # constants.ts (状态/优先级/产品线/阶段选项映射), chineseWorkday.ts (中国工作日计算)
 │   └── vite.config.ts         # Vite 配置 (含 /api 代理)
 ├── server/
 │   ├── src/
 │   │   ├── index.ts           # Express 入口
 │   │   ├── middleware/        # auth.ts, permission.ts
-│   │   ├── routes/            # auth, users, projects, activities, products, roles, risk, weeklyReports, uploads, aiConfig
+│   │   ├── routes/            # auth, users, projects, activities, products, roles, risk, weeklyReports, uploads, aiConfig, notifications, activityComments, templates, auditLogs, wecomConfig
 │   │   └── prisma/            # schema.prisma, seed.ts
 │   └── .env                   # 环境变量
 └── .gitignore
@@ -182,7 +182,7 @@ users ──┬── user_roles ──── roles ──── role_permission
         │              ├── risk_assessments
         │              └── weekly_reports
         │
-        └── activities (assignee)
+        └── activities (assignees, 多对多)
 ```
 
 ### 表清单
@@ -196,14 +196,45 @@ users ──┬── user_roles ──── roles ──── role_permission
 | role_permissions | 角色-权限 | N:N 关联表 |
 | projects | 项目（含 product_line 字段） | 1:N → activities, products, risk_assessments, weekly_reports, project_members |
 | project_members | 项目协作者 | N:N 关联表（users ↔ projects），复合主键 [projectId, userId] |
-| activities | 活动/任务 | 自引用（parentId）, N:1 → projects, users |
+| activities | 活动/任务 | 自引用（parentId）, N:1 → projects, N:N → users（assignees） |
+| _ActivityAssignees | 活动-负责人 | N:N 隐式关联表（activities ↔ users） |
+| activity_archives | 活动归档快照 | N:1 → projects |
+| activity_comments | 活动评论 | N:1 → activities, users |
 | products | 产品 | N:1 → projects |
+| product_change_logs | 产品变更日志 | N:1 → products |
 | risk_assessments | 风险评估 | N:1 → projects |
 | weekly_reports | 项目周报 | N:1 → projects, users |
+| notifications | 用户通知 | N:1 → users |
+| project_templates | 项目模板 | 独立表 |
+| template_activities | 模板活动 | N:1 → project_templates |
 | ai_configs | AI 配置（多配置，按功能绑定） | 独立表 |
 | ai_usage_logs | AI 调用日志（token 用量） | N:1 → projects |
+| audit_logs | 审计日志 | N:1 → users |
+| wecom_configs | 企微配置 | 独立表 |
 
-## 10. 环境变量
+## 10. 扩展功能（已实现）
+
+以下功能已实现但不在原始规格文档中，此处补充记录：
+
+| 功能 | 说明 | 关键文件 |
+|------|------|----------|
+| 排程工具 | 资源冲突检测、What-If 延期模拟、一键重排、AI 工期建议 | `activities.ts`, `SchedulingTools.tsx` |
+| 关键路径计算 (CPM) | 前向/后向遍历算法，甘特图标记关键路径 | `activities.ts` |
+| 批量操作 | 批量更新活动状态/阶段/负责人，批量删除 | `activities.ts` |
+| 基线对比 | 对比两个存档快照或存档 vs 当前状态的差异 | `activities.ts` |
+| 活动评论 | 活动级别的评论 CRUD | `activityComments.ts`, `ActivityComments.tsx` |
+| 通知系统 | 活动到期、周报提醒、里程碑临近通知 | `notifications.ts`, `Notification` model |
+| 审计日志 | 活动 CRUD 操作全链路日志记录 | `auditLogs.ts`, `AuditLog` model |
+| 项目模板 | 模板管理 + 基于模板创建项目自动生成活动 | `templates.ts`, `TemplateManagement.tsx` |
+| 里程碑时间线 | 独立 Tab 页，菱形标记可视化展示 | `Detail/index.tsx` |
+| 依赖级联更新 | 修改计划日期自动 BFS 更新下游依赖活动 | `activities.ts` |
+| 列设置偏好 | 用户可自定义活动表列可见性和排序，持久化到 `User.preferences` | `ColumnSettings.tsx` |
+| 企微集成 | 企业微信配置管理 | `wecomConfig.ts` |
+| 工作量统计 | 按人员聚合活动数/进行中/逾期/总工期 | `activities.ts` |
+| 存档标签 | 存档快照可命名 | `ActivityArchive.label` |
+| 暗色主题 | 支持 light/dark 主题切换，持久化偏好 | `themeStore.ts`, `global.css` |
+
+## 11. 环境变量
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
@@ -214,7 +245,7 @@ users ──┬── user_roles ──── roles ──── role_permission
 | AI_API_KEY | 外部 AI API 密钥 | （空） |
 | AI_API_URL | 外部 AI API 地址 | （空） |
 
-## 11. 启动流程
+## 12. 启动流程
 
 ```bash
 # 1. 安装依赖

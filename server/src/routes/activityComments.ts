@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
-import { sanitizePagination } from '../middleware/permission';
+import { sanitizePagination, isAdmin } from '../middleware/permission';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -87,8 +87,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
     }
 
     // 只有本人或管理员可以删除
-    const isAdmin = (req.user as any)?.permissions?.includes('user:delete');
-    if (comment.userId !== req.user!.id && !isAdmin) {
+    if (comment.userId !== req.user!.id && !isAdmin(req)) {
       res.status(403).json({ error: '只能删除自己的评论' });
       return;
     }

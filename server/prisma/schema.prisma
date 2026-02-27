@@ -96,6 +96,7 @@ model RolePermission {
 // ==================== 项目管理 ====================
 
 enum ProjectStatus {
+  PLANNING
   IN_PROGRESS
   COMPLETED
   ON_HOLD
@@ -113,7 +114,7 @@ model Project {
   name        String
   description String?
   productLine String?
-  status      ProjectStatus @default(IN_PROGRESS)
+  status      ProjectStatus @default(PLANNING)
   priority    Priority      @default(MEDIUM)
   startDate   DateTime?
   endDate     DateTime?
@@ -282,9 +283,12 @@ model WeeklyReport {
   weekEnd         DateTime
   year            Int
   weekNumber      Int
+  changeOverview  String?
+  demandAnalysis  String?
   keyProgress     String?
   nextWeekPlan    String?
   riskWarning     String?
+  risks           Json?
   phaseProgress   Json?
   attachments     Json?
   status          ReportStatus   @default(DRAFT)
@@ -298,7 +302,7 @@ model WeeklyReport {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   creator User    @relation("ReportCreator", fields: [createdBy], references: [id])
 
-  @@index([projectId, year, weekNumber])
+  @@unique([projectId, year, weekNumber])
   @@index([weekStart, weekEnd])
   @@index([createdBy])
   @@map("weekly_reports")

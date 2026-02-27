@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
-import { sanitizePagination } from '../middleware/permission';
+import { sanitizePagination, isAdmin } from '../middleware/permission';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -99,6 +99,10 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
  */
 router.post('/generate', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
+    if (!isAdmin(req)) {
+      res.status(403).json({ error: '只有管理员可以触发通知生成' });
+      return;
+    }
     const now = new Date();
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

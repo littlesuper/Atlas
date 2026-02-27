@@ -126,6 +126,7 @@ router.get('/drafts', authenticate, async (req: Request, res: Response): Promise
     const reports = await prisma.weeklyReport.findMany({
       where: {
         status: 'DRAFT',
+        createdBy: req.user!.id,
       },
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -406,9 +407,12 @@ router.post(
         projectId,
         weekStart,
         weekEnd,
+        changeOverview,
+        demandAnalysis,
         keyProgress,
         nextWeekPlan,
         riskWarning,
+        risks,
         phaseProgress,
         attachments,
         progressStatus,
@@ -448,9 +452,12 @@ router.post(
           weekEnd: new Date(weekEnd),
           year,
           weekNumber,
+          changeOverview: sanitizeRichText(changeOverview),
+          demandAnalysis: sanitizeRichText(demandAnalysis),
           keyProgress: sanitizeRichText(keyProgress),
           nextWeekPlan: sanitizeRichText(nextWeekPlan),
           riskWarning: sanitizeRichText(riskWarning),
+          risks: risks || null,
           phaseProgress: phaseProgress || null,
           attachments: attachments || null,
           progressStatus: progressStatus || 'ON_TRACK',
@@ -497,9 +504,12 @@ router.put(
       const {
         weekStart,
         weekEnd,
+        changeOverview,
+        demandAnalysis,
         keyProgress,
         nextWeekPlan,
         riskWarning,
+        risks,
         phaseProgress,
         attachments,
         status,
@@ -550,9 +560,12 @@ router.put(
         if (weekEnd !== undefined) updateData.weekEnd = newWeekEnd;
       }
 
+      if (changeOverview !== undefined) updateData.changeOverview = sanitizeRichText(changeOverview);
+      if (demandAnalysis !== undefined) updateData.demandAnalysis = sanitizeRichText(demandAnalysis);
       if (keyProgress !== undefined) updateData.keyProgress = sanitizeRichText(keyProgress);
       if (nextWeekPlan !== undefined) updateData.nextWeekPlan = sanitizeRichText(nextWeekPlan);
       if (riskWarning !== undefined) updateData.riskWarning = sanitizeRichText(riskWarning);
+      if (risks !== undefined) updateData.risks = risks;
       if (phaseProgress !== undefined) updateData.phaseProgress = phaseProgress;
       if (attachments !== undefined) updateData.attachments = attachments;
       if (status !== undefined) updateData.status = status;

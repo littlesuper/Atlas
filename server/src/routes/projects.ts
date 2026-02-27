@@ -43,10 +43,9 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     // 产品线筛选（支持逗号分隔多值，同时包含productLine为null的项目）
     if (productLine) {
       const lines = (productLine as string).split(',').map(l => l.trim());
-      where.OR = [
-        ...(where.OR || []),
-        { productLine: { in: lines } },
-        { productLine: null },
+      where.AND = [
+        ...(where.AND || []),
+        { OR: [{ productLine: { in: lines } }, { productLine: null }] },
       ];
     }
 
@@ -60,16 +59,16 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     }
     if (productLine) {
       const lines = (productLine as string).split(',').map(l => l.trim());
-      statsWhere.OR = [
-        ...(statsWhere.OR || []),
-        { productLine: { in: lines } },
-        { productLine: null },
+      statsWhere.AND = [
+        ...(statsWhere.AND || []),
+        { OR: [{ productLine: { in: lines } }, { productLine: null }] },
       ];
     }
 
     // 获取统计数据
-    const [all, inProgress, completed, onHold] = await Promise.all([
+    const [all, planning, inProgress, completed, onHold] = await Promise.all([
       prisma.project.count({ where: statsWhere }),
+      prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.PLANNING } }),
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.IN_PROGRESS } }),
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.COMPLETED } }),
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.ON_HOLD } }),
@@ -121,6 +120,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       pageSize: pageSizeNum,
       stats: {
         all,
+        planning,
         inProgress,
         completed,
         onHold,

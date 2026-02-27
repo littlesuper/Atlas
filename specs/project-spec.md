@@ -46,7 +46,7 @@
 | description | String | NULLABLE | 描述 |
 | type | ActivityType | NOT NULL, DEFAULT: TASK | 活动类型 |
 | phase | String | NULLABLE | 阶段标识：EVT/DVT/PVT/MP |
-| assigneeId | UUID | FK → users.id, NULLABLE | 负责人 |
+| assignees | User[] | N:N 关联（通过 `_ActivityAssignees` 中间表） | 负责人（多对多） |
 | status | ActivityStatus | NOT NULL, DEFAULT: NOT_STARTED | 状态 |
 | priority | Priority | NOT NULL, DEFAULT: MEDIUM | 优先级 |
 | planStartDate | DateTime | NULLABLE | 计划开始日期 |
@@ -137,6 +137,7 @@
 **ProjectStatus：**
 | 值 | 说明 |
 |----|------|
+| PLANNING | 规划中 |
 | IN_PROGRESS | 进行中 |
 | COMPLETED | 已完成 |
 | ON_HOLD | 已搁置 |
@@ -491,7 +492,7 @@ POST /api/activities
   "description": "完成整体原理图",
   "type": "TASK",
   "phase": "EVT",
-  "assigneeId": "uuid",
+  "assigneeIds": ["uuid1", "uuid2"],
   "status": "NOT_STARTED",
   "priority": "HIGH",
   "planStartDate": "2026-02-10",
@@ -640,7 +641,7 @@ POST /api/risk/project/:projectId/assess
 | 部分任务延期 | 延期率 > 10% | +1 |
 | 存在逾期任务 | 逾期数 > 3 | +3 |
 | 存在逾期任务 | 逾期数 > 0 | +1 |
-| 资源分配不足 | 未分配率 > 30% | +2 |
+| 资源分配不足 | 未分配负责人率 > 30%（基于 assignees 多对多关系） | +2 |
 
 **风险等级判定：**
 | 分值 | 等级（枚举值） | 中文显示 |
@@ -686,6 +687,15 @@ GET /api/weekly-reports?page=1&pageSize=20&projectId=uuid&year=2026&weekNumber=7
 | status | String | 按状态筛选 |
 
 **排序规则：** 按年份、周数倒序（最新周报在前）
+
+#### 获取当前用户草稿列表
+```
+GET /api/weekly-reports/drafts
+```
+**认证：** Bearer Token
+**权限：** 无（已认证即可）
+
+**说明：** 仅返回当前登录用户创建的草稿（`createdBy = 当前用户ID`，`status = DRAFT`），按更新时间倒序
 
 #### 获取项目的所有周报
 ```

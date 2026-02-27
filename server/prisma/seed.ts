@@ -311,7 +311,7 @@ async function main() {
       startDate: new Date('2026-01-15'),
       endDate: new Date('2026-02-15'),
       duration: 23,
-      assigneeId: zhangsanUser.id,
+      assignees: { connect: [{ id: zhangsanUser.id }] },
       sortOrder: 1,
     },
   });
@@ -329,7 +329,7 @@ async function main() {
       planEndDate: new Date('2026-03-15'),
       planDuration: 20,
       startDate: new Date('2026-02-16'),
-      assigneeId: zhangsanUser.id,
+      assignees: { connect: [{ id: zhangsanUser.id }] },
       sortOrder: 2,
       dependencies: [{ id: activity1.id, type: '0' }],
     },
@@ -340,6 +340,7 @@ async function main() {
   // 6. 创建示例产品
   console.log('创建示例产品...');
 
+  await prisma.product.deleteMany({});
   await prisma.product.create({
     data: {
       name: '智能传感器模组',
@@ -534,7 +535,7 @@ async function main() {
         startDate: a.start ? new Date(a.start) : undefined,
         endDate: a.end ? new Date(a.end) : undefined,
         duration: a.dur,
-        assigneeId: a.assignee === 'z' ? z : l,
+        assignees: { connect: [{ id: a.assignee === 'z' ? z : l }] },
         sortOrder: (i + 1) * 10,
         notes: a.notes,
       },
@@ -613,7 +614,7 @@ async function main() {
       planEndDate: new Date('2026-04-15'),
       planDuration: 33,
       startDate: new Date('2026-03-01'),
-      assigneeId: lisiUser.id,
+      assignees: { connect: [{ id: lisiUser.id }] },
       sortOrder: 10,
     },
   });
@@ -632,7 +633,7 @@ async function main() {
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-03-12'),
       duration: 9,
-      assigneeId: lisiUser.id,
+      assignees: { connect: [{ id: lisiUser.id }] },
       sortOrder: 20,
       notes: '对比 Logitech、Razer、自研方案三个方向',
       dependencies: [{ id: p3a1.id, type: '0' }],
@@ -651,7 +652,7 @@ async function main() {
       planEndDate: new Date('2026-04-10'),
       planDuration: 20,
       startDate: new Date('2026-03-13'),
-      assigneeId: lisiUser.id,
+      assignees: { connect: [{ id: lisiUser.id }] },
       sortOrder: 30,
       dependencies: [{ id: p3a2.id, type: '0' }],
     },
@@ -668,7 +669,7 @@ async function main() {
       planStartDate: new Date('2026-04-01'),
       planEndDate: new Date('2026-04-15'),
       planDuration: 11,
-      assigneeId: zhangsanUser.id,
+      assignees: { connect: [{ id: zhangsanUser.id }] },
       sortOrder: 40,
       notes: '向日葵远控 SDK v3.x 接口评估与 PoC',
     },
@@ -685,7 +686,7 @@ async function main() {
       planStartDate: new Date('2026-04-16'),
       planEndDate: new Date('2026-07-15'),
       planDuration: 65,
-      assigneeId: zhangsanUser.id,
+      assignees: { connect: [{ id: zhangsanUser.id }] },
       sortOrder: 50,
     },
   });
@@ -701,7 +702,7 @@ async function main() {
       planStartDate: new Date('2026-04-16'),
       planEndDate: new Date('2026-05-20'),
       planDuration: 25,
-      assigneeId: zhangsanUser.id,
+      assignees: { connect: [{ id: zhangsanUser.id }] },
       sortOrder: 60,
       notes: '候选: RK3566 / MT8183 / 高通 QCM2290',
     },
@@ -718,7 +719,7 @@ async function main() {
       planStartDate: new Date('2026-05-01'),
       planEndDate: new Date('2026-05-30'),
       planDuration: 22,
-      assigneeId: lisiUser.id,
+      assignees: { connect: [{ id: lisiUser.id }] },
       sortOrder: 70,
     },
   });
@@ -734,7 +735,7 @@ async function main() {
       planStartDate: new Date('2026-07-16'),
       planEndDate: new Date('2026-10-31'),
       planDuration: 77,
-      assigneeId: zhangsanUser.id,
+      assignees: { connect: [{ id: zhangsanUser.id }] },
       sortOrder: 80,
     },
   });
@@ -750,7 +751,7 @@ async function main() {
       planStartDate: new Date('2026-11-01'),
       planEndDate: new Date('2026-12-31'),
       planDuration: 43,
-      assigneeId: lisiUser.id,
+      assignees: { connect: [{ id: lisiUser.id }] },
       sortOrder: 90,
     },
   });

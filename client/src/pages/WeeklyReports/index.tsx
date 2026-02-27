@@ -27,7 +27,7 @@ import { WeeklyReport, ReportAttachment } from '../../types';
 import { useReportPermission } from '../../hooks/useReportPermission';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
-import { PRODUCT_LINE_MAP, REPORT_STATUS_MAP } from '../../utils/constants';
+import { PRODUCT_LINE_MAP } from '../../utils/constants';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 
@@ -90,7 +90,7 @@ const WeeklyReportsSummary: React.FC = () => {
         const data = (res.data || []) as WeeklyReport[];
         setReports(data.filter((r) => r.status !== 'DRAFT'));
       } else {
-        const params: Record<string, unknown> = { pageSize: 999 };
+        const params: Record<string, unknown> = { pageSize: 100 };
         if (productLine) params.productLine = productLine;
         const res = await weeklyReportsApi.list(params as Parameters<typeof weeklyReportsApi.list>[0]);
         setReports(res.data?.data || []);
@@ -225,6 +225,28 @@ const WeeklyReportsSummary: React.FC = () => {
           </Tooltip>
         );
       },
+    },
+    {
+      title: '变更概述',
+      width: 180,
+      render: (_: unknown, record: WeeklyReport) => (
+        <SafeHtml
+          className="html-content"
+          style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
+          html={record.changeOverview || '<span style="color:var(--color-text-4)">-</span>'}
+        />
+      ),
+    },
+    {
+      title: '需求研判',
+      width: 180,
+      render: (_: unknown, record: WeeklyReport) => (
+        <SafeHtml
+          className="html-content"
+          style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
+          html={record.demandAnalysis || '<span style="color:var(--color-text-4)">-</span>'}
+        />
+      ),
     },
     {
       title: '本周重要进展',

@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, invalidateAllUserCache } from '../middleware/auth';
-import { requirePermission } from '../middleware/permission';
+import { requirePermission, isAdmin } from '../middleware/permission';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -14,6 +14,7 @@ const prisma = new PrismaClient();
 router.get(
   '/',
   authenticate,
+  requirePermission('role', 'read'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const roles = await prisma.role.findMany({
@@ -61,6 +62,7 @@ router.get(
 router.get(
   '/permissions',
   authenticate,
+  requirePermission('role', 'read'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const permissions = await prisma.permission.findMany({

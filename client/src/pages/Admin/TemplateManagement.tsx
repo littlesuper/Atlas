@@ -21,10 +21,8 @@ import {
 } from '@arco-design/web-react/icon';
 import { templatesApi } from '../../api';
 import { ProjectTemplate, TemplateActivity, ActivityType, Priority } from '../../types';
-import { PRODUCT_LINE_MAP, ACTIVITY_TYPE_MAP, PRIORITY_MAP } from '../../utils/constants';
+import { PRODUCT_LINE_MAP, ACTIVITY_TYPE_MAP, PRIORITY_MAP, PHASE_OPTIONS } from '../../utils/constants';
 import dayjs from 'dayjs';
-
-const PHASE_OPTIONS = ['EVT', 'DVT', 'PVT', 'MP'];
 
 const TemplateManagement: React.FC = () => {
   const [form] = Form.useForm();

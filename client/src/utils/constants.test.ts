@@ -24,10 +24,10 @@ function assertMapEntry(map: Record<string, { label: string; color: string }>, k
 // ============ STATUS_MAP（项目状态）============
 
 describe('STATUS_MAP', () => {
-  const keys = ['IN_PROGRESS', 'ON_HOLD', 'COMPLETED'] as const;
+  const keys = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED'] as const;
 
-  it('包含所有 3 个项目状态', () => {
-    expect(Object.keys(STATUS_MAP)).toHaveLength(3);
+  it('包含所有 4 个项目状态', () => {
+    expect(Object.keys(STATUS_MAP)).toHaveLength(4);
   });
 
   keys.forEach((key) => {
@@ -133,10 +133,10 @@ describe('PRODUCT_LINE_MAP', () => {
 // ============ PRODUCT_CATEGORY_MAP（产品类别）============
 
 describe('PRODUCT_CATEGORY_MAP', () => {
-  const keys = ['ROUTER', 'GATEWAY', 'REMOTE_CONTROL', 'HARDWARE', 'ACCESSORY', 'OTHER'] as const;
+  const keys = ['ROUTER', 'GATEWAY', 'REMOTE_CONTROL', 'ACCESSORY', 'OTHER'] as const;
 
-  it('包含所有 6 个产品类别', () => {
-    expect(Object.keys(PRODUCT_CATEGORY_MAP)).toHaveLength(6);
+  it('包含所有 5 个产品类别', () => {
+    expect(Object.keys(PRODUCT_CATEGORY_MAP)).toHaveLength(5);
   });
 
   keys.forEach((key) => {

@@ -107,6 +107,8 @@ const WeeklyReportForm: React.FC = () => {
   const [projectId, setProjectId] = useState(projectIdParam || '');
   const [weekDate, setWeekDate] = useState<dayjs.Dayjs>(dayjs().startOf('isoWeek' as dayjs.OpUnitType));
   const [progressStatus, setProgressStatus] = useState<ProgressStatus>('ON_TRACK');
+  const [changeOverview, setChangeOverview] = useState('');
+  const [demandAnalysis, setDemandAnalysis] = useState('');
   const [keyProgress, setKeyProgress] = useState('');
   const [nextWeekPlan, setNextWeekPlan] = useState('');
   const [riskWarning, setRiskWarning] = useState('');
@@ -155,6 +157,8 @@ const WeeklyReportForm: React.FC = () => {
         setProjectId(r.projectId);
         setWeekDate(dayjs(r.weekStart));
         setProgressStatus(r.progressStatus as ProgressStatus);
+        setChangeOverview(r.changeOverview || '');
+        setDemandAnalysis(r.demandAnalysis || '');
         setKeyProgress(r.keyProgress || '');
         setNextWeekPlan(r.nextWeekPlan || '');
         setRiskWarning(r.riskWarning || '');
@@ -204,6 +208,8 @@ const WeeklyReportForm: React.FC = () => {
     weekStart: weekStart.format('YYYY-MM-DD'),
     weekEnd: weekEnd.format('YYYY-MM-DD'),
     progressStatus,
+    changeOverview: changeOverview || undefined,
+    demandAnalysis: demandAnalysis || undefined,
     keyProgress: keyProgress || undefined,
     nextWeekPlan: nextWeekPlan || undefined,
     riskWarning: riskWarning || undefined,
@@ -427,6 +433,35 @@ const WeeklyReportForm: React.FC = () => {
                   </Radio>
                 ))}
               </Radio.Group>
+            </div>
+          </div>
+        </Card>
+
+        {/* 变更信息与需求研判 */}
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>变更信息与需求研判</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ fontWeight: 500 }}>变更信息概述</span>
+              </div>
+              <RichTextEditor
+                value={changeOverview}
+                onChange={setChangeOverview}
+                placeholder="请输入本周变更信息概述（选填）..."
+                minHeight={120}
+              />
+            </div>
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ fontWeight: 500 }}>需求确认与研判</span>
+              </div>
+              <RichTextEditor
+                value={demandAnalysis}
+                onChange={setDemandAnalysis}
+                placeholder="请输入需求确认与研判内容（选填）..."
+                minHeight={120}
+              />
             </div>
           </div>
         </Card>

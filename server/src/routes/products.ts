@@ -655,14 +655,14 @@ router.delete(
         productModel: { from: existingProduct.model, to: null },
       });
 
-      // 清理图片和文档文件
-      cleanupFiles(existingProduct.images as any);
-      cleanupFiles(existingProduct.documents as any);
-
-      // 删除产品
+      // 先删除数据库记录，再异步清理文件（文件清理失败不影响业务逻辑）
       await prisma.product.delete({
         where: { id },
       });
+
+      // 异步清理图片和文档文件
+      cleanupFiles(existingProduct.images as any);
+      cleanupFiles(existingProduct.documents as any);
 
       res.json({ success: true });
     } catch (error) {

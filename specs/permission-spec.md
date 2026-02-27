@@ -110,7 +110,7 @@
 GET /api/roles
 ```
 **认证：** Bearer Token
-**权限：** 无（已认证即可）
+**权限：** `role:read`
 
 **响应（200）：**
 ```json
@@ -137,7 +137,7 @@ GET /api/roles
 GET /api/roles/permissions
 ```
 **认证：** Bearer Token
-**权限：** 无（已认证即可）
+**权限：** `role:read`
 
 **响应（200）：**
 ```json
@@ -273,6 +273,7 @@ PUT /api/users/:id
   "password": "newpassword（可选，留空不修改）"
 }
 ```
+- 邮箱格式校验：`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`，格式不正确返回 400
 - 更新角色时先删除旧关联再创建新关联（全量替换）
 
 #### 删除用户
@@ -317,7 +318,7 @@ DELETE /api/users/:id
 | POST /api/users | user:create |
 | PUT /api/users/:id | user:update |
 | DELETE /api/users/:id | user:delete |
-| GET /api/roles | 已认证 |
+| GET /api/roles | role:read |
 | POST /api/roles | role:create |
 | PUT /api/roles/:id | role:update |
 | DELETE /api/roles/:id | role:delete |
@@ -329,6 +330,14 @@ DELETE /api/users/:id
 | GET /api/projects/:id/members | 已认证 |
 | POST /api/projects/:id/members | project:update（仅项目经理或管理员） |
 | DELETE /api/projects/:id/members/:userId | project:update（仅项目经理或管理员） |
+| GET /api/notifications | 已认证（仅返回当前用户通知） |
+| PUT /api/notifications/:id/read | 已认证（仅操作自己的通知） |
+| PUT /api/notifications/read-all | 已认证（仅操作自己的通知） |
+| DELETE /api/notifications/:id | 已认证（仅操作自己的通知） |
+| POST /api/notifications/generate | 已认证 + 管理员 |
+| GET /api/activity-comments/activity/:id | 已认证 |
+| POST /api/activity-comments | 已认证 |
+| DELETE /api/activity-comments/:id | 已认证（本人或管理员） |
 | GET /api/ai-config | user:read |
 | POST /api/ai-config | user:update |
 | PUT /api/ai-config/:id | user:update |

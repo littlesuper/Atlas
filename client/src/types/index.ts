@@ -39,6 +39,7 @@ export interface Permission {
 // ============ 项目相关类型 ============
 
 export enum ProjectStatus {
+  PLANNING = 'PLANNING',
   IN_PROGRESS = 'IN_PROGRESS',
   ON_HOLD = 'ON_HOLD',
   COMPLETED = 'COMPLETED',
@@ -272,6 +273,13 @@ export interface ReportAttachment {
   section: string; // keyProgress | nextWeekPlan | riskWarning
 }
 
+export interface WeeklyReportRisk {
+  id: string;
+  description: string;
+  severity: string;
+  status: string;
+}
+
 export interface WeeklyReport {
   id: string;
   projectId: string;
@@ -280,9 +288,12 @@ export interface WeeklyReport {
   weekEnd: string;
   year: number;
   weekNumber: number;
+  changeOverview?: string;
+  demandAnalysis?: string;
   keyProgress?: string;
   nextWeekPlan?: string;
   riskWarning?: string;
+  risks?: WeeklyReportRisk[];
   phaseProgress?: Record<string, PhaseProgressItem>;
   attachments?: ReportAttachment[];
   status: string; // DRAFT | SUBMITTED | ARCHIVED

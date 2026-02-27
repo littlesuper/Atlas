@@ -47,6 +47,7 @@ import {
   ACTIVITY_STATUS_MAP,
   ACTIVITY_TYPE_MAP,
   DEPENDENCY_TYPE_MAP,
+  PHASE_OPTIONS,
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
@@ -69,8 +70,7 @@ function resolveTriple(t: DateTriple, changed: 'start' | 'end' | 'dur'): DateTri
   return t;
 }
 
-// 阶段配置
-const PHASE_OPTIONS = ['EVT', 'DVT', 'PVT', 'MP'];
+// 阶段颜色配置
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
 
 import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/workday';

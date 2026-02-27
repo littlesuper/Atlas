@@ -233,7 +233,16 @@ router.put(
         return;
       }
 
-      // 2. 检查邮箱是否被其他用户使用
+      // 2. 校验邮箱格式
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          res.status(400).json({ error: '邮箱格式不正确' });
+          return;
+        }
+      }
+
+      // 3. 检查邮箱是否被其他用户使用
       if (email && email !== existingUser.email) {
         const emailExists = await prisma.user.findFirst({
           where: {
@@ -248,7 +257,7 @@ router.put(
         }
       }
 
-      // 3. 准备更新数据
+      // 4. 准备更新数据
       const updateData: any = {};
       if (email) updateData.email = email;
       if (realName) updateData.realName = realName;
@@ -265,7 +274,7 @@ router.put(
         ['email', 'realName', 'phone', 'wecomUserId', 'status'],
       );
 
-      // 4. 更新用户基本信息
+      // 5. 更新用户基本信息
       await prisma.user.update({
         where: { id },
         data: updateData,
@@ -276,7 +285,7 @@ router.put(
         invalidateUserCache(id);
       }
 
-      // 5. 更新角色关联(全量替换)
+      // 6. 更新角色关联(全量替换)
       if (roleIds && Array.isArray(roleIds)) {
         // 先删除所有旧关联
         await prisma.userRole.deleteMany({
@@ -297,7 +306,7 @@ router.put(
         invalidateUserCache(id);
       }
 
-      // 6. 查询完整用户信息(含角色)
+      // 7. 查询完整用户信息(含角色)
       const updatedUser = await prisma.user.findUnique({
         where: { id },
         include: {

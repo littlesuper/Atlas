@@ -77,7 +77,7 @@ const ProjectList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [stats, setStats] = useState({ all: 0, inProgress: 0, completed: 0, onHold: 0 });
+  const [stats, setStats] = useState({ all: 0, planning: 0, inProgress: 0, completed: 0, onHold: 0 });
 
   // 表单联动：追踪当前选中的项目经理
   const [selectedManagerId, setSelectedManagerId] = useState<string>('');
@@ -91,7 +91,11 @@ const ProjectList: React.FC = () => {
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
   const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') || '');
-  const [selectedProductLine, setSelectedProductLine] = useState<string>(searchParams.get('productLine') || '');
+  const [selectedProductLines, setSelectedProductLines] = useState<string[]>(() => {
+    const param = searchParams.get('productLine');
+    if (param) return param.split(',').map(l => l.trim());
+    return Object.keys(PRODUCT_LINE_MAP); // 默认全部选中
+  });
 
   // 分页状态 — 从 URL 初始化
   const [pagination, setPagination] = useState({
@@ -107,9 +111,12 @@ const ProjectList: React.FC = () => {
     if (pagination.pageSize !== 20) params.set('pageSize', String(pagination.pageSize));
     if (searchKeyword) params.set('keyword', searchKeyword);
     if (selectedStatus) params.set('status', selectedStatus);
-    if (selectedProductLine) params.set('productLine', selectedProductLine);
+    const allKeys = Object.keys(PRODUCT_LINE_MAP);
+    if (selectedProductLines.length > 0 && selectedProductLines.length < allKeys.length) {
+      params.set('productLine', selectedProductLines.join(','));
+    }
     setSearchParams(params, { replace: true });
-  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLine, setSearchParams]);
+  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLines, setSearchParams]);
 
   // 加载项目列表
   const loadProjects = async (page = pagination.current, pageSize = pagination.pageSize) => {
@@ -120,13 +127,23 @@ const ProjectList: React.FC = () => {
         pageSize,
       };
       if (selectedStatus) params.status = selectedStatus;
-      if (selectedProductLine) params.productLine = selectedProductLine;
+      const allKeys = Object.keys(PRODUCT_LINE_MAP);
+      if (selectedProductLines.length > 0 && selectedProductLines.length < allKeys.length) {
+        params.productLine = selectedProductLines.join(',');
+      }
       if (searchKeyword) params.keyword = searchKeyword;
 
       const response = await projectsApi.list(params);
       const { data: list, total, stats: serverStats } = response.data;
       setProjects(list || []);
-      setStats(serverStats || { all: 0, inProgress: 0, completed: 0, onHold: 0 });
+      const s = (serverStats || {}) as any;
+      setStats({
+        all: s.all ?? 0,
+        planning: s.planning ?? 0,
+        inProgress: s.inProgress ?? 0,
+        completed: s.completed ?? 0,
+        onHold: s.onHold ?? 0,
+      });
       setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
     } catch (error) {
       Message.error('加载项目列表失败');
@@ -148,7 +165,7 @@ const ProjectList: React.FC = () => {
   useEffect(() => {
     loadProjects(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, selectedProductLine, searchKeyword]);
+  }, [selectedStatus, selectedProductLines, searchKeyword]);
 
   useEffect(() => {
     loadUsers();
@@ -159,6 +176,7 @@ const ProjectList: React.FC = () => {
   // 统计数据（来自服务端）
   const statistics = useMemo(() => ({
     total: stats.all,
+    planning: stats.planning,
     inProgress: stats.inProgress,
     completed: stats.completed,
     onHold: stats.onHold,
@@ -422,6 +440,13 @@ const ProjectList: React.FC = () => {
             onClick={() => setSelectedStatus('')}
           />
           <StatCard
+            title="规划中"
+            count={statistics.planning}
+            color="rgb(var(--primary-6))"
+            selected={selectedStatus === 'PLANNING'}
+            onClick={() => setSelectedStatus('PLANNING')}
+          />
+          <StatCard
             title="进行中"
             count={statistics.inProgress}
             color="var(--status-success)"
@@ -456,19 +481,31 @@ const ProjectList: React.FC = () => {
                 allowClear
                 onChange={handleSearch}
               />
-              <Select
-                style={{ width: 140 }}
-                placeholder="产品线筛选"
-                allowClear
-                value={selectedProductLine || undefined}
-                onChange={(value) => setSelectedProductLine(value || '')}
-              >
-                {Object.entries(PRODUCT_LINE_MAP).map(([key, value]) => (
-                  <Select.Option key={key} value={key}>
+              {Object.entries(PRODUCT_LINE_MAP).map(([key, value]) => {
+                const isSelected = selectedProductLines.includes(key);
+                return (
+                  <Tag
+                    key={key}
+                    checkable
+                    checked={isSelected}
+                    color={isSelected ? value.color : undefined}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    onCheck={() => {
+                      if (isSelected) {
+                        // 至少保留一个
+                        if (selectedProductLines.length > 1) {
+                          setSelectedProductLines(selectedProductLines.filter(l => l !== key));
+                        }
+                      } else {
+                        setSelectedProductLines([...selectedProductLines, key]);
+                      }
+                      setPagination((prev) => ({ ...prev, current: 1 }));
+                    }}
+                  >
                     {value.label}
-                  </Select.Option>
-                ))}
-              </Select>
+                  </Tag>
+                );
+              })}
               {hasPermission('project', 'create') && (
                 <Button
                   type="primary"
@@ -520,7 +557,7 @@ const ProjectList: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{
-              status: 'IN_PROGRESS',
+              status: 'PLANNING',
               priority: 'MEDIUM',
               productLine: 'DANDELION',
             }}

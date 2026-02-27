@@ -43,6 +43,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   // 获取所有活动（包括子活动）
   const allActivities = await prisma.activity.findMany({
     where: { projectId },
+    include: { assignees: { select: { id: true } } },
   });
 
   const totalActivities = allActivities.length;
@@ -92,7 +93,38 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     }
   }
 
-  // 2. 评估逾期未完成任务
+  // 2. 评估任务延期率（计划结束日期已过但未完成的活动占比）
+  const activitiesWithPlanEnd = allActivities.filter(
+    (a) => a.planEndDate && a.status !== ActivityStatus.CANCELLED
+  );
+  if (activitiesWithPlanEnd.length > 0) {
+    const delayedActivities = activitiesWithPlanEnd.filter(
+      (a) =>
+        a.planEndDate! < now &&
+        a.status !== ActivityStatus.COMPLETED
+    );
+    const delayRate = (delayedActivities.length / activitiesWithPlanEnd.length) * 100;
+
+    if (delayRate > 30) {
+      riskScore += 3;
+      riskFactors.push({
+        factor: '大量任务延期',
+        severity: 'HIGH',
+        description: `${delayedActivities.length}个任务延期，延期率${delayRate.toFixed(0)}%，超过30%`,
+      });
+      suggestions.push('大量任务延期，建议重新评估项目计划并调整排期');
+    } else if (delayRate > 10) {
+      riskScore += 1;
+      riskFactors.push({
+        factor: '部分任务延期',
+        severity: 'MEDIUM',
+        description: `${delayedActivities.length}个任务延期，延期率${delayRate.toFixed(0)}%，超过10%`,
+      });
+      suggestions.push('关注延期任务，分析延期原因并制定应对措施');
+    }
+  }
+
+  // 3. 评估逾期未完成任务
   const overdueActivities = allActivities.filter(
     (a) =>
       a.planEndDate &&
@@ -122,7 +154,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   // 4. 评估资源分配
   const unassignedActivities = allActivities.filter(
     (a) =>
-      !a.assigneeId &&
+      a.assignees.length === 0 &&
       a.status !== ActivityStatus.COMPLETED &&
       a.status !== ActivityStatus.CANCELLED
   );
