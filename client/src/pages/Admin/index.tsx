@@ -225,8 +225,8 @@ const AdminPage: React.FC = () => {
           await usersApi.delete(user.id);
           Message.success('删除成功');
           loadUsers();
-        } catch (error) {
-          Message.error('删除失败');
+        } catch {
+          // 错误已由请求拦截器统一提示
         }
       },
     });
