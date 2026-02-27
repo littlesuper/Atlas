@@ -356,7 +356,14 @@ const TemplateManagement: React.FC = () => {
       title: '模板名称',
       dataIndex: 'name',
       width: 200,
-      render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span>,
+      render: (name: string, record: ProjectTemplate) => (
+        <span
+          style={{ fontWeight: 500, color: 'var(--color-text-1)', cursor: 'pointer' }}
+          onClick={() => handleOpen(record)}
+        >
+          {name}
+        </span>
+      ),
     },
     {
       title: '描述',
@@ -520,8 +527,8 @@ const TemplateManagement: React.FC = () => {
       ),
     },
     {
-      title: '操作',
-      width: 64,
+      title: '',
+      width: 48,
       render: (_: unknown, record: TemplateActivity) => (
         <Tooltip content="删除">
           <Button
@@ -548,12 +555,9 @@ const TemplateManagement: React.FC = () => {
               {editing ? `编辑模板 - ${editing.name}` : '新建模板'}
             </span>
           </div>
-          <Space>
-            <Button onClick={handleBack}>取消</Button>
-            <Button type="primary" loading={saving} onClick={handleSubmit}>
-              {editing ? '保存' : '创建'}
-            </Button>
-          </Space>
+          <Button type="primary" loading={saving} onClick={handleSubmit}>
+            {editing ? '保存' : '创建'}
+          </Button>
         </div>
 
         <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
@@ -578,6 +582,7 @@ const TemplateManagement: React.FC = () => {
         </div>
 
         <Table
+          size="small"
           columns={activityColumns}
           data={activities}
           rowKey="id"
@@ -635,7 +640,6 @@ const TemplateManagement: React.FC = () => {
         loading={loading}
         rowKey="id"
         pagination={false}
-        scroll={{ x: 900 }}
       />
     </MainLayout>
   );
