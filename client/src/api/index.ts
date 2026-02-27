@@ -384,12 +384,16 @@ export const riskApi = {
   getHistory: (projectId: string, params?: { page?: number; pageSize?: number }) =>
     request.get<any>(`/risk/project/${projectId}`, { params }),
 
+  getTrend: (projectId: string) =>
+    request.get<any>(`/risk/project/${projectId}`, { params: { pageSize: 50 } }),
+
   assess: (projectId: string) =>
     request.post<{
       id: string;
       riskLevel: string;
       riskFactors: Array<{ factor: string; severity: string; description: string }>;
       suggestions: string[];
+      source?: string;
       assessedAt: string;
     }>(`/risk/project/${projectId}/assess`),
 

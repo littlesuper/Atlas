@@ -137,6 +137,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
     let riskLevel: string;
     let riskFactors: any[];
     let suggestions: string[];
+    let source: string = 'rule_engine';
 
     const analysisData = {
       project: {
@@ -170,6 +171,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
         riskLevel = parsed.riskLevel;
         riskFactors = parsed.riskFactors;
         suggestions = parsed.suggestions;
+        source = 'ai';
       } else {
         throw new Error('AI 未配置或返回为空');
       }
@@ -179,10 +181,11 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
       riskLevel = result.riskLevel;
       riskFactors = result.riskFactors;
       suggestions = result.suggestions;
+      source = 'rule_engine';
     }
 
     const assessment = await prisma.riskAssessment.create({
-      data: { projectId, riskLevel, riskFactors, suggestions },
+      data: { projectId, riskLevel, riskFactors, suggestions, source },
     });
 
     res.json(assessment);

@@ -256,6 +256,7 @@ model RiskAssessment {
   riskLevel    String
   riskFactors  Json
   suggestions  Json
+  source       String   @default("rule_engine") // "ai" | "rule_engine"
   assessedAt   DateTime @default(now())
 
   // 关联关系

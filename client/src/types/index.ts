@@ -307,10 +307,17 @@ export interface WeeklyReport {
 
 // ============ 风险评估相关类型 ============
 
+export interface TriggeredActivity {
+  id: string;
+  name: string;
+  detail?: string;
+}
+
 export interface RiskFactor {
   factor: string;
   severity: string;
   description: string;
+  triggeredActivities?: TriggeredActivity[];
 }
 
 export interface RiskAssessment {
@@ -319,6 +326,7 @@ export interface RiskAssessment {
   riskLevel: string;
   riskFactors: RiskFactor[];
   suggestions: string[];
+  source?: string; // 'ai' | 'rule_engine'
   assessedAt: string;
 }
 
