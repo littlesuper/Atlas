@@ -441,7 +441,6 @@ const ProjectDetail: React.FC = () => {
       phase: activity.phase,
       name: activity.name,
       description: activity.description,
-      parentId: activity.parentId,
       type: activity.type,
       status: activity.status,
       priority: activity.priority,
@@ -528,7 +527,6 @@ const ProjectDetail: React.FC = () => {
         endDate: values.actualEnd ? dayjs(values.actualEnd).format('YYYY-MM-DD') : undefined,
         duration: actualDuration ?? undefined,
         assigneeIds: values.assigneeIds || [],
-        parentId: values.parentId,
         notes: values.notes,
         sortOrder: editingActivity
           ? editingActivity.sortOrder
@@ -574,7 +572,6 @@ const ProjectDetail: React.FC = () => {
                       endDate: snapshot.endDate ? dayjs(snapshot.endDate).format('YYYY-MM-DD') : undefined,
                       duration: snapshot.duration ?? undefined,
                       assigneeIds: snapshot.assignees?.map((a) => a.id) ?? [],
-                      parentId: snapshot.parentId,
                       notes: snapshot.notes,
                       dependencies: Array.isArray(snapshot.dependencies)
                         ? snapshot.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
@@ -609,12 +606,9 @@ const ProjectDetail: React.FC = () => {
 
   // 删除活动
   const handleDeleteActivity = (activity: Activity) => {
-    const hasChildren = activities.some((a) => a.parentId === activity.id);
     Modal.confirm({
       title: '确认删除',
-      content: hasChildren
-        ? `确定要删除活动"${activity.name}"及其所有子活动吗？此操作不可恢复。`
-        : `确定要删除活动"${activity.name}"吗？此操作不可恢复。`,
+      content: `确定要删除活动"${activity.name}"吗？此操作不可恢复。`,
       onOk: async () => {
         try {
           await activitiesApi.delete(activity.id);
@@ -741,7 +735,7 @@ const ProjectDetail: React.FC = () => {
     if (!id) return;
     setSaving(true);
     try {
-      await activitiesApi.reorder(id, reordered.map((a, i) => ({ id: a.id, sortOrder: (i + 1) * 10, parentId: a.parentId })));
+      await activitiesApi.reorder(id, reordered.map((a, i) => ({ id: a.id, sortOrder: (i + 1) * 10 })));
     } catch {
       Message.error('保存排序失败');
       loadActivities(); // 回滚
@@ -2146,7 +2140,6 @@ const ProjectDetail: React.FC = () => {
             {/* 分隔线 */}
             <div style={{ borderTop: '1px solid var(--color-border-2)', margin: '4px 0 16px' }} />
 
-            {/* 父活动 */}
             {/* 前置依赖 */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

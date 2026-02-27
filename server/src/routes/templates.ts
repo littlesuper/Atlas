@@ -82,7 +82,6 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
           ? {
               create: activities.map((a: any, idx: number) => ({
                 id: a.id, // 允许前端指定 id 以维持依赖引用
-                parentId: a.parentId || null,
                 name: a.name,
                 type: a.type || 'TASK',
                 phase: a.phase || null,
@@ -148,7 +147,6 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
             data: activities.map((a: any, idx: number) => ({
               id: a.id,
               templateId: id,
-              parentId: a.parentId || null,
               name: a.name,
               type: a.type || 'TASK',
               phase: a.phase || null,
@@ -316,7 +314,6 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
           data: {
             id: newId,
             projectId,
-            parentId: ta.parentId ? (idMap.get(ta.parentId) || null) : null,
             name: ta.name,
             type: ta.type,
             phase: ta.phase,

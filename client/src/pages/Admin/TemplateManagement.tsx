@@ -105,14 +105,13 @@ const TemplateManagement: React.FC = () => {
         ...a,
         id: genId(),
       }));
-      // Remap parentId and dependency ids
+      // Remap dependency ids
       const idMap = new Map<string, string>();
       (full.activities || []).forEach((orig, i) => {
         idMap.set(orig.id, acts[i].id);
       });
       const remapped = acts.map((a) => ({
         ...a,
-        parentId: a.parentId ? idMap.get(a.parentId) || a.parentId : null,
         dependencies: a.dependencies?.map((d: { id: string; type: string; lag?: number }) => ({
           ...d,
           id: idMap.get(d.id) || d.id,
@@ -145,7 +144,6 @@ const TemplateManagement: React.FC = () => {
         phases: values.phases?.length ? values.phases : undefined,
         activities: activities.map((a, idx) => ({
           id: a.id,
-          parentId: a.parentId || null,
           name: a.name,
           type: a.type || 'TASK',
           phase: a.phase || null,
@@ -182,7 +180,6 @@ const TemplateManagement: React.FC = () => {
       {
         id: genId(),
         templateId: editing?.id || '',
-        parentId: null,
         name: '',
         type: 'TASK' as ActivityType,
         phase: null,
@@ -203,12 +200,10 @@ const TemplateManagement: React.FC = () => {
 
   const removeActivity = (id: string) => {
     setActivities((prev) => {
-      // Also remove from dependencies and clear parentId references
       return prev
         .filter((a) => a.id !== id)
         .map((a) => ({
           ...a,
-          parentId: a.parentId === id ? null : a.parentId,
           dependencies: a.dependencies?.filter((d) => d.id !== id) || null,
         }));
     });
@@ -302,14 +297,14 @@ const TemplateManagement: React.FC = () => {
   // Activity table columns (inside drawer)
   const activityColumns = [
     {
-      title: '序号',
-      width: 60,
+      title: '#',
+      width: 45,
       render: (_: unknown, __: unknown, idx: number) => idx + 1,
     },
     {
       title: '活动名称',
       dataIndex: 'name',
-      width: 200,
+      width: 180,
       render: (name: string, record: TemplateActivity) => (
         <Input
           size="small"
@@ -384,31 +379,9 @@ const TemplateManagement: React.FC = () => {
       ),
     },
     {
-      title: '父活动',
-      dataIndex: 'parentId',
-      width: 150,
-      render: (parentId: string | null, record: TemplateActivity) => (
-        <Select
-          size="small"
-          value={parentId || undefined}
-          allowClear
-          placeholder="无"
-          onChange={(v) => updateActivity(record.id, 'parentId', v || null)}
-        >
-          {activities
-            .filter((a) => a.id !== record.id)
-            .map((a) => (
-              <Select.Option key={a.id} value={a.id}>
-                {a.name || '(未命名)'}
-              </Select.Option>
-            ))}
-        </Select>
-      ),
-    },
-    {
       title: '前置依赖',
       dataIndex: 'dependencies',
-      width: 180,
+      width: 160,
       render: (deps: TemplateActivity['dependencies'], record: TemplateActivity) => (
         <Select
           size="small"
@@ -494,7 +467,7 @@ const TemplateManagement: React.FC = () => {
       />
 
       <Drawer
-        width={1100}
+        width={1200}
         title={editing ? `编辑模板 - ${editing.name}` : '新建模板'}
         visible={drawerVisible}
         onCancel={() => setDrawerVisible(false)}
@@ -553,14 +526,23 @@ const TemplateManagement: React.FC = () => {
           data={activities}
           rowKey="id"
           pagination={false}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1100 }}
           size="small"
+          className="template-activity-table"
           noDataElement={
             <div style={{ padding: '24px 0', color: 'var(--color-text-3)' }}>
               暂无活动，点击上方"添加活动"开始构建模板
             </div>
           }
         />
+        <style>{`
+          .template-activity-table .arco-table-td {
+            padding: 8px 6px !important;
+          }
+          .template-activity-table .arco-table-body {
+            padding-bottom: 8px;
+          }
+        `}</style>
       </Drawer>
     </>
   );

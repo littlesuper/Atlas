@@ -11,33 +11,6 @@ import { callAi } from '../utils/aiClient';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-/**
- * 构建活动树形结构
- */
-function buildActivityTree(activities: any[]): any[] {
-  const activityMap = new Map();
-  const rootActivities: any[] = [];
-
-  // 初始化map
-  activities.forEach((activity) => {
-    activityMap.set(activity.id, { ...activity, children: [] });
-  });
-
-  // 构建树形结构
-  activities.forEach((activity) => {
-    const node = activityMap.get(activity.id);
-    if (activity.parentId) {
-      const parent = activityMap.get(activity.parentId);
-      if (parent) {
-        parent.children.push(node);
-      }
-    } else {
-      rootActivities.push(node);
-    }
-  });
-
-  return rootActivities;
-}
 
 /**
  * 查询前置活动并调用调度器计算日期
@@ -188,16 +161,14 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
       return;
     }
 
-    // 树形模式（向后兼容）：返回完整树形结构
+    // 返回完整活动列表
     const activities = await prisma.activity.findMany({
       where: { projectId },
       orderBy: { sortOrder: 'asc' },
       include: includeAssignee,
     });
 
-    const tree = buildActivityTree(activities);
-
-    res.json(tree);
+    res.json(activities);
   } catch (error) {
     console.error('获取活动列表错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
@@ -255,7 +226,7 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
         start_date: activity.startDate,
         end_date: activity.endDate,
         duration: activity.duration,
-        parent: activity.parentId || '0',
+        parent: '0',
         type,
         assignee: (activity as any).assignees?.map((u: any) => u.realName).join(', ') || '',
         status: activity.status,
@@ -298,7 +269,6 @@ router.post(
     try {
       const {
         projectId,
-        parentId,
         name,
         description,
         type,
@@ -333,23 +303,6 @@ router.post(
         return;
       }
 
-      // 验证父活动是否存在且属于同一项目
-      if (parentId) {
-        const parentActivity = await prisma.activity.findUnique({
-          where: { id: parentId },
-        });
-
-        if (!parentActivity) {
-          res.status(400).json({ error: '父活动不存在' });
-          return;
-        }
-
-        if (parentActivity.projectId !== projectId) {
-          res.status(400).json({ error: '父活动不属于该项目' });
-          return;
-        }
-      }
-
       // 解析负责人列表
       const resolvedAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
 
@@ -381,7 +334,6 @@ router.post(
       const activity = await prisma.activity.create({
         data: {
           projectId,
-          parentId: parentId || null,
           name,
           description,
           type: type || ActivityType.TASK,
@@ -738,28 +690,6 @@ router.delete(
 
       const projectId = existingActivity.projectId;
 
-      // 递归收集所有子孙活动 ID
-      const collectDescendantIds = async (parentId: string): Promise<string[]> => {
-        const children = await prisma.activity.findMany({
-          where: { parentId },
-          select: { id: true },
-        });
-        const ids: string[] = [];
-        for (const child of children) {
-          ids.push(child.id);
-          ids.push(...await collectDescendantIds(child.id));
-        }
-        return ids;
-      };
-
-      const descendantIds = await collectDescendantIds(id);
-
-      // 先删子孙，再删自身
-      if (descendantIds.length > 0) {
-        await prisma.activity.deleteMany({
-          where: { id: { in: descendantIds } },
-        });
-      }
       await prisma.activity.delete({ where: { id } });
 
       // 自动更新项目进度
@@ -812,7 +742,6 @@ router.put('/project/:projectId/reorder', authenticate, requirePermission('activ
           where: { id: item.id },
           data: {
             sortOrder: item.sortOrder,
-            parentId: item.parentId || null,
           },
         })
       )

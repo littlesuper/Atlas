@@ -33,9 +33,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      activities: {
-        where: { parentId: null }, // 只统计顶级活动
-      },
+      activities: true,
     },
   });
 

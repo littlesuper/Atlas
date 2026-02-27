@@ -308,7 +308,6 @@ async function createActivities() {
 
       const body: any = {
         projectId: PROJECT_ID,
-        parentId: phaseIds[phase],
         name: act.name,
         type: act.isMilestone ? 'MILESTONE' : 'TASK',
         phase,

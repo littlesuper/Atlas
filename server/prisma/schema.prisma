@@ -165,7 +165,6 @@ enum ActivityStatus {
 model Activity {
   id            String         @id @default(uuid())
   projectId     String
-  parentId      String?
   name          String
   description   String?
   type          ActivityType   @default(TASK)
@@ -186,13 +185,10 @@ model Activity {
 
   // 关联关系
   project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parent     Activity?         @relation("ActivityHierarchy", fields: [parentId], references: [id])
-  children   Activity[]        @relation("ActivityHierarchy")
   assignees  User[]            @relation("ActivityAssignees")
   comments   ActivityComment[]
 
   @@index([projectId])
-  @@index([parentId])
   @@map("activities")
 }
 
@@ -229,7 +225,6 @@ model ProjectTemplate {
 model TemplateActivity {
   id           String       @id @default(uuid())
   templateId   String
-  parentId     String?
   name         String
   type         ActivityType @default(TASK)
   phase        String?
@@ -241,11 +236,8 @@ model TemplateActivity {
 
   // 关联关系
   template ProjectTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  parent   TemplateActivity? @relation("TemplateHierarchy", fields: [parentId], references: [id])
-  children TemplateActivity[] @relation("TemplateHierarchy")
 
   @@index([templateId])
-  @@index([parentId])
   @@map("template_activities")
 }
 

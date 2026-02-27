@@ -99,7 +99,6 @@ export interface ActivityDependency {
 export interface Activity {
   id: string;
   projectId: string;
-  parentId?: string | null;
   name: string;
   description?: string;
   type: ActivityType;
@@ -156,7 +155,6 @@ export interface Notification {
 export interface TemplateActivity {
   id: string;
   templateId: string;
-  parentId?: string | null;
   name: string;
   type: ActivityType;
   phase?: string | null;

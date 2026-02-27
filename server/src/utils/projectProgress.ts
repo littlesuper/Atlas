@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 /**
  * 计算项目整体进度
- * 基于顶级活动（parentId为null）的状态自动计算
+ * 基于所有活动的状态自动计算
  *
  * 进度计算规则：
  * - COMPLETED（已完成）= 100%
@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
  * @returns 项目平均进度（0-100，保留2位小数）
  */
 export async function calculateProjectProgress(projectId: string): Promise<number> {
-  const topLevelWhere = { projectId, parentId: null };
+  const topLevelWhere = { projectId };
 
   // 使用并行 count 查询替代 findMany + 内存遍历
   const [totalCount, completedCount, inProgressCount] = await Promise.all([

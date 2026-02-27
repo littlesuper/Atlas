@@ -176,7 +176,6 @@ export const activitiesApi = {
     duration?: number;
     assigneeId?: string;
     assigneeIds?: string[];
-    parentId?: string;
     notes?: string;
     sortOrder?: number;
     dependencies?: Array<{ id: string; type: string; lag?: number }>;
@@ -198,7 +197,6 @@ export const activitiesApi = {
     duration?: number;
     assigneeId?: string | null;
     assigneeIds?: string[];
-    parentId?: string | null;
     notes?: string | null;
     dependencies?: Array<{ id: string; type: string; lag?: number }> | null;
     [key: string]: unknown;
@@ -208,7 +206,7 @@ export const activitiesApi = {
   delete: (activityId: string) => request.delete(`/activities/${activityId}`),
 
   // 批量排序
-  reorder: (projectId: string, items: { id: string; sortOrder: number; parentId?: string | null }[]) =>
+  reorder: (projectId: string, items: { id: string; sortOrder: number }[]) =>
     request.put(`/activities/project/${projectId}/reorder`, { items }),
 
   // 归档快照 CRUD
