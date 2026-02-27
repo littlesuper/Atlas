@@ -14,6 +14,7 @@ const AdminManagement = React.lazy(() => import('./pages/Admin'));
 const WeeklyReportsSummary = React.lazy(() => import('./pages/WeeklyReports'));
 const WeeklyReportForm = React.lazy(() => import('./pages/WeeklyReports/Form'));
 const WorkloadPage = React.lazy(() => import('./pages/Workload'));
+const TemplateManagement = React.lazy(() => import('./pages/Admin/TemplateManagement'));
 
 // 受保护的路由组件
 interface ProtectedRouteProps {
@@ -188,6 +189,16 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <WeeklyReportForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 项目模板管理 */}
+          <Route
+            path="/templates"
+            element={
+              <ProtectedRoute requirePermission={{ resource: 'project', action: 'create' }}>
+                <TemplateManagement />
               </ProtectedRoute>
             }
           />

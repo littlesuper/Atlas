@@ -15,17 +15,15 @@ import {
   Message,
   Modal,
   Tooltip,
-  Popover,
 } from '@arco-design/web-react';
 import {
   IconSearch,
   IconPlus,
   IconEdit,
   IconDelete,
-  IconMoreVertical,
+  IconFile,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import TemplateManagement from '../../Admin/TemplateManagement';
 import { projectsApi, usersApi, weeklyReportsApi, templatesApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
 import { Project, User, ProjectTemplate } from '../../../types';
@@ -90,7 +88,6 @@ const ProjectList: React.FC = () => {
 
   // 模板列表
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
-  const [templateDrawerVisible, setTemplateDrawerVisible] = useState(false);
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
@@ -520,24 +517,12 @@ const ProjectList: React.FC = () => {
                   >
                     新建项目
                   </Button>
-                  <Popover
-                    trigger="click"
-                    position="br"
-                    content={
-                      <div style={{ width: 160 }}>
-                        <Button
-                          size="small"
-                          type="text"
-                          onClick={() => setTemplateDrawerVisible(true)}
-                          style={{ width: '100%' }}
-                        >
-                          项目模板管理
-                        </Button>
-                      </div>
-                    }
-                  >
-                    <Button icon={<IconMoreVertical />} />
-                  </Popover>
+                  <Tooltip content="项目模板管理">
+                    <Button
+                      icon={<IconFile />}
+                      onClick={() => navigate('/templates')}
+                    />
+                  </Tooltip>
                 </>
               )}
             </Space>
@@ -736,16 +721,6 @@ const ProjectList: React.FC = () => {
           </Form>
         </Drawer>
 
-        {/* 项目模板管理抽屉 */}
-        <Drawer
-          width={1200}
-          title="项目模板管理"
-          visible={templateDrawerVisible}
-          onCancel={() => setTemplateDrawerVisible(false)}
-          footer={null}
-        >
-          <TemplateManagement />
-        </Drawer>
       </div>
     </MainLayout>
   );
