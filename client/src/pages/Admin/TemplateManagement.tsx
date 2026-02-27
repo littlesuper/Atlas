@@ -34,33 +34,6 @@ const genId = (): string =>
     ? crypto.randomUUID()
     : `tmp-${Date.now()}-${++_idCounter}`;
 
-// 自动展开的 Select 包装：mount 后自动 click 触发下拉展开
-const AutoOpenSelect: React.FC<React.ComponentProps<typeof Select> & { onDismiss: () => void }> = ({ onDismiss, children, ...props }) => {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      const input = wrapRef.current?.querySelector('.arco-select-view') as HTMLElement;
-      input?.click();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
-  React.useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const popup = document.querySelector('.arco-select-popup');
-      if (wrapRef.current?.contains(e.target as Node)) return;
-      if (popup?.contains(e.target as Node)) return;
-      onDismiss();
-    };
-    document.addEventListener('mousedown', handler, true);
-    return () => document.removeEventListener('mousedown', handler, true);
-  }, [onDismiss]);
-  return (
-    <div ref={wrapRef} style={{ display: 'inline-block' }}>
-      <Select {...props}>{children}</Select>
-    </div>
-  );
-};
-
 const TemplateManagement: React.FC = () => {
   const [form] = Form.useForm();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
@@ -69,10 +42,6 @@ const TemplateManagement: React.FC = () => {
   const [editing, setEditing] = useState<ProjectTemplate | null>(null);
   const [activities, setActivities] = useState<TemplateActivity[]>([]);
   const [saving, setSaving] = useState(false);
-
-  // 点击编辑状态
-  const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
-  const [inlineValue, setInlineValue] = useState<string>('');
 
   // 拖拽排序状态
   const dragIndexRef = useRef(-1);
@@ -117,7 +86,6 @@ const TemplateManagement: React.FC = () => {
       form.resetFields();
       setActivities([]);
     }
-    setInlineEditing(null);
     setDrawerVisible(true);
   };
 
@@ -261,42 +229,6 @@ const TemplateManagement: React.FC = () => {
     });
   };
 
-  // ---- 点击编辑 ----
-
-  const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
-    setInlineEditing({ id: activityId, field });
-    setInlineValue(currentValue);
-  };
-
-  const commitInlineEdit = (activity: TemplateActivity, field: string) => {
-    setInlineEditing(null);
-    updateActivity(activity.id, field, inlineValue || (field === 'name' ? '' : null));
-  };
-
-  const commitNumberEdit = (activity: TemplateActivity) => {
-    setInlineEditing(null);
-    const num = parseInt(inlineValue, 10);
-    updateActivity(activity.id, 'planDuration', num > 0 ? num : null);
-  };
-
-  // 全局点击外部关闭内联编辑
-  useEffect(() => {
-    if (!inlineEditing) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('.arco-select-popup, .arco-select, .arco-input-wrapper, .arco-input-number')) return;
-      setInlineEditing(null);
-    };
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setInlineEditing(null);
-    };
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handler, true);
-    }, 0);
-    document.addEventListener('keydown', keyHandler, true);
-    return () => { clearTimeout(timer); document.removeEventListener('mousedown', handler, true); document.removeEventListener('keydown', keyHandler, true); };
-  }, [inlineEditing]);
-
   // ---- 拖拽排序 ----
 
   const handleMouseDown = (e: React.MouseEvent, index: number) => {
@@ -423,7 +355,7 @@ const TemplateManagement: React.FC = () => {
     },
   ];
 
-  // Activity table columns (inside drawer) — click-to-edit
+  // Activity table columns (inside drawer) — direct form controls
   const activityColumns = [
     {
       title: '',
@@ -449,180 +381,93 @@ const TemplateManagement: React.FC = () => {
     {
       title: '活动名称',
       dataIndex: 'name',
-      render: (name: string, record: TemplateActivity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
-          return (
-            <Input
-              autoFocus
-              size="small"
-              value={inlineValue}
-              placeholder="活动名称"
-              onChange={setInlineValue}
-              onBlur={() => commitInlineEdit(record, 'name')}
-              onPressEnter={() => commitInlineEdit(record, 'name')}
-            />
-          );
-        }
-        return (
-          <span
-            style={{ fontWeight: 500, cursor: 'pointer', display: 'inline-block', minWidth: 40, minHeight: 18 }}
-            onClick={() => startInlineEdit(record.id, 'name', name || '')}
-          >
-            {name || <span style={{ color: 'var(--color-text-4)' }}>点击输入名称</span>}
-          </span>
-        );
-      },
+      render: (_: string, record: TemplateActivity) => (
+        <Input
+          size="small"
+          value={record.name}
+          placeholder="活动名称"
+          onChange={(v) => updateActivity(record.id, 'name', v)}
+        />
+      ),
     },
     {
       title: '类型',
       dataIndex: 'type',
-      width: 90,
-      render: (type: string, record: TemplateActivity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'type') {
-          return (
-            <AutoOpenSelect
-              size="small"
-              style={{ width: 100 }}
-              value={record.type}
-              onDismiss={() => setInlineEditing(null)}
-              onChange={(v) => {
-                setInlineEditing(null);
-                updateActivity(record.id, 'type', v);
-              }}
-            >
-              {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Select.Option>
-              ))}
-            </AutoOpenSelect>
-          );
-        }
-        const cfg = ACTIVITY_TYPE_MAP[type as keyof typeof ACTIVITY_TYPE_MAP] ?? { label: type, color: 'default' };
-        return (
-          <Tag
-            color={cfg.color}
-            style={{ cursor: 'pointer' }}
-            onClick={() => setInlineEditing({ id: record.id, field: 'type' })}
-          >
-            {cfg.label}
-          </Tag>
-        );
-      },
+      width: 120,
+      render: (_: string, record: TemplateActivity) => (
+        <Select
+          size="small"
+          value={record.type}
+          onChange={(v) => updateActivity(record.id, 'type', v)}
+        >
+          {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
+            <Select.Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Select.Option>
+          ))}
+        </Select>
+      ),
     },
     {
       title: '阶段',
       dataIndex: 'phase',
-      width: 80,
-      render: (phase: string | null, record: TemplateActivity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'phase') {
-          return (
-            <AutoOpenSelect
-              size="small"
-              style={{ width: 90 }}
-              value={record.phase || undefined}
-              allowClear
-              placeholder="阶段"
-              onDismiss={() => setInlineEditing(null)}
-              onChange={(v) => {
-                setInlineEditing(null);
-                updateActivity(record.id, 'phase', v || null);
-              }}
-            >
-              {PHASE_OPTIONS.map((p) => (
-                <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
-              ))}
-            </AutoOpenSelect>
-          );
-        }
-        return (
-          <span
-            style={{ cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
-            onClick={() => setInlineEditing({ id: record.id, field: 'phase' })}
-          >
-            {phase ? <Tag color={PHASE_COLOR[phase] || 'default'}>{phase}</Tag> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
-          </span>
-        );
-      },
+      width: 100,
+      render: (_: string | null, record: TemplateActivity) => (
+        <Select
+          size="small"
+          value={record.phase || undefined}
+          allowClear
+          placeholder="阶段"
+          onChange={(v) => updateActivity(record.id, 'phase', v || null)}
+        >
+          {PHASE_OPTIONS.map((p) => (
+            <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
+          ))}
+        </Select>
+      ),
     },
     {
       title: '工期',
       dataIndex: 'planDuration',
-      width: 80,
-      render: (dur: number | null, record: TemplateActivity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'planDuration') {
-          return (
-            <InputNumber
-              autoFocus
-              size="small"
-              style={{ width: 70 }}
-              min={1}
-              precision={0}
-              suffix="天"
-              value={inlineValue ? parseInt(inlineValue, 10) : undefined}
-              onChange={(v) => setInlineValue(v != null ? String(v) : '')}
-              onBlur={() => commitNumberEdit(record)}
-              onKeyDown={(e) => { if ((e as unknown as React.KeyboardEvent).key === 'Enter') commitNumberEdit(record); }}
-            />
-          );
-        }
-        return (
-          <span
-            style={{ cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
-            onClick={() => startInlineEdit(record.id, 'planDuration', dur != null ? String(dur) : '')}
-          >
-            {dur != null ? `${dur}天` : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
-          </span>
-        );
-      },
+      width: 90,
+      render: (_: number | null, record: TemplateActivity) => (
+        <InputNumber
+          size="small"
+          style={{ width: '100%' }}
+          min={1}
+          precision={0}
+          suffix="天"
+          value={record.planDuration ?? undefined}
+          onChange={(v) => updateActivity(record.id, 'planDuration', v != null && v > 0 ? v : null)}
+        />
+      ),
     },
     {
       title: '前置依赖',
       dataIndex: 'dependencies',
-      width: 160,
-      render: (deps: TemplateActivity['dependencies'], record: TemplateActivity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'dependencies') {
-          return (
-            <AutoOpenSelect
-              size="small"
-              mode="multiple"
-              style={{ width: 180 }}
-              value={(deps || []).map((d) => d.id)}
-              allowClear
-              placeholder="选择依赖"
-              onDismiss={() => setInlineEditing(null)}
-              onChange={(ids: string[]) => {
-                setInlineEditing(null);
-                const newDeps = ids.map((depId) => {
-                  const existing = (deps || []).find((d) => d.id === depId);
-                  return existing || { id: depId, type: '0' };
-                });
-                updateActivity(record.id, 'dependencies', newDeps.length > 0 ? newDeps : null);
-              }}
-            >
-              {activities
-                .filter((a) => a.id !== record.id)
-                .map((a) => (
-                  <Select.Option key={a.id} value={a.id}>
-                    {a.name || '(未命名)'}
-                  </Select.Option>
-                ))}
-            </AutoOpenSelect>
-          );
-        }
-        const text = (deps || [])
-          .map((d) => {
-            const target = activities.find((a) => a.id === d.id);
-            return target?.name || '(未命名)';
-          })
-          .join(', ');
-        return (
-          <span
-            style={{ cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18, color: text ? undefined : 'var(--color-text-4)' }}
-            onClick={() => setInlineEditing({ id: record.id, field: 'dependencies' })}
-          >
-            {text || '-'}
-          </span>
-        );
-      },
+      width: 180,
+      render: (deps: TemplateActivity['dependencies'], record: TemplateActivity) => (
+        <Select
+          size="small"
+          mode="multiple"
+          value={(deps || []).map((d) => d.id)}
+          allowClear
+          placeholder="选择依赖"
+          onChange={(ids: string[]) => {
+            const newDeps = ids.map((depId) => {
+              const existing = (deps || []).find((d) => d.id === depId);
+              return existing || { id: depId, type: '0' };
+            });
+            updateActivity(record.id, 'dependencies', newDeps.length > 0 ? newDeps : null);
+          }}
+        >
+          {activities
+            .filter((a) => a.id !== record.id)
+            .map((a) => (
+              <Select.Option key={a.id} value={a.id}>
+                {a.name || '(未命名)'}
+              </Select.Option>
+            ))}
+        </Select>
+      ),
     },
     {
       title: '操作',
