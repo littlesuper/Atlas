@@ -431,7 +431,7 @@ const TemplateManagement: React.FC = () => {
     },
     {
       title: 'ID',
-      width: 52,
+      width: 56,
       render: (_: unknown, record: TemplateActivity) => (
         <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
       ),
@@ -439,6 +439,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '活动名称',
       dataIndex: 'name',
+      width: 280,
       render: (_: string, record: TemplateActivity) => (
         <Input
           size="small"
@@ -514,7 +515,7 @@ const TemplateManagement: React.FC = () => {
     },
     {
       title: '操作',
-      width: 48,
+      width: 56,
       render: (_: unknown, record: TemplateActivity) => (
         <Tooltip content="删除">
           <Button
