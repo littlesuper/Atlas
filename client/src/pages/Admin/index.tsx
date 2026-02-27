@@ -641,35 +641,27 @@ const AdminPage: React.FC = () => {
             </Form.Item>
           </div>
 
-          {formCanLogin && (
-            <Form.Item
-              label="用户名"
-              field="username"
-              rules={[
-                { required: true, message: '请输入用户名' },
-                { minLength: 2, message: '用户名长度不能少于2位' },
-              ]}
-              extra={!editingUser ? '根据姓名自动生成拼音，可手动修改' : '用户名创建后不可修改'}
-            >
-              <Input
-                placeholder="请输入用户名"
-                disabled={!!editingUser}
-              />
-            </Form.Item>
-          )}
+          <Form.Item
+            label="用户名"
+            field="username"
+            rules={[
+              { minLength: 2, message: '用户名长度不能少于2位' },
+            ]}
+            extra={!editingUser ? '根据姓名自动生成拼音，可手动修改' : '用户名创建后不可修改'}
+          >
+            <Input
+              placeholder="请输入用户名"
+              disabled={!!editingUser}
+            />
+          </Form.Item>
 
-          {formCanLogin && (
-            <Form.Item
-              label={editingUser && editingUser.canLogin !== false ? '密码（留空表示不修改）' : '密码'}
-              field="password"
-              rules={editingUser && editingUser.canLogin !== false ? [{ minLength: 6, message: '密码长度不能少于6位' }] : [
-                { required: true, message: '请输入密码' },
-                { minLength: 6, message: '密码长度不能少于6位' },
-              ]}
-            >
-              <Input.Password placeholder="请输入密码" />
-            </Form.Item>
-          )}
+          <Form.Item
+            label="密码"
+            field="password"
+            rules={[{ minLength: 6, message: '密码长度不能少于6位' }]}
+          >
+            <Input.Password placeholder="请输入密码" />
+          </Form.Item>
 
           <Form.Item
             label="企微UserID"
@@ -682,7 +674,7 @@ const AdminPage: React.FC = () => {
           <Form.Item
             label="角色"
             field="roleIds"
-            rules={formCanLogin ? [{ required: true, message: '请选择至少一个角色' }] : []}
+            rules={[{ required: true, message: '请选择至少一个角色' }]}
           >
             <Select
               placeholder="请选择角色"
