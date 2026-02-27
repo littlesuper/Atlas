@@ -589,6 +589,12 @@ body[arco-theme='dark'] .arco-table-tr:hover .arco-table-td {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
+body[arco-theme='dark'] .arco-table-tr:hover .arco-input,
+body[arco-theme='dark'] .arco-table-tr:hover .arco-select-view,
+body[arco-theme='dark'] .arco-table-tr:hover .arco-input-number {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
 /* 输入框 / 选择器 */
 body[arco-theme='dark'] .arco-input,
 body[arco-theme='dark'] .arco-textarea,
