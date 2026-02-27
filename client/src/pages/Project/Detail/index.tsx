@@ -184,8 +184,10 @@ const ProjectDetail: React.FC = () => {
   // 协作者管理
   const [membersModalVisible, setMembersModalVisible] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
 
-  // 双击内联编辑
+  // 单击内联编辑
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [archiveDrawerVisible, setArchiveDrawerVisible] = useState(false);
@@ -300,32 +302,35 @@ const ProjectDetail: React.FC = () => {
     }
   }, []);
 
-  const handleAddMember = async (userId: string) => {
-    if (!id) return;
-    setMembersLoading(true);
-    try {
-      await projectsApi.addMember(id, userId);
-      Message.success('协作者添加成功');
-      await loadProject();
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || '添加失败';
-      Message.error(msg);
-    } finally {
-      setMembersLoading(false);
-    }
+  const openMembersModal = () => {
+    setPendingMemberIds(project?.members?.map((m) => m.user.id) || []);
+    setMemberSearch('');
+    setMembersModalVisible(true);
   };
 
-  const handleRemoveMember = async (userId: string) => {
-    if (!id) return;
+  const handleMembersConfirm = async () => {
+    if (!id || !project) return;
+    const currentIds = new Set(project.members?.map((m) => m.user.id) || []);
+    const pendingSet = new Set(pendingMemberIds);
+    const toAdd = pendingMemberIds.filter((uid) => !currentIds.has(uid));
+    const toRemove = [...currentIds].filter((uid) => !pendingSet.has(uid));
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      setMembersModalVisible(false);
+      return;
+    }
     setMembersLoading(true);
     try {
-      await projectsApi.removeMember(id, userId);
-      Message.success('协作者已移除');
+      await Promise.all([
+        ...toAdd.map((uid) => projectsApi.addMember(id, uid)),
+        ...toRemove.map((uid) => projectsApi.removeMember(id, uid)),
+      ]);
+      Message.success(`协作者已更新（添加 ${toAdd.length}，移除 ${toRemove.length}）`);
       await loadProject();
     } catch {
-      Message.error('移除失败');
+      Message.error('更新协作者失败');
     } finally {
       setMembersLoading(false);
+      setMembersModalVisible(false);
     }
   };
 
@@ -731,7 +736,7 @@ const ProjectDetail: React.FC = () => {
   };
 
 
-  // ========== 双击内联编辑 ==========
+  // ========== 单击内联编辑 ==========
   const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
     if (!(hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))) return;
     setInlineEditing({ id: activityId, field });
@@ -1004,7 +1009,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ fontFamily: 'monospace', color: 'var(--color-text-3)', cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
-            onDoubleClick={() => startInlineEdit(record.id, 'predecessor', text)}
+            onClick={() => startInlineEdit(record.id, 'predecessor', text)}
           >
             {text || '-'}
           </span>
@@ -1035,7 +1040,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'phase' })}
+            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'phase' })}
           >
             {record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
           </span>
@@ -1062,7 +1067,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ fontWeight: 500, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 4 }}
-            onDoubleClick={() => startInlineEdit(record.id, 'name', name)}
+            onClick={() => startInlineEdit(record.id, 'name', name)}
           >
             {name}
             {criticalActivityIds.includes(record.id) && (
@@ -1096,7 +1101,7 @@ const ProjectDetail: React.FC = () => {
           <Tag
             color={cfg.color}
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'type' })}
+            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'type' })}
           >
             {cfg.label}
           </Tag>
@@ -1127,7 +1132,7 @@ const ProjectDetail: React.FC = () => {
           <Tag
             color={cfg.color}
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'status' })}
+            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'status' })}
           >
             {cfg.label}
           </Tag>
@@ -1167,7 +1172,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
+            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
           >
             {names}
           </span>
@@ -1200,7 +1205,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
+            onClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
           >
             {days != null ? `${days}天` : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
           </span>
@@ -1231,7 +1236,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ cursor: !hasDeps && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => {
+            onClick={() => {
               if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
               if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id)) {
                 setInlineEditing({ id: record.id, field: 'planDates' });
@@ -1266,7 +1271,7 @@ const ProjectDetail: React.FC = () => {
         return (
           <span
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onDoubleClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'actualDates' })}
+            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'actualDates' })}
           >
             {renderActualDates(record)}
           </span>
@@ -1302,7 +1307,7 @@ const ProjectDetail: React.FC = () => {
                 whiteSpace: 'nowrap',
                 color: notes ? undefined : 'var(--color-text-4)',
               }}
-              onDoubleClick={() => startInlineEdit(record.id, 'notes', notes || '')}
+              onClick={() => startInlineEdit(record.id, 'notes', notes || '')}
             >
               {notes || '-'}
             </span>
@@ -1479,13 +1484,20 @@ const ProjectDetail: React.FC = () => {
                   value: (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       {project.members && project.members.length > 0
-                        ? project.members.map((m) => (
-                            <Tag key={m.user.id} size="small">{m.user.realName}</Tag>
-                          ))
+                        ? (
+                          <>
+                            {project.members.slice(0, 3).map((m) => (
+                              <Tag key={m.user.id} size="small">{m.user.realName}</Tag>
+                            ))}
+                            {project.members.length > 3 && (
+                              <Tag size="small" color="gray">+{project.members.length - 3}</Tag>
+                            )}
+                          </>
+                        )
                         : <span style={{ color: 'var(--color-text-4)' }}>暂无</span>
                       }
                       {(useAuthStore.getState().user?.permissions?.includes('*:*') || useAuthStore.getState().user?.id === project.managerId) && (
-                        <Button type="text" size="mini" onClick={() => setMembersModalVisible(true)} style={{ padding: '0 4px' }}>管理</Button>
+                        <Button type="text" size="mini" onClick={openMembersModal} style={{ padding: '0 4px' }}>管理</Button>
                       )}
                     </div>
                   ),
@@ -2166,60 +2178,81 @@ const ProjectDetail: React.FC = () => {
           title="管理协作者"
           visible={membersModalVisible}
           onCancel={() => setMembersModalVisible(false)}
-          footer={<Button onClick={() => setMembersModalVisible(false)}>关闭</Button>}
+          onOk={handleMembersConfirm}
+          okText="确定"
+          cancelText="取消"
+          confirmLoading={membersLoading}
           style={{ maxWidth: 480 }}
         >
+          {/* 已选成员标签 */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>添加协作者</div>
-            <Select
-              placeholder="搜索并选择用户"
-              showSearch
-              allowClear
-              loading={membersLoading}
-              filterOption={(input, option) =>
-                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
-              onChange={(userId) => {
-                if (userId) handleAddMember(userId);
-              }}
-              value={undefined}
-              style={{ width: '100%' }}
-            >
-              {users
-                .filter((u) =>
-                  u.id !== project?.managerId &&
-                  !project?.members?.some((m) => m.user.id === u.id)
-                )
-                .map((u) => (
-                  <Select.Option key={u.id} value={u.id}>
-                    {u.realName} ({u.username})
-                  </Select.Option>
-                ))
-              }
-            </Select>
-          </div>
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>当前协作者</div>
-            {project?.members && project.members.length > 0 ? (
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                {project.members.map((m) => (
-                  <div key={m.user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--color-fill-2)' }}>
-                    <span>{m.user.realName} ({m.user.username})</span>
-                    <Button
-                      type="text"
-                      status="danger"
-                      size="small"
-                      loading={membersLoading}
-                      onClick={() => handleRemoveMember(m.user.id)}
+            <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>
+              当前协作者（{pendingMemberIds.length} 人）
+            </div>
+            {pendingMemberIds.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {pendingMemberIds.map((uid) => {
+                  const u = users.find((u) => u.id === uid);
+                  return (
+                    <Tag
+                      key={uid}
+                      closable
+                      onClose={() => setPendingMemberIds(pendingMemberIds.filter((id) => id !== uid))}
+                      style={{ margin: 0 }}
                     >
-                      移除
-                    </Button>
+                      {u?.realName || uid}
+                    </Tag>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--color-text-4)' }}>暂无协作者，从下方搜索添加</div>
+            )}
+          </div>
+
+          {/* 搜索添加 */}
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginBottom: 8 }}>添加成员</div>
+            <Input
+              placeholder="搜索姓名或用户名..."
+              allowClear
+              value={memberSearch}
+              onChange={setMemberSearch}
+              style={{ marginBottom: 8 }}
+            />
+            <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+              {users
+                .filter((u) => u.id !== project?.managerId && !pendingMemberIds.includes(u.id))
+                .filter((u) => {
+                  if (!memberSearch) return true;
+                  const kw = memberSearch.toLowerCase();
+                  return u.realName.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
+                })
+                .map((u) => (
+                  <div
+                    key={u.id}
+                    onClick={() => { setPendingMemberIds([...pendingMemberIds, u.id]); setMemberSearch(''); }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 8px', borderRadius: 6, cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-fill-2)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span>
+                      <span style={{ fontWeight: 500 }}>{u.realName}</span>
+                      <span style={{ color: 'var(--color-text-3)', marginLeft: 6, fontSize: 13 }}>{u.username}</span>
+                    </span>
+                    <IconPlus style={{ color: 'var(--color-text-3)', fontSize: 12 }} />
                   </div>
                 ))}
-              </Space>
-            ) : (
-              <Empty description="暂无协作者" style={{ padding: '12px 0' }} />
-            )}
+              {users.filter((u) => u.id !== project?.managerId && !pendingMemberIds.includes(u.id)).filter((u) => {
+                if (!memberSearch) return true;
+                const kw = memberSearch.toLowerCase();
+                return u.realName.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
+              }).length === 0 && (
+                <div style={{ padding: '12px 0', textAlign: 'center', color: 'var(--color-text-4)', fontSize: 13 }}>
+                  {memberSearch ? '无匹配用户' : '所有用户已添加'}
+                </div>
+              )}
+            </div>
           </div>
         </Modal>
 
