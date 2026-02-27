@@ -453,6 +453,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '活动名称',
       dataIndex: 'name',
+      width: 240,
       render: (_: string, record: TemplateActivity) => (
         <Input
           size="small"
