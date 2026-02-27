@@ -7,17 +7,16 @@ export enum UserStatus {
 
 export interface User {
   id: string;
-  username: string;
-  email: string;
+  username?: string;
   realName: string;
-  phone?: string;
   wecomUserId?: string;
+  canLogin: boolean;
   status: UserStatus;
   roles: string[]; // 角色名称数组
   permissions: string[]; // 权限代码数组 (格式: resource:action)
   collaboratingProjectIds?: string[]; // 协作项目 ID 列表
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface Role {

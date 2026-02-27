@@ -11,7 +11,7 @@ interface AuthState {
   loginWithWecom: (data: { accessToken: string; refreshToken: string; user: User }) => void;
   logout: () => void;
   fetchUser: () => Promise<void>;
-  updateProfile: (data: { realName?: string; email?: string; phone?: string }) => void;
+  updateProfile: (data: { realName?: string }) => void;
   hasPermission: (resource: string, action: string) => boolean;
   isProjectManager: (managerId: string, projectId?: string) => boolean;
 }

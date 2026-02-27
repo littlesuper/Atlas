@@ -62,7 +62,18 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 3. 验证密码
+    // 3. 检查是否允许登录
+    if (!user.canLogin) {
+      res.status(403).json({ error: '该账号未开启登录权限' });
+      return;
+    }
+
+    // 3.5 验证密码
+    if (!user.password) {
+      res.status(403).json({ error: '该账号不支持密码登录' });
+      return;
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       res.status(401).json({ error: '用户名或密码错误' });
@@ -125,7 +136,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email,
         realName: user.realName,
         roles,
         permissions,
@@ -213,15 +223,12 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // 获取完整的用户信息(包含phone字段)
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
         id: true,
         username: true,
-        email: true,
         realName: true,
-        phone: true,
       },
     });
 
@@ -233,9 +240,7 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
     res.json({
       id: user.id,
       username: user.username,
-      email: user.email,
       realName: user.realName,
-      phone: user.phone,
       roles: req.user.roles.map((r) => r.name),
       permissions: req.user.permissions,
       collaboratingProjectIds: req.user.collaboratingProjectIds,
@@ -257,7 +262,7 @@ router.put('/profile', authenticate, async (req: Request, res: Response): Promis
       return;
     }
 
-    const { realName, email, phone } = req.body;
+    const { realName } = req.body;
     const data: Record<string, string | null> = {};
 
     if (realName !== undefined) {
@@ -268,26 +273,6 @@ router.put('/profile', authenticate, async (req: Request, res: Response): Promis
       data.realName = realName.trim();
     }
 
-    if (email !== undefined) {
-      if (!email || !email.trim()) {
-        res.status(400).json({ error: '邮箱不能为空' });
-        return;
-      }
-      // 检查邮箱是否被其他用户占用
-      const existingUser = await prisma.user.findFirst({
-        where: { email: email.trim(), id: { not: req.user.id } },
-      });
-      if (existingUser) {
-        res.status(400).json({ error: '该邮箱已被其他用户使用' });
-        return;
-      }
-      data.email = email.trim();
-    }
-
-    if (phone !== undefined) {
-      data.phone = phone?.trim() || null;
-    }
-
     if (Object.keys(data).length === 0) {
       res.status(400).json({ error: '没有需要更新的字段' });
       return;
@@ -296,7 +281,7 @@ router.put('/profile', authenticate, async (req: Request, res: Response): Promis
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data,
-      select: { id: true, username: true, email: true, realName: true, phone: true },
+      select: { id: true, username: true, realName: true },
     });
 
     res.json(updatedUser);
@@ -335,8 +320,8 @@ router.post('/change-password', authenticate, async (req: Request, res: Response
       select: { password: true },
     });
 
-    if (!user) {
-      res.status(404).json({ error: '用户不存在' });
+    if (!user || !user.password) {
+      res.status(404).json({ error: '用户不存在或不支持密码登录' });
       return;
     }
 
@@ -495,30 +480,15 @@ router.post('/wecom/login', async (req: Request, res: Response): Promise<void> =
       },
     });
 
-    // 3. 未找到则自动创建用户
+    // 3. 未找到则自动创建用户（联系人类型）
     if (!user) {
       const detail = await getUserDetail(wecomUserId);
 
-      // 查找「只读成员」角色
-      const readonlyRole = await prisma.role.findFirst({
-        where: { name: '只读成员' },
-      });
-
-      const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-      const username = `wecom_${wecomUserId}`;
-      const email = detail.email || `${wecomUserId}@wecom.local`;
-
       user = await prisma.user.create({
         data: {
-          username,
-          email,
-          password: randomPassword,
           realName: detail.name || wecomUserId,
-          phone: detail.mobile || null,
           wecomUserId,
-          userRoles: readonlyRole
-            ? { create: { roleId: readonlyRole.id } }
-            : undefined,
+          canLogin: false,
         },
         include: {
           userRoles: {
@@ -588,7 +558,6 @@ router.post('/wecom/login', async (req: Request, res: Response): Promise<void> =
       user: {
         id: user.id,
         username: user.username,
-        email: user.email,
         realName: user.realName,
         roles,
         permissions,

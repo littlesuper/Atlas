@@ -28,8 +28,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        username: string;
-        email: string;
+        username: string | null;
         realName: string;
         roles: Array<{
           id: string;
@@ -158,7 +157,6 @@ export const authenticate = async (
     const userData: Express.Request['user'] = {
       id: user.id,
       username: user.username,
-      email: user.email,
       realName: user.realName,
       roles,
       permissions,

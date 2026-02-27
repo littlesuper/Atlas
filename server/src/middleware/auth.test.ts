@@ -43,7 +43,6 @@ function mockRes() {
 const VALID_USER = {
   id: 'u1',
   username: 'testuser',
-  email: 'test@test.com',
   realName: 'Test User',
   status: 'ACTIVE',
   userRoles: [

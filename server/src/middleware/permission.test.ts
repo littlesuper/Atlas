@@ -14,7 +14,6 @@ function mockReq(overrides: Partial<Express.Request['user']> = {}): Request {
     user: {
       id: 'u1',
       username: 'test',
-      email: 'test@test.com',
       realName: 'Test',
       roles: [],
       permissions: [],

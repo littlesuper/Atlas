@@ -41,8 +41,8 @@ export const authApi = {
 
   getMe: () => request.get<User>('/auth/me'),
 
-  updateProfile: (data: { realName?: string; email?: string; phone?: string }) =>
-    request.put<Pick<User, 'id' | 'username' | 'email' | 'realName' | 'phone'>>('/auth/profile', data),
+  updateProfile: (data: { realName?: string }) =>
+    request.put<Pick<User, 'id' | 'username' | 'realName'>>('/auth/profile', data),
 
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     request.post<{ success: boolean; message: string }>('/auth/change-password', data),
@@ -62,23 +62,22 @@ export const authApi = {
 
 // ============ 用户管理 API ============
 export const usersApi = {
-  list: (params?: { page?: number; pageSize?: number; keyword?: string }) =>
+  list: (params?: { page?: number; pageSize?: number; keyword?: string; canLogin?: string }) =>
     request.get<PaginatedResponse<User>>('/users', { params }),
 
   create: (data: {
-    username: string;
-    email: string;
-    password: string;
+    username?: string;
+    password?: string;
     realName: string;
-    phone?: string;
-    roleIds: string[];
+    wecomUserId?: string;
+    canLogin?: boolean;
+    roleIds?: string[];
   }) => request.post<User>('/users', data),
 
   update: (id: string, data: {
-    email?: string;
     realName?: string;
-    phone?: string;
     wecomUserId?: string | null;
+    canLogin?: boolean;
     status?: string;
     roleIds?: string[];
     password?: string;

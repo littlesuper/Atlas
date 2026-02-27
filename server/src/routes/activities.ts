@@ -1096,7 +1096,7 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
 
     // Aggregate by assignee
     const userMap = new Map<string, {
-      userId: string; realName: string; username: string;
+      userId: string; realName: string; username: string | null;
       totalActivities: number; inProgress: number; overdue: number; totalDuration: number;
     }>();
 

@@ -18,13 +18,12 @@ enum UserStatus {
 }
 
 model User {
-  id        String     @id @default(uuid())
-  username  String     @unique
-  email     String     @unique
-  password  String
-  realName  String
-  phone       String?
+  id          String     @id @default(uuid())
+  username    String?    @unique
+  password    String?
+  realName    String
   wecomUserId String?    @unique
+  canLogin    Boolean    @default(true)
   status      UserStatus @default(ACTIVE)
   preferences Json?
   createdAt DateTime   @default(now())

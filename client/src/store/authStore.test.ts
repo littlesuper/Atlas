@@ -24,7 +24,7 @@ function makeUser(permissions: string[]) {
     id: 'user-1',
     username: 'test',
     realName: '测试用户',
-    email: 'test@example.com',
+    canLogin: true,
     status: 'ACTIVE' as const,
     permissions,
     roles: [],

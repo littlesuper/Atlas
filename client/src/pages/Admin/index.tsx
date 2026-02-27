@@ -15,6 +15,7 @@ import {
   Tooltip,
   Checkbox,
   Divider,
+  Switch,
 } from '@arco-design/web-react';
 import {
   IconSearch,
@@ -33,6 +34,7 @@ import AuditLogTab from './AuditLog';
 import WecomManagement from './WecomManagement';
 import TemplateManagement from './TemplateManagement';
 import dayjs from 'dayjs';
+import { pinyin } from 'pinyin-pro';
 
 const AdminPage: React.FC = () => {
   const { hasPermission } = useAuthStore();
@@ -72,6 +74,10 @@ const AdminPage: React.FC = () => {
   const [userModalVisible, setUserModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userSearchKeyword, setUserSearchKeyword] = useState('');
+  const [canLoginFilter, setCanLoginFilter] = useState<string>('');
+  // 控制表单中「允许登录」和「状态」开关
+  const [formCanLogin, setFormCanLogin] = useState(true);
+  const [formStatus, setFormStatus] = useState<string>('ACTIVE');
 
   // 角色数据
   const [roles, setRoles] = useState<Role[]>([]);
@@ -84,7 +90,10 @@ const AdminPage: React.FC = () => {
   const loadUsers = async () => {
     setUsersLoading(true);
     try {
-      const response = await usersApi.list({ keyword: userSearchKeyword || undefined });
+      const params: any = {};
+      if (userSearchKeyword) params.keyword = userSearchKeyword;
+      if (canLoginFilter) params.canLogin = canLoginFilter;
+      const response = await usersApi.list(params);
       setUsers(response.data.data || []);
     } catch (error) {
       Message.error('加载用户列表失败');
@@ -128,7 +137,7 @@ const AdminPage: React.FC = () => {
     if (mainTab === 'account') {
       loadUsers();
     }
-  }, [userSearchKeyword]);
+  }, [userSearchKeyword, canLoginFilter]);
 
   // 处理搜索
   const handleUserSearch = useMemo(() => {
@@ -145,17 +154,18 @@ const AdminPage: React.FC = () => {
   const handleOpenUserModal = (user?: User) => {
     if (user) {
       setEditingUser(user);
+      setFormCanLogin(user.canLogin !== false);
+      setFormStatus(user.status || 'ACTIVE');
       userForm.setFieldsValue({
         username: user.username,
         realName: user.realName,
-        email: user.email,
-        phone: user.phone,
         wecomUserId: user.wecomUserId,
         roleIds: user.roles || [],
-        status: user.status,
       });
     } else {
       setEditingUser(null);
+      setFormCanLogin(true);
+      setFormStatus('ACTIVE');
       userForm.resetFields();
     }
     setUserModalVisible(true);
@@ -173,39 +183,28 @@ const AdminPage: React.FC = () => {
       }).filter(Boolean) || [];
 
       if (editingUser) {
-        const updateData: {
-          email?: string;
-          realName?: string;
-          phone?: string;
-          wecomUserId?: string;
-          status?: string;
-          roleIds?: string[];
-        } = {
-          email: values.email,
+        const updateData: any = {
           realName: values.realName,
-          phone: values.phone,
           wecomUserId: values.wecomUserId || null,
-          status: values.status,
+          canLogin: formCanLogin,
+          status: formStatus,
           roleIds,
         };
 
         if (values.password) {
-          (updateData as typeof updateData & { password?: string }).password = values.password;
+          updateData.password = values.password;
         }
 
         await usersApi.update(editingUser.id, updateData);
         Message.success('用户更新成功');
       } else {
-        const createData = {
+        await usersApi.create({
           username: values.username,
-          email: values.email,
           password: values.password,
           realName: values.realName,
-          phone: values.phone,
+          canLogin: formCanLogin,
           roleIds,
-        };
-
-        await usersApi.create(createData);
+        });
         Message.success('用户创建成功');
       }
 
@@ -224,10 +223,10 @@ const AdminPage: React.FC = () => {
       onOk: async () => {
         try {
           await usersApi.delete(user.id);
-          Message.success('用户删除成功');
+          Message.success('删除成功');
           loadUsers();
         } catch (error) {
-          Message.error('用户删除失败');
+          Message.error('删除失败');
         }
       },
     });
@@ -294,27 +293,27 @@ const AdminPage: React.FC = () => {
   // 用户表格列配置
   const userColumns = [
     {
-      title: '用户名',
-      dataIndex: 'username',
-      width: 150,
-      sorter: (a: User, b: User) => a.username.localeCompare(b.username),
-    },
-    {
       title: '姓名',
       dataIndex: 'realName',
       width: 120,
       sorter: (a: User, b: User) => (a.realName || '').localeCompare(b.realName || ''),
     },
     {
-      title: '邮箱',
-      dataIndex: 'email',
-      width: 200,
+      title: '用户名',
+      dataIndex: 'username',
+      width: 150,
+      sorter: (a: User, b: User) => (a.username || '').localeCompare(b.username || ''),
+      render: (username?: string) => username || '-',
     },
     {
-      title: '手机',
-      dataIndex: 'phone',
-      width: 140,
-      render: (phone?: string) => phone || '-',
+      title: '允许登录',
+      dataIndex: 'canLogin',
+      width: 100,
+      render: (canLogin: boolean) => (
+        <Tag color={canLogin !== false ? 'green' : 'gray'}>
+          {canLogin !== false ? '是' : '否'}
+        </Tag>
+      ),
     },
     {
       title: '角色',
@@ -327,6 +326,7 @@ const AdminPage: React.FC = () => {
               {role}
             </Tag>
           ))}
+          {roles.length === 0 && '-'}
         </Space>
       ),
     },
@@ -490,10 +490,19 @@ const AdminPage: React.FC = () => {
                   {/* 用户管理 */}
                   <Tabs.TabPane key="users" title="用户管理">
                     <div className="toolbar">
-                      <div className="toolbar-left">
-                        共 {users.length} 个用户
-                      </div>
+                      <div className="toolbar-left" />
                       <Space>
+                        <span style={{ color: 'var(--color-text-3)', fontSize: 13 }}>共 {users.length} 个用户</span>
+                        <Select
+                          placeholder="全部"
+                          value={canLoginFilter || undefined}
+                          onChange={(value) => setCanLoginFilter(value || '')}
+                          allowClear
+                          style={{ width: 140 }}
+                        >
+                          <Select.Option value="true">允许登录</Select.Option>
+                          <Select.Option value="false">不可登录</Select.Option>
+                        </Select>
                         <Input
                           style={{ width: 240 }}
                           prefix={<IconSearch />}
@@ -519,7 +528,7 @@ const AdminPage: React.FC = () => {
                       loading={usersLoading}
                       rowKey="id"
                       pagination={{ pageSize: 20, showTotal: true }}
-                      scroll={{ x: 1300 }}
+                      scroll={{ x: 1400 }}
                     />
                   </Tabs.TabPane>
 
@@ -592,66 +601,75 @@ const AdminPage: React.FC = () => {
           }}
         >
           <Form.Item
-            label="用户名"
-            field="username"
-            rules={[
-              { required: true, message: '请输入用户名' },
-              { minLength: 2, message: '用户名长度不能少于2位' },
-            ]}
-          >
-            <Input
-              placeholder="请输入用户名"
-              disabled={!!editingUser}
-            />
-          </Form.Item>
-
-          <Form.Item
             label="姓名"
             field="realName"
             rules={[{ required: true, message: '请输入姓名' }]}
           >
-            <Input placeholder="请输入姓名" />
+            <Input
+              placeholder="请输入姓名"
+              onChange={(value) => {
+                if (!editingUser && value) {
+                  const py = pinyin(value, { toneType: 'none', type: 'array' }).join('');
+                  userForm.setFieldValue('username', py);
+                }
+              }}
+            />
           </Form.Item>
 
-          <Form.Item
-            label="邮箱"
-            field="email"
-            rules={[
-              { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '请输入有效的邮箱地址' },
-            ]}
-          >
-            <Input placeholder="请输入邮箱" />
-          </Form.Item>
+          <div style={{ display: 'flex', gap: 24 }}>
+            <Form.Item label="允许登录">
+              <Space>
+                <Switch
+                  checked={formCanLogin}
+                  onChange={setFormCanLogin}
+                />
+                <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
+                  {formCanLogin ? '可登录' : '不可登录'}
+                </span>
+              </Space>
+            </Form.Item>
+            <Form.Item label="账号状态">
+              <Space>
+                <Switch
+                  checked={formStatus !== 'DISABLED'}
+                  onChange={(checked) => setFormStatus(checked ? 'ACTIVE' : 'DISABLED')}
+                />
+                <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
+                  {formStatus !== 'DISABLED' ? '启用' : '已禁用'}
+                </span>
+              </Space>
+            </Form.Item>
+          </div>
 
-          <Form.Item
-            label={editingUser ? '密码（留空表示不修改）' : '密码'}
-            field="password"
-            rules={editingUser ? [{ minLength: 6, message: '密码长度不能少于6位' }] : [
-              { required: true, message: '请输入密码' },
-              { minLength: 6, message: '密码长度不能少于6位' },
-            ]}
-          >
-            <Input.Password placeholder="请输入密码" />
-          </Form.Item>
+          {formCanLogin && (
+            <Form.Item
+              label="用户名"
+              field="username"
+              rules={[
+                { required: true, message: '请输入用户名' },
+                { minLength: 2, message: '用户名长度不能少于2位' },
+              ]}
+              extra={!editingUser ? '根据姓名自动生成拼音，可手动修改' : '用户名创建后不可修改'}
+            >
+              <Input
+                placeholder="请输入用户名"
+                disabled={!!editingUser}
+              />
+            </Form.Item>
+          )}
 
-          <Form.Item
-            label="手机号"
-            field="phone"
-            rules={[
-              {
-                validator: (value, callback) => {
-                  if (value && !/^1[3-9]\d{9}$/.test(value)) {
-                    callback('请输入有效的手机号码');
-                  } else {
-                    callback();
-                  }
-                },
-              },
-            ]}
-          >
-            <Input placeholder="请输入手机号" />
-          </Form.Item>
+          {formCanLogin && (
+            <Form.Item
+              label={editingUser && editingUser.canLogin !== false ? '密码（留空表示不修改）' : '密码'}
+              field="password"
+              rules={editingUser && editingUser.canLogin !== false ? [{ minLength: 6, message: '密码长度不能少于6位' }] : [
+                { required: true, message: '请输入密码' },
+                { minLength: 6, message: '密码长度不能少于6位' },
+              ]}
+            >
+              <Input.Password placeholder="请输入密码" />
+            </Form.Item>
+          )}
 
           <Form.Item
             label="企微UserID"
@@ -664,7 +682,7 @@ const AdminPage: React.FC = () => {
           <Form.Item
             label="角色"
             field="roleIds"
-            rules={[{ required: true, message: '请选择至少一个角色' }]}
+            rules={formCanLogin ? [{ required: true, message: '请选择至少一个角色' }] : []}
           >
             <Select
               placeholder="请选择角色"
@@ -674,20 +692,6 @@ const AdminPage: React.FC = () => {
               {roles.map((role) => (
                 <Select.Option key={role.id} value={role.name}>
                   {role.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="状态"
-            field="status"
-            rules={[{ required: true, message: '请选择状态' }]}
-          >
-            <Select placeholder="请选择状态">
-              {Object.entries(USER_STATUS_MAP).map(([key, value]) => (
-                <Select.Option key={key} value={key}>
-                  <Tag color={value.color}>{value.label}</Tag>
                 </Select.Option>
               ))}
             </Select>

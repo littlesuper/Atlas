@@ -23,23 +23,25 @@ router.get(
         page = '1',
         pageSize = '20',
         keyword = '',
+        canLogin,
       } = req.query;
 
       const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
       const skip = (pageNum - 1) * pageSizeNum;
 
-      // 构建搜索条件(按用户名/姓名/邮箱模糊搜索,不区分大小写)
-      const where = keyword
-        ? {
-            OR: [
-              { username: { contains: keyword as string } },
-              { realName: { contains: keyword as string } },
-              { email: { contains: keyword as string } },
-            ],
-          }
-        : {};
+      const where: any = {};
+      if (keyword) {
+        where.OR = [
+          { username: { contains: keyword as string } },
+          { realName: { contains: keyword as string } },
+        ];
+      }
+      if (canLogin === 'true') {
+        where.canLogin = true;
+      } else if (canLogin === 'false') {
+        where.canLogin = false;
+      }
 
-      // 查询用户列表
       const [users, total] = await Promise.all([
         prisma.user.findMany({
           where,
@@ -49,10 +51,9 @@ router.get(
           select: {
             id: true,
             username: true,
-            email: true,
             realName: true,
-            phone: true,
             wecomUserId: true,
+            canLogin: true,
             status: true,
             createdAt: true,
             userRoles: {
@@ -71,14 +72,12 @@ router.get(
         prisma.user.count({ where }),
       ]);
 
-      // 格式化响应数据（roles 返回角色名称字符串数组，与 auth 接口格式一致）
       const data = users.map((user) => ({
         id: user.id,
         username: user.username,
-        email: user.email,
         realName: user.realName,
-        phone: user.phone,
         wecomUserId: user.wecomUserId,
+        canLogin: user.canLogin,
         status: user.status,
         createdAt: user.createdAt,
         roles: user.userRoles.map((ur) => ur.role.name),
@@ -108,58 +107,51 @@ router.post(
   requirePermission('user', 'create'),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const { username, email, password, realName, phone, roleIds } = req.body;
+      const { username, password, realName, roleIds, canLogin = true } = req.body;
 
-      // 1. 验证必填字段
-      if (!username || !email || !password || !realName) {
-        res.status(400).json({ error: '用户名、邮箱、密码和姓名不能为空' });
+      if (!realName) {
+        res.status(400).json({ error: '姓名不能为空' });
         return;
       }
+      if (canLogin) {
+        if (!username || !password) {
+          res.status(400).json({ error: '允许登录的用户需填写用户名和密码' });
+          return;
+        }
+      }
 
-      // 2. 检查用户名是否已存在
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          OR: [{ username }, { email }],
-        },
-      });
-
-      if (existingUser) {
-        if (existingUser.username === username) {
+      // 检查用户名唯一性
+      if (username) {
+        const existingUser = await prisma.user.findUnique({
+          where: { username },
+        });
+        if (existingUser) {
           res.status(400).json({ error: '用户名已存在' });
           return;
         }
-        if (existingUser.email === email) {
-          res.status(400).json({ error: '邮箱已存在' });
-          return;
-        }
       }
 
-      // 3. 加密密码
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
 
-      // 4. 创建用户（事务保证原子性）
       const user = await prisma.$transaction(async (tx) => {
         const newUser = await tx.user.create({
           data: {
-            username,
-            email,
-            password: hashedPassword,
+            username: username || null,
+            password: hashedPassword || null,
             realName,
-            phone: phone || null,
+            canLogin: !!canLogin,
             status: 'ACTIVE',
           },
           select: {
             id: true,
             username: true,
-            email: true,
             realName: true,
-            phone: true,
+            canLogin: true,
             status: true,
             createdAt: true,
           },
         });
 
-        // 关联角色
         if (roleIds && Array.isArray(roleIds) && roleIds.length > 0) {
           await tx.userRole.createMany({
             data: roleIds.map((roleId: string) => ({
@@ -172,18 +164,13 @@ router.post(
         return newUser;
       });
 
-      // 5. 查询完整用户信息(含角色)
       const userWithRoles = await prisma.user.findUnique({
         where: { id: user.id },
         include: {
           userRoles: {
             include: {
               role: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
+                select: { id: true, name: true, description: true },
               },
             },
           },
@@ -195,9 +182,8 @@ router.post(
       res.status(201).json({
         id: userWithRoles!.id,
         username: userWithRoles!.username,
-        email: userWithRoles!.email,
         realName: userWithRoles!.realName,
-        phone: userWithRoles!.phone,
+        canLogin: userWithRoles!.canLogin,
         status: userWithRoles!.status,
         createdAt: userWithRoles!.createdAt,
         roles: userWithRoles!.userRoles.map((ur) => ur.role.name),
@@ -221,9 +207,8 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const { email, realName, phone, wecomUserId, status, roleIds, password } = req.body;
+      const { realName, wecomUserId, status, roleIds, password, canLogin } = req.body;
 
-      // 1. 检查用户是否存在
       const existingUser = await prisma.user.findUnique({
         where: { id },
       });
@@ -233,36 +218,32 @@ router.put(
         return;
       }
 
-      // 2. 校验邮箱格式
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          res.status(400).json({ error: '邮箱格式不正确' });
+      // 如果开启登录，校验必填字段
+      if (canLogin === true && !existingUser.canLogin) {
+        const finalUsername = req.body.username || existingUser.username;
+        const finalPassword = password || existingUser.password;
+        if (!finalUsername || !finalPassword) {
+          res.status(400).json({ error: '开启登录需要填写用户名和密码' });
           return;
         }
       }
 
-      // 3. 检查邮箱是否被其他用户使用
-      if (email && email !== existingUser.email) {
-        const emailExists = await prisma.user.findFirst({
-          where: {
-            email,
-            id: { not: id },
-          },
+      // 检查用户名唯一性
+      if (req.body.username && req.body.username !== existingUser.username) {
+        const usernameExists = await prisma.user.findFirst({
+          where: { username: req.body.username, id: { not: id } },
         });
-
-        if (emailExists) {
-          res.status(400).json({ error: '邮箱已被使用' });
+        if (usernameExists) {
+          res.status(400).json({ error: '用户名已被使用' });
           return;
         }
       }
 
-      // 4. 准备更新数据
       const updateData: any = {};
-      if (email) updateData.email = email;
+      if (req.body.username) updateData.username = req.body.username;
       if (realName) updateData.realName = realName;
-      if (phone !== undefined) updateData.phone = phone || null;
       if (wecomUserId !== undefined) updateData.wecomUserId = wecomUserId || null;
+      if (canLogin !== undefined) updateData.canLogin = !!canLogin;
       if (status) updateData.status = status;
       if (password) {
         updateData.password = await bcrypt.hash(password, 10);
@@ -271,53 +252,35 @@ router.put(
       const userChanges = diffFields(
         existingUser as unknown as Record<string, unknown>,
         updateData,
-        ['email', 'realName', 'phone', 'wecomUserId', 'status'],
+        ['realName', 'wecomUserId', 'canLogin', 'status'],
       );
 
-      // 5. 更新用户基本信息
       await prisma.user.update({
         where: { id },
         data: updateData,
       });
 
-      // 状态变更时清除该用户缓存（如禁用账号需立即生效）
-      if (status) {
+      if (status || canLogin !== undefined) {
         invalidateUserCache(id);
       }
 
-      // 6. 更新角色关联(全量替换)
       if (roleIds && Array.isArray(roleIds)) {
-        // 先删除所有旧关联
-        await prisma.userRole.deleteMany({
-          where: { userId: id },
-        });
-
-        // 创建新关联
+        await prisma.userRole.deleteMany({ where: { userId: id } });
         if (roleIds.length > 0) {
           await prisma.userRole.createMany({
-            data: roleIds.map((roleId: string) => ({
-              userId: id,
-              roleId,
-            })),
+            data: roleIds.map((roleId: string) => ({ userId: id, roleId })),
           });
         }
-
-        // 角色变更后清除该用户的认证缓存
         invalidateUserCache(id);
       }
 
-      // 7. 查询完整用户信息(含角色)
       const updatedUser = await prisma.user.findUnique({
         where: { id },
         include: {
           userRoles: {
             include: {
               role: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
+                select: { id: true, name: true, description: true },
               },
             },
           },
@@ -329,10 +292,9 @@ router.put(
       res.json({
         id: updatedUser!.id,
         username: updatedUser!.username,
-        email: updatedUser!.email,
         realName: updatedUser!.realName,
-        phone: updatedUser!.phone,
         wecomUserId: updatedUser!.wecomUserId,
+        canLogin: updatedUser!.canLogin,
         status: updatedUser!.status,
         createdAt: updatedUser!.createdAt,
         roles: updatedUser!.userRoles.map((ur) => ur.role.name),
@@ -357,7 +319,6 @@ router.delete(
     try {
       const { id } = req.params;
 
-      // 1. 检查用户是否存在
       const existingUser = await prisma.user.findUnique({
         where: { id },
       });
@@ -367,7 +328,6 @@ router.delete(
         return;
       }
 
-      // Check if user is project manager for any project
       const managedProjects = await prisma.project.count({
         where: { managerId: id },
       });
@@ -376,10 +336,7 @@ router.delete(
         return;
       }
 
-      // 2. 删除用户(级联删除userRoles)
-      await prisma.user.delete({
-        where: { id },
-      });
+      await prisma.user.delete({ where: { id } });
 
       auditLog({ req, action: 'DELETE', resourceType: 'user', resourceId: id, resourceName: existingUser.realName });
 

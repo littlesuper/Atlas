@@ -2355,7 +2355,7 @@ const ProjectDetail: React.FC = () => {
                 .filter((u) => {
                   if (!memberSearch) return true;
                   const kw = memberSearch.toLowerCase();
-                  return u.realName.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
+                  return u.realName.toLowerCase().includes(kw) || (u.username || '').toLowerCase().includes(kw);
                 })
                 .map((u) => (
                   <div
@@ -2367,7 +2367,7 @@ const ProjectDetail: React.FC = () => {
                   >
                     <span>
                       <span style={{ fontWeight: 500 }}>{u.realName}</span>
-                      <span style={{ color: 'var(--color-text-3)', marginLeft: 6, fontSize: 13 }}>{u.username}</span>
+                      {u.username && <span style={{ color: 'var(--color-text-3)', marginLeft: 6, fontSize: 13 }}>{u.username}</span>}
                     </span>
                     <IconPlus style={{ color: 'var(--color-text-3)', fontSize: 12 }} />
                   </div>
@@ -2375,7 +2375,7 @@ const ProjectDetail: React.FC = () => {
               {users.filter((u) => u.id !== project?.managerId && !pendingMemberIds.includes(u.id)).filter((u) => {
                 if (!memberSearch) return true;
                 const kw = memberSearch.toLowerCase();
-                return u.realName.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
+                return u.realName.toLowerCase().includes(kw) || (u.username || '').toLowerCase().includes(kw);
               }).length === 0 && (
                 <div style={{ padding: '12px 0', textAlign: 'center', color: 'var(--color-text-4)', fontSize: 13 }}>
                   {memberSearch ? '无匹配用户' : '所有用户已添加'}

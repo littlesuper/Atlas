@@ -57,14 +57,32 @@ npx playwright test            # E2E 测试
 - 状态管理使用 Zustand（不用 Redux）
 - 路由使用 React Router v7
 - 日期处理使用 Day.js
+- 中文姓名转拼音使用 pinyin-pro（`client` 依赖）
 - 开发环境数据库为 SQLite（`server/prisma/dev.db`），无需安装 PostgreSQL
 - 工作日计算考虑中国法定节假日（`server/src/utils/workday.ts`）
+
+## 用户模型
+
+User 模型支持两种使用场景：
+- **可登录用户**（`canLogin: true`）：需要 username + password，可分配角色和权限，可登录系统
+- **仅联系人**（`canLogin: false`）：只需 realName，可被分配为活动负责人，但无法登录
+
+关键字段：
+- `username`（可选，唯一）：登录用户名，创建时根据姓名自动生成拼音，创建后不可修改
+- `password`（可选）：仅可登录用户需要
+- `realName`（必填）：用户姓名
+- `wecomUserId`（可选，唯一）：企业微信用户ID，用于企微扫码登录
+- `canLogin`（布尔值）：控制是否允许登录系统
+- `status`（ACTIVE/DISABLED）：账号启用/禁用状态
+
+注意：User 模型没有 email 和 phone 字段。
 
 ## 数据库
 
 - Schema 位于 `server/prisma/schema.prisma`，包含 21 个模型
 - 开发环境使用 SQLite，生产环境切换为 PostgreSQL
 - 修改 schema 后需运行 `npx prisma migrate dev --name <描述>` 创建迁移
+- 开发环境也可用 `npx prisma db push` 快速同步 schema（不生成迁移文件）
 - 种子数据包含 3 个测试账号：admin/admin123, zhangsan/123456, lisi/123456
 
 ## 环境变量
