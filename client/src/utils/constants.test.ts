@@ -24,10 +24,10 @@ function assertMapEntry(map: Record<string, { label: string; color: string }>, k
 // ============ STATUS_MAP（项目状态）============
 
 describe('STATUS_MAP', () => {
-  const keys = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED'] as const;
+  const keys = ['IN_PROGRESS', 'ON_HOLD', 'COMPLETED'] as const;
 
-  it('包含所有 4 个项目状态', () => {
-    expect(Object.keys(STATUS_MAP)).toHaveLength(4);
+  it('包含所有 3 个项目状态', () => {
+    expect(Object.keys(STATUS_MAP)).toHaveLength(3);
   });
 
   keys.forEach((key) => {

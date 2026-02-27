@@ -66,9 +66,8 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     }
 
     // 获取统计数据
-    const [all, planning, inProgress, completed, onHold] = await Promise.all([
+    const [all, inProgress, completed, onHold] = await Promise.all([
       prisma.project.count({ where: statsWhere }),
-      prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.PLANNING } }),
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.IN_PROGRESS } }),
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.COMPLETED } }),
       prisma.project.count({ where: { ...statsWhere, status: ProjectStatus.ON_HOLD } }),
@@ -120,7 +119,6 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       pageSize: pageSizeNum,
       stats: {
         all,
-        planning,
         inProgress,
         completed,
         onHold,

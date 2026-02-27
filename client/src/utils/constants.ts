@@ -1,9 +1,5 @@
 // ============ 项目状态映射 ============
 export const STATUS_MAP = {
-  PLANNING: {
-    label: '规划中',
-    color: 'blue',
-  },
   IN_PROGRESS: {
     label: '进行中',
     color: 'green',

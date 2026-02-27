@@ -441,13 +441,6 @@ const ProjectList: React.FC = () => {
             onClick={() => setSelectedStatus('')}
           />
           <StatCard
-            title="规划中"
-            count={statistics.planning}
-            color="rgb(var(--primary-6))"
-            selected={selectedStatus === 'PLANNING'}
-            onClick={() => setSelectedStatus('PLANNING')}
-          />
-          <StatCard
             title="进行中"
             count={statistics.inProgress}
             color="var(--status-success)"
@@ -567,7 +560,7 @@ const ProjectList: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{
-              status: 'PLANNING',
+              status: 'IN_PROGRESS',
               priority: 'MEDIUM',
               productLine: 'DANDELION',
             }}
