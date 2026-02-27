@@ -4,7 +4,6 @@ import {
   Button,
   Space,
   Modal,
-  Drawer,
   Form,
   Input,
   Select,
@@ -19,6 +18,7 @@ import {
   IconDelete,
   IconCopy,
   IconDragDotVertical,
+  IconLeft,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../layouts/MainLayout';
 import { templatesApi } from '../../api';
@@ -38,7 +38,7 @@ const TemplateManagement: React.FC = () => {
   const [form] = Form.useForm();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [mode, setMode] = useState<'list' | 'edit'>('list');
   const [editing, setEditing] = useState<ProjectTemplate | null>(null);
   const [activities, setActivities] = useState<TemplateActivity[]>([]);
   const [saving, setSaving] = useState(false);
@@ -86,7 +86,14 @@ const TemplateManagement: React.FC = () => {
       form.resetFields();
       setActivities([]);
     }
-    setDrawerVisible(true);
+    setMode('edit');
+  };
+
+  const handleBack = () => {
+    setMode('list');
+    setEditing(null);
+    form.resetFields();
+    setActivities([]);
   };
 
   const handleDelete = (tpl: ProjectTemplate) => {
@@ -165,7 +172,7 @@ const TemplateManagement: React.FC = () => {
         Message.success('模板创建成功');
       }
 
-      setDrawerVisible(false);
+      setMode('list');
       loadTemplates();
     } catch (err) {
       console.error('保存模板失败', err);
@@ -439,7 +446,6 @@ const TemplateManagement: React.FC = () => {
     {
       title: '活动名称',
       dataIndex: 'name',
-      width: 280,
       render: (_: string, record: TemplateActivity) => (
         <Input
           size="small"
@@ -530,57 +536,41 @@ const TemplateManagement: React.FC = () => {
     },
   ];
 
-  return (
-    <MainLayout>
-      <div className="toolbar">
-        <div className="toolbar-left">
-          共 {templates.length} 个模板
-        </div>
-        <Button type="primary" icon={<IconPlus />} onClick={() => handleOpen()}>
-          新建模板
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        data={templates}
-        loading={loading}
-        rowKey="id"
-        pagination={false}
-        scroll={{ x: 900 }}
-      />
-
-      <Drawer
-        width={1200}
-        title={editing ? `编辑模板 - ${editing.name}` : '新建模板'}
-        visible={drawerVisible}
-        onCancel={() => setDrawerVisible(false)}
-        footer={
-          <div style={{ textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setDrawerVisible(false)}>取消</Button>
-              <Button type="primary" loading={saving} onClick={handleSubmit}>
-                {editing ? '保存' : '创建'}
-              </Button>
-            </Space>
+  if (mode === 'edit') {
+    return (
+      <MainLayout>
+        <div className="toolbar">
+          <div className="toolbar-left">
+            <Button type="text" icon={<IconLeft />} onClick={handleBack} style={{ marginRight: 8 }}>
+              返回
+            </Button>
+            <span style={{ fontWeight: 500, fontSize: 16 }}>
+              {editing ? `编辑模板 - ${editing.name}` : '新建模板'}
+            </span>
           </div>
-        }
-      >
-        <Form form={form} layout="vertical">
+          <Space>
+            <Button onClick={handleBack}>取消</Button>
+            <Button type="primary" loading={saving} onClick={handleSubmit}>
+              {editing ? '保存' : '创建'}
+            </Button>
+          </Space>
+        </div>
+
+        <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
           <Form.Item
             label="模板名称"
             field="name"
             rules={[{ required: true, message: '请输入模板名称' }]}
           >
-            <Input placeholder="如：标准路由器项目模板" />
+            <Input placeholder="如：标准路由器项目模板" style={{ width: 280 }} />
           </Form.Item>
 
           <Form.Item label="描述" field="description">
-            <Input.TextArea placeholder="模板描述（选填）" rows={2} />
+            <Input placeholder="模板描述（选填）" style={{ width: 360 }} />
           </Form.Item>
         </Form>
 
-        <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 500 }}>活动列表（{activities.length}）</span>
           <Button type="outline" size="small" icon={<IconPlus />} onClick={addActivity}>
             添加活动
@@ -624,7 +614,29 @@ const TemplateManagement: React.FC = () => {
             },
           }}
         />
-      </Drawer>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <div className="toolbar">
+        <div className="toolbar-left">
+          共 {templates.length} 个模板
+        </div>
+        <Button type="primary" icon={<IconPlus />} onClick={() => handleOpen()}>
+          新建模板
+        </Button>
+      </div>
+
+      <Table
+        columns={columns}
+        data={templates}
+        loading={loading}
+        rowKey="id"
+        pagination={false}
+        scroll={{ x: 900 }}
+      />
     </MainLayout>
   );
 };
