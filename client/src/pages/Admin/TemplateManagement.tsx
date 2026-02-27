@@ -239,16 +239,18 @@ const TemplateManagement: React.FC = () => {
     Object.entries(DEPENDENCY_TYPE_MAP).map(([k, v]) => [v.label, k])
   );
 
+  const formatSeq = (n: number): string => String(n).padStart(3, '0');
+
   const getSeq = (record: TemplateActivity): string => {
     const idx = activitySeqMap.get(record.id);
-    return idx != null ? String(idx) : '?';
+    return idx != null ? formatSeq(idx) : '?';
   };
 
   const getPredecessorSeq = (activity: TemplateActivity): string => {
     if (!activity.dependencies || activity.dependencies.length === 0) return '';
     return activity.dependencies.map((dep) => {
       const seq = activitySeqMap.get(dep.id);
-      const seqStr = seq != null ? String(seq) : '?';
+      const seqStr = seq != null ? formatSeq(seq) : '?';
       const typeLabel = DEPENDENCY_TYPE_MAP[dep.type as keyof typeof DEPENDENCY_TYPE_MAP]?.label || 'FS';
       const lag = dep.lag ?? 0;
       const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
