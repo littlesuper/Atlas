@@ -527,8 +527,8 @@ const TemplateManagement: React.FC = () => {
       ),
     },
     {
-      title: '',
-      width: 48,
+      title: '操作',
+      width: 64,
       render: (_: unknown, record: TemplateActivity) => (
         <Tooltip content="删除">
           <Button
