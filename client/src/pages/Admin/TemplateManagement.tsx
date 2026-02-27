@@ -445,7 +445,7 @@ const TemplateManagement: React.FC = () => {
     },
     {
       title: 'ID',
-      width: 56,
+      width: 66,
       render: (_: unknown, record: TemplateActivity) => (
         <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
       ),
@@ -499,7 +499,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '工期',
       dataIndex: 'planDuration',
-      width: 80,
+      width: 100,
       render: (_: number | null, record: TemplateActivity) => (
         <InputNumber
           size="small"
