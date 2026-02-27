@@ -410,7 +410,7 @@ const TemplateManagement: React.FC = () => {
   const activityColumns = [
     {
       title: '',
-      width: 50,
+      width: 44,
       render: (_: unknown, _record: TemplateActivity, index: number) => (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
           <div
@@ -431,7 +431,7 @@ const TemplateManagement: React.FC = () => {
     },
     {
       title: 'ID',
-      width: 50,
+      width: 52,
       render: (_: unknown, record: TemplateActivity) => (
         <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
       ),
@@ -451,7 +451,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '类型',
       dataIndex: 'type',
-      width: 120,
+      width: 100,
       render: (_: string, record: TemplateActivity) => (
         <Select
           size="small"
@@ -467,7 +467,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '阶段',
       dataIndex: 'phase',
-      width: 100,
+      width: 90,
       render: (_: string | null, record: TemplateActivity) => (
         <Select
           size="small"
@@ -485,7 +485,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '工期',
       dataIndex: 'planDuration',
-      width: 90,
+      width: 80,
       render: (_: number | null, record: TemplateActivity) => (
         <InputNumber
           size="small"
@@ -501,7 +501,7 @@ const TemplateManagement: React.FC = () => {
     {
       title: '前置',
       dataIndex: 'dependencies',
-      width: 120,
+      width: 150,
       render: (_: TemplateActivity['dependencies'], record: TemplateActivity) => (
         <Input
           size="small"
@@ -514,7 +514,7 @@ const TemplateManagement: React.FC = () => {
     },
     {
       title: '操作',
-      width: 50,
+      width: 48,
       render: (_: unknown, record: TemplateActivity) => (
         <Tooltip content="删除">
           <Button
