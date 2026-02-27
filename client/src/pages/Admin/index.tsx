@@ -32,7 +32,6 @@ import { USER_STATUS_MAP, PERMISSION_RESOURCE_MAP, PERMISSION_ACTION_MAP } from 
 import AiManagement from './AiManagement';
 import AuditLogTab from './AuditLog';
 import WecomManagement from './WecomManagement';
-import TemplateManagement from './TemplateManagement';
 import dayjs from 'dayjs';
 import { pinyin } from 'pinyin-pro';
 
@@ -52,7 +51,6 @@ const AdminPage: React.FC = () => {
   const visibleTabs = useMemo(() => {
     const tabs: string[] = [];
     if (hasPermission('system', 'ai')) tabs.push('ai');
-    if (hasPermission('system', 'ai')) tabs.push('templates');
     if (hasPermission('system', 'account')) tabs.push('account');
     if (hasPermission('system', 'audit_log')) tabs.push('audit');
     return tabs;
@@ -473,13 +471,6 @@ const AdminPage: React.FC = () => {
           {hasPermission('system', 'ai') && (
             <Tabs.TabPane key="ai" title="AI管理">
               <AiManagement />
-            </Tabs.TabPane>
-          )}
-
-          {/* 项目模板 */}
-          {hasPermission('system', 'ai') && (
-            <Tabs.TabPane key="templates" title="项目模板">
-              <TemplateManagement />
             </Tabs.TabPane>
           )}
 
