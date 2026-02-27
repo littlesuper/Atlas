@@ -68,10 +68,6 @@ export const ACTIVITY_TYPE_MAP = {
     label: '任务',
     color: 'blue',
   },
-  PHASE: {
-    label: '阶段',
-    color: 'cyan',
-  },
 } as const;
 
 // ============ 产品线映射 ============

@@ -488,8 +488,9 @@ const ProjectList: React.FC = () => {
                     key={key}
                     checkable
                     checked={isSelected}
+                    size="medium"
                     color={isSelected ? value.color : undefined}
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    style={{ cursor: 'pointer', userSelect: 'none', fontSize: 14, padding: '3px 12px' }}
                     onCheck={() => {
                       if (isSelected) {
                         // 至少保留一个

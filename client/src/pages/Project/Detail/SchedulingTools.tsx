@@ -8,11 +8,11 @@ import {
   Message,
   InputNumber,
   Select,
-  DatePicker,
   Modal,
   Empty,
   Typography,
   Alert,
+  Radio,
 } from '@arco-design/web-react';
 import { activitiesApi } from '../../../api';
 import { Activity, ResourceConflict, WhatIfResult, AiScheduleSuggestion } from '../../../types';
@@ -33,12 +33,10 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
   // What-if
   const [whatIfActivityId, setWhatIfActivityId] = useState<string>('');
   const [whatIfDays, setWhatIfDays] = useState<number>(5);
+  const [whatIfDirection, setWhatIfDirection] = useState<'delay' | 'advance'>('delay');
   const [whatIfResult, setWhatIfResult] = useState<WhatIfResult | null>(null);
   const [whatIfLoading, setWhatIfLoading] = useState(false);
-
-  // Reschedule
-  const [rescheduleDate, setRescheduleDate] = useState<string>('');
-  const [rescheduling, setRescheduling] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
 
   // AI suggestions
   const [aiResult, setAiResult] = useState<AiScheduleSuggestion | null>(null);
@@ -50,10 +48,13 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
   );
 
   // ---- Resource conflict detection ----
+  const [conflictScope, setConflictScope] = useState<'project' | 'all'>('all');
+
   const loadConflicts = useCallback(async () => {
     setConflictsLoading(true);
     try {
-      const res = await activitiesApi.getResourceConflicts({ projectId });
+      const params = conflictScope === 'project' ? { projectId } : undefined;
+      const res = await activitiesApi.getResourceConflicts(params);
       setConflicts(res.data || []);
       setConflictsLoaded(true);
     } catch {
@@ -61,17 +62,18 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
     } finally {
       setConflictsLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, conflictScope]);
 
   // ---- What-if simulation ----
   const runWhatIf = async () => {
     if (!whatIfActivityId) {
-      Message.warning('请选择要模拟延期的活动');
+      Message.warning('请选择要模拟的活动');
       return;
     }
     setWhatIfLoading(true);
     try {
-      const res = await activitiesApi.whatIf(projectId, whatIfActivityId, whatIfDays);
+      const days = whatIfDirection === 'advance' ? -whatIfDays : whatIfDays;
+      const res = await activitiesApi.whatIf(projectId, whatIfActivityId, days);
       setWhatIfResult(res.data);
     } catch {
       Message.error('模拟失败');
@@ -80,25 +82,29 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
     }
   };
 
-  // ---- Reschedule ----
-  const handleReschedule = () => {
-    if (!rescheduleDate) {
-      Message.warning('请选择基准日期');
-      return;
-    }
+  // ---- Apply what-if results ----
+  const handleApplyWhatIf = () => {
+    if (!whatIfResult || whatIfResult.affected.length === 0) return;
     Modal.confirm({
-      title: '确认重排',
-      content: '此操作将重新计算所有未完成活动的计划时间，是否继续？',
+      title: '确认应用模拟结果',
+      content: `此操作将先归档当前活动快照，然后批量更新 ${whatIfResult.affected.length} 个活动的计划日期。是否继续？`,
       onOk: async () => {
-        setRescheduling(true);
+        setApplyLoading(true);
         try {
-          const res = await activitiesApi.reschedule(projectId, rescheduleDate);
-          Message.success(`重排完成，更新了 ${res.data.updatedCount} 个活动`);
+          const affected = whatIfResult.affected.map((a) => ({
+            id: a.id,
+            newStart: a.newStart,
+            newEnd: a.newEnd,
+          }));
+          const label = `What-If 模拟应用 (${whatIfDirection === 'advance' ? '提前' : '延期'} ${whatIfDays} 工作日)`;
+          await activitiesApi.applyWhatIf(projectId, affected, label);
+          Message.success('模拟结果已成功应用');
+          setWhatIfResult(null);
           onRefresh();
         } catch {
-          Message.error('重排失败');
+          Message.error('应用模拟结果失败');
         } finally {
-          setRescheduling(false);
+          setApplyLoading(false);
         }
       },
     });
@@ -130,19 +136,28 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
       dataIndex: 'activities',
       render: (acts: ResourceConflict['activities']) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {acts.map((a) => (
-            <div key={a.id} style={{ fontSize: 12 }}>
-              <Tag size="small" color="blue">{a.projectName}</Tag>
-              <span>{a.name}</span>
-              <span style={{ color: 'var(--color-text-3)', marginLeft: 8 }}>
-                {dayjs(a.planStartDate).format('MM-DD')} ~ {dayjs(a.planEndDate).format('MM-DD')}
-              </span>
-            </div>
-          ))}
+          {acts.map((a) => {
+            const isOtherProject = a.projectId !== projectId;
+            return (
+              <div key={a.id} style={{ fontSize: 12 }}>
+                <Tag size="small" color={isOtherProject ? 'orange' : 'blue'}>{a.projectName}</Tag>
+                <span>{a.name}</span>
+                <span style={{ color: 'var(--color-text-3)', marginLeft: 8 }}>
+                  {dayjs(a.planStartDate).format('MM-DD')} ~ {dayjs(a.planEndDate).format('MM-DD')}
+                </span>
+              </div>
+            );
+          })}
         </div>
       ),
     },
   ];
+
+  // Determine color for new dates: green if earlier, orange if later
+  const getDateColor = (original: string | null, newDate: string | null) => {
+    if (!original || !newDate) return 'rgb(var(--warning-6))';
+    return dayjs(newDate).isBefore(dayjs(original)) ? 'rgb(var(--success-6))' : 'rgb(var(--warning-6))';
+  };
 
   // What-if affected table columns
   const whatIfColumns = [
@@ -167,16 +182,16 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
       title: '新开始日期',
       dataIndex: 'newStart',
       width: 120,
-      render: (d: string | null) => d ? (
-        <span style={{ color: 'rgb(var(--warning-6))' }}>{dayjs(d).format('YYYY-MM-DD')}</span>
+      render: (d: string | null, record: WhatIfResult['affected'][0]) => d ? (
+        <span style={{ color: getDateColor(record.originalStart, d) }}>{dayjs(d).format('YYYY-MM-DD')}</span>
       ) : '-',
     },
     {
       title: '新结束日期',
       dataIndex: 'newEnd',
       width: 120,
-      render: (d: string | null) => d ? (
-        <span style={{ color: 'rgb(var(--warning-6))' }}>{dayjs(d).format('YYYY-MM-DD')}</span>
+      render: (d: string | null, record: WhatIfResult['affected'][0]) => d ? (
+        <span style={{ color: getDateColor(record.originalEnd, d) }}>{dayjs(d).format('YYYY-MM-DD')}</span>
       ) : '-',
     },
   ];
@@ -186,11 +201,22 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
       {/* Resource conflict detection */}
       <Card title="资源冲突检测" size="small">
         <Typography.Paragraph style={{ color: 'var(--color-text-3)', marginBottom: 12 }}>
-          检测项目中是否存在同一人员在同一时间段被分配到多个活动的冲突情况。
+          检测同一人员在同一时间段被分配到多个活动的冲突情况，支持跨项目全局检测。
         </Typography.Paragraph>
-        <Button type="primary" loading={conflictsLoading} onClick={loadConflicts}>
-          {conflictsLoaded ? '刷新检测' : '开始检测'}
-        </Button>
+        <Space>
+          <Radio.Group
+            type="button"
+            size="default"
+            value={conflictScope}
+            onChange={(v) => { setConflictScope(v); setConflictsLoaded(false); setConflicts([]); }}
+          >
+            <Radio value="all">所有项目</Radio>
+            <Radio value="project">仅当前项目</Radio>
+          </Radio.Group>
+          <Button type="primary" loading={conflictsLoading} onClick={loadConflicts}>
+            {conflictsLoaded ? '刷新检测' : '开始检测'}
+          </Button>
+        </Space>
 
         {conflictsLoaded && (
           <div style={{ marginTop: 12 }}>
@@ -219,12 +245,12 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
       {/* What-if simulation */}
       <Card title="What-If 模拟" size="small">
         <Typography.Paragraph style={{ color: 'var(--color-text-3)', marginBottom: 12 }}>
-          模拟某个活动延期后对下游依赖活动和项目整体结束日期的影响（不会实际修改数据）。
+          模拟某个活动延期或提前完成后对下游依赖活动和项目整体结束日期的影响（不会实际修改数据）。
         </Typography.Paragraph>
-        <Space>
+        <Space wrap>
           <Select
             style={{ width: 300 }}
-            placeholder="选择要模拟延期的活动"
+            placeholder="选择要模拟的活动"
             showSearch
             value={whatIfActivityId || undefined}
             onChange={(v) => setWhatIfActivityId(v || '')}
@@ -236,7 +262,15 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
               <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>
             ))}
           </Select>
-          <span>延期</span>
+          <Radio.Group
+            type="button"
+            size="default"
+            value={whatIfDirection}
+            onChange={(v) => { setWhatIfDirection(v); setWhatIfResult(null); }}
+          >
+            <Radio value="delay">延期</Radio>
+            <Radio value="advance">提前</Radio>
+          </Radio.Group>
           <InputNumber
             style={{ width: 80 }}
             value={whatIfDays}
@@ -253,52 +287,48 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
         {whatIfResult && (
           <div style={{ marginTop: 12 }}>
             <Space style={{ marginBottom: 8 }}>
-              <Tag color="orange">影响 {whatIfResult.affectedCount} 个下游活动</Tag>
+              <Tag color={whatIfDirection === 'advance' ? 'green' : 'orange'}>
+                影响 {whatIfResult.affectedCount} 个下游活动
+              </Tag>
               {whatIfResult.projectEndDateBefore && whatIfResult.projectEndDateAfter && (
                 <span style={{ fontSize: 13, color: 'var(--color-text-2)' }}>
                   项目结束日期：{dayjs(whatIfResult.projectEndDateBefore).format('YYYY-MM-DD')}
                   {' → '}
-                  <span style={{ color: 'rgb(var(--warning-6))', fontWeight: 500 }}>
+                  <span style={{
+                    color: dayjs(whatIfResult.projectEndDateAfter).isBefore(dayjs(whatIfResult.projectEndDateBefore))
+                      ? 'rgb(var(--success-6))' : 'rgb(var(--warning-6))',
+                    fontWeight: 500,
+                  }}>
                     {dayjs(whatIfResult.projectEndDateAfter).format('YYYY-MM-DD')}
                   </span>
                 </span>
               )}
             </Space>
             {whatIfResult.affected.length > 0 ? (
-              <Table
-                columns={whatIfColumns}
-                data={whatIfResult.affected}
-                rowKey="id"
-                pagination={false}
-                size="small"
-              />
+              <>
+                <Table
+                  columns={whatIfColumns}
+                  data={whatIfResult.affected}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                />
+                <div style={{ marginTop: 12 }}>
+                  <Button
+                    type="primary"
+                    status="warning"
+                    loading={applyLoading}
+                    onClick={handleApplyWhatIf}
+                  >
+                    一键导入更新
+                  </Button>
+                </div>
+              </>
             ) : (
               <Empty description="无下游受影响活动" />
             )}
           </div>
         )}
-      </Card>
-
-      {/* One-click reschedule */}
-      <Card title="一键重排" size="small">
-        <Typography.Paragraph style={{ color: 'var(--color-text-3)', marginBottom: 12 }}>
-          从指定基准日期重新计算所有未完成活动的计划时间（已完成/已取消的活动不受影响）。
-        </Typography.Paragraph>
-        <Space>
-          <DatePicker
-            style={{ width: 200 }}
-            placeholder="选择基准日期"
-            onChange={(dateStr) => setRescheduleDate(dateStr ? dayjs(dateStr).format('YYYY-MM-DD') : '')}
-          />
-          <Button
-            type="primary"
-            status="warning"
-            loading={rescheduling}
-            onClick={handleReschedule}
-          >
-            执行重排
-          </Button>
-        </Space>
       </Card>
 
       {/* AI scheduling suggestions */}

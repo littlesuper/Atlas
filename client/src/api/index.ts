@@ -255,6 +255,10 @@ export const activitiesApi = {
   whatIf: (projectId: string, activityId: string, delayDays: number) =>
     request.post<WhatIfResult>(`/activities/project/${projectId}/what-if`, { activityId, delayDays }),
 
+  // 应用 What-if 模拟结果
+  applyWhatIf: (projectId: string, affected: Array<{ id: string; newStart: string | null; newEnd: string | null }>, archiveLabel?: string) =>
+    request.post<{ success: boolean; updatedCount: number }>(`/activities/project/${projectId}/what-if/apply`, { affected, archiveLabel }),
+
   // 一键重排
   reschedule: (projectId: string, baseDate?: string) =>
     request.post<{ success: boolean; updatedCount: number }>(`/activities/project/${projectId}/reschedule`, { baseDate }),

@@ -28,6 +28,7 @@ import {
   IconDelete,
   IconDragDotVertical,
   IconStorage,
+  IconUndo,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, activitiesApi, usersApi, authApi } from '../../../api';
@@ -190,6 +191,7 @@ const ProjectDetail: React.FC = () => {
   // 单击内联编辑
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [phaseFilter, setPhaseFilter] = useState<string | null>(null);
   const [archiveDrawerVisible, setArchiveDrawerVisible] = useState(false);
   const [archiveList, setArchiveList] = useState<Array<{ id: string; createdAt: string; count: number; label?: string }>>([]);
   const [archiveLoading, setArchiveLoading] = useState(false);
@@ -425,39 +427,43 @@ const ProjectDetail: React.FC = () => {
     return () => scrollEl.removeEventListener('scroll', onHScroll);
   }, [theadFixed, theadFixedPos, columnPrefs]);
 
+  // 用活动数据填充表单
+  const populateFormFromActivity = (activity: Activity) => {
+    const pd = activity.planStartDate && activity.planEndDate
+      ? calcWorkdays(dayjs(activity.planStartDate), dayjs(activity.planEndDate))
+      : activity.planDuration ?? null;
+    const ad = activity.startDate && activity.endDate
+      ? calcWorkdays(dayjs(activity.startDate), dayjs(activity.endDate))
+      : activity.duration ?? null;
+    setPlanDuration(pd);
+    setActualDuration(ad);
+    form.setFieldsValue({
+      phase: activity.phase,
+      name: activity.name,
+      description: activity.description,
+      parentId: activity.parentId,
+      type: activity.type,
+      status: activity.status,
+      priority: activity.priority,
+      planStart: activity.planStartDate ? dayjs(activity.planStartDate) : undefined,
+      planEnd: activity.planEndDate ? dayjs(activity.planEndDate) : undefined,
+      actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
+      actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
+      assigneeIds: activity.assignees?.map((a) => a.id) ?? [],
+      notes: activity.notes,
+    });
+    const rawDeps = activity.dependencies;
+    const deps = Array.isArray(rawDeps)
+      ? rawDeps
+      : (() => { try { return JSON.parse(rawDeps as unknown as string) as typeof rawDeps; } catch { return []; } })();
+    setFormDeps((deps || []).map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 })));
+  };
+
   // 打开创建/编辑抽屉
   const handleOpenDrawer = (activity?: Activity) => {
     if (activity) {
       setEditingActivity(activity);
-      const pd = activity.planStartDate && activity.planEndDate
-        ? calcWorkdays(dayjs(activity.planStartDate), dayjs(activity.planEndDate))
-        : activity.planDuration ?? null;
-      const ad = activity.startDate && activity.endDate
-        ? calcWorkdays(dayjs(activity.startDate), dayjs(activity.endDate))
-        : activity.duration ?? null;
-      setPlanDuration(pd);
-      setActualDuration(ad);
-      form.setFieldsValue({
-        phase: activity.phase,
-        name: activity.name,
-        description: activity.description,
-        parentId: activity.parentId,
-        type: activity.type,
-        status: activity.status,
-        priority: activity.priority,
-        planStart: activity.planStartDate ? dayjs(activity.planStartDate) : undefined,
-        planEnd: activity.planEndDate ? dayjs(activity.planEndDate) : undefined,
-        actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
-        actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
-        assigneeIds: activity.assignees?.map((a) => a.id) ?? [],
-        notes: activity.notes,
-      });
-      // Load dependencies
-      const rawDeps = activity.dependencies;
-      const deps = Array.isArray(rawDeps)
-        ? rawDeps
-        : (() => { try { return JSON.parse(rawDeps as unknown as string) as typeof rawDeps; } catch { return []; } })();
-      setFormDeps((deps || []).map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 })));
+      populateFormFromActivity(activity);
     } else {
       setEditingActivity(null);
       setPlanDuration(null);
@@ -542,8 +548,52 @@ const ProjectDetail: React.FC = () => {
       };
 
       if (editingActivity) {
+        // 保存更新前的原始数据，用于撤回
+        const snapshot = { ...editingActivity };
         await activitiesApi.update(editingActivity.id, data);
-        Message.success('活动更新成功');
+        Message.success({
+          id: 'activity-update-undo',
+          content: (
+            <span>
+              活动更新成功{' '}
+              <a
+                style={{ marginLeft: 8 }}
+                onClick={async () => {
+                  try {
+                    await activitiesApi.update(snapshot.id, {
+                      name: snapshot.name,
+                      description: snapshot.description,
+                      type: snapshot.type,
+                      phase: snapshot.phase,
+                      status: snapshot.status,
+                      priority: snapshot.priority,
+                      planStartDate: snapshot.planStartDate ? dayjs(snapshot.planStartDate).format('YYYY-MM-DD') : undefined,
+                      planEndDate: snapshot.planEndDate ? dayjs(snapshot.planEndDate).format('YYYY-MM-DD') : undefined,
+                      planDuration: snapshot.planDuration ?? undefined,
+                      startDate: snapshot.startDate ? dayjs(snapshot.startDate).format('YYYY-MM-DD') : undefined,
+                      endDate: snapshot.endDate ? dayjs(snapshot.endDate).format('YYYY-MM-DD') : undefined,
+                      duration: snapshot.duration ?? undefined,
+                      assigneeIds: snapshot.assignees?.map((a) => a.id) ?? [],
+                      parentId: snapshot.parentId,
+                      notes: snapshot.notes,
+                      dependencies: Array.isArray(snapshot.dependencies)
+                        ? snapshot.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
+                        : undefined,
+                    });
+                    Message.success('已撤回修改');
+                    loadActivities();
+                    loadProject();
+                  } catch {
+                    Message.error('撤回失败');
+                  }
+                }}
+              >
+                <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤回修改
+              </a>
+            </span>
+          ),
+          duration: 5000,
+        });
       } else {
         await activitiesApi.create(data);
         Message.success('活动创建成功');
@@ -559,9 +609,12 @@ const ProjectDetail: React.FC = () => {
 
   // 删除活动
   const handleDeleteActivity = (activity: Activity) => {
+    const hasChildren = activities.some((a) => a.parentId === activity.id);
     Modal.confirm({
       title: '确认删除',
-      content: `确定要删除活动"${activity.name}"吗？此操作不可恢复。`,
+      content: hasChildren
+        ? `确定要删除活动"${activity.name}"及其所有子活动吗？此操作不可恢复。`
+        : `确定要删除活动"${activity.name}"吗？此操作不可恢复。`,
       onOk: async () => {
         try {
           await activitiesApi.delete(activity.id);
@@ -737,10 +790,61 @@ const ProjectDetail: React.FC = () => {
 
 
   // ========== 单击内联编辑 ==========
+  // 全局点击外部关闭内联编辑（解决 DatePicker 等组件点击空白不取消的问题）
+  useEffect(() => {
+    if (!inlineEditing) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // 忽略弹出层内的点击（DatePicker / Select popup 渲染到 body）
+      if (target.closest('.arco-picker-dropdown, .arco-select-popup, .arco-picker, .arco-select, .arco-input-wrapper, .arco-input-number')) return;
+      setInlineEditing(null);
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setInlineEditing(null);
+      }
+    };
+    // 延迟注册，避免触发编辑的那次点击立刻关闭
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handler, true);
+    }, 0);
+    document.addEventListener('keydown', keyHandler, true);
+    return () => { clearTimeout(timer); document.removeEventListener('mousedown', handler, true); document.removeEventListener('keydown', keyHandler, true); };
+  }, [inlineEditing]);
+
   const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
     if (!(hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))) return;
     setInlineEditing({ id: activityId, field });
     setInlineValue(currentValue);
+  };
+
+  // 统一的"更新成功 + 撤回"提示
+  const showUndoMessage = (activityId: string, rollbackPayload: Record<string, unknown>) => {
+    Message.success({
+      id: 'activity-update-undo',
+      content: (
+        <span>
+          更新成功{' '}
+          <a
+            onClick={async () => {
+              try {
+                await activitiesApi.update(activityId, rollbackPayload);
+                Message.clear();
+                Message.success('已撤回');
+                loadActivities();
+                loadProject();
+              } catch {
+                Message.error('撤回失败');
+              }
+            }}
+            style={{ marginLeft: 8, cursor: 'pointer' }}
+          >
+            <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤回修改
+          </a>
+        </span>
+      ),
+      duration: 5000,
+    });
   };
 
   const commitInlineEdit = async (activity: Activity, field: string) => {
@@ -750,7 +854,7 @@ const ProjectDetail: React.FC = () => {
     try {
       await activitiesApi.update(activity.id, { [field]: inlineValue || undefined });
       setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: inlineValue } : a));
-      Message.success('更新成功');
+      showUndoMessage(activity.id, { [field]: original ?? undefined });
     } catch {
       Message.error('更新失败');
     }
@@ -758,10 +862,11 @@ const ProjectDetail: React.FC = () => {
 
   const commitSelectEdit = async (activity: Activity, field: string, value: string) => {
     setInlineEditing(null);
+    const oldValue = (activity as unknown as Record<string, unknown>)[field] as string;
     try {
       await activitiesApi.update(activity.id, { [field]: value });
       setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: value } : a));
-      Message.success('更新成功');
+      showUndoMessage(activity.id, { [field]: oldValue });
     } catch {
       Message.error('更新失败');
     }
@@ -894,10 +999,17 @@ const ProjectDetail: React.FC = () => {
     if (startField === 'planStartDate' && startVal && endVal) {
       payload.planDuration = calcWorkdays(dayjs(startVal), dayjs(endVal));
     }
+    const rollback: Record<string, unknown> = {
+      [startField]: (activity as unknown as Record<string, unknown>)[startField] ? dayjs((activity as unknown as Record<string, unknown>)[startField] as string).format('YYYY-MM-DD') : null,
+      [endField]: (activity as unknown as Record<string, unknown>)[endField] ? dayjs((activity as unknown as Record<string, unknown>)[endField] as string).format('YYYY-MM-DD') : null,
+    };
+    if (startField === 'planStartDate') {
+      rollback.planDuration = activity.planDuration;
+    }
     try {
       await activitiesApi.update(activity.id, payload);
       loadActivities();
-      Message.success('更新成功');
+      showUndoMessage(activity.id, rollback);
     } catch {
       Message.error('更新失败');
     }
@@ -913,15 +1025,18 @@ const ProjectDetail: React.FC = () => {
       : activity.planDuration;
     if (newDur === oldDur) return;
     const payload: Record<string, unknown> = { planDuration: newDur };
-    // 有计划开始日期时，用 开始日期 + 工期 推算结束日期
     if (activity.planStartDate) {
       const endDate = addWorkdays(dayjs(activity.planStartDate), newDur);
       payload.planEndDate = endDate.format('YYYY-MM-DD');
     }
+    const rollback: Record<string, unknown> = { planDuration: oldDur };
+    if (activity.planEndDate) {
+      rollback.planEndDate = dayjs(activity.planEndDate).format('YYYY-MM-DD');
+    }
     try {
       await activitiesApi.update(activity.id, payload);
       loadActivities();
-      Message.success('更新成功');
+      showUndoMessage(activity.id, rollback);
     } catch {
       Message.error('更新失败');
     }
@@ -937,10 +1052,13 @@ const ProjectDetail: React.FC = () => {
       Message.error('格式错误，示例: 3FS+2, 5');
       return;
     }
+    const oldDeps = Array.isArray(activity.dependencies)
+      ? activity.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
+      : null;
     try {
       await activitiesApi.update(activity.id, { dependencies: deps.length > 0 ? deps : null });
-      Message.success('更新成功');
-      loadActivities(); // 依赖变更会触发日期级联，需重新加载
+      loadActivities();
+      showUndoMessage(activity.id, { dependencies: oldDeps });
     } catch {
       Message.error('更新失败');
     }
@@ -1050,7 +1168,7 @@ const ProjectDetail: React.FC = () => {
     name: {
       title: '活动名称',
       dataIndex: 'name',
-      width: 200,
+      width: 280,
       render: (name: string, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
           return (
@@ -1149,6 +1267,10 @@ const ProjectDetail: React.FC = () => {
               mode="multiple"
               size="small"
               allowClear
+              showSearch
+              filterOption={(input, option) =>
+                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+              }
               style={{ width: 160 }}
               value={record.assignees?.map((a) => a.id) ?? []}
               onDismiss={() => {
@@ -1156,9 +1278,10 @@ const ProjectDetail: React.FC = () => {
               }}
               onChange={(v: string[]) => {
                 setInlineEditing(null);
+                const oldIds = record.assignees?.map((a) => a.id) ?? [];
                 activitiesApi.update(record.id, { assigneeIds: v }).then(() => {
                   loadActivities();
-                  Message.success('更新成功');
+                  showUndoMessage(record.id, { assigneeIds: oldIds });
                 }).catch(() => Message.error('更新失败'));
               }}
             >
@@ -1429,9 +1552,6 @@ const ProjectDetail: React.FC = () => {
   const priorityConfig = PRIORITY_MAP[project.priority as keyof typeof PRIORITY_MAP] ?? { label: project.priority, color: 'default' };
   const productLineConfig = PRODUCT_LINE_MAP[project.productLine as keyof typeof PRODUCT_LINE_MAP] ?? { label: project.productLine, color: 'default' };
 
-  // 可选的前置任务（排除自身）
-  const predecessorOptions = activities.filter((a) => editingActivity ? a.id !== editingActivity.id : true);
-
   return (
     <MainLayout>
       {/* 活动列表吸顶表头：通过 Portal 渲染到 body，避开 Tabs 的 transform 上下文 */}
@@ -1527,6 +1647,24 @@ const ProjectDetail: React.FC = () => {
                   {saving ? '保存排序中...' : ''}
                 </span>
                 <Space>
+                  <span style={{ fontSize: 12 }}>
+                    {(['EVT', 'DVT', 'PVT', 'MP'] as const).map(phase => {
+                      const total = activities.filter(a => a.phase === phase).reduce((sum, a) => sum + (a.planDuration || 0), 0);
+                      if (total === 0) return null;
+                      const isActive = phaseFilter === phase;
+                      return (
+                        <Tag
+                          key={phase}
+                          size="small"
+                          color={isActive ? PHASE_COLOR[phase] : 'gray'}
+                          style={{ marginRight: 4, cursor: 'pointer', opacity: isActive ? 1 : 0.65 }}
+                          onClick={() => setPhaseFilter(prev => prev === phase ? null : phase)}
+                        >
+                          {phase} {total}天
+                        </Tag>
+                      );
+                    })}
+                  </span>
                   <span style={{ fontSize: 12 }}>
                     <span
                       style={{ cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: statusFilter === 'NOT_STARTED' ? 'var(--color-fill-2)' : undefined, color: statusFilter === 'NOT_STARTED' ? 'var(--color-text-1)' : 'var(--color-text-3)' }}
@@ -1626,6 +1764,7 @@ const ProjectDetail: React.FC = () => {
                   columns={activityColumns}
                   data={(() => {
                     let list = [...activities];
+                    if (phaseFilter) list = list.filter(a => a.phase === phaseFilter);
                     if (statusFilter) list = list.filter(a => a.status === statusFilter);
                     return list;
                   })()}
@@ -1997,7 +2136,7 @@ const ProjectDetail: React.FC = () => {
                 }>
                   {users.map((u) => (
                     <Select.Option key={u.id} value={u.id}>
-                      {u.realName} ({u.username})
+                      {u.realName}
                     </Select.Option>
                   ))}
                 </Select>
@@ -2008,16 +2147,6 @@ const ProjectDetail: React.FC = () => {
             <div style={{ borderTop: '1px solid var(--color-border-2)', margin: '4px 0 16px' }} />
 
             {/* 父活动 */}
-            <Form.Item label="父活动" field="parentId">
-              <Select placeholder="请选择父活动（可选）" allowClear>
-                {predecessorOptions.map((a) => (
-                  <Select.Option key={a.id} value={a.id}>
-                    {formatSeq(activities.findIndex((x) => x.id === a.id) + 1)} - {a.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-
             {/* 前置依赖 */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

@@ -738,10 +738,29 @@ router.delete(
 
       const projectId = existingActivity.projectId;
 
-      // 删除活动（级联删除子活动）
-      await prisma.activity.delete({
-        where: { id },
-      });
+      // 递归收集所有子孙活动 ID
+      const collectDescendantIds = async (parentId: string): Promise<string[]> => {
+        const children = await prisma.activity.findMany({
+          where: { parentId },
+          select: { id: true },
+        });
+        const ids: string[] = [];
+        for (const child of children) {
+          ids.push(child.id);
+          ids.push(...await collectDescendantIds(child.id));
+        }
+        return ids;
+      };
+
+      const descendantIds = await collectDescendantIds(id);
+
+      // 先删子孙，再删自身
+      if (descendantIds.length > 0) {
+        await prisma.activity.deleteMany({
+          where: { id: { in: descendantIds } },
+        });
+      }
+      await prisma.activity.delete({ where: { id } });
 
       // 自动更新项目进度
       await updateProjectProgress(projectId);
@@ -1351,16 +1370,16 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
 
 /**
  * POST /api/activities/project/:projectId/what-if
- * 模拟某个任务延期 N 天，返回对整体计划的影响（不保存）
- * Body: { activityId, delayDays }
+ * 模拟某个任务延期或提前 N 天，返回对整体计划的影响（不保存）
+ * Body: { activityId, delayDays } — delayDays 为正数表示延期，负数表示提前
  */
 router.post('/project/:projectId/what-if', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
     const { activityId, delayDays } = req.body;
 
-    if (!activityId || delayDays === undefined) {
-      res.status(400).json({ error: '活动ID和延期天数不能为空' });
+    if (!activityId || delayDays === undefined || delayDays === 0) {
+      res.status(400).json({ error: '活动ID和偏移天数不能为空，且天数不能为0' });
       return;
     }
 
@@ -1381,7 +1400,7 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
       return;
     }
 
-    // 模拟延期
+    // 模拟延期/提前（delayDays 为正延期、为负提前）
     const { offsetWorkdays: owFn } = await import('../utils/workday');
     if (target.planStartDate) {
       target.planStartDate = owFn(target.planStartDate, delayDays);
@@ -1487,6 +1506,80 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
     });
   } catch (error) {
     console.error('What-if 模拟错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * POST /api/activities/project/:projectId/what-if/apply
+ * 将 What-If 模拟结果应用到实际数据：先归档快照，再批量更新活动日期
+ * Body: { affected: [{id, newStart, newEnd}], archiveLabel? }
+ */
+router.post('/project/:projectId/what-if/apply', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const { affected, archiveLabel } = req.body;
+
+    if (!Array.isArray(affected) || affected.length === 0) {
+      res.status(400).json({ error: '受影响活动列表不能为空' });
+      return;
+    }
+
+    // 权限检查
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) { res.status(404).json({ error: '项目不存在' }); return; }
+    if (!canManageProject(req, project.managerId, projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    // Step 1: 创建归档快照
+    const allActivities = await prisma.activity.findMany({
+      where: { projectId },
+      orderBy: { sortOrder: 'asc' },
+      include: { assignees: { select: { id: true, realName: true, username: true } } },
+    });
+
+    await prisma.activityArchive.create({
+      data: {
+        projectId,
+        label: archiveLabel || 'What-If 模拟应用前快照',
+        snapshot: allActivities as any,
+      },
+    });
+
+    // Step 2: 批量更新受影响活动的计划日期
+    const { calculateWorkdays: calcWd } = await import('../utils/workday');
+    let updatedCount = 0;
+    for (const item of affected) {
+      const { id, newStart, newEnd } = item;
+      if (!id) continue;
+
+      const updateData: any = {};
+      if (newStart) updateData.planStartDate = new Date(newStart);
+      if (newEnd) updateData.planEndDate = new Date(newEnd);
+      if (newStart && newEnd) {
+        updateData.planDuration = calcWd(new Date(newStart), new Date(newEnd));
+      }
+
+      await prisma.activity.update({ where: { id }, data: updateData });
+      updatedCount++;
+    }
+
+    // Step 3: 更新项目进度
+    await updateProjectProgress(projectId);
+
+    // Step 4: 写审计日志
+    await auditLog({
+      action: 'UPDATE',
+      resourceType: 'ACTIVITY',
+      resourceId: projectId,
+      resourceName: `What-If 模拟应用 (${updatedCount} 个活动)`,
+      req,
+    });
+
+    res.json({ success: true, updatedCount });
+  } catch (error) {
+    console.error('应用 What-If 模拟结果错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

@@ -100,11 +100,10 @@ describe('ACTIVITY_STATUS_MAP', () => {
 // ============ ACTIVITY_TYPE_MAP（活动类型）============
 
 describe('ACTIVITY_TYPE_MAP', () => {
-  it('包含 MILESTONE、TASK、PHASE 三种类型', () => {
-    expect(Object.keys(ACTIVITY_TYPE_MAP)).toHaveLength(3);
+  it('包含 MILESTONE、TASK 两种类型', () => {
+    expect(Object.keys(ACTIVITY_TYPE_MAP)).toHaveLength(2);
     expect(ACTIVITY_TYPE_MAP).toHaveProperty('MILESTONE');
     expect(ACTIVITY_TYPE_MAP).toHaveProperty('TASK');
-    expect(ACTIVITY_TYPE_MAP).toHaveProperty('PHASE');
   });
 
   it('MILESTONE 标签为"里程碑"，颜色为 purple', () => {

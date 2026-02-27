@@ -70,11 +70,14 @@ export function calcWorkdays(start: dayjs.Dayjs, end: dayjs.Dayjs): number {
 
 /**
  * 根据开始日期和工期推算结束日期（跳过非工作日）
+ * 保证 calcWorkdays(start, addWorkdays(start, n)) === n
  */
 export function addWorkdays(start: dayjs.Dayjs, days: number): dayjs.Dayjs {
   let remaining = days;
   let cur = start;
-  while (remaining > 1) {
+  // 起始日如果是工作日，算作第1天
+  if (isWorkday(cur)) remaining--;
+  while (remaining > 0) {
     cur = cur.add(1, 'day');
     if (isWorkday(cur)) remaining--;
   }
@@ -85,11 +88,14 @@ export function addWorkdays(start: dayjs.Dayjs, days: number): dayjs.Dayjs {
 
 /**
  * 根据结束日期和工期反推开始日期（跳过非工作日，往前推）
+ * 保证 calcWorkdays(subtractWorkdays(end, n), end) === n
  */
 export function subtractWorkdays(end: dayjs.Dayjs, days: number): dayjs.Dayjs {
   let remaining = days;
   let cur = end;
-  while (remaining > 1) {
+  // 结束日如果是工作日，算作第1天
+  if (isWorkday(cur)) remaining--;
+  while (remaining > 0) {
     cur = cur.subtract(1, 'day');
     if (isWorkday(cur)) remaining--;
   }
