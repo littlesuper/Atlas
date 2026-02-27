@@ -413,7 +413,7 @@ const TemplateManagement: React.FC = () => {
     },
   ];
 
-  // Activity table columns (inside drawer) — direct form controls
+  // Activity table columns — direct form controls
   const activityColumns = [
     {
       title: '',
@@ -521,7 +521,7 @@ const TemplateManagement: React.FC = () => {
     },
     {
       title: '操作',
-      width: 56,
+      width: 64,
       render: (_: unknown, record: TemplateActivity) => (
         <Tooltip content="删除">
           <Button
@@ -540,11 +540,11 @@ const TemplateManagement: React.FC = () => {
     return (
       <MainLayout>
         <div className="toolbar">
-          <div className="toolbar-left">
-            <Button type="text" icon={<IconLeft />} onClick={handleBack} style={{ marginRight: 8 }}>
+          <div className="toolbar-left" style={{ display: 'flex', alignItems: 'center' }}>
+            <Button type="text" icon={<IconLeft />} onClick={handleBack} style={{ marginRight: 8, color: 'var(--color-text-2)' }}>
               返回
             </Button>
-            <span style={{ fontWeight: 500, fontSize: 16 }}>
+            <span style={{ fontWeight: 500, fontSize: 15, color: 'var(--color-text-1)' }}>
               {editing ? `编辑模板 - ${editing.name}` : '新建模板'}
             </span>
           </div>
@@ -571,7 +571,7 @@ const TemplateManagement: React.FC = () => {
         </Form>
 
         <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 500 }}>活动列表（{activities.length}）</span>
+          <span style={{ fontWeight: 500, fontSize: 13, color: 'var(--color-text-2)' }}>活动列表（{activities.length}）</span>
           <Button type="outline" size="small" icon={<IconPlus />} onClick={addActivity}>
             添加活动
           </Button>
