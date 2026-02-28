@@ -119,14 +119,13 @@ router.get('/latest-status', authenticate, async (_req: Request, res: Response):
 
 /**
  * GET /api/weekly-reports/drafts
- * 获取当前用户的草稿列表
+ * 获取所有草稿周报
  */
 router.get('/drafts', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const reports = await prisma.weeklyReport.findMany({
       where: {
         status: 'DRAFT',
-        createdBy: req.user!.id,
       },
       orderBy: { updatedAt: 'desc' },
       include: {

@@ -253,7 +253,7 @@ const WeeklyReportsSummary: React.FC = () => {
       render: (_: unknown, record: WeeklyReport) => {
         const sectionAtts = ((record.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'keyProgress');
         return (
-          <div>
+          <div style={{ overflow: 'hidden' }}>
             <SafeHtml
               className="html-content"
               style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
@@ -271,7 +271,7 @@ const WeeklyReportsSummary: React.FC = () => {
       render: (_: unknown, record: WeeklyReport) => {
         const sectionAtts = ((record.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'nextWeekPlan');
         return (
-          <div>
+          <div style={{ overflow: 'hidden' }}>
             <SafeHtml
               className="html-content"
               style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
@@ -290,7 +290,7 @@ const WeeklyReportsSummary: React.FC = () => {
       render: (_: unknown, record: WeeklyReport) => {
         const sectionAtts = ((record.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'riskWarning');
         return (
-          <div>
+          <div style={{ overflow: 'hidden' }}>
             <SafeHtml
               className="html-content"
               style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13 }}
@@ -327,49 +327,9 @@ const WeeklyReportsSummary: React.FC = () => {
     },
   ];
 
-  // ===== 草稿箱表格列 =====
+  // ===== 草稿箱表格列（复用已提交列，替换操作列） =====
   const draftColumns = [
-    {
-      title: '项目名称',
-      dataIndex: 'project.name',
-      width: 200,
-      render: (_: unknown, record: WeeklyReport) => (
-        <a
-          style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
-          onClick={() => navigate(`/projects/${record.projectId}?tab=weekly`)}
-        >
-          {record.project?.name || '-'}
-        </a>
-      ),
-    },
-    {
-      title: '周次',
-      width: 140,
-      render: (_: unknown, record: WeeklyReport) => (
-        <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
-          {record.year}年第{record.weekNumber}周
-        </span>
-      ),
-    },
-    {
-      title: '产品线',
-      width: 120,
-      render: (_: unknown, record: WeeklyReport) => {
-        const pl = record.project?.productLine || '';
-        const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP] ?? { label: pl || '-', color: 'default' };
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
-      },
-    },
-    {
-      title: '更新时间',
-      width: 160,
-      sorter: (a: WeeklyReport, b: WeeklyReport) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-      render: (_: unknown, record: WeeklyReport) => (
-        <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
-          {dayjs(record.updatedAt).format('YYYY-MM-DD HH:mm')}
-        </span>
-      ),
-    },
+    ...submittedColumns.slice(0, -1),
     {
       title: '操作',
       width: 140,
@@ -509,7 +469,7 @@ const WeeklyReportsSummary: React.FC = () => {
                 loading={draftsLoading}
                 rowKey="id"
                 pagination={{ pageSize: 20, showTotal: true }}
-                scroll={{ x: 800 }}
+                scroll={{ x: 1200 }}
                 noDataElement={<Empty description="暂无草稿" />}
               />
             </Tabs.TabPane>
