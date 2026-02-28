@@ -170,10 +170,24 @@
 | WR-004 | 更新草稿 | 草稿存在 | PUT `/api/weekly-reports/:id` | 200 |
 | WR-005 | 删除周报 | 周报存在 | DELETE `/api/weekly-reports/:id` | 200 |
 | WR-006 | 获取项目周报列表 | 项目有周报 | GET `/api/weekly-reports/project/:projectId` | 200 |
-| WR-007 | 获取用户草稿 | 用户有草稿 | GET `/api/weekly-reports/drafts` | 200 |
+| WR-007 | 获取所有草稿 | 系统存在草稿周报 | GET `/api/weekly-reports/drafts` | 200，返回所有草稿（不限创建者） |
 | WR-008 | 按周汇总 | 该周有周报 | GET `/api/weekly-reports/week/:year/:weekNumber` | 200 |
 | WR-009 | AI 建议 | 项目有活动数据 | POST `/api/weekly-reports/project/:projectId/ai-suggestions` | 200，返回 keyProgress/nextWeekPlan/riskWarning |
 | WR-010 | progressStatus 枚举 | — | 分别设置 ON_TRACK/MINOR_ISSUE/MAJOR_ISSUE | 均成功 |
+| WR-011 | 草稿箱列与已提交一致 | 存在草稿周报 | 切换到草稿箱 Tab | 表格列与已提交周报一致（项目名称、产品线、状态、变更概述、需求研判、本周进展、下周计划、风险预警、操作） |
+
+### 3.9 资源看板
+
+| 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
+|------|---------|---------|---------|---------|
+| RES-001 | 资源看板 API | 登录，有活动数据 | GET `/api/activities/workload` | 200，返回 `{ summary, members, issues }` 三段式结构 |
+| RES-002 | 项目筛选 | 登录 | GET `/api/activities/workload?projectId=xxx` | 200，仅返回该项目的资源数据 |
+| RES-003 | 统计卡片 | 有逾期/无负责人活动 | 打开 /workload 页面 | 显示 3 个统计卡片：逾期任务（红色）、无人负责（橙色）、超载人员（深红） |
+| RES-004 | 人员负载条形图 | 有分配了负责人的活动 | 打开 /workload 页面 | 每人一行堆叠条形图（蓝=进行中、灰=未开始、红=逾期），Tooltip 显示具体数字 |
+| RES-005 | 超载标记 | 某人进行中活动 ≥ 5 | 打开 /workload 页面 | 该行红色浅背景 + 红色"超载"Tag |
+| RES-006 | 需关注表格-逾期 | 有逾期活动 | 打开 /workload 页面 | 需关注表格显示红点 + "逾期 N 天"（红字） |
+| RES-007 | 需关注表格-无人负责 | 有未分配负责人的活动 | 打开 /workload 页面 | 需关注表格显示橙点 + 计划时间范围 |
+| RES-008 | 需关注空状态 | 无逾期、无未分配活动 | 打开 /workload 页面 | 显示绿色 "✓ 暂无需关注事项" |
 
 ---
 

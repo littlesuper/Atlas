@@ -128,7 +128,7 @@ HWSystem/
 | /weekly-reports | 项目周报汇总 | 已登录 |
 | /weekly-reports/new | 创建周报 | 已登录 |
 | /weekly-reports/:id/edit | 编辑周报 | 已登录 |
-| /workload | 项目资源（资源负载视图） | 已登录 |
+| /workload | 项目资源（资源看板） | 已登录 |
 | /products | 产品管理 | 已登录 |
 | /admin | 系统管理（账号管理） | 已登录 + user:read |
 
@@ -231,7 +231,7 @@ users ──┬── user_roles ──── roles ──── role_permission
 | 依赖级联更新 | 修改计划日期自动 BFS 更新下游依赖活动 | `activities.ts` |
 | 列设置偏好 | 用户可自定义活动表列可见性和排序，持久化到 `User.preferences` | `ColumnSettings.tsx` |
 | 企微集成 | 企业微信配置管理 | `wecomConfig.ts` |
-| 工作量统计 | 按人员聚合活动数/进行中/逾期/总工期 | `activities.ts` |
+| 资源看板 | 三段式仪表盘：统计卡片（逾期/无人负责/超载）+ 人员负载堆叠条形图 + 需关注问题表格 | `activities.ts`, `Workload/index.tsx` |
 | 存档标签 | 存档快照可命名 | `ActivityArchive.label` |
 | 暗色主题 | 支持 light/dark 主题切换，持久化偏好 | `themeStore.ts`, `global.css` |
 

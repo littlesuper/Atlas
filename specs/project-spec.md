@@ -727,14 +727,14 @@ GET /api/weekly-reports?page=1&pageSize=20&projectId=uuid&year=2026&weekNumber=7
 
 **排序规则：** 按年份、周数倒序（最新周报在前）
 
-#### 获取当前用户草稿列表
+#### 获取所有草稿列表
 ```
 GET /api/weekly-reports/drafts
 ```
 **认证：** Bearer Token
 **权限：** 无（已认证即可）
 
-**说明：** 仅返回当前登录用户创建的草稿（`createdBy = 当前用户ID`，`status = DRAFT`），按更新时间倒序
+**说明：** 返回所有草稿周报（`status = DRAFT`），按更新时间倒序。不按用户过滤，所有已登录用户可查看全部草稿。
 
 #### 获取项目的所有周报
 ```
@@ -1118,22 +1118,35 @@ DELETE /api/uploads/:filename
   - 选项：全部 / 各产品线选项
   - 默认：全部
 
-**数据表格：**
+**Tab 切换：** 已提交周报 | 草稿箱
+
+#### 已提交周报 Tab
+
+- 按周次分组展示，每组显示"YYYY 年第 N 周 · MM-DD ~ MM-DD"标题
+- 筛选功能（周次选择器、产品线筛选）仅在已提交 Tab 显示
+
+**数据表格列：**
 
 | 列名 | 字段 | 宽度 | 说明 |
 |------|------|------|------|
-| 项目名称 | project.name | 200px | 链接，点击跳转到项目周报详情页（带 tab=weekly-report 参数） |
+| 项目名称 | project.name | 200px | 链接，点击跳转到项目周报详情页（带 tab=weekly 参数） |
 | 产品线 | project.productLine | 120px | 显示中文标签 |
-| 项目状态 | progressStatus | 120px | 图标显示（✓ / ⚠️ / ✕），Tooltip 显示文字说明 |
-| 本周重要进展 | keyProgress | - | HTML 富文本渲染，ellipsis 省略；下方显示该区域附件（readOnly 模式） |
-| 下周工作计划 | nextWeekPlan | - | HTML 富文本渲染，ellipsis 省略；下方显示该区域附件（readOnly 模式） |
-| 风险预警 | riskWarning | 200px | HTML 富文本渲染，红色字体，无风险显示绿色"无"；下方显示该区域附件（readOnly 模式） |
-| 状态 | status | 100px | 草稿（灰色 Tag）/ 已提交（绿色 Tag） |
+| 状态 | progressStatus | 80px | 图标显示（✓ / ⚠️ / ✕），Tooltip 显示文字说明 |
+| 变更概述 | changeOverview | 180px | HTML 富文本渲染，maxHeight 80px 溢出隐藏 |
+| 需求研判 | demandAnalysis | 180px | HTML 富文本渲染，maxHeight 80px 溢出隐藏 |
+| 本周重要进展 | keyProgress | - | HTML 富文本渲染，maxHeight 80px；下方显示该区域附件（readOnly 模式），单元格 overflow: hidden 防止附件名溢出 |
+| 下周工作计划 | nextWeekPlan | - | HTML 富文本渲染，maxHeight 80px；下方显示该区域附件（readOnly 模式），单元格 overflow: hidden |
+| 风险预警 | riskWarning | 200px | HTML 富文本渲染，无风险显示绿色"无"；下方显示该区域附件（readOnly 模式），单元格 overflow: hidden |
+| 操作 | - | 100px | 编辑、删除按钮（权限控制） |
 
 **空状态：** 显示"该周暂无周报"
 
+#### 草稿箱 Tab
+
+- 显示所有草稿周报（不限创建者），分页 20 条/页
+- 表格列与已提交 Tab 完全一致（复用 submittedColumns），仅操作列替换为：编辑、提交、删除按钮
+
 **表格设置：**
-- 无分页（单页显示所有数据）
 - 横向滚动（最小宽度 1200px）
 - HTML 内容类名：`html-content`
 
@@ -1162,7 +1175,65 @@ Response: WeeklyReport[]
 - 图标大小：12px
 - DatePicker：size="small", bordered={false}, suffixIcon={null}
 
-## 7. 统一搜索框组件
+## 7. 项目资源看板页面
+
+**路由：** `/workload`
+**文件位置：** `/client/src/pages/Workload/index.tsx`
+
+### 7.1 页面布局（从上到下）
+
+**A. 统计卡片（3 列 CSS Grid）**
+
+3 个只读卡片（高度 88px）：
+| 卡片 | 颜色 | 数据来源 |
+|------|------|----------|
+| 逾期任务 | `--status-danger`（红） | `summary.totalOverdue` |
+| 无人负责 | `--status-warning`（橙） | `summary.totalUnassigned` |
+| 超载人员 | `--status-danger-dark`（深红） | `summary.overloadedCount`（进行中 ≥ 5） |
+
+**B. 人员负载（Card）**
+
+- 标题行：左侧"人员负载"，右侧项目筛选 Select（240px，可搜索、可清除）
+- 每人一行：姓名（80px，粗体）+ CSS 堆叠条形图 + 数字标签
+  - 条形图（3 段 flex，带 Tooltip）：蓝色=进行中、灰色=未开始、红色=逾期
+  - 右侧标签："N进行中 N逾期"
+  - 超载人员（inProgress ≥ 5）：红色浅背景 `rgba(245, 63, 63, 0.06)` + 红色 Tag "超载"
+- 空状态：Empty 组件
+
+**C. 需关注（Card + Table）**
+
+| 列名 | 宽度 | 说明 |
+|------|------|------|
+| 类型 | 120px | 圆点图标（红=逾期、橙=无人负责）+ 文字 |
+| 活动名称 | - | 可点击，跳转到所属项目详情页 |
+| 所属项目 | 180px | 蓝色链接，跳转项目详情 |
+| 负责人 | 120px | 姓名列表，无负责人显示"-" |
+| 详情 | 160px | 逾期：红色"逾期 N 天"；无人负责：计划时间范围 |
+
+- 排序：逾期在前（天数降序），无人负责在后（开始时间升序）
+- 空状态：绿色 "✓ 暂无需关注事项"
+
+### 7.2 API 接口
+
+```
+GET /api/activities/workload
+Query: projectId (可选)
+```
+
+**响应结构：**
+```json
+{
+  "summary": { "totalOverdue": 3, "totalUnassigned": 2, "overloadedCount": 1 },
+  "members": [{ "userId", "realName", "username", "totalActivities", "inProgress", "notStarted", "overdue", "totalDuration" }],
+  "issues": [{ "type", "activityId", "activityName", "projectId", "projectName", "assigneeNames", "planStartDate", "planEndDate", "overdueDays" }]
+}
+```
+
+- `members` 按 `(inProgress + overdue)` 降序排列
+- `issues` 中逾期按天数降序，无人负责按开始时间升序
+- `overloadedCount` = members 中 inProgress ≥ 5 的人数
+
+## 8. 统一搜索框组件
 
 **文件位置：** `/client/src/components/SearchInput.tsx`
 
@@ -1191,7 +1262,7 @@ interface SearchInputProps {
 - 用户管理页
 - 活动列表页
 
-## 8. 富文本编辑器组件
+## 9. 富文本编辑器组件
 
 **文件位置：** `/client/src/components/RichTextEditor.tsx`
 
@@ -1225,7 +1296,7 @@ interface RichTextEditorProps {
 
 **生命周期：** `useEffect` cleanup 调用 `editor.destroy()` 防止内存泄漏。
 
-## 8.1 附件列表组件
+## 9.1 附件列表组件
 
 **文件位置：** `/client/src/components/AttachmentList.tsx`
 
@@ -1262,7 +1333,7 @@ interface AttachmentListProps {
 
 **删除：** 调用 `uploadApi.delete(filename)` 清理服务器文件（静默处理失败），然后从列表移除。
 
-## 9. 环境变量
+## 10. 环境变量
 
 | 变量 | 说明 |
 |------|------|
