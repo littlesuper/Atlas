@@ -32,14 +32,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       path: '/weekly-reports',
     },
     {
+      key: '/workload',
+      label: '项目资源',
+      path: '/workload',
+    },
+    {
       key: '/products',
       label: '产品管理',
       path: '/products',
-    },
-    {
-      key: '/workload',
-      label: '资源负载',
-      path: '/workload',
     },
     {
       key: '/admin',
