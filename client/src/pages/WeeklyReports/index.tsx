@@ -455,7 +455,6 @@ const WeeklyReportsSummary: React.FC = () => {
                       rowKey="id"
                       pagination={false}
                       scroll={{ x: 1200 }}
-                      size="small"
                     />
                   </div>
                 ))
