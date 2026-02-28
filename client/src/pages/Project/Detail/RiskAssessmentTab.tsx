@@ -128,7 +128,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
       Message.success('风险评估完成');
       await Promise.all([load(), loadTrend()]);
     } catch {
-      Message.error('风险评估失败');
+      // axios 拦截器已显示后端错误信息
     } finally {
       setAssessing(false);
     }
@@ -146,9 +146,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
       {/* 操作栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
-          {assessments.length > 0
-            ? `共 ${total} 次评估记录`
-            : '暂无评估记录'}
+          {assessments.length > 0 ? `共 ${total} 次评估记录` : ''}
         </span>
         <Button
           type="primary"
