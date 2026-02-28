@@ -49,7 +49,7 @@ const WorkloadPage: React.FC = () => {
     {
       title: '类型',
       dataIndex: 'type',
-      width: 100,
+      width: 120,
       render: (type: string) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{
