@@ -1067,46 +1067,115 @@ router.get('/project/:projectId/critical-path', authenticate, async (req: Reques
 
 /**
  * GET /api/activities/workload
- * 资源负载统计
+ * 资源负载看板：summary + members + issues
  */
 router.get('/workload', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.query;
 
     const where: any = {};
-    if (projectId) where.projectId = projectId;
+    if (projectId) where.projectId = projectId as string;
 
     const activities = await prisma.activity.findMany({
       where,
       include: {
         assignees: { select: { id: true, realName: true, username: true } },
+        project: { select: { id: true, name: true } },
       },
     });
+
+    const now = new Date();
 
     // Aggregate by assignee
     const userMap = new Map<string, {
       userId: string; realName: string; username: string | null;
-      totalActivities: number; inProgress: number; overdue: number; totalDuration: number;
+      totalActivities: number; inProgress: number; notStarted: number; overdue: number; totalDuration: number;
     }>();
 
-    const now = new Date();
+    const overdueIssues: Array<{
+      type: 'overdue'; activityId: string; activityName: string;
+      projectId: string; projectName: string; assigneeNames: string[];
+      planStartDate: string | null; planEndDate: string | null; overdueDays: number;
+    }> = [];
+    const overdueSet = new Set<string>();
+
+    const unassignedIssues: Array<{
+      type: 'unassigned'; activityId: string; activityName: string;
+      projectId: string; projectName: string; assigneeNames: string[];
+      planStartDate: string | null; planEndDate: string | null;
+    }> = [];
+
     for (const a of activities) {
+      const isActive = a.status !== 'COMPLETED' && a.status !== 'CANCELLED';
+      const isOverdue = isActive && a.planEndDate && a.planEndDate < now;
+
+      // Aggregate per assignee
       for (const u of a.assignees) {
         let entry = userMap.get(u.id);
         if (!entry) {
-          entry = { userId: u.id, realName: u.realName, username: u.username, totalActivities: 0, inProgress: 0, overdue: 0, totalDuration: 0 };
+          entry = { userId: u.id, realName: u.realName, username: u.username, totalActivities: 0, inProgress: 0, notStarted: 0, overdue: 0, totalDuration: 0 };
           userMap.set(u.id, entry);
         }
         entry.totalActivities++;
         if (a.status === 'IN_PROGRESS') entry.inProgress++;
-        if (a.planEndDate && a.planEndDate < now && a.status !== 'COMPLETED' && a.status !== 'CANCELLED') {
-          entry.overdue++;
-        }
+        if (a.status === 'NOT_STARTED') entry.notStarted++;
+        if (isOverdue) entry.overdue++;
         entry.totalDuration += a.planDuration || 0;
+      }
+
+      // Overdue issues (deduplicated)
+      if (isOverdue && !overdueSet.has(a.id)) {
+        overdueSet.add(a.id);
+        const diffMs = now.getTime() - new Date(a.planEndDate!).getTime();
+        const overdueDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        overdueIssues.push({
+          type: 'overdue',
+          activityId: a.id,
+          activityName: a.name,
+          projectId: a.project.id,
+          projectName: a.project.name,
+          assigneeNames: a.assignees.map((u: any) => u.realName),
+          planStartDate: a.planStartDate ? a.planStartDate.toISOString() : null,
+          planEndDate: a.planEndDate ? a.planEndDate.toISOString() : null,
+          overdueDays,
+        });
+      }
+
+      // Unassigned issues
+      if (isActive && a.assignees.length === 0) {
+        unassignedIssues.push({
+          type: 'unassigned',
+          activityId: a.id,
+          activityName: a.name,
+          projectId: a.project.id,
+          projectName: a.project.name,
+          assigneeNames: [],
+          planStartDate: a.planStartDate ? a.planStartDate.toISOString() : null,
+          planEndDate: a.planEndDate ? a.planEndDate.toISOString() : null,
+        });
       }
     }
 
-    res.json(Array.from(userMap.values()));
+    const members = Array.from(userMap.values())
+      .sort((a, b) => (b.inProgress + b.overdue) - (a.inProgress + a.overdue));
+
+    // Sort issues: overdue (days desc) then unassigned (start date asc)
+    overdueIssues.sort((a, b) => b.overdueDays - a.overdueDays);
+    unassignedIssues.sort((a, b) => {
+      const da = a.planStartDate ? new Date(a.planStartDate).getTime() : Infinity;
+      const db = b.planStartDate ? new Date(b.planStartDate).getTime() : Infinity;
+      return da - db;
+    });
+
+    const issues = [...overdueIssues, ...unassignedIssues];
+
+    const summary = {
+      totalOverdue: overdueSet.size,
+      totalUnassigned: unassignedIssues.length,
+      overloadedCount: members.filter(m => m.inProgress >= 5).length,
+    };
+
+    res.json({ summary, members, issues });
   } catch (error) {
     console.error('获取资源负载错误:', error);
     res.status(500).json({ error: '服务器内部错误' });

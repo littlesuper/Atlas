@@ -21,6 +21,7 @@ import {
   ResourceConflict,
   WhatIfResult,
   AiScheduleSuggestion,
+  WorkloadResponse,
 } from '../types';
 
 // 分页响应结构
@@ -239,10 +240,7 @@ export const activitiesApi = {
 
   // 资源负载
   getWorkload: (params?: { projectId?: string }) =>
-    request.get<Array<{
-      userId: string; realName: string; username: string;
-      totalActivities: number; inProgress: number; overdue: number; totalDuration: number;
-    }>>('/activities/workload', { params }),
+    request.get<WorkloadResponse>('/activities/workload', { params }),
 
   // 资源冲突检测
   getResourceConflicts: (params?: { projectId?: string }) =>

@@ -391,6 +391,43 @@ export interface AuditLog {
   createdAt: string;
 }
 
+// ============ 资源负载仪表盘类型 ============
+
+export interface WorkloadSummary {
+  totalOverdue: number;
+  totalUnassigned: number;
+  overloadedCount: number;
+}
+
+export interface WorkloadMember {
+  userId: string;
+  realName: string;
+  username: string | null;
+  totalActivities: number;
+  inProgress: number;
+  notStarted: number;
+  overdue: number;
+  totalDuration: number;
+}
+
+export interface WorkloadIssue {
+  type: 'overdue' | 'unassigned';
+  activityId: string;
+  activityName: string;
+  projectId: string;
+  projectName: string;
+  assigneeNames: string[];
+  planStartDate?: string | null;
+  planEndDate?: string | null;
+  overdueDays?: number;
+}
+
+export interface WorkloadResponse {
+  summary: WorkloadSummary;
+  members: WorkloadMember[];
+  issues: WorkloadIssue[];
+}
+
 // ============ 通用类型 ============
 
 export interface ApiResponse<T = unknown> {
