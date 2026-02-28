@@ -29,6 +29,7 @@ import {
   IconDragDotVertical,
   IconStorage,
   IconUndo,
+  IconUpload,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, activitiesApi, usersApi, authApi } from '../../../api';
@@ -175,6 +176,9 @@ const ProjectDetail: React.FC = () => {
 
   // 行间快速插入
   const insertAtIndexRef = useRef<number | null>(null);
+
+  // Excel 导入
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 活动列表表头吸顶
   const tableWrapRef    = useRef<HTMLDivElement>(null);
@@ -459,6 +463,55 @@ const ProjectDetail: React.FC = () => {
   };
 
   // 打开创建/编辑抽屉
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    // 重置 input 以便再次选择同一文件
+    e.target.value = '';
+    try {
+      const { data } = await activitiesApi.importExcel(id, file);
+      const importedIds = (data.activities || []).map((a: any) => a.id);
+      const msg = `导入成功，共 ${data.count} 条活动${data.skipped ? `，跳过 ${data.skipped} 条重复` : ''}`;
+      Message.success({
+        id: 'import-excel-undo',
+        content: (
+          <span>
+            {msg}
+            {importedIds.length > 0 && (
+              <a
+                style={{ marginLeft: 8, cursor: 'pointer' }}
+                onClick={async () => {
+                  Message.clear();
+                  Message.loading('正在撤销...');
+                  try {
+                    await activitiesApi.undoImport(id!, importedIds);
+                    Message.clear();
+                    Message.success('已撤销导入');
+                    loadActivities();
+                    loadProject();
+                  } catch {
+                    Message.clear();
+                  }
+                }}
+              >
+                <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤销
+              </a>
+            )}
+          </span>
+        ),
+        duration: 8000,
+      });
+      if (data.createdUsers && data.createdUsers.length > 0) {
+        Message.info(`已自动创建 ${data.createdUsers.length} 个联系人账号：${data.createdUsers.join('、')}`);
+      }
+      setDrawerVisible(false);
+      loadActivities();
+      loadProject();
+    } catch (err: any) {
+      Message.error(err?.response?.data?.error || '导入失败');
+    }
+  };
+
   const handleOpenDrawer = (activity?: Activity) => {
     if (activity) {
       setEditingActivity(activity);
@@ -604,17 +657,68 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  // 删除活动
+  // 活动快照 → 创建参数
+  const activityToCreatePayload = (s: Activity) => ({
+    projectId: s.projectId,
+    name: s.name,
+    description: s.description,
+    type: s.type,
+    phase: s.phase,
+    status: s.status,
+    priority: s.priority,
+    planStartDate: s.planStartDate || undefined,
+    planEndDate: s.planEndDate || undefined,
+    planDuration: s.planDuration ?? undefined,
+    startDate: s.startDate || undefined,
+    endDate: s.endDate || undefined,
+    duration: s.duration ?? undefined,
+    assigneeIds: s.assignees?.map(a => a.id) || [],
+    notes: s.notes || undefined,
+    sortOrder: s.sortOrder,
+    dependencies: Array.isArray(s.dependencies)
+      ? s.dependencies.map(d => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
+      : undefined,
+  });
+
+  // 删除活动（支持撤销）
   const handleDeleteActivity = (activity: Activity) => {
     Modal.confirm({
       title: '确认删除',
-      content: `确定要删除活动"${activity.name}"吗？此操作不可恢复。`,
+      content: `确定要删除活动"${activity.name}"吗？`,
       onOk: async () => {
         try {
+          const snapshot = { ...activity };
           await activitiesApi.delete(activity.id);
-          Message.success('活动删除成功');
           loadActivities();
           loadProject();
+          Message.success({
+            id: 'delete-undo',
+            content: (
+              <span>
+                已删除活动「{snapshot.name}」{' '}
+                <a
+                  style={{ marginLeft: 8, cursor: 'pointer' }}
+                  onClick={async () => {
+                    Message.clear();
+                    Message.loading('正在撤销...');
+                    try {
+                      await activitiesApi.create(activityToCreatePayload(snapshot));
+                      Message.clear();
+                      Message.success('已撤销删除');
+                      loadActivities();
+                      loadProject();
+                    } catch {
+                      Message.clear();
+                      Message.error('撤销失败');
+                    }
+                  }}
+                >
+                  <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤销
+                </a>
+              </span>
+            ),
+            duration: 5000,
+          });
         } catch {
           Message.error('活动删除失败');
         }
@@ -902,14 +1006,43 @@ const ProjectDetail: React.FC = () => {
     if (selectedIds.size === 0) return;
     Modal.confirm({
       title: '确认批量删除',
-      content: `确定要删除选中的 ${selectedIds.size} 个活动吗？此操作不可恢复。`,
+      content: `确定要删除选中的 ${selectedIds.size} 个活动吗？`,
       onOk: async () => {
         try {
+          const snapshots = activities.filter(a => selectedIds.has(a.id)).map(a => ({ ...a }));
+          const count = selectedIds.size;
           await activitiesApi.batchDelete(Array.from(selectedIds));
-          Message.success(`已删除 ${selectedIds.size} 个活动`);
           setSelectedIds(new Set());
           loadActivities();
           loadProject();
+          Message.success({
+            id: 'batch-delete-undo',
+            content: (
+              <span>
+                已删除 {count} 个活动{' '}
+                <a
+                  style={{ marginLeft: 8, cursor: 'pointer' }}
+                  onClick={async () => {
+                    Message.clear();
+                    Message.loading('正在撤销...');
+                    try {
+                      await activitiesApi.batchCreate(snapshots.map(activityToCreatePayload));
+                      Message.clear();
+                      Message.success(`已撤销删除 ${count} 个活动`);
+                      loadActivities();
+                      loadProject();
+                    } catch {
+                      Message.clear();
+                      Message.error('撤销失败');
+                    }
+                  }}
+                >
+                  <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤销
+                </a>
+              </span>
+            ),
+            duration: 8000,
+          });
         } catch { Message.error('批量删除失败'); }
       },
     });
@@ -2059,7 +2192,23 @@ const ProjectDetail: React.FC = () => {
           visible={drawerVisible}
           onCancel={() => { insertAtIndexRef.current = null; setDrawerVisible(false); }}
           footer={
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {!editingActivity && (
+                  <>
+                    <Button icon={<IconUpload />} onClick={() => fileInputRef.current?.click()}>
+                      批量导入
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      style={{ display: 'none' }}
+                      onChange={handleImportExcel}
+                    />
+                  </>
+                )}
+              </div>
               <Space>
                 <Button onClick={() => setDrawerVisible(false)}>取消</Button>
                 <Button type="primary" onClick={handleSubmitActivity}>

@@ -263,6 +263,35 @@ export const activitiesApi = {
   // AI 排计划建议
   getAiSchedule: (projectId: string) =>
     request.post<AiScheduleSuggestion>(`/activities/project/${projectId}/ai-schedule`),
+
+  // 批量创建活动（用于撤销删除）
+  batchCreate: (activities: Array<{
+    projectId: string; name: string; description?: string; type?: string;
+    phase?: string; status?: string; priority?: string;
+    planStartDate?: string; planEndDate?: string; planDuration?: number;
+    startDate?: string; endDate?: string; duration?: number;
+    assigneeIds?: string[]; notes?: string; sortOrder?: number;
+    dependencies?: Array<{ id: string; type: string; lag?: number }>;
+  }>) => request.post<{ success: boolean; count: number }>('/activities/batch-create', { activities }),
+
+  // 撤销导入活动
+  undoImport: (projectId: string, ids: string[]) =>
+    request.post<{ success: boolean; count: number }>(`/activities/project/${projectId}/undo-import`, { ids }),
+
+  // 导入 Excel 活动
+  importExcel: (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request.post<{
+      success: boolean;
+      count: number;
+      skipped: number;
+      createdUsers: string[];
+      activities: Activity[];
+    }>(`/activities/project/${projectId}/import-excel`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // ============ 项目模板 API ============

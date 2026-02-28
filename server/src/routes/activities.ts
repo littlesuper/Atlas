@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import multer from 'multer';
 import { PrismaClient, ActivityType } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, canManageProject, sanitizePagination } from '../middleware/permission';
@@ -7,6 +8,8 @@ import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils
 import { updateProjectProgress } from '../utils/projectProgress';
 import { auditLog, diffFields } from '../utils/auditLog';
 import { callAi } from '../utils/aiClient';
+import { parseExcelActivities } from '../utils/excelActivityParser';
+import { pinyin } from 'pinyin-pro';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -257,6 +260,64 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
 });
 
 /**
+ * POST /api/activities/batch-create
+ * 批量创建活动（用于撤销删除）
+ */
+router.post('/batch-create', authenticate, requirePermission('activity', 'create'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { activities: items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ error: '请提供活动数据' }); return;
+    }
+
+    const projectId = items[0].projectId;
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) { res.status(404).json({ error: '项目不存在' }); return; }
+    if (!canManageProject(req, project.managerId, projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    const created = await prisma.$transaction(
+      items.map((item: any) => {
+        const assigneeIds: string[] = Array.isArray(item.assigneeIds) ? item.assigneeIds : [];
+        let planDuration = item.planDuration;
+        if (!planDuration && item.planStartDate && item.planEndDate) {
+          planDuration = calculateWorkdays(new Date(item.planStartDate), new Date(item.planEndDate));
+        }
+        return prisma.activity.create({
+          data: {
+            projectId: item.projectId,
+            name: item.name,
+            description: item.description || null,
+            type: item.type || ActivityType.TASK,
+            phase: item.phase || null,
+            status: item.status || 'NOT_STARTED',
+            priority: item.priority || 'MEDIUM',
+            planStartDate: item.planStartDate ? new Date(item.planStartDate) : null,
+            planEndDate: item.planEndDate ? new Date(item.planEndDate) : null,
+            planDuration: planDuration || null,
+            startDate: item.startDate ? new Date(item.startDate) : null,
+            endDate: item.endDate ? new Date(item.endDate) : null,
+            duration: item.duration || null,
+            dependencies: item.dependencies || null,
+            notes: item.notes || null,
+            sortOrder: item.sortOrder || 0,
+            assignees: assigneeIds.length > 0 ? { connect: assigneeIds.map((id: string) => ({ id })) } : undefined,
+          },
+          include: { assignees: { select: { id: true, realName: true, username: true } } },
+        });
+      })
+    );
+
+    await updateProjectProgress(projectId);
+    res.status(201).json({ success: true, count: created.length });
+  } catch (error) {
+    console.error('批量创建活动错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * POST /api/activities
  * 创建活动
  * 权限：activity:create
@@ -472,6 +533,50 @@ router.delete('/archives/:id', authenticate, requirePermission('activity', 'dele
 });
 
 /**
+ * PUT /api/activities/batch-update
+ * 批量更新活动（必须在 /:id 之前注册）
+ */
+router.put('/batch-update', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { ids, updates } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: '请选择活动' }); return;
+    }
+
+    const activities = await prisma.activity.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, projectId: true },
+    });
+    const projectIds = [...new Set(activities.map(a => a.projectId))];
+    if (projectIds.length !== 1) {
+      res.status(400).json({ error: '批量操作仅支持同一项目的活动' }); return;
+    }
+
+    const projectId = projectIds[0];
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { managerId: true } });
+    if (!canManageProject(req, project?.managerId ?? '', projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    for (const actId of ids) {
+      const updateData: any = {};
+      if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.phase !== undefined) updateData.phase = updates.phase;
+      if (updates.assigneeIds !== undefined) {
+        updateData.assignees = { set: updates.assigneeIds.map((uid: string) => ({ id: uid })) };
+      }
+      await prisma.activity.update({ where: { id: actId }, data: updateData });
+    }
+
+    await updateProjectProgress(projectId);
+    res.json({ success: true, count: ids.length });
+  } catch (error) {
+    console.error('批量更新错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * PUT /api/activities/:id
  * 更新活动
  * 权限：activity:update
@@ -656,6 +761,41 @@ router.put(
 );
 
 /**
+ * DELETE /api/activities/batch-delete
+ * 批量删除活动（必须在 /:id 之前注册，否则会被 /:id 捕获）
+ */
+router.delete('/batch-delete', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: '请选择活动' }); return;
+    }
+
+    const activities = await prisma.activity.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, projectId: true },
+    });
+    const projectIds = [...new Set(activities.map(a => a.projectId))];
+    if (projectIds.length !== 1) {
+      res.status(400).json({ error: '批量操作仅支持同一项目的活动' }); return;
+    }
+
+    const projectId = projectIds[0];
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { managerId: true } });
+    if (!canManageProject(req, project?.managerId ?? '', projectId)) {
+      res.status(403).json({ error: '无权操作' }); return;
+    }
+
+    await prisma.activity.deleteMany({ where: { id: { in: ids } } });
+    await updateProjectProgress(projectId);
+    res.json({ success: true, count: ids.length });
+  } catch (error) {
+    console.error('批量删除错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * DELETE /api/activities/:id
  * 删除活动
  * 权限：activity:delete
@@ -822,86 +962,6 @@ router.post('/archives/compare', authenticate, async (req: Request, res: Respons
     res.json({ diffs });
   } catch (error) {
     console.error('对比归档错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
-
-/**
- * PUT /api/activities/batch-update
- * 批量更新活动
- */
-router.put('/batch-update', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { ids, updates } = req.body;
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      res.status(400).json({ error: '请选择活动' }); return;
-    }
-
-    // 验证所有活动属于同一项目
-    const activities = await prisma.activity.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, projectId: true },
-    });
-    const projectIds = [...new Set(activities.map(a => a.projectId))];
-    if (projectIds.length !== 1) {
-      res.status(400).json({ error: '批量操作仅支持同一项目的活动' }); return;
-    }
-
-    const projectId = projectIds[0];
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { managerId: true } });
-    if (!canManageProject(req, project?.managerId ?? '', projectId)) {
-      res.status(403).json({ error: '无权操作' }); return;
-    }
-
-    for (const actId of ids) {
-      const updateData: any = {};
-      if (updates.status !== undefined) updateData.status = updates.status;
-      if (updates.phase !== undefined) updateData.phase = updates.phase;
-      if (updates.assigneeIds !== undefined) {
-        updateData.assignees = { set: updates.assigneeIds.map((uid: string) => ({ id: uid })) };
-      }
-      await prisma.activity.update({ where: { id: actId }, data: updateData });
-    }
-
-    await updateProjectProgress(projectId);
-    res.json({ success: true, count: ids.length });
-  } catch (error) {
-    console.error('批量更新错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
-
-/**
- * DELETE /api/activities/batch-delete
- * 批量删除活动
- */
-router.delete('/batch-delete', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { ids } = req.body;
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      res.status(400).json({ error: '请选择活动' }); return;
-    }
-
-    const activities = await prisma.activity.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, projectId: true },
-    });
-    const projectIds = [...new Set(activities.map(a => a.projectId))];
-    if (projectIds.length !== 1) {
-      res.status(400).json({ error: '批量操作仅支持同一项目的活动' }); return;
-    }
-
-    const projectId = projectIds[0];
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { managerId: true } });
-    if (!canManageProject(req, project?.managerId ?? '', projectId)) {
-      res.status(403).json({ error: '无权操作' }); return;
-    }
-
-    await prisma.activity.deleteMany({ where: { id: { in: ids } } });
-    await updateProjectProgress(projectId);
-    res.json({ success: true, count: ids.length });
-  } catch (error) {
-    console.error('批量删除错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1616,5 +1676,226 @@ router.post('/project/:projectId/reschedule', authenticate, async (req: Request,
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
+
+/**
+ * POST /api/activities/project/:projectId/import-excel
+ * 从 Excel 文件导入活动
+ */
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = (file.originalname || '').toLowerCase();
+    if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+      cb(null, true);
+    } else {
+      cb(new Error('仅支持 .xlsx / .xls 文件'));
+    }
+  },
+});
+
+router.post(
+  '/project/:projectId/import-excel',
+  authenticate,
+  requirePermission('activity', 'create'),
+  excelUpload.single('file'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+
+      // 验证项目存在
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      if (!project) {
+        res.status(404).json({ error: '项目不存在' });
+        return;
+      }
+
+      // 权限检查
+      if (!canManageProject(req, project.managerId, projectId)) {
+        res.status(403).json({ error: '无权在此项目中导入活动' });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({ error: '请上传 Excel 文件' });
+        return;
+      }
+
+      // 解析 Excel
+      const parsed = parseExcelActivities(req.file.buffer);
+      if (parsed.length === 0) {
+        res.json({ success: true, count: 0, skipped: 0, createdUsers: [], activities: [] });
+        return;
+      }
+
+      // 收集所有负责人姓名
+      const allNames = new Set<string>();
+      parsed.forEach((a) => a.assigneeNames.forEach((n) => allNames.add(n)));
+
+      // 查询已有用户（按 realName 匹配）
+      const existingUsers = allNames.size > 0
+        ? await prisma.user.findMany({
+            where: { realName: { in: Array.from(allNames) } },
+            select: { id: true, realName: true },
+          })
+        : [];
+      const userMap = new Map<string, string>(); // realName → userId
+      existingUsers.forEach((u) => userMap.set(u.realName, u.id));
+
+      // 自动创建不存在的联系人（用户名由姓名拼音生成，重复时追加数字）
+      const createdUsers: string[] = [];
+      for (const name of allNames) {
+        if (!userMap.has(name)) {
+          const baseUsername = pinyin(name, { toneType: 'none', type: 'array' }).join('');
+          let username = baseUsername;
+          let suffix = 1;
+          while (await prisma.user.findUnique({ where: { username } })) {
+            username = baseUsername + suffix;
+            suffix++;
+          }
+          const newUser = await prisma.user.create({
+            data: { realName: name, username, canLogin: false },
+          });
+          userMap.set(name, newUser.id);
+          createdUsers.push(name);
+        }
+      }
+
+      // 查询项目现有活动，用于去重（按 名称+阶段+计划日期 匹配）
+      const dateStr = (d: Date | null | undefined) => d ? d.toISOString().slice(0, 10) : '';
+      const existingActivities = await prisma.activity.findMany({
+        where: { projectId },
+        select: { name: true, phase: true, planStartDate: true, planEndDate: true },
+      });
+      const existingSet = new Set(
+        existingActivities.map((a) =>
+          `${a.name}|${a.phase || ''}|${dateStr(a.planStartDate)}|${dateStr(a.planEndDate)}`
+        )
+      );
+
+      // 过滤掉与现有活动重复的行
+      const toCreate = parsed.filter((a) => {
+        const key = `${a.name}|${a.phase || ''}|${dateStr(a.planStartDate)}|${dateStr(a.planEndDate)}`;
+        return !existingSet.has(key);
+      });
+      const skipped = parsed.length - toCreate.length;
+
+      if (toCreate.length === 0) {
+        res.json({ success: true, count: 0, skipped, createdUsers, activities: [] });
+        return;
+      }
+
+      // 获取当前最大 sortOrder
+      const maxSort = await prisma.activity.aggregate({
+        where: { projectId },
+        _max: { sortOrder: true },
+      });
+      let sortOrder = (maxSort._max.sortOrder ?? 0) + 1;
+
+      // 批量创建活动
+      const activities = await prisma.$transaction(
+        toCreate.map((a) => {
+          const assigneeIds = a.assigneeNames
+            .map((n) => userMap.get(n))
+            .filter((id): id is string => !!id);
+
+          const data: any = {
+            projectId,
+            name: a.name,
+            type: ActivityType.TASK,
+            phase: a.phase || null,
+            status: a.status || 'NOT_STARTED',
+            planStartDate: a.planStartDate || null,
+            planEndDate: a.planEndDate || null,
+            planDuration: a.planDuration || null,
+            notes: a.notes || null,
+            sortOrder: sortOrder++,
+          };
+
+          // 自动计算工期
+          if (!data.planDuration && data.planStartDate && data.planEndDate) {
+            data.planDuration = calculateWorkdays(data.planStartDate, data.planEndDate);
+          }
+
+          if (assigneeIds.length > 0) {
+            data.assignees = { connect: assigneeIds.map((id) => ({ id })) };
+          }
+
+          return prisma.activity.create({
+            data,
+            include: {
+              assignees: { select: { id: true, realName: true, username: true } },
+            },
+          });
+        })
+      );
+
+      // 更新项目进度
+      await updateProjectProgress(projectId);
+
+      auditLog({
+        req,
+        action: 'CREATE',
+        resourceType: 'activity',
+        resourceId: projectId,
+        resourceName: `批量导入 ${activities.length} 条活动`,
+      });
+
+      res.json({
+        success: true,
+        count: activities.length,
+        skipped,
+        createdUsers,
+        activities,
+      });
+    } catch (error: any) {
+      console.error('导入 Excel 活动错误:', error?.message, error?.stack);
+      res.status(500).json({ error: error?.message || '服务器内部错误' });
+    }
+  }
+);
+
+/**
+ * POST /api/activities/project/:projectId/undo-import
+ * 撤销批量导入的活动
+ */
+router.post(
+  '/project/:projectId/undo-import',
+  authenticate,
+  requirePermission('activity', 'create'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      const { ids } = req.body;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ error: '无可撤销的活动' });
+        return;
+      }
+
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      if (!project) {
+        res.status(404).json({ error: '项目不存在' });
+        return;
+      }
+      if (!canManageProject(req, project.managerId, projectId)) {
+        res.status(403).json({ error: '无权操作' });
+        return;
+      }
+
+      // 仅删除属于该项目的活动
+      await prisma.activity.deleteMany({
+        where: { id: { in: ids }, projectId },
+      });
+
+      await updateProjectProgress(projectId);
+
+      res.json({ success: true, count: ids.length });
+    } catch (error) {
+      console.error('撤销导入错误:', error);
+      res.status(500).json({ error: '服务器内部错误' });
+    }
+  }
+);
 
 export default router;
