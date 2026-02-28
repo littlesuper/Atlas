@@ -1,6 +1,6 @@
 {
   "name": "hwsystem",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "贝锐硬件管理系统",
   "private": true,
   "workspaces": [

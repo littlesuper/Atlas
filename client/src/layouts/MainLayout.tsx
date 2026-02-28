@@ -86,6 +86,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <IconPoweroff style={{ marginRight: '8px' }} />
         退出登录
       </Menu.Item>
+      <Menu.Item key="version" disabled style={{ cursor: 'default', fontSize: 12, color: 'var(--color-text-4)' }}>
+        v{__APP_VERSION__}
+      </Menu.Item>
     </Menu>
   );
 

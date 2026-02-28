@@ -4,7 +4,13 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
 import path from 'path';
+import { readFileSync } from 'fs';
+import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
+
+const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf-8'));
+const gitHash = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim(); } catch { return 'unknown'; } })();
+const appVersion = `${pkg.version}-${gitHash}`;
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
 import rolesRoutes from './routes/roles';
@@ -70,6 +76,7 @@ app.use('/uploads', express.static(uploadsPath));
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
+    version: appVersion,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
