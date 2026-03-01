@@ -9,6 +9,7 @@ import {
   Tag,
   Space,
   InputNumber,
+  Message,
 } from '@arco-design/web-react';
 import {
   IconPlus,
@@ -130,6 +131,10 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
     if (changed === 'start') start = value as dayjs.Dayjs | null;
     else if (changed === 'end') end = value as dayjs.Dayjs | null;
     else dur = value as number | null;
+    if (changed !== 'dur' && start && end && end.isBefore(start, 'day')) {
+      Message.error('结束时间不能早于开始时间');
+      return;
+    }
     const result = resolveTriple({ start, end, dur }, changed);
     form.setFieldsValue({ planStart: result.start ?? undefined, planEnd: result.end ?? undefined });
     setPlanDuration(result.dur);
@@ -143,6 +148,10 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
     if (changed === 'start') start = value as dayjs.Dayjs | null;
     else if (changed === 'end') end = value as dayjs.Dayjs | null;
     else dur = value as number | null;
+    if (changed !== 'dur' && start && end && end.isBefore(start, 'day')) {
+      Message.error('结束时间不能早于开始时间');
+      return;
+    }
     const result = resolveTriple({ start, end, dur }, changed);
     form.setFieldsValue({ actualStart: result.start ?? undefined, actualEnd: result.end ?? undefined });
     setActualDuration(result.dur);

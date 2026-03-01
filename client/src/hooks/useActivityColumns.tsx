@@ -534,6 +534,11 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
               onChange={(dateStr) => {
                 if (dateStr) {
                   const startVal = dayjs(dateStr).format('YYYY-MM-DD');
+                  if (record.planEndDate && dayjs(record.planEndDate).isBefore(dayjs(startVal), 'day')) {
+                    Message.error('开始时间不能晚于结束时间');
+                    setInlineEditing(null);
+                    return;
+                  }
                   const payload: Record<string, unknown> = { planStartDate: startVal };
                   if (record.planEndDate) {
                     payload.planDuration = calcWorkdays(dayjs(startVal), dayjs(record.planEndDate));
@@ -579,6 +584,11 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
               onChange={(dateStr) => {
                 if (dateStr) {
                   const endVal = dayjs(dateStr).format('YYYY-MM-DD');
+                  if (record.planStartDate && dayjs(endVal).isBefore(dayjs(record.planStartDate), 'day')) {
+                    Message.error('结束时间不能早于开始时间');
+                    setInlineEditing(null);
+                    return;
+                  }
                   const payload: Record<string, unknown> = { planEndDate: endVal };
                   if (record.planStartDate) {
                     payload.planDuration = calcWorkdays(dayjs(record.planStartDate), dayjs(endVal));
@@ -596,7 +606,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         }
         return (
           <span
-            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: !hasDeps && canManage ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'rgb(var(--danger-6))' : undefined, cursor: !hasDeps && canManage ? 'pointer' : 'default' }}
             onClick={() => {
               if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
               if (canManage) setInlineEditing({ id: record.id, field: 'planEndDate' });
@@ -622,6 +632,11 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
               onChange={(dateStr) => {
                 if (dateStr) {
                   const startVal = dayjs(dateStr).format('YYYY-MM-DD');
+                  if (record.endDate && dayjs(record.endDate).isBefore(dayjs(startVal), 'day')) {
+                    Message.error('开始时间不能晚于结束时间');
+                    setInlineEditing(null);
+                    return;
+                  }
                   const payload: Record<string, unknown> = { startDate: startVal };
                   if (record.endDate) {
                     payload.duration = calcWorkdays(dayjs(startVal), dayjs(record.endDate));
@@ -637,9 +652,10 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
             />
           );
         }
+        const isLate = record.planStartDate && record.startDate && dayjs(record.startDate).isAfter(dayjs(record.planStartDate), 'day');
         return (
           <span
-            style={{ whiteSpace: 'nowrap', cursor: canManage ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', color: isLate ? 'rgb(var(--danger-6))' : undefined, cursor: canManage ? 'pointer' : 'default' }}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'actualStartDate' })}
           >
             {dateFmt(record.startDate)}
@@ -663,6 +679,11 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
               onChange={(dateStr) => {
                 if (dateStr) {
                   const endVal = dayjs(dateStr).format('YYYY-MM-DD');
+                  if (record.startDate && dayjs(endVal).isBefore(dayjs(record.startDate), 'day')) {
+                    Message.error('结束时间不能早于开始时间');
+                    setInlineEditing(null);
+                    return;
+                  }
                   const payload: Record<string, unknown> = { endDate: endVal };
                   if (record.startDate) {
                     payload.duration = calcWorkdays(dayjs(record.startDate), dayjs(endVal));
@@ -680,7 +701,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         }
         return (
           <span
-            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: canManage ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'rgb(var(--danger-6))' : undefined, cursor: canManage ? 'pointer' : 'default' }}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'actualEndDate' })}
           >
             {dateFmt(record.endDate)}
@@ -722,7 +743,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
             <span
               style={{
                 cursor: canManage ? 'pointer' : 'default',
-                maxWidth: 120,
+                maxWidth: '100%',
                 display: 'inline-block',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
