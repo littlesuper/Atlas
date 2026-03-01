@@ -28,7 +28,7 @@ import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/work
 import ActivityComments from './ActivityComments';
 import dayjs from 'dayjs';
 
-const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
+const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
 
 // 三方联动辅助
 type DateTriple = { start: dayjs.Dayjs | null; end: dayjs.Dayjs | null; dur: number | null };

@@ -77,7 +77,7 @@ const AutoOpenDatePicker: React.FC<React.ComponentProps<typeof DatePicker> & { o
 };
 
 // 阶段颜色配置
-const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
+const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
 
 // 格式化3位序号
 function formatSeq(n: number): string {

@@ -1,7 +1,7 @@
 # Atlas E2E 测试用例集（完整版）
 
 > 基于 Playwright + Arco Design 的端到端测试套件
-> 共 **33 个测试文件**，**163 个测试用例**（全部通过）
+> 共 **46 个测试文件**，**239 个测试用例**（全部通过）
 
 ---
 
@@ -19,65 +19,80 @@ e2e/
 └── specs/                  # 所有测试文件
     ├── ── 认证与权限 ──
     │   ├── auth.spec.ts                    # 登录/登出/鉴权重定向
-    │   └── permission-access.spec.ts       # 非管理员权限访问控制 ★NEW
+    │   ├── auth-validation.spec.ts         # 登录表单验证/空值/长度/Tab切换
+    │   ├── permission-access.spec.ts       # 非管理员权限访问控制
+    │   └── permission-buttons.spec.ts      # 权限按钮可见性检测
     │
     ├── ── 导航与布局 ──
     │   ├── navigation.spec.ts              # 侧边栏+Tab 导航
-    │   └── responsive-layout.spec.ts       # 页面布局/Header/Avatar/铃铛 ★NEW
+    │   └── responsive-layout.spec.ts       # 页面布局/Header/Avatar/铃铛
     │
     ├── ── 项目管理 ──
     │   ├── projects.spec.ts                # 项目 CRUD 基础
-    │   ├── project-edit-search.spec.ts     # 项目编辑/搜索/状态/统计卡片 ★NEW
+    │   ├── project-edit-search.spec.ts     # 项目编辑/搜索/状态/统计卡片
     │   ├── project-filters.spec.ts         # 产品线筛选
-    │   └── project-detail-tabs.spec.ts     # 详情页多 Tab 切换 ★NEW
+    │   ├── project-detail-tabs.spec.ts     # 详情页多 Tab 切换
+    │   └── project-archive.spec.ts         # 项目归档与恢复
     │
     ├── ── 活动管理 ──
     │   ├── activities.spec.ts              # 活动 CRUD 基础
     │   ├── activity-filters.spec.ts        # 阶段/状态筛选 + Esc 退出
-    │   ├── activity-inline-edit.spec.ts    # 内联编辑完整测试 ★NEW
-    │   ├── activity-dependencies.spec.ts   # 活动依赖关系 ★NEW
-    │   ├── activity-export.spec.ts         # 导入导出功能 ★NEW
-    │   ├── column-settings.spec.ts         # 列设置/可见性切换 ★NEW
+    │   ├── activity-inline-edit.spec.ts    # 内联编辑完整测试
+    │   ├── activity-date-edit.spec.ts      # 日期内联编辑/工期计算
+    │   ├── activity-dependencies.spec.ts   # 活动依赖关系
+    │   ├── activity-drag-sort.spec.ts      # 拖拽排序/ID序号
+    │   ├── activity-export.spec.ts         # 导出功能
+    │   ├── activity-import.spec.ts         # 批量导入功能
+    │   ├── column-settings.spec.ts         # 列设置/可见性切换
     │   ├── snapshots.spec.ts               # 项目快照管理
     │   └── comments.spec.ts                # 活动评论
     │
+    ├── ── 重构验证 ──
+    │   └── refactor-smoke.spec.ts          # Detail 页面重构冒烟测试
+    │
     ├── ── 全站 UI 质量 ──
-    │   └── table-header-nowrap.spec.ts     # 全站表头禁止换行检测 ★NEW
+    │   └── table-header-nowrap.spec.ts     # 全站表头禁止换行检测
     │
     ├── ── 甘特图 ──
-    │   └── gantt-chart.spec.ts             # 甘特图视图/缩放 ★NEW
+    │   └── gantt-chart.spec.ts             # 甘特图视图/缩放
     │
     ├── ── 产品管理 ──
     │   ├── products.spec.ts                # 产品 CRUD 基础
-    │   └── product-advanced.spec.ts        # 产品编辑/复制/类别/变更记录 ★NEW
+    │   ├── product-advanced.spec.ts        # 产品编辑/复制/类别/变更记录
+    │   ├── product-filters.spec.ts         # 产品筛选/搜索/导出
+    │   └── product-comparison.spec.ts      # 产品对比功能
     │
     ├── ── 周报管理 ──
     │   ├── weekly-reports.spec.ts          # 周报查看
-    │   └── weekly-report-crud.spec.ts      # 周报创建/草稿/提交/筛选 ★NEW
+    │   ├── weekly-report-crud.spec.ts      # 周报创建/草稿/提交/筛选
+    │   └── weekly-report-form.spec.ts      # 周报表单填写/AI分析/提交
     │
     ├── ── 资源负载 ──
     │   ├── workload.spec.ts                # 负载页面基础
-    │   └── workload-advanced.spec.ts       # 负载筛选/统计/问题列表 ★NEW
+    │   ├── workload-advanced.spec.ts       # 负载筛选/统计/问题列表
+    │   └── workload-navigation.spec.ts     # 负载页导航/超载/颜色条
     │
     ├── ── 系统管理 ──
     │   ├── admin.spec.ts                   # 系统管理 Tab 查看
-    │   ├── user-management.spec.ts         # 用户 CRUD ★NEW
-    │   ├── role-management.spec.ts         # 角色 CRUD + 权限 ★NEW
-    │   ├── audit-log.spec.ts               # 审计日志查看/筛选/分页 ★NEW
-    │   └── template-management.spec.ts     # 模板 CRUD + 活动 ★NEW
+    │   ├── user-management.spec.ts         # 用户 CRUD
+    │   ├── user-role-assignment.spec.ts    # 用户角色/拼音用户名/canLogin
+    │   ├── role-management.spec.ts         # 角色 CRUD + 权限
+    │   ├── audit-log.spec.ts               # 审计日志查看/筛选/分页
+    │   ├── audit-log-filters.spec.ts       # 审计日志高级筛选
+    │   └── template-management.spec.ts     # 模板 CRUD + 活动
     │
     ├── ── 其他功能 ──
     │   ├── risk.spec.ts                    # 风险评估
     │   ├── scheduling-tools.spec.ts        # 排期工具
     │   ├── notifications.spec.ts           # 通知管理
-    │   └── form-validation.spec.ts         # 表单验证错误处理 ★NEW
+    │   └── form-validation.spec.ts         # 表单验证错误处理
 ```
 
 ---
 
 ## 测试用例详细清单
 
-### 1. 认证与权限 (auth.spec.ts + permission-access.spec.ts)
+### 1. 认证与权限 (auth.spec.ts + auth-validation.spec.ts + permission-access.spec.ts + permission-buttons.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -91,6 +106,19 @@ e2e/
 | 1.8 | 非管理员访问系统管理 | 权限限制或可访问 |
 | 1.9 | 非管理员查看项目详情 | 可以查看 |
 | 1.10 | lisi 账号登录 | 成功访问 |
+| 1.11 | 空用户名登录表单验证 | 验证错误提示 |
+| 1.12 | 空密码登录表单验证 | 验证错误提示 |
+| 1.13 | 用户名少于3字符验证 | 长度验证提示 |
+| 1.14 | 密码少于6字符验证 | 长度验证提示 |
+| 1.15 | 不存在用户登录 | 错误消息提示 |
+| 1.16 | 登录Tab切换（密码/企微） | Tab切换正常 |
+| 1.17 | URL code参数自动切换企微Tab | 自动选中企微登录Tab |
+| 1.18 | admin 可见所有管理按钮 | 新建项目等按钮可见 |
+| 1.19 | 非管理员项目创建按钮可见性 | 按权限控制显示 |
+| 1.20 | 非管理员系统管理页内容受限 | 部分Tab受限 |
+| 1.21 | 非管理员产品创建按钮可见性 | 按权限控制显示 |
+| 1.22 | 非管理员无法访问模板页 | 权限限制 |
+| 1.23 | 非管理员侧边栏隐藏系统管理 | 导航项不可见 |
 
 ### 2. 导航与布局 (navigation.spec.ts + responsive-layout.spec.ts)
 
@@ -106,7 +134,7 @@ e2e/
 | 2.8 | 页面标题匹配路由 | 标题非空 |
 | 2.9 | 表格水平溢出处理 | 不超出视口 |
 
-### 3. 项目管理 (projects.spec.ts + project-edit-search.spec.ts + project-filters.spec.ts + project-detail-tabs.spec.ts)
+### 3. 项目管理 (projects.spec.ts + project-edit-search.spec.ts + project-filters.spec.ts + project-detail-tabs.spec.ts + project-archive.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -130,8 +158,11 @@ e2e/
 | 3.18 | 切换到甘特图 Tab | 甘特图加载 |
 | 3.19 | 切换回活动 Tab 保持数据 | 行数不变 |
 | 3.20 | 快速切换 Tab 不崩溃 | 页面保持稳定 |
+| 3.21 | 归档项目 | 确认后项目归档成功 |
+| 3.22 | 归档项目出现在已归档筛选 | 已归档列表可见，无编辑/删除按钮 |
+| 3.23 | 取消归档恢复项目 | 项目恢复为活动状态 |
 
-### 4. 活动管理 (activities.spec.ts + activity-filters.spec.ts + activity-inline-edit.spec.ts + activity-dependencies.spec.ts + activity-export.spec.ts + column-settings.spec.ts + snapshots.spec.ts + comments.spec.ts)
+### 4. 活动管理 (activities.spec.ts + activity-filters.spec.ts + activity-inline-edit.spec.ts + activity-date-edit.spec.ts + activity-dependencies.spec.ts + activity-drag-sort.spec.ts + activity-export.spec.ts + activity-import.spec.ts + column-settings.spec.ts + snapshots.spec.ts + comments.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -166,6 +197,24 @@ e2e/
 | 4.29 | 快照返回导航 | 返回项目快照 Tab |
 | 4.30 | 添加活动评论 | 评论发送成功 |
 | 4.31 | 查看变更历史 | 历史 Tab 切换 |
+| 4.32 | 内联编辑计划开始日期 | DatePicker选中后保存，格式正确 |
+| 4.33 | 内联编辑计划工期自动计算结束日期 | InputNumber修改后结束日期更新 |
+| 4.34 | 拖拽手柄在活动行可见 | drag-dot-vertical 图标存在 |
+| 4.35 | 活动显示连续3位ID | 001/002/003 序号正确 |
+| 4.36 | 拖拽活动改变排序 | 拖拽操作后顺序变化 |
+| 4.37 | 导入按钮在工具栏可见 | 活动下拉菜单有导入选项 |
+| 4.38 | 导入Modal显示拖拽上传区 | 上传区域和格式提示可见 |
+| 4.39 | 导入Modal接受xlsx格式 | 文件输入支持.xlsx/.xls |
+
+### 4b. 重构验证 (refactor-smoke.spec.ts)
+
+| # | 用例 | 预期结果 |
+|---|------|----------|
+| 4b.1 | 项目列表导航到详情页 | Tab（活动列表/里程碑/甘特图）和统计卡片可见 |
+| 4b.2 | 活动表格列正确 | compact-table 中含 ID/活动名称/状态/操作 列头 |
+| 4b.3 | 编辑图标打开活动抽屉 | 抽屉显示"编辑活动"，含前置依赖/计划开始字段 |
+| 4b.4 | 撤回按钮和活动下拉可见 | IconUndo 按钮和"活动"下拉按钮存在 |
+| 4b.5 | Tab 切换正常 | 里程碑→甘特图→活动列表切换后表格仍可见 |
 
 ### 5. 甘特图 (gantt-chart.spec.ts)
 
@@ -175,7 +224,7 @@ e2e/
 | 5.2 | 缩放控件功能 | 日/周/月/季/年切换 |
 | 5.3 | 甘特图显示活动条 | 活动名称可见 |
 
-### 6. 产品管理 (products.spec.ts + product-advanced.spec.ts)
+### 6. 产品管理 (products.spec.ts + product-advanced.spec.ts + product-filters.spec.ts + product-comparison.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -186,8 +235,18 @@ e2e/
 | 6.5 | 复制产品 | 复制品出现 |
 | 6.6 | 产品类别选择显示规格模板 | 类别切换正常 |
 | 6.7 | 查看产品详情 | 详情抽屉/页面可见 |
+| 6.8 | 按名称搜索产品 | 匹配结果显示 |
+| 6.9 | 按规格关键词搜索 | 匹配结果显示 |
+| 6.10 | 按状态下拉筛选 | 筛选后行数变化 |
+| 6.11 | 按类别筛选 | 筛选后行数变化 |
+| 6.12 | 统计卡片点击筛选 | 研发中/量产/停产卡片切换 |
+| 6.13 | 产品表格分页 | 分页组件可用 |
+| 6.14 | CSV 导出触发下载 | 文件下载生成 |
+| 6.15 | 选中2个产品显示对比按钮 | 对比按钮出现 |
+| 6.16 | 对比抽屉并排显示产品 | 属性并排对比 |
+| 6.17 | 选中少于2个隐藏对比按钮 | 按钮不可见/禁用 |
 
-### 7. 周报管理 (weekly-reports.spec.ts + weekly-report-crud.spec.ts)
+### 7. 周报管理 (weekly-reports.spec.ts + weekly-report-crud.spec.ts + weekly-report-form.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -198,8 +257,12 @@ e2e/
 | 7.5 | 查看已提交/草稿 Tab | 两个 Tab 可见 |
 | 7.6 | 查看草稿列表 | 表格或空状态可见 |
 | 7.7 | 周选择器筛选 | 筛选器可见 |
+| 7.8 | 导航到周报Tab并点击创建 | 跳转到周报表单页 |
+| 7.9 | 填写周报表单保存草稿 | 状态选择、富文本编辑、草稿保存成功 |
+| 7.10 | 提交周报 | 确认弹窗后提交成功 |
+| 7.11 | 已提交周报出现在汇总页 | 汇总表格中可见 |
 
-### 8. 资源负载 (workload.spec.ts + workload-advanced.spec.ts)
+### 8. 资源负载 (workload.spec.ts + workload-advanced.spec.ts + workload-navigation.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -211,8 +274,14 @@ e2e/
 | 8.6 | 成员活动详情 | 行数据非空 |
 | 8.7 | 问题列表显示 | 逾期/无人负责提示 |
 | 8.8 | 负载条视觉显示 | 进度条可见 |
+| 8.9 | 负载页含统计卡片 | 统计卡片渲染 |
+| 8.10 | 超载人员显示超载标记 | "超载"Tag可见 |
+| 8.11 | 点击活动名称导航到项目 | 跳转到项目详情 |
+| 8.12 | 项目筛选更新显示 | 下拉筛选后数据刷新 |
+| 8.13 | 清除筛选显示全部 | 全部负载数据显示 |
+| 8.14 | 负载条颜色段显示 | 彩色条形图渲染 |
 
-### 9. 系统管理 (admin.spec.ts + user-management.spec.ts + role-management.spec.ts + audit-log.spec.ts + template-management.spec.ts)
+### 9. 系统管理 (admin.spec.ts + user-management.spec.ts + user-role-assignment.spec.ts + role-management.spec.ts + audit-log.spec.ts + audit-log-filters.spec.ts + template-management.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -237,6 +306,16 @@ e2e/
 | 9.19 | 模板活动表格列 | ID/名称/类型/阶段/工期列 |
 | 9.20 | 复制模板 | 副本出现 |
 | 9.21 | 删除模板 | 模板消失 |
+| 9.22 | 创建用户验证自动拼音用户名 | 拼音用户名自动生成 |
+| 9.23 | 编辑模式用户名不可修改 | 用户名字段禁用 |
+| 9.24 | 切换 canLogin 开关 | 登录权限状态切换 |
+| 9.25 | 按登录状态筛选用户 | 筛选结果正确 |
+| 9.26 | 按用户筛选审计日志 | 筛选后结果变化 |
+| 9.27 | 按操作类型筛选审计日志 | 筛选后结果变化 |
+| 9.28 | 按日期范围筛选审计日志 | 筛选后结果变化 |
+| 9.29 | 按关键词搜索审计日志 | 搜索结果匹配 |
+| 9.30 | 按资源类型筛选审计日志 | 筛选后结果变化 |
+| 9.31 | 多条件组合筛选审计日志 | 组合筛选结果正确 |
 
 ### 10. 排期与风险 (scheduling-tools.spec.ts + risk.spec.ts)
 

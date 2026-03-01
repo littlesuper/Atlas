@@ -26,7 +26,7 @@ import { ProjectTemplate, TemplateActivity, ActivityType } from '../../types';
 import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS, DEPENDENCY_TYPE_MAP } from '../../utils/constants';
 import dayjs from 'dayjs';
 
-const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'cyan', PVT: 'purple', MP: 'orange' };
+const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
 
 let _idCounter = 0;
 const genId = (): string =>
