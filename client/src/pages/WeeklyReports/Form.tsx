@@ -16,6 +16,9 @@ import {
   IconSave,
   IconSend,
   IconBulb,
+  IconCheckCircleFill,
+  IconExclamationCircleFill,
+  IconCloseCircleFill,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi, projectsApi, uploadApi } from '../../api';
@@ -40,10 +43,10 @@ interface PhaseData {
   schedule: string;
 }
 
-const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: string; color: string }> = [
-  { value: 'ON_TRACK', label: '✓ 顺利进行', color: 'var(--status-success)' },
-  { value: 'MINOR_ISSUE', label: '⚠️ 轻度阻碍', color: 'var(--status-warning)' },
-  { value: 'MAJOR_ISSUE', label: '✕ 严重阻碍', color: 'var(--status-danger)' },
+const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: React.ReactNode; color: string }> = [
+  { value: 'ON_TRACK', label: <><IconCheckCircleFill style={{ marginRight: 4 }} /> 正常</>, color: 'var(--status-success)' },
+  { value: 'MINOR_ISSUE', label: <><IconExclamationCircleFill style={{ marginRight: 4 }} /> 轻度阻碍</>, color: 'var(--status-warning)' },
+  { value: 'MAJOR_ISSUE', label: <><IconCloseCircleFill style={{ marginRight: 4 }} /> 严重阻碍</>, color: 'var(--status-danger)' },
 ];
 
 /** 上周参考折叠区 */

@@ -446,7 +446,7 @@
 | 10.1.4 | 产品线筛选器过滤周报 | 🆕 | P1 |
 | 10.1.5 | 查看草稿箱 Tab | ✅ | P1 |
 | 10.1.6 | 周报按年+周分组显示 | 🆕 | P2 |
-| 10.1.7 | 状态图标正确显示（✓/⚠️/✕） | 🆕 | P2 |
+| 10.1.7 | 状态图标正确显示（Arco 实心图标：IconCheckCircleFill / IconExclamationCircleFill / IconCloseCircleFill） | 🆕 | P2 |
 
 ### 10.2 周报 CRUD
 

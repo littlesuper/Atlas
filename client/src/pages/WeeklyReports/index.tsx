@@ -20,6 +20,9 @@ import {
   IconEdit,
   IconSend,
   IconDelete,
+  IconCheckCircleFill,
+  IconExclamationCircleFill,
+  IconCloseCircleFill,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi } from '../../api';
@@ -33,13 +36,13 @@ import isoWeek from 'dayjs/plugin/isoWeek';
 
 dayjs.extend(isoWeek);
 
-const PROGRESS_ICON: Record<string, string> = {
-  ON_TRACK: '✓',
-  MINOR_ISSUE: '⚠️',
-  MAJOR_ISSUE: '✕',
+const PROGRESS_ICON: Record<string, React.ReactNode> = {
+  ON_TRACK: <IconCheckCircleFill />,
+  MINOR_ISSUE: <IconExclamationCircleFill />,
+  MAJOR_ISSUE: <IconCloseCircleFill />,
 };
 const PROGRESS_TOOLTIP: Record<string, string> = {
-  ON_TRACK: '顺利进行',
+  ON_TRACK: '正常',
   MINOR_ISSUE: '轻度阻碍',
   MAJOR_ISSUE: '严重阻碍',
 };
@@ -214,15 +217,13 @@ const WeeklyReportsSummary: React.FC = () => {
     {
       title: '状态',
       width: 100,
-      align: 'center' as const,
-      sorter: (a: WeeklyReport, b: WeeklyReport) => a.progressStatus.localeCompare(b.progressStatus),
       render: (_: unknown, record: WeeklyReport) => {
         const icon = PROGRESS_ICON[record.progressStatus] || '?';
         const color = PROGRESS_COLOR[record.progressStatus] || 'var(--status-not-started)';
         const tip = PROGRESS_TOOLTIP[record.progressStatus] || record.progressStatus;
         return (
           <Tooltip content={tip}>
-            <span style={{ color, fontWeight: 700, fontSize: 16, cursor: 'default' }}>{icon}</span>
+            <span style={{ color, fontSize: 18, cursor: 'default', display: 'inline-flex' }}>{icon}</span>
           </Tooltip>
         );
       },

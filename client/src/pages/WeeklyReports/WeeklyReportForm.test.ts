@@ -25,9 +25,9 @@ interface PhaseData {
 }
 
 const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: string; color: string }> = [
-  { value: 'ON_TRACK', label: '✓ 顺利进行', color: 'var(--status-success)' },
-  { value: 'MINOR_ISSUE', label: '⚠️ 轻度阻碍', color: 'var(--status-warning)' },
-  { value: 'MAJOR_ISSUE', label: '✕ 严重阻碍', color: 'var(--status-danger)' },
+  { value: 'ON_TRACK', label: '正常', color: 'var(--status-success)' },
+  { value: 'MINOR_ISSUE', label: '轻度阻碍', color: 'var(--status-warning)' },
+  { value: 'MAJOR_ISSUE', label: '严重阻碍', color: 'var(--status-danger)' },
 ];
 
 // Form.tsx 的 mergePhase helper（useEffect 内部逻辑）
@@ -262,7 +262,7 @@ describe('PROGRESS_OPTIONS 常量', () => {
     });
   });
 
-  it('第一个选项为 ON_TRACK（顺利进行）', () => {
+  it('第一个选项为 ON_TRACK（正常）', () => {
     expect(PROGRESS_OPTIONS[0].value).toBe('ON_TRACK');
   });
 });

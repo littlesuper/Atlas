@@ -104,9 +104,10 @@ body {
   padding: 6px 6px !important;
 }
 
-/* 带排序的表头列：左右 padding 匹配 td，上下归零避免额外行高 */
+/* 带排序/筛选的表头列：仅清除垂直 padding，水平保持 Arco 默认以对齐 td */
 .arco-table .arco-table-cell-with-sorter {
-  padding: 0 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 .compact-table .arco-table .arco-table-cell-with-sorter {
   padding: 0 6px !important;

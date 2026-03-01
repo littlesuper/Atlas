@@ -177,9 +177,9 @@
 **ProgressStatus（项目状态）：**
 | 值 | 图标 | 颜色 | 说明 |
 |----|------|------|------|
-| ON_TRACK | ✓ | 绿色 | 顺利进行 |
-| MINOR_ISSUE | ⚠️ | 黄色 | 轻度阻碍 |
-| MAJOR_ISSUE | ✕ | 红色 | 严重阻碍 |
+| ON_TRACK | IconCheckCircleFill（实心勾） | 绿色 | 正常 |
+| MINOR_ISSUE | IconExclamationCircleFill（实心叹号） | 黄色 | 轻度阻碍 |
+| MAJOR_ISSUE | IconCloseCircleFill（实心叉） | 红色 | 严重阻碍 |
 
 ### dependencies JSON 结构
 ```json
@@ -954,7 +954,7 @@ DELETE /api/uploads/:filename
 
 ### 5.1 项目列表页 `/projects`（系统首页）
 
-- **顶部统计卡片：** 全部项目、进行中、已完成、已搁置。数据来自后端接口（不受分页影响），点击卡片可筛选对应状态（再次点击取消筛选），选中卡片高亮显示蓝色边框和投影。"全部项目"卡片点击清除状态筛选。
+- **顶部统计卡片：** 全部项目、进行中、已完成、已暂停、已归档。数据来自后端接口（不受分页影响），点击卡片可筛选对应状态（再次点击取消筛选），选中卡片高亮显示对应色边框。"全部项目"卡片点击清除状态筛选。每张卡片右侧有超大半透明装饰图标（溢出裁切）+ 模糊光晕背景，图标映射：全部→IconApps、进行中→IconThunderbolt、已完成→IconCheckCircle、已暂停→IconPause、已归档→IconStorage。
 - **表格展示：** 项目名称（可点击进入详情，无排序）、产品线标签（蒲公英=蓝色、向日葵=橙色）、状态标签（无排序）、优先级标签（可排序）、进度条（可排序）、负责人（纯文字姓名）、时间（可排序）、活动数。表格使用 Arco 默认间距（非紧凑模式）
 - **排序：** 默认按开始时间升序排列（从远到近，最早的项目在上），优先级/进度/时间列支持点击表头排序
 - **项目搜索：** 表格标题栏右侧搜索框，按项目名称模糊搜索，300ms 防抖。
@@ -1064,11 +1064,11 @@ DELETE /api/uploads/:filename
   - 右侧："创建周报"按钮（需 `weekly_report:create` 权限 + 项目管理权限，点击时自动检测本周是否已有周报，如有则跳转编辑）
 - **卡片展示：** 使用 Card 组件展示每份周报
   - **卡片标题：**
-    - 左侧：进展状态图标（ON_TRACK=绿色✓ / MINOR_ISSUE=黄色⚠️ / MAJOR_ISSUE=红色✕）
+    - 左侧：进展状态图标（ON_TRACK=绿色 IconCheckCircleFill / MINOR_ISSUE=黄色 IconExclamationCircleFill / MAJOR_ISSUE=红色 IconCloseCircleFill）
     - 周次：如"2026 年第 7 周"
     - 日期范围：如"02-10 ~ 02-16"
     - 状态标签：草稿（灰色）/ 已提交（绿色）/ 已归档（橙色）
-    - 进展状态文字：顺利进行 / 轻度阻碍 / 严重阻碍
+    - 进展状态文字：正常 / 轻度阻碍 / 严重阻碍
   - **卡片内容（三列布局 Row/Col span=8）：**
     - 本周重要进展（HTML渲染）+ 该区域附件标签
     - 下周工作计划（HTML渲染，左边框分隔）+ 该区域附件标签
@@ -1174,7 +1174,7 @@ DELETE /api/uploads/:filename
 |------|------|------|------|
 | 项目名称 | project.name | 200px | 链接，点击跳转到项目周报详情页（带 tab=weekly 参数） |
 | 产品线 | project.productLine | 120px | 显示中文标签 |
-| 状态 | progressStatus | 80px | 图标显示（✓ / ⚠️ / ✕），Tooltip 显示文字说明 |
+| 状态 | progressStatus | 100px | Arco 实心图标显示（IconCheckCircleFill / IconExclamationCircleFill / IconCloseCircleFill），Tooltip 显示文字说明，左对齐，无排序 |
 | 变更概述 | changeOverview | 180px | HTML 富文本渲染，maxHeight 80px 溢出隐藏 |
 | 需求研判 | demandAnalysis | 180px | HTML 富文本渲染，maxHeight 80px 溢出隐藏 |
 | 本周重要进展 | keyProgress | - | HTML 富文本渲染，maxHeight 80px；下方显示该区域附件（readOnly 模式），单元格 overflow: hidden 防止附件名溢出 |

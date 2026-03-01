@@ -15,6 +15,9 @@ import {
   IconEdit,
   IconDelete,
   IconSend,
+  IconCheckCircleFill,
+  IconExclamationCircleFill,
+  IconCloseCircleFill,
 } from '@arco-design/web-react/icon';
 import { weeklyReportsApi } from '../../api';
 import { useAuthStore } from '../../store/authStore';
@@ -35,10 +38,10 @@ interface Props {
   snapshotData?: any[] | null;
 }
 
-const PROGRESS_ICON: Record<string, string> = {
-  ON_TRACK: '✓',
-  MINOR_ISSUE: '⚠️',
-  MAJOR_ISSUE: '✕',
+const PROGRESS_ICON: Record<string, React.ReactNode> = {
+  ON_TRACK: <IconCheckCircleFill />,
+  MINOR_ISSUE: <IconExclamationCircleFill />,
+  MAJOR_ISSUE: <IconCloseCircleFill />,
 };
 
 const PROGRESS_COLOR: Record<string, string> = {
@@ -137,7 +140,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived, s
                 style={{ width: '100%' }}
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ color: iconColor, fontWeight: 700 }}>{icon}</span>
+                    <span style={{ color: iconColor, fontSize: 18, display: 'inline-flex' }}>{icon}</span>
                     <span style={{ fontWeight: 600 }}>
                       {report.year} 年第 {report.weekNumber} 周
                     </span>

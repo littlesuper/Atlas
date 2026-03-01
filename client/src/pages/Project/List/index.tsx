@@ -23,6 +23,14 @@ import {
   IconDelete,
   IconFile,
   IconUndo,
+  IconApps,
+  IconThunderbolt,
+  IconCheckCircle,
+  IconPause,
+  IconStorage,
+  IconCheckCircleFill,
+  IconExclamationCircleFill,
+  IconCloseCircleFill,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, usersApi, weeklyReportsApi, templatesApi } from '../../../api';
@@ -39,33 +47,63 @@ import dayjs from 'dayjs';
 const { RangePicker } = DatePicker;
 
 // 统计卡片组件
+interface StatCardDecor {
+  icon: React.ReactNode;
+  style: React.CSSProperties;
+}
+
 interface StatCardProps {
   title: string;
   count: number;
   color: string;
+  decors: StatCardDecor[];
+  glowStyle?: React.CSSProperties;
   selected: boolean;
   onClick: () => void;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, count, color, selected, onClick }) => {
-  return (
-    <Card
-      hoverable
-      onClick={onClick}
-      style={{
-        height: 88,
-        cursor: 'pointer',
-        border: selected ? `2px solid ${color}` : '1px solid var(--color-border-2)',
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-        <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>{title}</div>
-        <div style={{ fontSize: 28, fontWeight: 600, color: color }}>{count}</div>
-      </div>
-    </Card>
-  );
-};
+const StatCard: React.FC<StatCardProps> = ({ title, count, color, decors, glowStyle, selected, onClick }) => (
+  <Card
+    hoverable
+    onClick={onClick}
+    style={{
+      height: 88,
+      cursor: 'pointer',
+      border: selected ? `2px solid ${color}` : '1px solid var(--color-border-2)',
+      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+      overflow: 'hidden',
+    }}
+  >
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+      {/* Glow blob */}
+      <div style={{
+        position: 'absolute',
+        width: 120,
+        height: 120,
+        borderRadius: '50%',
+        backgroundColor: color,
+        opacity: 0.07,
+        filter: 'blur(20px)',
+        pointerEvents: 'none',
+        ...glowStyle,
+      }} />
+      {/* Decorative icons */}
+      {decors.map((d, i) => (
+        <span key={i} style={{
+          position: 'absolute',
+          color,
+          lineHeight: 1,
+          pointerEvents: 'none',
+          ...d.style,
+        }}>
+          {d.icon}
+        </span>
+      ))}
+      <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8, position: 'relative' }}>{title}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color, position: 'relative' }}>{count}</div>
+    </div>
+  </Card>
+);
 
 const ProjectList: React.FC = () => {
   const navigate = useNavigate();
@@ -343,11 +381,11 @@ const ProjectList: React.FC = () => {
         const ps = latestStatus[record.id] as keyof typeof PROGRESS_STATUS_MAP | undefined;
         if (!ps) return null;
         const cfg = PROGRESS_STATUS_MAP[ps];
-        const ICON: Record<string, string> = { ON_TRACK: '✓', MINOR_ISSUE: '⚠️', MAJOR_ISSUE: '✕' };
+        const ICON: Record<string, React.ReactNode> = { ON_TRACK: <IconCheckCircleFill />, MINOR_ISSUE: <IconExclamationCircleFill />, MAJOR_ISSUE: <IconCloseCircleFill /> };
         const COLOR: Record<string, string> = { ON_TRACK: 'var(--status-success)', MINOR_ISSUE: 'var(--status-warning)', MAJOR_ISSUE: 'var(--status-danger)' };
         return (
           <Tooltip content={`周报状态：${cfg.label}`}>
-            <span style={{ color: COLOR[ps], fontWeight: 600, cursor: 'default' }}>{ICON[ps]}</span>
+            <span style={{ color: COLOR[ps], fontSize: 16, cursor: 'default', display: 'inline-flex', verticalAlign: 'middle' }}>{ICON[ps]}</span>
           </Tooltip>
         );
       },
@@ -493,6 +531,10 @@ const ProjectList: React.FC = () => {
             title="全部项目"
             count={statistics.total}
             color="var(--status-info)"
+            glowStyle={{ right: -30, bottom: -40 }}
+            decors={[
+              { icon: <IconApps />, style: { right: -20, bottom: -28, fontSize: 120, transform: 'rotate(15deg)', opacity: 0.07 } },
+            ]}
             selected={selectedStatus === ''}
             onClick={() => setSelectedStatus('')}
           />
@@ -500,6 +542,10 @@ const ProjectList: React.FC = () => {
             title="进行中"
             count={statistics.inProgress}
             color="var(--status-success)"
+            glowStyle={{ right: -20, top: -50 }}
+            decors={[
+              { icon: <IconThunderbolt />, style: { right: -12, top: -30, fontSize: 130, transform: 'rotate(-22deg)', opacity: 0.08 } },
+            ]}
             selected={selectedStatus === 'IN_PROGRESS'}
             onClick={() => setSelectedStatus('IN_PROGRESS')}
           />
@@ -507,6 +553,10 @@ const ProjectList: React.FC = () => {
             title="已完成"
             count={statistics.completed}
             color="var(--status-not-started)"
+            glowStyle={{ right: -35, bottom: -45 }}
+            decors={[
+              { icon: <IconCheckCircle />, style: { right: -28, bottom: -34, fontSize: 115, transform: 'rotate(10deg)', opacity: 0.07 } },
+            ]}
             selected={selectedStatus === 'COMPLETED'}
             onClick={() => setSelectedStatus('COMPLETED')}
           />
@@ -514,6 +564,10 @@ const ProjectList: React.FC = () => {
             title="已暂停"
             count={statistics.onHold}
             color="var(--status-warning)"
+            glowStyle={{ right: -25, top: -45 }}
+            decors={[
+              { icon: <IconPause />, style: { right: -16, top: -34, fontSize: 125, transform: 'rotate(-12deg)', opacity: 0.07 } },
+            ]}
             selected={selectedStatus === 'ON_HOLD'}
             onClick={() => setSelectedStatus('ON_HOLD')}
           />
@@ -521,6 +575,10 @@ const ProjectList: React.FC = () => {
             title="已归档"
             count={statistics.archived}
             color="var(--color-purple-6, #722ed1)"
+            glowStyle={{ right: -30, bottom: -35 }}
+            decors={[
+              { icon: <IconStorage />, style: { right: -22, bottom: -26, fontSize: 110, transform: 'rotate(22deg)', opacity: 0.08 } },
+            ]}
             selected={selectedStatus === 'ARCHIVED'}
             onClick={() => setSelectedStatus('ARCHIVED')}
           />
