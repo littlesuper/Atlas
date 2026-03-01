@@ -268,7 +268,7 @@ cd .. && npm run dev
 - 前端：http://localhost:5173
 - 后端：http://localhost:3000
 - 健康检查：GET http://localhost:3000/api/health
-- 健康检查返回版本号格式：`x.y.z-<gitHash>`（如 `1.2.3-a1b2c3d`）
+- 健康检查返回版本号格式：`x.y.z`（如 `1.2.3`）
 
 ### 版本号规则
 
@@ -285,6 +285,9 @@ cd .. && npm run dev
 - `z` 通过 `post-commit` Git Hook 在每次提交后自动递增
 - 当 `x` 或 `y` 发生变化时，`z` 自动重置为 1
 - 版本号存储在根目录 `package.json` 的 `version` 字段中
+- 前端通过 `/api/health` 接口动态获取版本号（页面加载时请求），无需重启前端即可显示最新版本
+- 后端 `/api/health` 接口每次请求时实时读取 `package.json`，无需重启服务端
+- 前端右上角用户下拉菜单底部显示 `vx.y.z` 格式的版本号
 
 ## 12. 模块规格文档索引
 

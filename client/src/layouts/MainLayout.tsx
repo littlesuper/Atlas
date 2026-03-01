@@ -19,6 +19,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { user, hasPermission, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
 
+  // 动态获取版本号
+  const [appVersion, setAppVersion] = React.useState('');
+  React.useEffect(() => {
+    fetch('/api/health').then(r => r.json()).then(d => setAppVersion(d.version || '')).catch(() => {});
+  }, []);
+
   // 菜单项配置
   const menuItems = [
     {
@@ -86,9 +92,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <IconPoweroff style={{ marginRight: '8px' }} />
         退出登录
       </Menu.Item>
-      <Menu.Item key="version" disabled style={{ cursor: 'default', fontSize: 12, color: 'var(--color-text-4)' }}>
-        v{__APP_VERSION__}
-      </Menu.Item>
+      {appVersion && (
+        <Menu.Item key="version" disabled style={{ cursor: 'default', fontSize: 12, color: 'var(--color-text-4)' }}>
+          v{appVersion}
+        </Menu.Item>
+      )}
     </Menu>
   );
 
