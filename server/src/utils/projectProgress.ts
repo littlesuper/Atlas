@@ -4,38 +4,48 @@ const prisma = new PrismaClient();
 
 /**
  * 计算项目整体进度
- * 基于所有活动的状态自动计算
+ * 基于所有活动的状态，按 planDuration（计划工期）加权平均
  *
  * 进度计算规则：
  * - COMPLETED（已完成）= 100%
  * - IN_PROGRESS（进行中）= 50%
  * - 其他状态（未开始/已取消）= 0%
  *
- * 优化：使用 Prisma count 查询替代加载所有记录到内存
+ * 加权规则：
+ * - 每个活动的权重 = planDuration（工作日数），无 planDuration 的活动 fallback 权重为 1
+ * - 最终进度 = Σ(活动进度 × 权重) / Σ(权重)
  *
  * @param projectId 项目ID
- * @returns 项目平均进度（0-100，保留2位小数）
+ * @returns 项目加权平均进度（0-100，保留2位小数）
  */
 export async function calculateProjectProgress(projectId: string): Promise<number> {
-  const topLevelWhere = { projectId };
+  const activities = await prisma.activity.findMany({
+    where: { projectId },
+    select: { status: true, planDuration: true },
+  });
 
-  // 使用并行 count 查询替代 findMany + 内存遍历
-  const [totalCount, completedCount, inProgressCount] = await Promise.all([
-    prisma.activity.count({ where: topLevelWhere }),
-    prisma.activity.count({ where: { ...topLevelWhere, status: ActivityStatus.COMPLETED } }),
-    prisma.activity.count({ where: { ...topLevelWhere, status: ActivityStatus.IN_PROGRESS } }),
-  ]);
-
-  // 如果没有活动，进度为0
-  if (totalCount === 0) {
+  if (activities.length === 0) {
     return 0;
   }
 
-  // COMPLETED = 100%, IN_PROGRESS = 50%, others = 0%
-  const totalProgress = completedCount * 100 + inProgressCount * 50;
+  let totalWeight = 0;
+  let weightedProgress = 0;
 
-  // 计算平均进度（保留2位小数）
-  const averageProgress = totalProgress / totalCount;
+  for (const activity of activities) {
+    const weight = activity.planDuration && activity.planDuration > 0 ? activity.planDuration : 1;
+    let progress = 0;
+
+    if (activity.status === ActivityStatus.COMPLETED) {
+      progress = 100;
+    } else if (activity.status === ActivityStatus.IN_PROGRESS) {
+      progress = 50;
+    }
+
+    totalWeight += weight;
+    weightedProgress += progress * weight;
+  }
+
+  const averageProgress = weightedProgress / totalWeight;
   return Math.round(averageProgress * 100) / 100;
 }
 

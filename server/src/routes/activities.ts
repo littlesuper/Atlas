@@ -9,6 +9,7 @@ import { updateProjectProgress } from '../utils/projectProgress';
 import { auditLog, diffFields } from '../utils/auditLog';
 import { callAi } from '../utils/aiClient';
 import { parseExcelActivities } from '../utils/excelActivityParser';
+import { detectCircularDependency } from '../utils/dependencyValidator';
 import { pinyin } from 'pinyin-pro';
 
 const router = express.Router();
@@ -372,6 +373,15 @@ router.post(
       // 解析负责人列表
       const resolvedAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
 
+      // 循环依赖检测（创建时 activityId 为空字符串，因为活动还不存在）
+      if (dependencies && Array.isArray(dependencies) && dependencies.length > 0) {
+        const hasCycle = await detectCircularDependency(projectId, '', dependencies, prisma);
+        if (hasCycle) {
+          res.status(400).json({ error: '存在循环依赖，无法保存' });
+          return;
+        }
+      }
+
       // 根据依赖关系自动计算计划日期
       let resolvedPlanStart = planStartDate ? new Date(planStartDate) : null;
       let resolvedPlanEnd = planEndDate ? new Date(planEndDate) : null;
@@ -555,6 +565,14 @@ router.put(
       }
       if (status !== undefined) updateData.status = status;
       if (priority !== undefined) updateData.priority = priority;
+      // 循环依赖检测
+      if (dependencies !== undefined && Array.isArray(dependencies) && dependencies.length > 0) {
+        const hasCycle = await detectCircularDependency(existingActivity.projectId, id, dependencies, prisma);
+        if (hasCycle) {
+          res.status(400).json({ error: '存在循环依赖，无法保存' });
+          return;
+        }
+      }
       if (dependencies !== undefined) updateData.dependencies = dependencies;
       if (notes !== undefined) updateData.notes = notes;
       if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
