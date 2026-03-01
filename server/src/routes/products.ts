@@ -333,6 +333,15 @@ router.post(
         projectId,
       } = req.body;
 
+      // 归档项目检查
+      if (projectId) {
+        const proj = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+        if (proj?.status === 'ARCHIVED') {
+          res.status(403).json({ error: '归档项目不可修改' });
+          return;
+        }
+      }
+
       // 验证必填字段
       if (!name) {
         res.status(400).json({ error: '产品名称不能为空' });
@@ -522,6 +531,16 @@ router.put(
       if (!existingProduct) {
         res.status(404).json({ error: '产品不存在' });
         return;
+      }
+
+      // 归档项目检查
+      const effectiveProjectId = projectId !== undefined ? projectId : existingProduct.projectId;
+      if (effectiveProjectId) {
+        const proj = await prisma.project.findUnique({ where: { id: effectiveProjectId }, select: { status: true } });
+        if (proj?.status === 'ARCHIVED') {
+          res.status(403).json({ error: '归档项目不可修改' });
+          return;
+        }
       }
 
       // 校验状态枚举

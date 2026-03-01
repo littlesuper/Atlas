@@ -110,7 +110,7 @@ export const projectsApi = {
     status?: string;
     keyword?: string;
     productLine?: string;
-  }) => request.get<PaginatedResponse<Project> & { stats: { all: number; inProgress: number; completed: number; onHold: number } }>('/projects', { params }),
+  }) => request.get<PaginatedResponse<Project> & { stats: { all: number; inProgress: number; completed: number; onHold: number; archived: number } }>('/projects', { params }),
 
   get: (id: string) => request.get<Project>(`/projects/${id}`),
 
@@ -148,6 +148,19 @@ export const projectsApi = {
 
   removeMember: (projectId: string, userId: string) =>
     request.delete(`/projects/${projectId}/members/${userId}`),
+
+  // 项目归档
+  archiveProject: (id: string, remark?: string) =>
+    request.post(`/projects/${id}/archive`, { remark }),
+
+  unarchiveProject: (id: string) =>
+    request.post(`/projects/${id}/unarchive`),
+
+  listProjectArchives: (id: string) =>
+    request.get<Array<{ id: string; archivedBy: string; archivedAt: string; remark?: string }>>(`/projects/${id}/archives`),
+
+  getProjectArchive: (archiveId: string) =>
+    request.get(`/projects/archives/${archiveId}`),
 };
 
 // ============ 活动/任务管理 API ============

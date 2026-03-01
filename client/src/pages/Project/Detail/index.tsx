@@ -22,6 +22,7 @@ import {
   Spin,
   Dropdown,
   Menu,
+  Alert,
 } from '@arco-design/web-react';
 import {
   IconLeft,
@@ -34,6 +35,7 @@ import {
   IconUpload,
   IconDownload,
   IconNav,
+  IconSafe,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, activitiesApi, usersApi, authApi } from '../../../api';
@@ -274,6 +276,38 @@ const ProjectDetail: React.FC = () => {
       Message.error('加载项目详情失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const isArchived = project?.status === 'ARCHIVED';
+
+  const handleArchiveProject = async () => {
+    if (!id) return;
+    Modal.confirm({
+      title: '归档项目',
+      content: '归档后项目将变为只读状态，所有数据不可编辑。确定要归档吗？',
+      okButtonProps: { status: 'warning' },
+      okText: '确认归档',
+      onOk: async () => {
+        try {
+          await projectsApi.archiveProject(id);
+          Message.success('项目归档成功');
+          loadProject();
+        } catch {
+          Message.error('归档失败');
+        }
+      },
+    });
+  };
+
+  const handleUnarchiveProject = async () => {
+    if (!id) return;
+    try {
+      await projectsApi.unarchiveProject(id);
+      Message.success('已取消归档');
+      loadProject();
+    } catch {
+      Message.error('取消归档失败');
     }
   };
 
@@ -1027,7 +1061,7 @@ const ProjectDetail: React.FC = () => {
   }, [inlineEditing]);
 
   const startInlineEdit = (activityId: string, field: string, currentValue: string) => {
-    if (!(hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))) return;
+    if (isArchived || !(hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))) return;
     setInlineEditing({ id: activityId, field });
     setInlineValue(currentValue);
   };
@@ -1340,8 +1374,8 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'phase' })}
+            style={{ cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onClick={() => !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'phase' })}
           >
             {record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
           </span>
@@ -1367,7 +1401,7 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ fontWeight: 500, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ fontWeight: 500, cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 4 }}
             onClick={() => startInlineEdit(record.id, 'name', name)}
           >
             {name}
@@ -1401,8 +1435,8 @@ const ProjectDetail: React.FC = () => {
         return (
           <Tag
             color={cfg.color}
-            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'type' })}
+            style={{ cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onClick={() => !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'type' })}
           >
             {cfg.label}
           </Tag>
@@ -1432,8 +1466,8 @@ const ProjectDetail: React.FC = () => {
         return (
           <Tag
             color={cfg.color}
-            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'status' })}
+            style={{ cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onClick={() => !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'status' })}
           >
             {cfg.label}
           </Tag>
@@ -1477,8 +1511,8 @@ const ProjectDetail: React.FC = () => {
         const names = record.assignees?.map((a) => a.realName).join(', ') || '-';
         return (
           <span
-            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
+            style={{ cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onClick={() => !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
           >
             {names}
           </span>
@@ -1510,7 +1544,7 @@ const ProjectDetail: React.FC = () => {
           : record.planDuration;
         return (
           <span
-            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
           >
             {days != null ? <>{days}<span style={{ fontSize: 12, color: 'var(--color-text-3)', paddingLeft: 2 }}>天</span></> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
@@ -1551,10 +1585,10 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ whiteSpace: 'nowrap', cursor: !hasDeps && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', cursor: !hasDeps && !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => {
               if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
-              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
+              if (!isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
                 setInlineEditing({ id: record.id, field: 'planStartDate' });
             }}
           >
@@ -1597,10 +1631,10 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: !hasDeps && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: !hasDeps && !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => {
               if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
-              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
+              if (!isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
                 setInlineEditing({ id: record.id, field: 'planEndDate' });
             }}
           >
@@ -1641,9 +1675,9 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ whiteSpace: 'nowrap', cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => {
-              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
+              if (!isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
                 setInlineEditing({ id: record.id, field: 'actualStartDate' });
             }}
           >
@@ -1685,9 +1719,9 @@ const ProjectDetail: React.FC = () => {
         }
         return (
           <span
-            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => {
-              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
+              if (!isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
                 setInlineEditing({ id: record.id, field: 'actualEndDate' });
             }}
           >
@@ -1729,7 +1763,7 @@ const ProjectDetail: React.FC = () => {
           <Tooltip content={notes || ''}>
             <span
               style={{
-                cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default',
+                cursor: !isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default',
                 maxWidth: 120,
                 display: 'inline-block',
                 overflow: 'hidden',
@@ -1750,8 +1784,8 @@ const ProjectDetail: React.FC = () => {
   // 根据偏好生成最终列数组
   const activityColumns = useMemo(() => {
     // 始终存在的拖拽手柄列
-    const canManage = hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id);
-    const canCreate = hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id);
+    const canManage = hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && !isArchived;
+    const canCreate = hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && !isArchived;
 
     // 批量选择列（有管理权限时显示）
     const checkCol = canManage ? {
@@ -1820,12 +1854,12 @@ const ProjectDetail: React.FC = () => {
       fixed: 'right' as const,
       render: (_: unknown, record: Activity) => (
         <Space size={4}>
-          {hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && (
+          {!isArchived && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && (
             <Tooltip content="编辑">
               <IconEdit style={{ cursor: 'pointer', color: 'rgb(var(--primary-6))' }} onClick={() => handleOpenDrawer(record)} />
             </Tooltip>
           )}
-          {hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id) && (
+          {!isArchived && hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id) && (
             <Tooltip content="删除">
               <IconDelete style={{ cursor: 'pointer', color: 'rgb(var(--danger-6))' }} onClick={() => handleDeleteActivity(record)} />
             </Tooltip>
@@ -1883,13 +1917,21 @@ const ProjectDetail: React.FC = () => {
         {/* 顶部卡片 */}
         <Card style={{ marginBottom: 16 }}>
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            {/* 第一行：返回 + 项目名称 + 状态 + 产品线 + 优先级 */}
+            {/* 第一行：返回 + 项目名称 + 状态 + 产品线 + 优先级 + 归档按钮 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Button icon={<IconLeft />} onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/projects')}>返回</Button>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{project.name}</h2>
               <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
               <Tag color={productLineConfig.color}>{productLineConfig.label}</Tag>
               <Tag color={priorityConfig.color}>{priorityConfig.label}</Tag>
+              <div style={{ flex: 1 }} />
+              {hasPermission('project', 'update') && isProjectManager(project.managerId, project.id) && (
+                isArchived ? (
+                  <Button icon={<IconUndo />} onClick={handleUnarchiveProject}>取消归档</Button>
+                ) : (
+                  <Button icon={<IconSafe />} onClick={handleArchiveProject}>归档</Button>
+                )
+              )}
             </div>
 
             {/* 第二行：项目描述 */}
@@ -1939,6 +1981,22 @@ const ProjectDetail: React.FC = () => {
             </div>
           </Space>
         </Card>
+
+        {/* 归档只读提示 */}
+        {isArchived && (
+          <Alert
+            type="warning"
+            content={
+              <span>
+                该项目已归档，所有内容为只读状态。
+                {hasPermission('project', 'update') && isProjectManager(project.managerId, project.id) && (
+                  <Button type="text" size="small" onClick={handleUnarchiveProject} style={{ marginLeft: 8 }}>取消归档</Button>
+                )}
+              </span>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         {/* Tab 区域 */}
         <Card>
@@ -1991,13 +2049,13 @@ const ProjectDetail: React.FC = () => {
                   <Dropdown
                     droplist={
                       <Menu>
-                        {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                        {!isArchived && hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
                           <Menu.Item key="1" onClick={() => handleOpenDrawer()}>
                             <IconPlus style={{ marginRight: 8 }} />
                             新建活动
                           </Menu.Item>
                         )}
-                        {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                        {!isArchived && hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
                           <Menu.Item key="2" onClick={() => setImportModalVisible(true)}>
                             <IconUpload style={{ marginRight: 8 }} />
                             批量导入
@@ -2364,17 +2422,17 @@ const ProjectDetail: React.FC = () => {
 
             {/* AI 风险评估 */}
             <Tabs.TabPane key="risk" title="AI风险评估">
-              {id && <RiskAssessmentTab projectId={id} />}
+              {id && <RiskAssessmentTab projectId={id} isArchived={isArchived} />}
             </Tabs.TabPane>
 
             {/* 产品列表 */}
             <Tabs.TabPane key="products" title="产品列表">
-              {id && <ProductsTab projectId={id} />}
+              {id && <ProductsTab projectId={id} isArchived={isArchived} />}
             </Tabs.TabPane>
 
             {/* 项目周报 */}
             <Tabs.TabPane key="weekly" title="项目周报">
-              {id && <ProjectWeeklyTab projectId={id} managerId={project?.managerId} />}
+              {id && <ProjectWeeklyTab projectId={id} managerId={project?.managerId} isArchived={isArchived} />}
             </Tabs.TabPane>
 
             {/* 排期工具 */}
@@ -2384,6 +2442,7 @@ const ProjectDetail: React.FC = () => {
                   projectId={id}
                   activities={activities}
                   onRefresh={loadActivities}
+                  isArchived={isArchived}
                 />
               )}
             </Tabs.TabPane>
@@ -2831,7 +2890,7 @@ const ProjectDetail: React.FC = () => {
               共 {archiveList.length} 个归档
             </span>
             <Space>
-              {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+              {!isArchived && hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
                 <Button
                   size="small"
                   type="primary"

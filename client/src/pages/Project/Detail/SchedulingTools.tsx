@@ -22,9 +22,10 @@ interface SchedulingToolsProps {
   projectId: string;
   activities: Activity[];
   onRefresh: () => void;
+  isArchived?: boolean;
 }
 
-const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities, onRefresh }) => {
+const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities, onRefresh, isArchived }) => {
   // Resource conflicts
   const [conflicts, setConflicts] = useState<ResourceConflict[]>([]);
   const [conflictsLoading, setConflictsLoading] = useState(false);
@@ -319,6 +320,7 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
                     status="warning"
                     loading={applyLoading}
                     onClick={handleApplyWhatIf}
+                    disabled={isArchived}
                   >
                     一键导入更新
                   </Button>

@@ -31,6 +31,7 @@ interface Props {
   projectId: string;
   managerId?: string;
   collaboratingProjectIds?: string[];
+  isArchived?: boolean;
 }
 
 const PROGRESS_ICON: Record<string, string> = {
@@ -45,7 +46,7 @@ const PROGRESS_COLOR: Record<string, string> = {
   MAJOR_ISSUE: 'var(--status-danger)',
 };
 
-const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
+const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived }) => {
   const navigate = useNavigate();
   const { hasPermission, isProjectManager } = useAuthStore();
   const { canEdit: canEditReport, canDelete } = useReportPermission();
@@ -110,7 +111,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>共 {reports.length} 份周报</span>
-        {hasPermission('weekly_report', 'create') && isProjectManager(managerId ?? '', projectId) && (
+        {!isArchived && hasPermission('weekly_report', 'create') && isProjectManager(managerId ?? '', projectId) && (
           <Button type="primary" icon={<IconPlus />} onClick={handleCreate}>创建周报</Button>
         )}
       </div>
@@ -143,7 +144,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId }) => {
                   </div>
                 }
                 extra={
-                  canEditReport(report) ? (
+                  !isArchived && canEditReport(report) ? (
                   <Space>
                     <Tooltip content="编辑">
                       <Button type="text" icon={<IconEdit />} size="small"

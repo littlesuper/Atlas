@@ -22,6 +22,8 @@ import {
   IconEdit,
   IconDelete,
   IconFile,
+  IconSafe,
+  IconUndo,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, usersApi, weeklyReportsApi, templatesApi } from '../../../api';
@@ -78,7 +80,7 @@ const ProjectList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [stats, setStats] = useState({ all: 0, planning: 0, inProgress: 0, completed: 0, onHold: 0 });
+  const [stats, setStats] = useState({ all: 0, planning: 0, inProgress: 0, completed: 0, onHold: 0, archived: 0 });
 
   // 表单联动：追踪当前选中的项目经理
   const [selectedManagerId, setSelectedManagerId] = useState<string>('');
@@ -144,6 +146,7 @@ const ProjectList: React.FC = () => {
         inProgress: s.inProgress ?? 0,
         completed: s.completed ?? 0,
         onHold: s.onHold ?? 0,
+        archived: s.archived ?? 0,
       });
       setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
     } catch (error) {
@@ -181,6 +184,7 @@ const ProjectList: React.FC = () => {
     inProgress: stats.inProgress,
     completed: stats.completed,
     onHold: stats.onHold,
+    archived: stats.archived,
   }), [stats]);
 
 
@@ -296,6 +300,40 @@ const ProjectList: React.FC = () => {
     });
   };
 
+  // 归档项目
+  const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [archivingProject, setArchivingProject] = useState<Project | null>(null);
+  const [archiveRemark, setArchiveRemark] = useState('');
+
+  const handleArchive = (project: Project) => {
+    setArchivingProject(project);
+    setArchiveRemark('');
+    setArchiveModalVisible(true);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!archivingProject) return;
+    try {
+      await projectsApi.archiveProject(archivingProject.id, archiveRemark || undefined);
+      Message.success('项目归档成功');
+      setArchiveModalVisible(false);
+      setArchivingProject(null);
+      loadProjects();
+    } catch (error) {
+      Message.error('项目归档失败');
+    }
+  };
+
+  const handleUnarchive = async (project: Project) => {
+    try {
+      await projectsApi.unarchiveProject(project.id);
+      Message.success('项目已取消归档');
+      loadProjects();
+    } catch (error) {
+      Message.error('取消归档失败');
+    }
+  };
+
   // 表格列配置
   const columns = [
     {
@@ -390,33 +428,63 @@ const ProjectList: React.FC = () => {
     },
     {
       title: '操作',
-      width: 120,
+      width: 150,
       fixed: 'right' as const,
-      render: (_: unknown, record: Project) => (
-        <Space>
-          {hasPermission('project', 'update') && isProjectManager(record.managerId, record.id) && (
-            <Tooltip content="编辑">
-              <Button
-                type="text"
-                icon={<IconEdit />}
-                size="small"
-                onClick={() => handleOpenDrawer(record)}
-              />
-            </Tooltip>
-          )}
-          {hasPermission('project', 'delete') && isProjectManager(record.managerId, record.id) && (
-            <Tooltip content="删除">
-              <Button
-                type="text"
-                status="danger"
-                icon={<IconDelete />}
-                size="small"
-                onClick={() => handleDelete(record)}
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: Project) => {
+        const isArchived = record.status === 'ARCHIVED';
+        return (
+          <Space>
+            {isArchived ? (
+              <>
+                {hasPermission('project', 'update') && isProjectManager(record.managerId, record.id) && (
+                  <Tooltip content="取消归档">
+                    <Button
+                      type="text"
+                      icon={<IconUndo />}
+                      size="small"
+                      onClick={() => handleUnarchive(record)}
+                    />
+                  </Tooltip>
+                )}
+              </>
+            ) : (
+              <>
+                {hasPermission('project', 'update') && isProjectManager(record.managerId, record.id) && (
+                  <Tooltip content="编辑">
+                    <Button
+                      type="text"
+                      icon={<IconEdit />}
+                      size="small"
+                      onClick={() => handleOpenDrawer(record)}
+                    />
+                  </Tooltip>
+                )}
+                {hasPermission('project', 'update') && isProjectManager(record.managerId, record.id) && (
+                  <Tooltip content="归档">
+                    <Button
+                      type="text"
+                      icon={<IconSafe />}
+                      size="small"
+                      onClick={() => handleArchive(record)}
+                    />
+                  </Tooltip>
+                )}
+                {hasPermission('project', 'delete') && isProjectManager(record.managerId, record.id) && (
+                  <Tooltip content="删除">
+                    <Button
+                      type="text"
+                      status="danger"
+                      icon={<IconDelete />}
+                      size="small"
+                      onClick={() => handleDelete(record)}
+                    />
+                  </Tooltip>
+                )}
+              </>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -459,6 +527,13 @@ const ProjectList: React.FC = () => {
             color="var(--status-warning)"
             selected={selectedStatus === 'ON_HOLD'}
             onClick={() => setSelectedStatus('ON_HOLD')}
+          />
+          <StatCard
+            title="已归档"
+            count={statistics.archived}
+            color="var(--color-purple-6, #722ed1)"
+            selected={selectedStatus === 'ARCHIVED'}
+            onClick={() => setSelectedStatus('ARCHIVED')}
           />
         </div>
 
@@ -622,7 +697,9 @@ const ProjectList: React.FC = () => {
                 rules={[{ required: true, message: '请选择状态' }]}
               >
                 <Select placeholder="状态">
-                  {Object.entries(STATUS_MAP).map(([key, value]) => (
+                  {Object.entries(STATUS_MAP)
+                    .filter(([key]) => key !== 'ARCHIVED')
+                    .map(([key, value]) => (
                     <Select.Option key={key} value={key}>
                       <Tag color={value.color}>{value.label}</Tag>
                     </Select.Option>
@@ -713,6 +790,27 @@ const ProjectList: React.FC = () => {
           </Form>
         </Drawer>
 
+        {/* 归档确认弹窗 */}
+        <Modal
+          title="归档项目"
+          visible={archiveModalVisible}
+          onOk={handleConfirmArchive}
+          onCancel={() => { setArchiveModalVisible(false); setArchivingProject(null); }}
+          okText="确认归档"
+          okButtonProps={{ status: 'warning' }}
+        >
+          <p>确定要归档项目「{archivingProject?.name}」吗？</p>
+          <p style={{ color: 'var(--color-text-3)', fontSize: 13 }}>
+            归档后项目将变为只读状态，所有活动、产品、周报等数据不可编辑。可随时取消归档恢复。
+          </p>
+          <Input.TextArea
+            placeholder="归档备注（可选）"
+            value={archiveRemark}
+            onChange={setArchiveRemark}
+            rows={2}
+            style={{ marginTop: 8 }}
+          />
+        </Modal>
       </div>
     </MainLayout>
   );

@@ -41,6 +41,7 @@ export enum ProjectStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   ON_HOLD = 'ON_HOLD',
   COMPLETED = 'COMPLETED',
+  ARCHIVED = 'ARCHIVED',
 }
 
 export enum Priority {
@@ -136,6 +137,15 @@ export interface ActivityComment {
   user?: Pick<User, 'id' | 'realName' | 'username'>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectArchive {
+  id: string;
+  projectId: string;
+  snapshot: Record<string, unknown>;
+  archivedBy: string;
+  archivedAt: string;
+  remark?: string;
 }
 
 export interface Notification {

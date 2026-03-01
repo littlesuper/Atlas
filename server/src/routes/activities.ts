@@ -353,6 +353,11 @@ router.post(
         where: { id: projectId },
       });
 
+      if (project && project.status === 'ARCHIVED') {
+        res.status(403).json({ error: '归档项目不可修改' });
+        return;
+      }
+
       if (!project) {
         res.status(400).json({ error: '项目不存在' });
         return;
@@ -620,8 +625,12 @@ router.put(
       // 项目归属检查：管理员、项目经理或协作者可以修改活动
       const actProject = await prisma.project.findUnique({
         where: { id: existingActivity.projectId },
-        select: { managerId: true },
+        select: { managerId: true, status: true },
       });
+      if (actProject?.status === 'ARCHIVED') {
+        res.status(403).json({ error: '归档项目不可修改' });
+        return;
+      }
       if (!canManageProject(req, actProject?.managerId ?? '', existingActivity.projectId)) {
         res.status(403).json({ error: '只能修改自己负责的项目中的活动' });
         return;
@@ -821,8 +830,12 @@ router.delete(
       // 项目归属检查：管理员、项目经理或协作者可以删除活动
       const delProject = await prisma.project.findUnique({
         where: { id: existingActivity.projectId },
-        select: { managerId: true },
+        select: { managerId: true, status: true },
       });
+      if (delProject?.status === 'ARCHIVED') {
+        res.status(403).json({ error: '归档项目不可修改' });
+        return;
+      }
       if (!canManageProject(req, delProject?.managerId ?? '', existingActivity.projectId)) {
         res.status(403).json({ error: '只能删除自己负责的项目中的活动' });
         return;

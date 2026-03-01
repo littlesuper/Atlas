@@ -12,6 +12,10 @@ export const STATUS_MAP = {
     label: '已完成',
     color: 'gray',
   },
+  ARCHIVED: {
+    label: '已归档',
+    color: 'purple',
+  },
 } as const;
 
 // ============ 优先级映射 ============

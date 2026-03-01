@@ -29,6 +29,7 @@ echarts.use([LineChart, GridComponent, TooltipComponent, MarkAreaComponent, Canv
 
 interface Props {
   projectId: string;
+  isArchived?: boolean;
 }
 
 const RISK_LEVEL_CONFIG: Record<string, { color: string; bgVar: string }> = {
@@ -56,7 +57,7 @@ const SOURCE_LABEL: Record<string, { text: string; color: string }> = {
   rule_engine: { text: '规则引擎', color: 'gray' },
 };
 
-const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
+const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived }) => {
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -148,14 +149,16 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
         <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
           {assessments.length > 0 ? `共 ${total} 次评估记录` : ''}
         </span>
-        <Button
-          type="primary"
-          icon={<IconThunderbolt />}
-          loading={assessing}
-          onClick={handleAssess}
-        >
-          发起评估
-        </Button>
+        {!isArchived && (
+          <Button
+            type="primary"
+            icon={<IconThunderbolt />}
+            loading={assessing}
+            onClick={handleAssess}
+          >
+            发起评估
+          </Button>
+        )}
       </div>
 
       {/* 风险趋势图 */}
@@ -171,7 +174,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId }) => {
               <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: 'var(--color-text-2)' }}>历史记录</div>
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 {history.map((a) => (
-                  <RiskCard key={a.id} assessment={a} onDelete={() => handleDelete(a.id)} />
+                  <RiskCard key={a.id} assessment={a} onDelete={isArchived ? undefined : () => handleDelete(a.id)} />
                 ))}
               </Space>
               {total > pageSize && (

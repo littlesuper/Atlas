@@ -98,6 +98,7 @@ enum ProjectStatus {
   IN_PROGRESS
   COMPLETED
   ON_HOLD
+  ARCHIVED
 }
 
 enum Priority {
@@ -126,6 +127,7 @@ model Project {
   members          ProjectMember[]
   activities       Activity[]
   activityArchives ActivityArchive[]
+  projectArchives  ProjectArchive[]
   products         Product[]
   riskAssessments  RiskAssessment[]
   weeklyReports    WeeklyReport[]
@@ -202,6 +204,20 @@ model ActivityArchive {
 
   @@index([projectId])
   @@map("activity_archives")
+}
+
+model ProjectArchive {
+  id         String   @id @default(uuid())
+  projectId  String
+  snapshot   Json
+  archivedBy String
+  archivedAt DateTime @default(now())
+  remark     String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_archives")
 }
 
 // ==================== 项目模板 ====================

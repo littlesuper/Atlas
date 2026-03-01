@@ -9,6 +9,7 @@ import {
 
 interface ProductsTabProps {
   projectId: string;
+  isArchived?: boolean;
 }
 
 const ProductsTab: React.FC<ProductsTabProps> = ({ projectId }) => {

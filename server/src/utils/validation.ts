@@ -1,4 +1,4 @@
-export const VALID_PROJECT_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'ON_HOLD'];
+export const VALID_PROJECT_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'ARCHIVED'];
 export const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 export function isValidProjectStatus(s: string): boolean {

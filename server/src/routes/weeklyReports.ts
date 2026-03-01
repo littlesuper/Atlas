@@ -433,6 +433,12 @@ router.post(
         return;
       }
 
+      // 归档项目检查
+      if (project.status === 'ARCHIVED') {
+        res.status(403).json({ error: '归档项目不可修改' });
+        return;
+      }
+
       // 归属检查：管理员、项目经理或协作者可以创建该项目的周报
       if (!canManageProject(req, project.managerId, projectId)) {
         res.status(403).json({ error: '只能为自己负责的项目创建周报' });
@@ -522,6 +528,16 @@ router.put(
 
       if (!existingReport) {
         res.status(404).json({ error: '周报不存在' });
+        return;
+      }
+
+      // 归档项目检查
+      const reportProj = await prisma.project.findUnique({
+        where: { id: existingReport.projectId },
+        select: { status: true },
+      });
+      if (reportProj?.status === 'ARCHIVED') {
+        res.status(403).json({ error: '归档项目不可修改' });
         return;
       }
 
