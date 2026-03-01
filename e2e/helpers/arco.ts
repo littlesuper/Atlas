@@ -73,3 +73,38 @@ export async function pickDateRange(page: Page, container: string = '.arco-drawe
   await rightCells.nth(14).click();
   await page.waitForTimeout(500);
 }
+
+/**
+ * Open the "新建活动" drawer by clicking the "活动" dropdown menu first.
+ * The activity create button is inside a Dropdown in the project detail toolbar.
+ */
+export async function openCreateActivityDrawer(page: Page) {
+  // Click the "活动" dropdown trigger button
+  const activityDropdown = page.locator('button.arco-btn-primary').filter({ hasText: '活动' });
+  await activityDropdown.click();
+  await page.waitForTimeout(300);
+
+  // Click "新建活动" in the dropdown menu
+  await page.locator('.arco-dropdown-menu-item, .arco-menu-item').filter({ hasText: '新建活动' }).click();
+  await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+}
+
+/**
+ * Click a sub-nav link by text (used in admin page for 用户管理/角色管理/企微配置).
+ * These are link-style navigation, not Arco Tabs.
+ */
+export async function clickSubNav(page: Page, text: string) {
+  await page.getByText(text, { exact: true }).click();
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Search for a project by name on the project list page.
+ * Useful when there are many projects and the target is not on page 1.
+ */
+export async function searchProject(page: Page, projectName: string) {
+  const searchInput = page.getByPlaceholder('搜索项目名称');
+  await searchInput.fill(projectName);
+  await page.waitForTimeout(500);
+  await waitForTableLoad(page);
+}

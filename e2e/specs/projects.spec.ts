@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { uniqueName, text } from '../fixtures/test-data';
-import { expectMessage, confirmModal, waitForTableLoad, clickDrawerSubmit, pickDateRange } from '../helpers/arco';
+import { expectMessage, confirmModal, waitForTableLoad, clickDrawerSubmit, pickDateRange, searchProject } from '../helpers/arco';
 
 test.describe.serial('Project Management', () => {
   const projectName = uniqueName(text.projectName);
@@ -14,7 +14,8 @@ test.describe.serial('Project Management', () => {
 
   test('create new project', async ({ authedPage: page }) => {
     await page.getByRole('button', { name: '新建项目' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await page.waitForTimeout(300);
 
     // Fill name and description
     await page.getByPlaceholder('请输入项目名称').fill(projectName);
@@ -40,11 +41,13 @@ test.describe.serial('Project Management', () => {
 
     await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
     await expect(page.getByText(projectName)).toBeVisible({ timeout: 10_000 });
   });
 
   test('click into project detail', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
     await page.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 10_000 });
@@ -52,6 +55,7 @@ test.describe.serial('Project Management', () => {
 
   test('delete project', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
 
     const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();

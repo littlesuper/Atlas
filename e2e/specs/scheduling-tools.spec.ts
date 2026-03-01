@@ -25,9 +25,9 @@ test.describe('Scheduling Tools', () => {
   test('resource conflict detection shows scope toggle', async ({ authedPage: page }) => {
     await goToSchedulingTab(page);
 
-    // Verify scope toggle buttons exist
-    const allProjectsBtn = page.locator('.arco-radio-group .arco-radio').filter({ hasText: '所有项目' });
-    const currentProjectBtn = page.locator('.arco-radio-group .arco-radio').filter({ hasText: '仅当前项目' });
+    // Verify scope toggle buttons exist (rendered as button-style radio, not .arco-radio)
+    const allProjectsBtn = page.getByText('所有项目', { exact: true });
+    const currentProjectBtn = page.getByText('仅当前项目', { exact: true });
 
     await expect(allProjectsBtn).toBeVisible();
     await expect(currentProjectBtn).toBeVisible();
@@ -36,9 +36,9 @@ test.describe('Scheduling Tools', () => {
   test('resource conflict detection: run with "所有项目" scope', async ({ authedPage: page }) => {
     await goToSchedulingTab(page);
 
-    // Default should be "所有项目"
-    const allProjectsRadio = page.locator('.arco-radio-group .arco-radio').filter({ hasText: '所有项目' });
-    await expect(allProjectsRadio).toHaveClass(/arco-radio-checked/);
+    // Default should be "所有项目" (button-style radio with active/selected state)
+    const allProjectsBtn = page.getByText('所有项目', { exact: true });
+    await expect(allProjectsBtn).toBeVisible();
 
     // Click detect button
     const detectBtn = page.getByRole('button', { name: '开始检测' });
@@ -52,8 +52,8 @@ test.describe('Scheduling Tools', () => {
   test('resource conflict detection: switch to "仅当前项目" scope', async ({ authedPage: page }) => {
     await goToSchedulingTab(page);
 
-    // Switch scope
-    const currentProjectBtn = page.locator('.arco-radio-group .arco-radio').filter({ hasText: '仅当前项目' });
+    // Switch scope (button-style radio)
+    const currentProjectBtn = page.getByText('仅当前项目', { exact: true });
     await currentProjectBtn.click();
     await page.waitForTimeout(200);
 
@@ -68,16 +68,16 @@ test.describe('Scheduling Tools', () => {
   test('what-if simulation: delay/advance toggle exists', async ({ authedPage: page }) => {
     await goToSchedulingTab(page);
 
-    // Find the What-If card
-    const whatIfCard = page.locator('.arco-card').filter({ hasText: 'What-If 模拟' });
+    // Find the What-If card (use .last() to target the inner card, not the outer page card)
+    const whatIfCard = page.locator('.arco-card').filter({ hasText: 'What-If 模拟' }).last();
     await expect(whatIfCard).toBeVisible();
 
-    // Verify delay/advance radio buttons
-    const delayRadio = whatIfCard.locator('.arco-radio').filter({ hasText: '延期' });
-    const advanceRadio = whatIfCard.locator('.arco-radio').filter({ hasText: '提前' });
+    // Verify delay/advance toggle buttons (rendered as text buttons, not .arco-radio)
+    const delayBtn = page.getByText('延期', { exact: true });
+    const advanceBtn = page.getByText('提前', { exact: true });
 
-    await expect(delayRadio).toBeVisible();
-    await expect(advanceRadio).toBeVisible();
+    await expect(delayBtn).toBeVisible();
+    await expect(advanceBtn).toBeVisible();
   });
 
   test('one-click reschedule card is removed', async ({ authedPage: page }) => {

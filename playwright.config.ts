@@ -8,7 +8,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: 'http://localhost:5176',
+    baseURL: 'http://localhost:5173',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
@@ -38,7 +38,7 @@ export default defineConfig({
     {
       command: 'npm run dev',
       cwd: './client',
-      port: 5176,
+      port: 5173,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },

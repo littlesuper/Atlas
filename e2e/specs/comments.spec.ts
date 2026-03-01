@@ -7,6 +7,8 @@ import {
   clickDrawerSubmit,
   pickDateRange,
   clickTab,
+  openCreateActivityDrawer,
+  searchProject,
 } from '../helpers/arco';
 
 test.describe.serial('Activity Comments', () => {
@@ -33,6 +35,7 @@ test.describe.serial('Activity Comments', () => {
     expect((await projResp).status()).toBeLessThan(400);
     await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
 
     // Navigate to project
     await page.getByText(projectName).click();
@@ -40,8 +43,7 @@ test.describe.serial('Activity Comments', () => {
     await page.waitForTimeout(1_000);
 
     // Create activity
-    await page.getByRole('button', { name: '新建活动' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await openCreateActivityDrawer(page);
 
     const phaseSelect = page.locator('.arco-drawer .arco-select').first();
     await phaseSelect.click();
@@ -61,6 +63,7 @@ test.describe.serial('Activity Comments', () => {
   test('add comment to activity', async ({ authedPage: page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
     await page.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
 
@@ -85,6 +88,7 @@ test.describe.serial('Activity Comments', () => {
   test('view history tab', async ({ authedPage: page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
     await page.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(500);
@@ -104,6 +108,7 @@ test.describe.serial('Activity Comments', () => {
   test('cleanup: delete test project', async ({ authedPage: page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
 
     const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();

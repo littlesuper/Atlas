@@ -7,6 +7,8 @@ import {
   clickDrawerSubmit,
   pickDateRange,
   waitForPageLoad,
+  openCreateActivityDrawer,
+  searchProject,
 } from '../helpers/arco';
 
 test.describe.serial('Risk Assessment', () => {
@@ -31,14 +33,14 @@ test.describe.serial('Risk Assessment', () => {
     expect((await projResp).status()).toBeLessThan(400);
     await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
 
     // Navigate to project and add activity
     await page.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
-    await page.getByRole('button', { name: '新建活动' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await openCreateActivityDrawer(page);
 
     const phaseSelect = page.locator('.arco-drawer .arco-select').first();
     await phaseSelect.click();
@@ -58,6 +60,7 @@ test.describe.serial('Risk Assessment', () => {
   test('trigger risk assessment', async ({ authedPage: page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
     await page.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
@@ -80,6 +83,7 @@ test.describe.serial('Risk Assessment', () => {
   test('cleanup: delete test project', async ({ authedPage: page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);
+    await searchProject(page, projectName);
 
     const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();

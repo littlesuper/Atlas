@@ -9,7 +9,7 @@ test.describe.serial('Weekly Reports', () => {
     // Should see the summary heading
     await expect(page.getByText('项目周报汇总')).toBeVisible();
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table')).toBeVisible();
+    await expect(page.locator('.arco-table').first()).toBeVisible();
   });
 
   test('navigate to project detail weekly reports tab', async ({ authedPage: page }) => {

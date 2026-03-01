@@ -124,22 +124,27 @@ test.describe('Activity List Filters & Inline Edit', () => {
     await goToProjectDetail(page);
     await waitForTableLoad(page);
 
-    // Find an activity name cell and click to enter inline edit
-    const nameCell = page.locator('.arco-table-body .arco-table-tr').first().locator('.arco-table-td').nth(4);
+    // Find the first data row
+    const firstRow = page.locator('.arco-table-tr').filter({ has: page.locator('.arco-table-td') }).first();
+    await expect(firstRow).toBeVisible({ timeout: 10_000 });
+
+    // Click on the name cell to enter inline edit
+    // Column order: checkbox(0), drag(1), ID(2), predecessor(3), phase(4), name(5)
+    const nameCell = firstRow.locator('.arco-table-td').nth(5);
     await nameCell.click();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(500);
 
     // Check if an input appeared (inline edit mode)
-    const inlineInput = page.locator('.arco-table-body .arco-input, .arco-table-body .arco-select, .arco-table-body .arco-input-number');
+    const inlineInput = page.locator('.arco-table .arco-input, .arco-table .arco-select-view, .arco-table .arco-input-number');
     const hasInlineEdit = await inlineInput.count() > 0;
 
     if (hasInlineEdit) {
       // Press Escape
       await page.keyboard.press('Escape');
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
 
       // Inline editor should be dismissed
-      const inputAfterEsc = await inlineInput.count();
+      const inputAfterEsc = await page.locator('.arco-table .arco-input').count();
       expect(inputAfterEsc).toBe(0);
     }
   });
