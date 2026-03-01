@@ -276,6 +276,10 @@ export const activitiesApi = {
   undoImport: (projectId: string, ids: string[]) =>
     request.post<{ success: boolean; count: number }>(`/activities/project/${projectId}/undo-import`, { ids }),
 
+  // 导出 Excel 活动
+  exportExcel: (projectId: string) =>
+    request.get(`/activities/project/${projectId}/export-excel`, { responseType: 'blob' }),
+
   // 导入 Excel 活动
   importExcel: (projectId: string, file: File) => {
     const formData = new FormData();

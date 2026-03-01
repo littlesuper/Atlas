@@ -20,6 +20,8 @@ import {
   Progress,
   InputNumber,
   Spin,
+  Dropdown,
+  Menu,
 } from '@arco-design/web-react';
 import {
   IconLeft,
@@ -30,6 +32,8 @@ import {
   IconStorage,
   IconUndo,
   IconUpload,
+  IconDownload,
+  IconNav,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, activitiesApi, usersApi, authApi } from '../../../api';
@@ -86,7 +90,7 @@ const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
   { key: 'name', label: '活动名称', removable: false },
   { key: 'type', label: '类型', removable: true },
   { key: 'status', label: '状态', removable: true },
-{ key: 'assignee', label: '负责人', removable: true },
+  { key: 'assignee', label: '负责人', removable: true },
   { key: 'planDuration', label: '计划工期', removable: true },
   { key: 'planDates', label: '计划时间', removable: true },
   { key: 'actualDates', label: '实际时间', removable: true },
@@ -105,14 +109,14 @@ const DEFAULT_COLUMN_PREFS: ColumnPrefs = {
 const COLUMN_WIDTH_MAP: Record<string, number> = {
   id: 60,
   predecessor: 100,
-  phase: 70,
-  name: 200,
+  phase: 80,
+  name: 0, // 自适应，不设固定宽度
   type: 80,
   status: 100,
   assignee: 120,
-  planDuration: 90,
-  planDates: 200,
-  actualDates: 200,
+  planDuration: 70,
+  planDates: 210,
+  actualDates: 250,
   notes: 140,
 };
 
@@ -151,6 +155,35 @@ const AutoOpenSelect: React.FC<React.ComponentProps<typeof Select> & { onDismiss
   );
 };
 
+// 用于包裹行内编辑的 RangePicker，自动获取焦点并展开面板
+const AutoOpenRangePicker: React.FC<React.ComponentProps<typeof DatePicker.RangePicker> & { onDismiss: () => void }> = ({ onDismiss, onChange, ...props }) => {
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // 找到内部的 input 元素，并触发 focus 和 click，以弹出日期选择面板
+    const timer = setTimeout(() => {
+      if (wrapRef.current) {
+        const input = wrapRef.current.querySelector('input');
+        if (input) {
+          input.focus();
+          input.click();
+        }
+      }
+    }, 50); // 给个短延迟确保内部 DOM 已完全挂载
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div ref={wrapRef} style={{ display: 'inline-block' }}>
+      <DatePicker.RangePicker
+        {...props}
+        onChange={onChange}
+      />
+    </div>
+  );
+};
+
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -181,9 +214,9 @@ const ProjectDetail: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 活动列表表头吸顶
-  const tableWrapRef    = useRef<HTMLDivElement>(null);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
-  const [theadFixed, setTheadFixed]       = useState(false);
+  const [theadFixed, setTheadFixed] = useState(false);
   const [theadFixedPos, setTheadFixedPos] = useState({ left: 0, width: 0, height: 0 });
 
   // 协作者管理
@@ -286,7 +319,15 @@ const ProjectDetail: React.FC = () => {
         const savedOrderSet = new Set(saved.order || []);
         for (const key of DEFAULT_COLUMN_ORDER) {
           const isNew = !savedOrderSet.has(key);
-          if (!order.includes(key)) order.push(key);
+          if (!order.includes(key)) {
+            // If the key is not 'notes', and 'notes' is currently the last element of the order array,
+            // we should insert it BEFORE 'notes' to keep 'notes' at the end.
+            if (key !== 'notes' && order[order.length - 1] === 'notes') {
+              order.splice(order.length - 1, 0, key);
+            } else {
+              order.push(key);
+            }
+          }
           // New column unknown to user's saved prefs → auto-visible
           if (isNew && !visible.includes(key)) visible.push(key);
         }
@@ -462,6 +503,60 @@ const ProjectDetail: React.FC = () => {
     setFormDeps((deps || []).map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 })));
   };
 
+  // 导出活动列表为 CSV（客户端生成，Chrome 不会阻止 .csv 下载）
+  const handleExportExcel = () => {
+    if (!activities.length) { Message.warning('暂无活动数据'); return; }
+
+    const statusMap: Record<string, string> = { NOT_STARTED: '未开始', IN_PROGRESS: '进行中', COMPLETED: '已完成', CANCELLED: '已取消' };
+    const typeMap: Record<string, string> = { TASK: '任务', MILESTONE: '里程碑', PHASE: '阶段' };
+    const depTypeMap: Record<string, string> = { '0': 'FS', '1': 'SS', '2': 'FF', '3': 'SF' };
+    const fmtDate = (d?: string | null) => d ? dayjs(d).format('YYYY-MM-DD') : '';
+
+    const formatDeps = (act: Activity): string => {
+      if (!act.dependencies) return '';
+      const deps = Array.isArray(act.dependencies) ? act.dependencies
+        : (() => { try { return JSON.parse(act.dependencies as unknown as string); } catch { return []; } })();
+      return deps.map((dep: { id: string; type: string; lag?: number }) => {
+        const seq = activitySeqMap.get(dep.id);
+        const seqStr = seq ? String(seq).padStart(3, '0') : '?';
+        const typeLabel = depTypeMap[dep.type] || 'FS';
+        const lag = dep.lag ?? 0;
+        const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
+        return `${seqStr}${typeLabel}${lagStr}`;
+      }).join(', ');
+    };
+
+    const headers = ['ID', '前置依赖', '阶段', '活动名称', '类型', '状态', '负责人', '计划工期', '计划时间', '实际时间', '备注'];
+    const rows = activities.map((a, i) => [
+      String(i + 1).padStart(3, '0'),
+      formatDeps(a),
+      a.phase || '',
+      a.name,
+      typeMap[a.type] || a.type,
+      statusMap[a.status] || a.status,
+      (a.assignees || []).map((u: any) => u.realName).join(', '),
+      a.planDuration != null ? String(a.planDuration) : '',
+      fmtDate(a.planStartDate),
+      fmtDate(a.planEndDate),
+      fmtDate(a.startDate),
+      fmtDate(a.endDate),
+      a.notes || '',
+    ]);
+
+    const escapeCsv = (v: string) => v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
+    const csv = [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\n');
+    // BOM 头确保 WPS/Excel 正确识别 UTF-8 中文
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project?.name || '项目'}_活动列表_${dayjs().format('YYYY-MM-DD')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // 打开创建/编辑抽屉
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -585,11 +680,11 @@ const ProjectDetail: React.FC = () => {
           ? editingActivity.sortOrder
           : insertAtIndexRef.current !== null
             ? (() => {
-                const idx = insertAtIndexRef.current!;
-                const prev = idx > 0 ? activities[idx - 1].sortOrder : 0;
-                const next = idx < activities.length ? activities[idx].sortOrder : prev + 20;
-                return Math.floor((prev + next) / 2);
-              })()
+              const idx = insertAtIndexRef.current!;
+              const prev = idx > 0 ? activities[idx - 1].sortOrder : 0;
+              const next = idx < activities.length ? activities[idx].sortOrder : prev + 20;
+              return Math.floor((prev + next) / 2);
+            })()
             : (activities.length + 1) * 10,
         dependencies: formDeps.filter((d) => d.id).map((d) => ({
           id: d.id,
@@ -893,8 +988,13 @@ const ProjectDetail: React.FC = () => {
     if (!inlineEditing) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      // 忽略已经被从 DOM 中移除的元素（如点击 DatePicker 的某一天后该天可能会被重新渲染而脱离 DOM）
+      if (!document.contains(target)) return;
       // 忽略弹出层内的点击（DatePicker / Select popup 渲染到 body）
-      if (target.closest('.arco-picker-dropdown, .arco-select-popup, .arco-picker, .arco-select, .arco-input-wrapper, .arco-input-number')) return;
+      if (target.closest('.arco-picker-dropdown, .arco-picker-range-wrapper, .arco-picker-panel, .arco-select-popup, .arco-picker, .arco-select, .arco-input-wrapper, .arco-input-number, .arco-picker-container')) return;
+      // 对于原生 Input / InputNumber，让它们自己的 onBlur 去处理保存，防止组件被提前卸载导致 blur 丢失
+      if (['name', 'notes', 'planDuration'].includes(inlineEditing.field)) return;
+
       setInlineEditing(null);
     };
     const keyHandler = (e: KeyboardEvent) => {
@@ -935,7 +1035,7 @@ const ProjectDetail: React.FC = () => {
                 Message.error('撤回失败');
               }
             }}
-            style={{ marginLeft: 8, cursor: 'pointer' }}
+            style={{ marginLeft: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
           >
             <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤回修改
           </a>
@@ -1111,37 +1211,6 @@ const ProjectDetail: React.FC = () => {
     return result;
   };
 
-  // 提交日期范围内联编辑
-  const commitDateRangeEdit = async (
-    activity: Activity,
-    startField: string,
-    endField: string,
-    dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null,
-  ) => {
-    setInlineEditing(null);
-    const startVal = dates?.[0]?.format('YYYY-MM-DD') || null;
-    const endVal = dates?.[1]?.format('YYYY-MM-DD') || null;
-    const payload: Record<string, unknown> = { [startField]: startVal, [endField]: endVal };
-    // 计划时间自动算工期
-    if (startField === 'planStartDate' && startVal && endVal) {
-      payload.planDuration = calcWorkdays(dayjs(startVal), dayjs(endVal));
-    }
-    const rollback: Record<string, unknown> = {
-      [startField]: (activity as unknown as Record<string, unknown>)[startField] ? dayjs((activity as unknown as Record<string, unknown>)[startField] as string).format('YYYY-MM-DD') : null,
-      [endField]: (activity as unknown as Record<string, unknown>)[endField] ? dayjs((activity as unknown as Record<string, unknown>)[endField] as string).format('YYYY-MM-DD') : null,
-    };
-    if (startField === 'planStartDate') {
-      rollback.planDuration = activity.planDuration;
-    }
-    try {
-      await activitiesApi.update(activity.id, payload);
-      loadActivities();
-      showUndoMessage(activity.id, rollback);
-    } catch {
-      Message.error('更新失败');
-    }
-  };
-
   // 提交计划工期内联编辑
   const commitPlanDurationEdit = async (activity: Activity) => {
     setInlineEditing(null);
@@ -1191,36 +1260,7 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  // 计划日期显示（含工作日数）
-  const renderPlanDates = (activity: Activity) => {
-    if (!activity.planStartDate) return '-';
-    const start = dayjs(activity.planStartDate).format('MM-DD');
-    const end = activity.planEndDate ? dayjs(activity.planEndDate).format('MM-DD') : '';
-    return <span>{start}{end ? ' ~ ' + end : ''}</span>;
-  };
-
-  // 实际日期显示（含工作日数，超期显示红色）
-  const renderActualDates = (activity: Activity) => {
-    if (!activity.startDate) return '-';
-    const startD = dayjs(activity.startDate);
-    const start = startD.format('MM-DD');
-    const endD = activity.endDate ? dayjs(activity.endDate) : null;
-    const end = endD ? endD.format('MM-DD') : '进行中';
-    // 实际结束晚于计划结束，或未完成且已超过计划结束日期
-    const isOverdue = activity.planEndDate && (
-      (endD && endD.isAfter(dayjs(activity.planEndDate), 'day')) ||
-      (!endD && dayjs(activity.planEndDate).isBefore(dayjs(), 'day') && activity.status !== 'COMPLETED')
-    );
-    const days = endD
-      ? calcWorkdays(startD, endD)
-      : calcWorkdays(startD, dayjs());
-    return (
-      <span style={{ color: isOverdue ? 'var(--status-danger)' : undefined }}>
-        {start} ~ {end}
-        <span style={{ color: isOverdue ? 'var(--status-danger)' : 'var(--color-text-3)', fontSize: 12, marginLeft: 4 }}>({days}天)</span>
-      </span>
-    );
-  };
+  const dateFmt = (d?: string | null) => d ? dayjs(d).format('YY年MM月DD日') : '-';
 
   // 表格列配置（keyed map）
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1263,7 +1303,7 @@ const ProjectDetail: React.FC = () => {
     },
     phase: {
       title: '阶段',
-      width: 70,
+      width: 80,
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'phase') {
           return (
@@ -1295,7 +1335,6 @@ const ProjectDetail: React.FC = () => {
     name: {
       title: '活动名称',
       dataIndex: 'name',
-      width: 280,
       render: (name: string, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
           return (
@@ -1431,7 +1470,7 @@ const ProjectDetail: React.FC = () => {
     },
     planDuration: {
       title: '计划工期',
-      width: 90,
+      width: 80,
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planDuration') {
           return (
@@ -1457,73 +1496,98 @@ const ProjectDetail: React.FC = () => {
             style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
           >
-            {days != null ? `${days}天` : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
+            {days != null ? <>{days}<span style={{ fontSize: 12, color: 'var(--color-text-3)', paddingLeft: 2 }}>天</span></> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
           </span>
         );
       },
     },
     planDates: {
       title: '计划时间',
-      width: 200,
+      width: 210,
       render: (_: unknown, record: Activity) => {
         const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planDates') {
           return (
-            <DatePicker.RangePicker
+            <AutoOpenRangePicker
               size="small"
-              style={{ width: 220 }}
+              style={{ width: 200 }}
               format="YYYY-MM-DD"
-              {...{ defaultPopupVisible: true } as any}
-              value={record.planStartDate && record.planEndDate ? [dayjs(record.planStartDate), dayjs(record.planEndDate)] as [dayjs.Dayjs, dayjs.Dayjs] : undefined}
-              onChange={(_, dates) => {
-                const parsed: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = dates && dates[0] && dates[1] ? [dayjs(dates[0]), dayjs(dates[1])] : null;
-                commitDateRangeEdit(record, 'planStartDate', 'planEndDate', parsed);
+              value={record.planStartDate && record.planEndDate ? [dayjs(record.planStartDate), dayjs(record.planEndDate)] : undefined}
+              onChange={(dateStr) => {
+                if (dateStr && dateStr[0] && dateStr[1]) {
+                  const startVal = dayjs(dateStr[0]).format('YYYY-MM-DD');
+                  const endVal = dayjs(dateStr[1]).format('YYYY-MM-DD');
+                  const payload: Record<string, unknown> = { planStartDate: startVal, planEndDate: endVal, planDuration: calcWorkdays(dayjs(startVal), dayjs(endVal)) };
+                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); });
+                } else {
+                  activitiesApi.update(record.id, { planStartDate: undefined, planEndDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); });
+                }
               }}
-              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
+              onDismiss={() => setInlineEditing(null)}
             />
           );
         }
+        const text = record.planStartDate && record.planEndDate
+          ? `${dateFmt(record.planStartDate)} - ${dateFmt(record.planEndDate)}`
+          : record.planStartDate ? dateFmt(record.planStartDate) : record.planEndDate ? dateFmt(record.planEndDate) : '-';
         return (
           <span
-            style={{ cursor: !hasDeps && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            style={{ whiteSpace: 'nowrap', cursor: !hasDeps && hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
             onClick={() => {
               if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
-              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id)) {
+              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
                 setInlineEditing({ id: record.id, field: 'planDates' });
-              }
             }}
           >
-            {renderPlanDates(record)}
+            {text}
           </span>
         );
       },
     },
     actualDates: {
       title: '实际时间',
-      width: 200,
+      width: 250,
       render: (_: unknown, record: Activity) => {
+        const isOverdue = record.planEndDate && record.endDate && dayjs(record.endDate).isAfter(dayjs(record.planEndDate), 'day');
         if (inlineEditing?.id === record.id && inlineEditing.field === 'actualDates') {
           return (
-            <DatePicker.RangePicker
+            <AutoOpenRangePicker
               size="small"
-              style={{ width: 220 }}
+              style={{ width: 200 }}
               format="YYYY-MM-DD"
-              {...{ defaultPopupVisible: true } as any}
-              value={record.startDate && record.endDate ? [dayjs(record.startDate), dayjs(record.endDate)] as [dayjs.Dayjs, dayjs.Dayjs] : record.startDate ? [dayjs(record.startDate), dayjs(record.startDate)] as [dayjs.Dayjs, dayjs.Dayjs] : undefined}
-              onChange={(_, dates) => {
-                const parsed: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = dates && dates[0] && dates[1] ? [dayjs(dates[0]), dayjs(dates[1])] : dates && dates[0] ? [dayjs(dates[0]), null] : null;
-                commitDateRangeEdit(record, 'startDate', 'endDate', parsed);
+              value={record.startDate && record.endDate ? [dayjs(record.startDate), dayjs(record.endDate)] : undefined}
+              onChange={(dateStr) => {
+                if (dateStr && dateStr[0] && dateStr[1]) {
+                  const startVal = dayjs(dateStr[0]).format('YYYY-MM-DD');
+                  const endVal = dayjs(dateStr[1]).format('YYYY-MM-DD');
+                  const payload: Record<string, unknown> = { startDate: startVal, endDate: endVal, duration: calcWorkdays(dayjs(startVal), dayjs(endVal)) };
+                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); });
+                } else {
+                  activitiesApi.update(record.id, { startDate: undefined, endDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); });
+                }
               }}
-              onVisibleChange={(visible) => { if (!visible) setInlineEditing(null); }}
+              onDismiss={() => setInlineEditing(null)}
             />
           );
         }
+        const days = record.startDate && record.endDate ? calcWorkdays(dayjs(record.startDate), dayjs(record.endDate)) : record.duration;
+        const text = record.startDate && record.endDate
+          ? <>{dateFmt(record.startDate)} - {dateFmt(record.endDate)}</>
+          : record.startDate ? <>{dateFmt(record.startDate)}</> : record.endDate ? <>{dateFmt(record.endDate)}</> : <>-</>;
         return (
           <span
-            style={{ cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
-            onClick={() => hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && setInlineEditing({ id: record.id, field: 'actualDates' })}
+            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'var(--status-danger)' : undefined, cursor: hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? 'pointer' : 'default' }}
+            onClick={() => {
+              if (hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id))
+                setInlineEditing({ id: record.id, field: 'actualDates' });
+            }}
           >
-            {renderActualDates(record)}
+            {text}
+            {days != null && (
+              <span style={{ fontSize: 12, color: 'var(--color-text-3)', paddingLeft: 6 }}>
+                {days}天
+              </span>
+            )}
           </span>
         );
       },
@@ -1590,6 +1654,7 @@ const ProjectDetail: React.FC = () => {
         />
       ),
       width: 36,
+      align: 'center' as const,
       render: (_: unknown, record: Activity) => (
         <input
           type="checkbox"
@@ -1762,11 +1827,11 @@ const ProjectDetail: React.FC = () => {
         {/* Tab 区域 */}
         <Card>
           <Tabs
-          activeTab={activeTab}
-          onChange={setActiveTab}
-          style={{ '--tab-bar-style': 'sticky' } as React.CSSProperties}
-          {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: 'var(--color-bg-1)', marginBottom: 0 } } as any}
-        >
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            style={{ '--tab-bar-style': 'sticky' } as React.CSSProperties}
+            {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: 'var(--color-bg-1)', marginBottom: 0 } } as any}
+          >
             {/* 活动列表 */}
             <Tabs.TabPane key="activities" title="活动列表">
               <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1807,9 +1872,33 @@ const ProjectDetail: React.FC = () => {
                       进行中 <span style={{ fontWeight: 500 }}>{activities.filter(a => a.status === 'IN_PROGRESS').length}</span>
                     </span>
                   </span>
-                  {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                    <Button type="primary" icon={<IconPlus />} onClick={() => handleOpenDrawer()}>新建活动</Button>
-                  )}
+                  <Dropdown
+                    droplist={
+                      <Menu>
+                        {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                          <Menu.Item key="1" onClick={() => handleOpenDrawer()}>
+                            <IconPlus style={{ marginRight: 8 }} />
+                            新建活动
+                          </Menu.Item>
+                        )}
+                        {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
+                          <Menu.Item key="2" onClick={() => Message.info('批量导入功能开发中')}>
+                            <IconUpload style={{ marginRight: 8 }} />
+                            批量导入
+                          </Menu.Item>
+                        )}
+                        <Menu.Item key="3" onClick={handleExportExcel}>
+                          <IconDownload style={{ marginRight: 8 }} />
+                          导出活动
+                        </Menu.Item>
+                      </Menu>
+                    }
+                    position="br"
+                  >
+                    <Button type="primary">
+                      <IconNav /> 活动 <IconLeft style={{ transform: 'rotate(-90deg)', marginLeft: 4, fontSize: 12 }} />
+                    </Button>
+                  </Dropdown>
                   <ColumnSettings
                     columnDefs={ACTIVITY_COLUMN_DEFS}
                     prefs={columnPrefs}
@@ -1901,7 +1990,7 @@ const ProjectDetail: React.FC = () => {
                   scroll={{ x: scrollX }}
                   components={{
                     body: {
-                      row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number; [key: string]: unknown }) => {
+                      row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number;[key: string]: unknown }) => {
                         const isSource = dragFromRef.current === index;
                         const isTarget = dragOverRef.current === index && dragOverRef.current !== dragFromRef.current;
                         const insertAbove = isTarget && dragFromRef.current > index;
@@ -2392,12 +2481,12 @@ const ProjectDetail: React.FC = () => {
                   onChange={(_s, d) => handlePlanChange('end', d ? dayjs(d as unknown as string) : null)}
                 />
               </Form.Item>
-              <Form.Item label="工期(天)">
+              <Form.Item label="计划工期(天)">
                 <InputNumber
                   min={1}
                   value={planDuration ?? undefined}
                   onChange={(v) => handlePlanChange('dur', v ?? null)}
-                  placeholder="工期"
+                  placeholder="计划工期"
                   style={{ width: '100%' }}
                 />
               </Form.Item>
@@ -2419,12 +2508,12 @@ const ProjectDetail: React.FC = () => {
                   onChange={(_s, d) => handleActualChange('end', d ? dayjs(d as unknown as string) : null)}
                 />
               </Form.Item>
-              <Form.Item label="工期(天)">
+              <Form.Item label="实际工期(天)">
                 <InputNumber
                   min={1}
                   value={actualDuration ?? undefined}
                   onChange={(v) => handleActualChange('dur', v ?? null)}
-                  placeholder="工期"
+                  placeholder="实际工期"
                   style={{ width: '100%' }}
                 />
               </Form.Item>
@@ -2519,10 +2608,10 @@ const ProjectDetail: React.FC = () => {
                 const kw = memberSearch.toLowerCase();
                 return u.realName.toLowerCase().includes(kw) || (u.username || '').toLowerCase().includes(kw);
               }).length === 0 && (
-                <div style={{ padding: '12px 0', textAlign: 'center', color: 'var(--color-text-4)', fontSize: 13 }}>
-                  {memberSearch ? '无匹配用户' : '所有用户已添加'}
-                </div>
-              )}
+                  <div style={{ padding: '12px 0', textAlign: 'center', color: 'var(--color-text-4)', fontSize: 13 }}>
+                    {memberSearch ? '无匹配用户' : '所有用户已添加'}
+                  </div>
+                )}
             </div>
           </div>
         </Modal>
@@ -2755,29 +2844,41 @@ const ProjectDetail: React.FC = () => {
                     columns={[
                       { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
                       { title: '阶段', width: 70, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
-                      { title: '活动名称', width: 180, dataIndex: 'name', render: (v: string) => (
-                        <Tooltip content={v} position="tl"><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span></Tooltip>
-                      )},
+                      {
+                        title: '活动名称', width: 180, dataIndex: 'name', render: (v: string) => (
+                          <Tooltip content={v} position="tl"><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span></Tooltip>
+                        )
+                      },
                       { title: '类型', width: 80, dataIndex: 'type', render: (v: string) => { const cfg = ACTIVITY_TYPE_MAP[v as keyof typeof ACTIVITY_TYPE_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
                       { title: '状态', width: 90, dataIndex: 'status', render: (v: string) => { const cfg = ACTIVITY_STATUS_MAP[v as keyof typeof ACTIVITY_STATUS_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
-                      { title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{realName: string}>) => {
-                        const text = v?.length ? v.map(u => u.realName).join(', ') : '-';
-                        return <Tooltip content={text}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span></Tooltip>;
-                      }},
+                      {
+                        title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{ realName: string }>) => {
+                          const text = v?.length ? v.map(u => u.realName).join(', ') : '-';
+                          return <Tooltip content={text}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span></Tooltip>;
+                        }
+                      },
                       { title: '计划工期', width: 90, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
-                      { title: '计划时间', width: 170, render: (_: unknown, r: Activity) => r.planStartDate ? `${dayjs(r.planStartDate).format('YYYY-MM-DD')}${r.planEndDate ? ' ~ ' + dayjs(r.planEndDate).format('MM-DD') : ''}` : '-' },
-                      { title: '实际时间', width: 170, render: (_: unknown, r: Activity) => {
-                        if (!r.startDate) return '-';
-                        const text = `${dayjs(r.startDate).format('YYYY-MM-DD')}${r.endDate ? ' ~ ' + dayjs(r.endDate).format('MM-DD') : ''}`;
-                        const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
-                        return <span style={overdue ? { color: 'var(--status-danger)' } : undefined}>{text}</span>;
-                      }},
-                      { title: '备注', width: 200, dataIndex: 'notes', render: (v: string | null) => {
-                        if (!v) return '-';
-                        return <Tooltip content={<div style={{ maxWidth: 360, whiteSpace: 'pre-wrap' }}>{v}</div>} position="tl">
-                          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
-                        </Tooltip>;
-                      }},
+                      {
+                        title: '计划时间', width: 210, render: (_: unknown, r: Activity) => {
+                          const text = r.planStartDate && r.planEndDate ? `${dateFmt(r.planStartDate)} - ${dateFmt(r.planEndDate)}` : dateFmt(r.planStartDate) || dateFmt(r.planEndDate) || '-';
+                          return <span style={{ whiteSpace: 'nowrap' }}>{text}</span>;
+                        }
+                      },
+                      { title: '实际开始', width: 115, render: (_: unknown, r: Activity) => dateFmt(r.startDate) },
+                      {
+                        title: '实际结束', width: 115, render: (_: unknown, r: Activity) => {
+                          const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
+                          return <span style={overdue ? { color: 'var(--status-danger)' } : undefined}>{dateFmt(r.endDate)}</span>;
+                        }
+                      },
+                      {
+                        title: '备注', width: 200, dataIndex: 'notes', render: (v: string | null) => {
+                          if (!v) return '-';
+                          return <Tooltip content={<div style={{ maxWidth: 360, whiteSpace: 'pre-wrap' }}>{v}</div>} position="tl">
+                            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
+                          </Tooltip>;
+                        }
+                      },
                     ]}
                     data={archiveDetail.snapshot}
                     rowKey="id"

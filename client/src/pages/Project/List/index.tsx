@@ -170,8 +170,8 @@ const ProjectList: React.FC = () => {
 
   useEffect(() => {
     loadUsers();
-    weeklyReportsApi.getLatestStatus().then(res => setLatestStatus(res.data || {})).catch(() => {});
-    templatesApi.list().then(res => setTemplates(res.data || [])).catch(() => {});
+    weeklyReportsApi.getLatestStatus().then(res => setLatestStatus(res.data || {})).catch(() => { });
+    templatesApi.list().then(res => setTemplates(res.data || [])).catch(() => { });
   }, []);
 
   // 统计数据（来自服务端）
@@ -301,6 +301,7 @@ const ProjectList: React.FC = () => {
     {
       title: '',
       width: 32,
+      align: 'center' as const,
       render: (_: unknown, record: Project) => {
         const ps = latestStatus[record.id] as keyof typeof PROGRESS_STATUS_MAP | undefined;
         if (!ps) return null;

@@ -60,14 +60,18 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // 1. 从请求头中获取token
+    // 1. 从请求头或 query 参数中获取 token（query 参数仅用于文件下载等无法设置 header 的场景）
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token: string | undefined;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (typeof req.query.token === 'string') {
+      token = req.query.token;
+    }
+    if (!token) {
       res.status(401).json({ error: '未提供认证令牌' });
       return;
     }
-
-    const token = authHeader.substring(7); // 去掉 "Bearer " 前缀
 
     // 2. 验证token
     const JWT_SECRET = process.env.JWT_SECRET;

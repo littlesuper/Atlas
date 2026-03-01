@@ -1747,6 +1747,114 @@ router.post('/project/:projectId/reschedule', authenticate, async (req: Request,
 });
 
 /**
+ * GET /api/activities/project/:projectId/export-excel
+ * 导出项目活动列表为 Excel 文件
+ */
+router.get(
+  '/project/:projectId/export-excel',
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      if (!project) {
+        res.status(404).json({ error: '项目不存在' });
+        return;
+      }
+
+      const activities = await prisma.activity.findMany({
+        where: { projectId },
+        include: { assignees: { select: { id: true, realName: true } } },
+        orderBy: { sortOrder: 'asc' },
+      });
+
+      // 构建 id → seq 映射
+      const idToSeq = new Map<string, number>();
+      activities.forEach((a, i) => idToSeq.set(a.id, i + 1));
+
+      const statusMap: Record<string, string> = {
+        NOT_STARTED: '未开始', IN_PROGRESS: '进行中', COMPLETED: '已完成', CANCELLED: '已取消',
+      };
+      const typeMap: Record<string, string> = { TASK: '任务', MILESTONE: '里程碑', PHASE: '阶段' };
+      const depTypeMap: Record<string, string> = { '0': 'FS', '1': 'SS', '2': 'FF', '3': 'SF' };
+
+      const fmtDate = (d: Date | null) => d ? d.toISOString().slice(0, 10) : '';
+
+      const formatDeps = (deps: unknown): string => {
+        if (!deps) return '';
+        const arr = Array.isArray(deps) ? deps : (() => { try { return JSON.parse(deps as string); } catch { return []; } })();
+        return arr.map((dep: { id: string; type: string; lag?: number }) => {
+          const seq = idToSeq.get(dep.id);
+          const seqStr = seq ? String(seq).padStart(3, '0') : '?';
+          const typeLabel = depTypeMap[dep.type] || 'FS';
+          const lag = dep.lag ?? 0;
+          const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
+          return `${seqStr}${typeLabel}${lagStr}`;
+        }).join(', ');
+      };
+
+      // 使用 ExcelJS 生成合规的 xlsx（SheetJS 社区版会产生 metadata.xml 等非标内容导致 Excel 报警告）
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Atlas';
+      wb.created = new Date();
+      const ws = wb.addWorksheet('活动列表');
+
+      const columns = [
+        { header: 'ID', key: 'id', width: 6 },
+        { header: '前置依赖', key: 'predecessor', width: 16 },
+        { header: '阶段', key: 'phase', width: 8 },
+        { header: '活动名称', key: 'name', width: 30 },
+        { header: '类型', key: 'type', width: 8 },
+        { header: '状态', key: 'status', width: 8 },
+        { header: '负责人', key: 'assignee', width: 12 },
+        { header: '计划工期', key: 'planDuration', width: 10 },
+        { header: '计划开始', key: 'planStart', width: 12 },
+        { header: '计划结束', key: 'planEnd', width: 12 },
+        { header: '实际开始', key: 'actualStart', width: 12 },
+        { header: '实际结束', key: 'actualEnd', width: 12 },
+        { header: '备注', key: 'notes', width: 20 },
+      ];
+      ws.columns = columns;
+
+      // 表头加粗 + 背景色
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F2F3F5' } };
+
+      activities.forEach((a, i) => {
+        ws.addRow({
+          id: String(i + 1).padStart(3, '0'),
+          predecessor: formatDeps(a.dependencies),
+          phase: a.phase || '',
+          name: a.name,
+          type: typeMap[a.type] || a.type,
+          status: statusMap[a.status] || a.status,
+          assignee: (a as any).assignees?.map((u: { realName: string }) => u.realName).join(', ') || '',
+          planDuration: a.planDuration ?? '',
+          planStart: fmtDate(a.planStartDate),
+          planEnd: fmtDate(a.planEndDate),
+          actualStart: fmtDate(a.startDate),
+          actualEnd: fmtDate(a.endDate),
+          notes: a.notes || '',
+        });
+      });
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const fileName = encodeURIComponent(`${project.name}_活动列表_${dateStr}.xlsx`);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${fileName}`);
+      await wb.xlsx.write(res);
+    } catch (error) {
+      console.error('导出 Excel 错误:', error);
+      res.status(500).json({ error: '服务器内部错误' });
+    }
+  }
+);
+
+/**
  * POST /api/activities/project/:projectId/import-excel
  * 从 Excel 文件导入活动
  */

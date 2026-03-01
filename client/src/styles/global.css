@@ -92,6 +92,11 @@ body {
   font-size: 14px;
 }
 
+.arco-table .arco-table-td,
+.arco-table .arco-table-th .arco-table-th-item {
+  padding: 6px 6px !important;
+}
+
 .arco-table-th {
   background-color: var(--color-fill-1);
   font-weight: 600;
