@@ -18,7 +18,7 @@ export function useColumnPrefs({ columnDefs, defaultVisible, defaultOrder }: Use
       const res = await authApi.getPreferences();
       const prefs = res.data as Record<string, unknown>;
       if (prefs?.activityColumns) {
-        const saved = prefs.activityColumns as { visible?: string[]; order?: string[] };
+        const saved = prefs.activityColumns as { visible?: string[]; order?: string[]; widths?: Record<string, number> };
         const validKeys = new Set(columnDefs.map((d) => d.key));
         const nonRemovableKeys = columnDefs.filter((d) => !d.removable).map((d) => d.key);
 
@@ -42,7 +42,19 @@ export function useColumnPrefs({ columnDefs, defaultVisible, defaultOrder }: Use
           if (isNew && !visible.includes(key)) visible.push(key);
         }
 
-        setColumnPrefs({ visible, order });
+        // Load widths, filtering to valid keys only
+        let widths: Record<string, number> | undefined;
+        if (saved.widths && typeof saved.widths === 'object') {
+          const filtered: Record<string, number> = {};
+          for (const [k, v] of Object.entries(saved.widths)) {
+            if (validKeys.has(k) && typeof v === 'number' && v >= 40) {
+              filtered[k] = v;
+            }
+          }
+          if (Object.keys(filtered).length > 0) widths = filtered;
+        }
+
+        setColumnPrefs({ visible, order, widths });
       }
     } catch {
       // Silently use default config on failure
@@ -58,5 +70,26 @@ export function useColumnPrefs({ columnDefs, defaultVisible, defaultOrder }: Use
     }
   }, []);
 
-  return { columnPrefs, loadColumnPrefs, saveColumnPrefs, defaultPrefs };
+  /** Update widths locally without persisting (for real-time drag feedback) */
+  const updateWidthsLocal = useCallback((widths: Record<string, number>) => {
+    setColumnPrefs((prev) => ({ ...prev, widths }));
+  }, []);
+
+  /** Persist widths to backend */
+  const persistWidths = useCallback(async (widths: Record<string, number>) => {
+    try {
+      // Read current prefs state via a callback to get fresh value
+      const currentPrefs = await new Promise<ColumnPrefs>((resolve) => {
+        setColumnPrefs((prev) => {
+          resolve(prev);
+          return prev;
+        });
+      });
+      await authApi.updatePreferences({ activityColumns: { ...currentPrefs, widths } });
+    } catch {
+      // Silent fail for width persistence
+    }
+  }, []);
+
+  return { columnPrefs, loadColumnPrefs, saveColumnPrefs, defaultPrefs, updateWidthsLocal, persistWidths };
 }

@@ -11,6 +11,7 @@ export interface ColumnDef {
 export interface ColumnPrefs {
   visible: string[];
   order: string[];
+  widths?: Record<string, number>;
 }
 
 interface ColumnSettingsProps {

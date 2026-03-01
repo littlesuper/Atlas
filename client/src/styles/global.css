@@ -355,6 +355,34 @@ body {
   background: rgba(79, 124, 255, 0.3);
 }
 
+/* ============ 列宽拖拽调整 ============ */
+.column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.column-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 25%;
+  right: 2px;
+  width: 2px;
+  height: 50%;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.column-resize-handle:hover::after,
+.column-resize-handle:active::after {
+  background: rgb(var(--primary-6));
+}
+
 /* ============ 表格行拖拽排序（飞书风格） ============ */
 
 /* 拖拽手柄 */

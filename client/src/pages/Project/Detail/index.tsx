@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -56,7 +56,9 @@ import { useProjectData } from '../../../hooks/useProjectData';
 import { useColumnPrefs } from '../../../hooks/useColumnPrefs';
 import { useInlineEdit } from '../../../hooks/useInlineEdit';
 import { useDragReorder } from '../../../hooks/useDragReorder';
-import { useActivityColumns, PHASE_COLOR } from '../../../hooks/useActivityColumns';
+import { useActivityColumns, COLUMN_WIDTH_MAP, PHASE_COLOR } from '../../../hooks/useActivityColumns';
+import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
+import ResizableHeaderCell from '../../../components/ResizableHeaderCell';
 
 // 活动列配置定义
 const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
@@ -115,7 +117,7 @@ const ProjectDetail: React.FC = () => {
     loadProject, loadActivities, loadUsers, loadCriticalPath, loadSnapshotData,
   } = useProjectData({ projectId: id, snapshotId });
 
-  const { columnPrefs, loadColumnPrefs, saveColumnPrefs, defaultPrefs } = useColumnPrefs({
+  const { columnPrefs, loadColumnPrefs, saveColumnPrefs, defaultPrefs, updateWidthsLocal, persistWidths } = useColumnPrefs({
     columnDefs: ACTIVITY_COLUMN_DEFS,
     defaultVisible: DEFAULT_COLUMN_VISIBLE,
     defaultOrder: DEFAULT_COLUMN_ORDER,
@@ -550,6 +552,28 @@ const ProjectDetail: React.FC = () => {
     });
   }, [selectedIds, activities, pushUndo, activityToCreatePayload, loadActivities, loadProject]);
 
+  // Column widths: merge defaults with user preferences
+  const columnWidths = useMemo(() => ({
+    ...COLUMN_WIDTH_MAP,
+    ...(columnPrefs.widths || {}),
+  }), [columnPrefs.widths]);
+
+  // Debounced width persistence
+  const { debouncedFn: debouncedPersistWidths } = useDebouncedCallback(
+    ((...args: unknown[]) => { persistWidths(args[0] as Record<string, number>); }) as (...args: unknown[]) => unknown,
+    500,
+  );
+
+  // Column resize handler
+  const handleColumnResize = useCallback((key: string, width: number) => {
+    const newWidths = { ...columnPrefs.widths, [key]: Math.round(width) };
+    updateWidthsLocal(newWidths);
+    debouncedPersistWidths(newWidths);
+  }, [columnPrefs.widths, updateWidthsLocal, debouncedPersistWidths]);
+
+  // Fixed column keys that should not be resizable
+  const fixedColumnKeys = useMemo(() => new Set<string>(), []);
+
   // Activity columns hook
   const {
     activityColumns, scrollX, activitySeqMap,
@@ -562,6 +586,7 @@ const ProjectDetail: React.FC = () => {
     handleMouseDown, loadActivities,
     columnPrefsVisible: columnPrefs.visible,
     columnPrefsOrder: columnPrefs.order,
+    columnWidths,
     selectedIds, setSelectedIds,
   });
 
@@ -951,6 +976,15 @@ const ProjectDetail: React.FC = () => {
                   pagination={false}
                   scroll={{ x: scrollX, y: 'calc(100vh - 280px)' }}
                   components={{
+                    header: {
+                      th: (props: React.HTMLAttributes<HTMLTableCellElement>) => (
+                        <ResizableHeaderCell
+                          {...props}
+                          onResize={handleColumnResize}
+                          fixedKeys={fixedColumnKeys}
+                        />
+                      ),
+                    },
                     body: {
                       row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number;[key: string]: unknown }) => {
                         const isSource = dragFromRef.current === index;

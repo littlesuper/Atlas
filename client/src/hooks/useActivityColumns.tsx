@@ -115,6 +115,7 @@ interface UseActivityColumnsOptions {
   // column prefs
   columnPrefsVisible: string[];
   columnPrefsOrder: string[];
+  columnWidths: Record<string, number>;
   // selection
   selectedIds: Set<string>;
   setSelectedIds: (ids: Set<string>) => void;
@@ -146,7 +147,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     startInlineEdit, showUndoMessage, commitInlineEdit, commitSelectEdit,
     handleOpenDrawer, handleDeleteActivity, handleInsertActivity, handleMouseDown,
     loadActivities,
-    columnPrefsVisible, columnPrefsOrder,
+    columnPrefsVisible, columnPrefsOrder, columnWidths,
     selectedIds, setSelectedIds,
   } = opts;
 
@@ -280,17 +281,19 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
   }, [activities, activitySeqMap]);
 
   // 表格列配置
-  const columnMap = useMemo<Record<string, { title: string; width?: number; dataIndex?: string; fixed?: 'right'; render?: (...args: any[]) => React.ReactNode }>>(() => ({
+  const columnMap = useMemo<Record<string, { title: string; width?: number; dataIndex?: string; fixed?: 'right'; onHeaderCell?: () => Record<string, unknown>; render?: (...args: any[]) => React.ReactNode }>>(() => ({
     id: {
       title: 'ID',
-      width: 60,
+      width: columnWidths.id,
+      onHeaderCell: () => ({ 'data-column-key': 'id' }),
       render: (_: unknown, record: Activity) => (
         <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
       ),
     },
     predecessor: {
       title: '前置',
-      width: 100,
+      width: columnWidths.predecessor,
+      onHeaderCell: () => ({ 'data-column-key': 'predecessor' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'predecessor') {
           return (
@@ -321,7 +324,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     phase: {
       title: '阶段',
-      width: 80,
+      width: columnWidths.phase,
+      onHeaderCell: () => ({ 'data-column-key': 'phase' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'phase') {
           return (
@@ -352,8 +356,9 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     name: {
       title: '活动名称',
-      width: 200,
+      width: columnWidths.name,
       dataIndex: 'name',
+      onHeaderCell: () => ({ 'data-column-key': 'name' }),
       render: (name: string, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
           return (
@@ -382,7 +387,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     type: {
       title: '类型',
-      width: 80,
+      width: columnWidths.type,
+      onHeaderCell: () => ({ 'data-column-key': 'type' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'type') {
           return (
@@ -413,7 +419,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     status: {
       title: '状态',
-      width: 100,
+      width: columnWidths.status,
+      onHeaderCell: () => ({ 'data-column-key': 'status' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'status') {
           return (
@@ -444,7 +451,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     assignee: {
       title: '负责人',
-      width: 120,
+      width: columnWidths.assignee,
+      onHeaderCell: () => ({ 'data-column-key': 'assignee' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeIds') {
           return (
@@ -487,7 +495,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     planDuration: {
       title: '计划工期',
-      width: 80,
+      width: columnWidths.planDuration,
+      onHeaderCell: () => ({ 'data-column-key': 'planDuration' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planDuration') {
           return (
@@ -520,7 +529,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     planStartDate: {
       title: '计划开始',
-      width: 140,
+      width: columnWidths.planStartDate,
+      onHeaderCell: () => ({ 'data-column-key': 'planStartDate' }),
       render: (_: unknown, record: Activity) => {
         const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planStartDate') {
@@ -569,7 +579,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     planEndDate: {
       title: '计划结束',
-      width: 140,
+      width: columnWidths.planEndDate,
+      onHeaderCell: () => ({ 'data-column-key': 'planEndDate' }),
       render: (_: unknown, record: Activity) => {
         const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
         const isOverdue = record.planEndDate && record.status !== 'COMPLETED' && dayjs(record.planEndDate).isBefore(dayjs(), 'day');
@@ -619,7 +630,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     actualStartDate: {
       title: '实际开始',
-      width: 140,
+      width: columnWidths.actualStartDate,
+      onHeaderCell: () => ({ 'data-column-key': 'actualStartDate' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'actualStartDate') {
           return (
@@ -665,7 +677,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     actualEndDate: {
       title: '实际结束',
-      width: 140,
+      width: columnWidths.actualEndDate,
+      onHeaderCell: () => ({ 'data-column-key': 'actualEndDate' }),
       render: (_: unknown, record: Activity) => {
         const isOverdue = record.planEndDate && record.endDate && dayjs(record.endDate).isAfter(dayjs(record.planEndDate), 'day');
         if (inlineEditing?.id === record.id && inlineEditing.field === 'actualEndDate') {
@@ -711,7 +724,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
     actualDuration: {
       title: '实际工期',
-      width: 80,
+      width: columnWidths.actualDuration,
+      onHeaderCell: () => ({ 'data-column-key': 'actualDuration' }),
       render: (_: unknown, record: Activity) => {
         const days = record.startDate && record.endDate ? calcWorkdays(dayjs(record.startDate), dayjs(record.endDate)) : record.duration;
         return (
@@ -724,7 +738,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     notes: {
       title: '备注',
       dataIndex: 'notes',
-      width: 300,
+      width: columnWidths.notes,
+      onHeaderCell: () => ({ 'data-column-key': 'notes' }),
       render: (notes: string | null, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
           return (
@@ -760,7 +775,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
   }), [
     inlineEditing, inlineValue, users, project, activities, activitySeqMap,
-    canManage, criticalActivityIds,
+    canManage, criticalActivityIds, columnWidths,
     getSeq, getPredecessorSeq, getPredecessorTooltip, commitPredecessorEdit, commitPlanDurationEdit,
     startInlineEdit, setInlineEditing, setInlineValue, commitInlineEdit, commitSelectEdit,
     showUndoMessage, loadActivities,
@@ -866,9 +881,9 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     const visibleSet = new Set(columnPrefsVisible);
     const dynamicWidth = columnPrefsOrder
       .filter((key) => visibleSet.has(key))
-      .reduce((sum, key) => sum + (COLUMN_WIDTH_MAP[key] || 100), 0);
+      .reduce((sum, key) => sum + (columnWidths[key] || COLUMN_WIDTH_MAP[key] || 100), 0);
     return dynamicWidth + 36 + 50 + 100;
-  }, [columnPrefsVisible, columnPrefsOrder]);
+  }, [columnPrefsVisible, columnPrefsOrder, columnWidths]);
 
   return {
     activityColumns,
