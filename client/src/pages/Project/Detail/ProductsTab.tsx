@@ -10,9 +10,10 @@ import {
 interface ProductsTabProps {
   projectId: string;
   isArchived?: boolean;
+  snapshotData?: any[] | null;
 }
 
-const ProductsTab: React.FC<ProductsTabProps> = ({ projectId }) => {
+const ProductsTab: React.FC<ProductsTabProps> = ({ projectId, snapshotData }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -29,8 +30,12 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ projectId }) => {
   };
 
   useEffect(() => {
-    loadProducts();
-  }, [projectId]);
+    if (snapshotData) {
+      setProducts(snapshotData as Product[]);
+    } else {
+      loadProducts();
+    }
+  }, [projectId, snapshotData]);
 
   const columns = [
     {

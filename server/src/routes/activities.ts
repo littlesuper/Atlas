@@ -441,101 +441,6 @@ router.post(
   }
 );
 
-/**
- * POST /api/activities/project/:projectId/archives
- * 创建归档快照
- */
-router.post('/project/:projectId/archives', authenticate, requirePermission('activity', 'create'), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const projectId = req.params.projectId as string;
-
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) { res.status(404).json({ error: '项目不存在' }); return; }
-    if (!canManageProject(req, project.managerId, projectId)) {
-      res.status(403).json({ error: '无权操作' }); return;
-    }
-
-    const activities = await prisma.activity.findMany({
-      where: { projectId },
-      orderBy: { sortOrder: 'asc' },
-      include: {
-        assignees: { select: { id: true, realName: true, username: true } },
-      },
-    });
-
-    const { label } = req.body || {};
-
-    const archive = await prisma.activityArchive.create({
-      data: { projectId, label: label || null, snapshot: activities as any },
-    });
-
-    res.status(201).json({ id: archive.id, label: archive.label, createdAt: archive.createdAt, count: activities.length });
-  } catch (error) {
-    console.error('创建归档错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
-
-/**
- * GET /api/activities/project/:projectId/archives
- * 获取项目归档列表（不含 snapshot）
- */
-router.get('/project/:projectId/archives', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const projectId = req.params.projectId as string;
-
-    const archives = await prisma.activityArchive.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, label: true, createdAt: true, snapshot: true },
-    });
-
-    const result = archives.map(a => ({
-      id: a.id,
-      label: a.label,
-      createdAt: a.createdAt,
-      count: Array.isArray(a.snapshot) ? (a.snapshot as any[]).length : 0,
-    }));
-
-    res.json(result);
-  } catch (error) {
-    console.error('获取归档列表错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
-
-/**
- * GET /api/activities/archives/:id
- * 获取归档详情（含 snapshot）
- */
-router.get('/archives/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const archiveId = req.params.id as string;
-    const archive = await prisma.activityArchive.findUnique({ where: { id: archiveId } });
-    if (!archive) { res.status(404).json({ error: '归档不存在' }); return; }
-    res.json(archive);
-  } catch (error) {
-    console.error('获取归档详情错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
-
-/**
- * DELETE /api/activities/archives/:id
- * 删除归档
- */
-router.delete('/archives/:id', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const archiveId = req.params.id as string;
-    const archive = await prisma.activityArchive.findUnique({ where: { id: archiveId } });
-    if (!archive) { res.status(404).json({ error: '归档不存在' }); return; }
-    await prisma.activityArchive.delete({ where: { id: archiveId } });
-    res.json({ success: true });
-  } catch (error) {
-    console.error('删除归档错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
 
 /**
  * PUT /api/activities/batch-update
@@ -903,78 +808,6 @@ router.put('/project/:projectId/reorder', authenticate, requirePermission('activ
     res.json({ success: true });
   } catch (error) {
     console.error('批量排序错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
-  }
-});
-
-/**
- * POST /api/activities/archives/compare
- * 对比两个归档（或归档 vs 当前活动）
- */
-router.post('/archives/compare', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { archiveId1, archiveId2, projectId } = req.body;
-    if (!archiveId1 || !projectId) {
-      res.status(400).json({ error: '参数不完整' }); return;
-    }
-
-    // 获取归档1
-    const archive1 = await prisma.activityArchive.findUnique({ where: { id: archiveId1 } });
-    if (!archive1) { res.status(404).json({ error: '归档1不存在' }); return; }
-    const snap1 = Array.isArray(archive1.snapshot) ? archive1.snapshot as any[] : [];
-
-    // 获取归档2或当前活动
-    let snap2: any[];
-    if (archiveId2 === 'current') {
-      const currentActivities = await prisma.activity.findMany({
-        where: { projectId },
-        orderBy: { sortOrder: 'asc' },
-        include: { assignees: { select: { id: true, realName: true } } },
-      });
-      snap2 = currentActivities;
-    } else {
-      const archive2 = await prisma.activityArchive.findUnique({ where: { id: archiveId2 } });
-      if (!archive2) { res.status(404).json({ error: '归档2不存在' }); return; }
-      snap2 = Array.isArray(archive2.snapshot) ? archive2.snapshot as any[] : [];
-    }
-
-    // 按活动名称匹配计算差异
-    const map1 = new Map(snap1.map((a: any) => [a.name, a]));
-    const map2 = new Map(snap2.map((a: any) => [a.name, a]));
-
-    const diffs: any[] = [];
-
-    // 检查 snap2 中的活动
-    for (const [name, a2] of map2) {
-      const a1 = map1.get(name);
-      if (!a1) {
-        diffs.push({ name, type: 'added', current: a2 });
-      } else {
-        // 比较关键字段
-        const changes: string[] = [];
-        if (a1.status !== a2.status) changes.push('status');
-        if (a1.phase !== a2.phase) changes.push('phase');
-        if (JSON.stringify(a1.planStartDate) !== JSON.stringify(a2.planStartDate)) changes.push('planStartDate');
-        if (JSON.stringify(a1.planEndDate) !== JSON.stringify(a2.planEndDate)) changes.push('planEndDate');
-        if (a1.planDuration !== a2.planDuration) changes.push('planDuration');
-        if (changes.length > 0) {
-          diffs.push({ name, type: 'changed', changes, before: a1, current: a2 });
-        } else {
-          diffs.push({ name, type: 'unchanged' });
-        }
-      }
-    }
-
-    // 检查 snap1 中已删除的活动
-    for (const [name, a1] of map1) {
-      if (!map2.has(name)) {
-        diffs.push({ name, type: 'deleted', before: a1 });
-      }
-    }
-
-    res.json({ diffs });
-  } catch (error) {
-    console.error('对比归档错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1603,22 +1436,7 @@ router.post('/project/:projectId/what-if/apply', authenticate, requirePermission
       res.status(403).json({ error: '无权操作' }); return;
     }
 
-    // Step 1: 创建归档快照
-    const allActivities = await prisma.activity.findMany({
-      where: { projectId },
-      orderBy: { sortOrder: 'asc' },
-      include: { assignees: { select: { id: true, realName: true, username: true } } },
-    });
-
-    await prisma.activityArchive.create({
-      data: {
-        projectId,
-        label: archiveLabel || 'What-If 模拟应用前快照',
-        snapshot: allActivities as any,
-      },
-    });
-
-    // Step 2: 批量更新受影响活动的计划日期
+    // 批量更新受影响活动的计划日期
     const { calculateWorkdays: calcWd } = await import('../utils/workday');
     let updatedCount = 0;
     for (const item of affected) {

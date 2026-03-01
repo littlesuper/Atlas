@@ -38,7 +38,7 @@ e2e/
     │   ├── activity-dependencies.spec.ts   # 活动依赖关系 ★NEW
     │   ├── activity-export.spec.ts         # 导入导出功能 ★NEW
     │   ├── column-settings.spec.ts         # 列设置/可见性切换 ★NEW
-    │   ├── archives.spec.ts                # 归档管理
+    │   ├── snapshots.spec.ts               # 项目快照管理
     │   └── comments.spec.ts                # 活动评论
     │
     ├── ── 全站 UI 质量 ──
@@ -131,7 +131,7 @@ e2e/
 | 3.19 | 切换回活动 Tab 保持数据 | 行数不变 |
 | 3.20 | 快速切换 Tab 不崩溃 | 页面保持稳定 |
 
-### 4. 活动管理 (activities.spec.ts + activity-filters.spec.ts + activity-inline-edit.spec.ts + activity-dependencies.spec.ts + activity-export.spec.ts + column-settings.spec.ts + archives.spec.ts + comments.spec.ts)
+### 4. 活动管理 (activities.spec.ts + activity-filters.spec.ts + activity-inline-edit.spec.ts + activity-dependencies.spec.ts + activity-export.spec.ts + column-settings.spec.ts + snapshots.spec.ts + comments.spec.ts)
 
 | # | 用例 | 预期结果 |
 |---|------|----------|
@@ -156,14 +156,14 @@ e2e/
 | 4.19 | 列设置弹窗打开 | 设置内容可见 |
 | 4.20 | 切换列可见性 | 表头列数变化 |
 | 4.21 | 列设置 Tab 切换后保持 | 列数不变 |
-| 4.22 | 归档抽屉打开 | 归档管理可见 |
-| 4.23 | 创建归档快照 | 归档数 +1 |
-| 4.24 | 查看归档详情 | 表格显示活动 |
-| 4.25 | 归档抽屉布局正确 | 高度和宽度合理 |
-| 4.26 | 创建多个归档 | 归档数正确 |
-| 4.27 | 切换归档 | 表格正常加载 |
-| 4.28 | 删除归档 | 归档数 -1 |
-| 4.29 | 删除所有归档空状态 | 显示空状态 |
+| 4.22 | 项目快照 Tab 打开 | 快照列表可见 |
+| 4.23 | 创建项目快照 | 快照数 +1 |
+| 4.24 | 创建带备注的快照 | 备注 Tag 显示 |
+| 4.25 | 查看快照（路由导航） | 跳转到快照只读页面 |
+| 4.26 | 快照横幅显示 | 蓝色横幅含时间和返回按钮 |
+| 4.27 | 快照只读模式 | 新建/编辑/删除按钮不可见 |
+| 4.28 | 快照活动列表显示 | 活动数据正确展示 |
+| 4.29 | 快照返回导航 | 返回项目快照 Tab |
 | 4.30 | 添加活动评论 | 评论发送成功 |
 | 4.31 | 查看变更历史 | 历史 Tab 切换 |
 

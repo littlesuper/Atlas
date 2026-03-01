@@ -32,6 +32,7 @@ interface Props {
   managerId?: string;
   collaboratingProjectIds?: string[];
   isArchived?: boolean;
+  snapshotData?: any[] | null;
 }
 
 const PROGRESS_ICON: Record<string, string> = {
@@ -46,7 +47,7 @@ const PROGRESS_COLOR: Record<string, string> = {
   MAJOR_ISSUE: 'var(--status-danger)',
 };
 
-const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived }) => {
+const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived, snapshotData }) => {
   const navigate = useNavigate();
   const { hasPermission, isProjectManager } = useAuthStore();
   const { canEdit: canEditReport, canDelete } = useReportPermission();
@@ -66,8 +67,12 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived })
   };
 
   useEffect(() => {
-    load();
-  }, [projectId]);
+    if (snapshotData) {
+      setReports(snapshotData as WeeklyReport[]);
+    } else {
+      load();
+    }
+  }, [projectId, snapshotData]);
 
   const handleCreate = () => {
     navigate(`/weekly-reports/new?projectId=${projectId}`);

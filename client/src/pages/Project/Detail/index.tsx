@@ -30,7 +30,6 @@ import {
   IconEdit,
   IconDelete,
   IconDragDotVertical,
-  IconStorage,
   IconUndo,
   IconUpload,
   IconDownload,
@@ -47,7 +46,8 @@ import RiskAssessmentTab from './RiskAssessmentTab';
 import ProductsTab from './ProductsTab';
 import ActivityComments from './ActivityComments';
 import SchedulingTools from './SchedulingTools';
-import { Project, Activity, ActivityArchive, User } from '../../../types';
+import SnapshotsTab from './SnapshotsTab';
+import { Project, Activity, User } from '../../../types';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
@@ -125,7 +125,7 @@ const COLUMN_WIDTH_MAP: Record<string, number> = {
   actualStartDate: 140,
   actualEndDate: 140,
   actualDuration: 80,
-  notes: 240,
+  notes: 300,
 };
 
 // 格式化3位序号
@@ -192,9 +192,15 @@ const AutoOpenDatePicker: React.FC<React.ComponentProps<typeof DatePicker> & { o
 };
 
 const ProjectDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, snapshotId } = useParams<{ id: string; snapshotId?: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isSnapshot = !!snapshotId;
+  const [snapshotMeta, setSnapshotMeta] = useState<{ archivedAt: string; remark?: string } | null>(null);
+  // 快照模式下子 tab 的数据
+  const [snapshotWeeklyReports, setSnapshotWeeklyReports] = useState<any[] | null>(null);
+  const [snapshotProducts, setSnapshotProducts] = useState<any[] | null>(null);
+  const [snapshotRiskAssessments, setSnapshotRiskAssessments] = useState<any[] | null>(null);
   const { hasPermission, isProjectManager } = useAuthStore();
   const [form] = Form.useForm();
 
@@ -236,12 +242,6 @@ const ProjectDetail: React.FC = () => {
   const [inlineEditing, setInlineEditing] = useState<{ id: string; field: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [phaseFilter, setPhaseFilter] = useState<string | null>(null);
-  const [archiveDrawerVisible, setArchiveDrawerVisible] = useState(false);
-  const [archiveList, setArchiveList] = useState<Array<{ id: string; createdAt: string; count: number; label?: string }>>([]);
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [expandedArchiveId, setExpandedArchiveId] = useState<string | null>(null);
-  const [archiveDetail, setArchiveDetail] = useState<ActivityArchive | null>(null);
-  const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
   const [inlineValue, setInlineValue] = useState<string>('');
 
   // 列偏好设置
@@ -252,14 +252,8 @@ const ProjectDetail: React.FC = () => {
   // 关键路径
   const [criticalActivityIds, setCriticalActivityIds] = useState<string[]>([]);
   // 归档标签 & 对比
-  const [archiveLabelInput, setArchiveLabelInput] = useState('');
-  const [archiveLabelModalVisible, setArchiveLabelModalVisible] = useState(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importUploading, setImportUploading] = useState(false);
-  const [compareMode, setCompareMode] = useState(false);
-  const [compareSelections, setCompareSelections] = useState<[string | null, string | null]>([null, null]);
-  const [compareDiffs, setCompareDiffs] = useState<any[] | null>(null);
-  const [compareLoading, setCompareLoading] = useState(false);
 
   // 表单中计划/实际工期
   const [planDuration, setPlanDuration] = useState<number | null>(null);
@@ -279,7 +273,7 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  const isArchived = project?.status === 'ARCHIVED';
+  const isArchived = project?.status === 'ARCHIVED' || isSnapshot;
 
   const handleArchiveProject = async () => {
     if (!id) return;
@@ -430,13 +424,57 @@ const ProjectDetail: React.FC = () => {
     } catch { /* ignore */ }
   };
 
+  // 快照模式：从快照 API 加载全量数据
+  const loadSnapshotData = async () => {
+    if (!snapshotId) return;
+    setLoading(true);
+    try {
+      const res = await projectsApi.getProjectArchive(snapshotId);
+      const data = res.data;
+      setSnapshotMeta({ archivedAt: data.archivedAt, remark: data.remark });
+      const snap = data.snapshot;
+      // 填充项目信息（映射为 Project 类型的关键字段）
+      if (snap.project) {
+        setProject({
+          ...snap.project,
+          id: id || '',
+          members: snap.project.members?.map((m: any) => ({ user: { id: m.userId, realName: m.realName, username: '' } })) || [],
+          manager: { id: snap.project.managerId, realName: snap.project.managerName || '', username: '' },
+        } as any);
+      }
+      // 填充活动列表
+      if (snap.activities) {
+        const flat = [...snap.activities].sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+        setActivities(flat);
+      }
+      // 存储子 tab 快照数据
+      setSnapshotProducts(snap.products || []);
+      setSnapshotWeeklyReports(snap.weeklyReports || []);
+      setSnapshotRiskAssessments(snap.riskAssessments || []);
+    } catch {
+      Message.error('加载快照数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    loadProject();
-    loadActivities();
-    loadUsers();
-    loadColumnPrefs();
-    loadCriticalPath();
-  }, [id]);
+    if (isSnapshot) {
+      // 快照模式下强制切到活动列表（排期工具/项目快照 tab 在快照模式下隐藏）
+      setActiveTab('activities');
+      loadSnapshotData();
+      loadColumnPrefs();
+    } else {
+      // 从快照返回时，根据 URL 参数恢复 tab（React 组件复用时 useState 初始值不重新执行）
+      const tabFromUrl = searchParams.get('tab');
+      if (tabFromUrl) setActiveTab(tabFromUrl);
+      loadProject();
+      loadActivities();
+      loadUsers();
+      loadColumnPrefs();
+      loadCriticalPath();
+    }
+  }, [id, snapshotId]);
 
   // ===== 活动列表表头吸顶：滚动检测 =====
   useEffect(() => {
@@ -872,58 +910,6 @@ const ProjectDetail: React.FC = () => {
   };
 
   // ========== 归档快照操作 ==========
-  const loadArchives = async () => {
-    if (!id) return;
-    setArchiveLoading(true);
-    try {
-      const res = await activitiesApi.listArchives(id);
-      setArchiveList(res.data);
-    } catch { /* ignore */ }
-    setArchiveLoading(false);
-  };
-
-  const handleCreateArchive = async (label?: string) => {
-    if (!id) return;
-    try {
-      await activitiesApi.createArchive(id, label || undefined);
-      Message.success('归档创建成功');
-      loadArchives();
-    } catch {
-      Message.error('创建归档失败');
-    }
-  };
-
-  const handleDeleteArchive = async (archiveId: string) => {
-    try {
-      await activitiesApi.deleteArchive(archiveId);
-      Message.success('已删除归档');
-      if (expandedArchiveId === archiveId) {
-        setExpandedArchiveId(null);
-        setArchiveDetail(null);
-      }
-      loadArchives();
-    } catch {
-      Message.error('删除归档失败');
-    }
-  };
-
-  const handleExpandArchive = async (archiveId: string) => {
-    if (expandedArchiveId === archiveId) {
-      setExpandedArchiveId(null);
-      setArchiveDetail(null);
-      return;
-    }
-    setExpandedArchiveId(archiveId);
-    setArchiveDetailLoading(true);
-    try {
-      const res = await activitiesApi.getArchive(archiveId);
-      setArchiveDetail(res.data);
-    } catch {
-      Message.error('获取归档详情失败');
-    }
-    setArchiveDetailLoading(false);
-  };
-
   // ========== 拖拽排序 ==========
   // 自定义拖拽（用 mouse 事件实现，以便控制光标为 grabbing）
   const isDraggingRef = useRef(false);
@@ -1199,16 +1185,6 @@ const ProjectDetail: React.FC = () => {
   };
 
   // 归档对比
-  const handleCompare = async () => {
-    if (!id || !compareSelections[0] || !compareSelections[1]) return;
-    setCompareLoading(true);
-    try {
-      const res = await activitiesApi.compareArchives(compareSelections[0], compareSelections[1], id);
-      setCompareDiffs(res.data.diffs || []);
-    } catch { Message.error('对比失败'); }
-    setCompareLoading(false);
-  };
-
   // 活动 ID → 序号映射（O(1) 查找替代 O(n) findIndex）
   const activitySeqMap = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -1745,7 +1721,7 @@ const ProjectDetail: React.FC = () => {
     notes: {
       title: '备注',
       dataIndex: 'notes',
-      width: 160,
+      width: 300,
       render: (notes: string | null, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
           return (
@@ -1914,24 +1890,41 @@ const ProjectDetail: React.FC = () => {
         document.body,
       )}
       <div>
+        {/* 快照模式横幅 */}
+        {isSnapshot && snapshotMeta && (
+          <Alert
+            type="info"
+            banner
+            closable={false}
+            showIcon={false}
+            style={{ marginBottom: 16 }}
+            content={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Button type="text" icon={<IconLeft />} size="small" onClick={() => navigate(`/projects/${id}?tab=snapshots`)}>
+                  返回项目
+                </Button>
+                <span>
+                  您正在查看 <b>{dayjs(snapshotMeta.archivedAt).format('YYYY-MM-DD HH:mm')}</b> 的项目快照
+                  {snapshotMeta.remark && <span>（{snapshotMeta.remark}）</span>}
+                  ，所有内容为只读。
+                </span>
+              </div>
+            }
+          />
+        )}
         {/* 顶部卡片 */}
         <Card style={{ marginBottom: 16 }}>
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             {/* 第一行：返回 + 项目名称 + 状态 + 产品线 + 优先级 + 归档按钮 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Button icon={<IconLeft />} onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/projects')}>返回</Button>
+              {!isSnapshot && (
+                <Button icon={<IconLeft />} onClick={() => navigate('/projects')}>返回</Button>
+              )}
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{project.name}</h2>
               <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
               <Tag color={productLineConfig.color}>{productLineConfig.label}</Tag>
               <Tag color={priorityConfig.color}>{priorityConfig.label}</Tag>
               <div style={{ flex: 1 }} />
-              {hasPermission('project', 'update') && isProjectManager(project.managerId, project.id) && (
-                isArchived ? (
-                  <Button icon={<IconUndo />} onClick={handleUnarchiveProject}>取消归档</Button>
-                ) : (
-                  <Button icon={<IconSafe />} onClick={handleArchiveProject}>归档</Button>
-                )
-              )}
             </div>
 
             {/* 第二行：项目描述 */}
@@ -1982,8 +1975,8 @@ const ProjectDetail: React.FC = () => {
           </Space>
         </Card>
 
-        {/* 归档只读提示 */}
-        {isArchived && (
+        {/* 归档只读提示（快照模式有自己的横幅，不显示此条） */}
+        {isArchived && !isSnapshot && (
           <Alert
             type="warning"
             content={
@@ -2079,16 +2072,16 @@ const ProjectDetail: React.FC = () => {
                     onChange={saveColumnPrefs}
                     defaultPrefs={DEFAULT_COLUMN_PREFS}
                     extraActions={
-                      hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
-                        <Button
-                          size="small"
-                          type="text"
-                          icon={<IconStorage />}
-                          onClick={() => { setArchiveDrawerVisible(true); loadArchives(); }}
-                          style={{ width: '100%' }}
-                        >
-                          归档管理
-                        </Button>
+                      !isSnapshot && hasPermission('project', 'update') && isProjectManager(project?.managerId ?? '', project?.id) ? (
+                        isArchived ? (
+                          <Button size="small" type="text" icon={<IconUndo />} onClick={handleUnarchiveProject} style={{ width: '100%' }}>
+                            取消归档
+                          </Button>
+                        ) : (
+                          <Button size="small" type="text" icon={<IconSafe />} onClick={handleArchiveProject} style={{ width: '100%' }}>
+                            项目归档
+                          </Button>
+                        )
                       ) : undefined
                     }
                   />
@@ -2422,30 +2415,39 @@ const ProjectDetail: React.FC = () => {
 
             {/* AI 风险评估 */}
             <Tabs.TabPane key="risk" title="AI风险评估">
-              {id && <RiskAssessmentTab projectId={id} isArchived={isArchived} />}
+              {id && <RiskAssessmentTab projectId={id} isArchived={isArchived} snapshotData={snapshotRiskAssessments} />}
             </Tabs.TabPane>
 
             {/* 产品列表 */}
             <Tabs.TabPane key="products" title="产品列表">
-              {id && <ProductsTab projectId={id} isArchived={isArchived} />}
+              {id && <ProductsTab projectId={id} isArchived={isArchived} snapshotData={snapshotProducts} />}
             </Tabs.TabPane>
 
             {/* 项目周报 */}
             <Tabs.TabPane key="weekly" title="项目周报">
-              {id && <ProjectWeeklyTab projectId={id} managerId={project?.managerId} isArchived={isArchived} />}
+              {id && <ProjectWeeklyTab projectId={id} managerId={project?.managerId} isArchived={isArchived} snapshotData={snapshotWeeklyReports} />}
             </Tabs.TabPane>
 
-            {/* 排期工具 */}
-            <Tabs.TabPane key="scheduling" title="排期工具">
-              {id && (
-                <SchedulingTools
-                  projectId={id}
-                  activities={activities}
-                  onRefresh={loadActivities}
-                  isArchived={isArchived}
-                />
-              )}
-            </Tabs.TabPane>
+            {/* 排期工具（快照模式隐藏） */}
+            {!isSnapshot && (
+              <Tabs.TabPane key="scheduling" title="排期工具">
+                {id && (
+                  <SchedulingTools
+                    projectId={id}
+                    activities={activities}
+                    onRefresh={loadActivities}
+                    isArchived={isArchived}
+                  />
+                )}
+              </Tabs.TabPane>
+            )}
+
+            {/* 项目快照（快照模式隐藏） */}
+            {!isSnapshot && (
+              <Tabs.TabPane key="snapshots" title="项目快照">
+                {id && <SnapshotsTab projectId={id} managerId={project?.managerId} isArchived={isArchived} />}
+              </Tabs.TabPane>
+            )}
           </Tabs>
         </Card>
 
@@ -2791,29 +2793,6 @@ const ProjectDetail: React.FC = () => {
           </div>
         </Modal>
 
-        {/* 归档标签输入 Modal */}
-        <Modal
-          title="创建归档"
-          visible={archiveLabelModalVisible}
-          onCancel={() => setArchiveLabelModalVisible(false)}
-          onOk={() => {
-            setArchiveLabelModalVisible(false);
-            handleCreateArchive(archiveLabelInput || undefined);
-          }}
-          okText="创建"
-          style={{ maxWidth: 420 }}
-        >
-          <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--color-text-3)' }}>
-            为归档添加一个可选标签，方便后续识别
-          </div>
-          <Input
-            placeholder="归档标签（可选）"
-            value={archiveLabelInput}
-            onChange={setArchiveLabelInput}
-            maxLength={50}
-          />
-        </Modal>
-
         {/* 批量导入 Modal */}
         <Modal
           title="批量导入活动"
@@ -2874,261 +2853,6 @@ const ProjectDetail: React.FC = () => {
           </div>
         </Modal>
 
-        {/* 归档管理抽屉 */}
-        <Drawer
-          width="85vw"
-          title="归档管理"
-          visible={archiveDrawerVisible}
-          onCancel={() => { setArchiveDrawerVisible(false); setExpandedArchiveId(null); setArchiveDetail(null); }}
-          footer={null}
-          headerStyle={{ borderBottom: '1px solid var(--color-border)' }}
-          bodyStyle={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '16px 20px' }}
-        >
-          {/* 顶部操作栏 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
-            <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
-              共 {archiveList.length} 个归档
-            </span>
-            <Space>
-              {!isArchived && hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                <Button
-                  size="small"
-                  type="primary"
-                  onClick={() => { setArchiveLabelInput(''); setArchiveLabelModalVisible(true); }}
-                  disabled={activities.length === 0}
-                >
-                  创建归档
-                </Button>
-              )}
-              <Button
-                size="small"
-                type={compareMode ? 'primary' : 'secondary'}
-                onClick={() => { setCompareMode(!compareMode); setCompareSelections([null, null]); setCompareDiffs(null); }}
-              >
-                {compareMode ? '退出对比' : '对比模式'}
-              </Button>
-            </Space>
-          </div>
-
-          {/* 左右分栏：左侧归档列表 + 右侧详情表格 */}
-          {archiveLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0' }}><Spin /></div>
-          ) : archiveList.length === 0 ? (
-            <Empty description="暂无归档记录" style={{ padding: '40px 0' }} />
-          ) : (
-            <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-              {/* 左侧归档列表 */}
-              <div style={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid var(--color-border)', paddingRight: 12 }}>
-                {archiveList.map(arc => {
-                  const isSelected = expandedArchiveId === arc.id;
-                  const canManageArc = hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id);
-                  const isCompareSelected = compareSelections.includes(arc.id);
-                  return (
-                    <div
-                      key={arc.id}
-                      style={{
-                        padding: '10px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
-                        background: isSelected ? 'var(--color-primary-light-1)' : isCompareSelected ? 'var(--color-warning-light-1)' : undefined,
-                        border: isSelected ? '1px solid var(--info-border)' : isCompareSelected ? '1px solid var(--color-warning-light-3)' : '1px solid transparent',
-                      }}
-                      onClick={() => {
-                        if (compareMode) {
-                          setCompareSelections(prev => {
-                            if (prev[0] === arc.id) return [null, prev[1]];
-                            if (prev[1] === arc.id) return [prev[0], null];
-                            if (!prev[0]) return [arc.id, prev[1]];
-                            if (!prev[1]) return [prev[0], arc.id];
-                            return [arc.id, prev[1]];
-                          });
-                        } else {
-                          handleExpandArchive(arc.id);
-                        }
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: isSelected ? 500 : 400, color: isSelected ? 'rgb(var(--primary-6))' : 'var(--color-text-1)' }}>
-                        {arc.label || dayjs(arc.createdAt).format('YYYY-MM-DD')}
-                      </div>
-                      {arc.label && (
-                        <div style={{ fontSize: 11, color: 'var(--color-text-4)', marginTop: 1 }}>
-                          {dayjs(arc.createdAt).format('YYYY-MM-DD')}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
-                        {dayjs(arc.createdAt).format('HH:mm')}
-                        <span style={{ marginLeft: 6 }}>{arc.count} 个活动</span>
-                        {compareMode && isCompareSelected && (
-                          <Tag size="small" color="orangered" style={{ marginLeft: 6 }}>
-                            {compareSelections[0] === arc.id ? 'A' : 'B'}
-                          </Tag>
-                        )}
-                      </div>
-                      {canManageArc && !compareMode && (
-                        <Button
-                          type="text" size="mini" status="danger"
-                          style={{ marginTop: 4, padding: '0 4px', height: 20, fontSize: 12 }}
-                          onClick={(e) => { e.stopPropagation(); handleDeleteArchive(arc.id); }}
-                        >
-                          删除
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-                {/* 对比模式：当前版本选项 */}
-                {compareMode && (
-                  <div
-                    style={{
-                      padding: '10px 12px', marginTop: 8, borderRadius: 6, cursor: 'pointer',
-                      background: compareSelections.includes('current') ? 'var(--color-warning-light-1)' : 'var(--color-fill-1)',
-                      border: compareSelections.includes('current') ? '1px solid var(--color-warning-light-3)' : '1px dashed var(--color-border)',
-                    }}
-                    onClick={() => {
-                      setCompareSelections(prev => {
-                        if (prev[0] === 'current') return [null, prev[1]];
-                        if (prev[1] === 'current') return [prev[0], null];
-                        if (!prev[0]) return ['current', prev[1]];
-                        if (!prev[1]) return [prev[0], 'current'];
-                        return ['current', prev[1]];
-                      });
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>当前版本</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
-                      {activities.length} 个活动
-                      {compareSelections.includes('current') && (
-                        <Tag size="small" color="orangered" style={{ marginLeft: 6 }}>
-                          {compareSelections[0] === 'current' ? 'A' : 'B'}
-                        </Tag>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 右侧详情区域 */}
-              <div style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
-                {/* 对比模式 */}
-                {compareMode ? (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
-                        {compareSelections[0] && compareSelections[1]
-                          ? '选择了两个版本进行对比'
-                          : `请在左侧选择${compareSelections[0] ? '第二个' : '两个'}版本`}
-                      </span>
-                      {compareSelections[0] && compareSelections[1] && (
-                        <Button size="small" type="primary" loading={compareLoading} onClick={handleCompare}>
-                          开始对比
-                        </Button>
-                      )}
-                    </div>
-                    {compareDiffs && (
-                      <Table
-                        columns={[
-                          { title: '活动名称', dataIndex: 'name', width: 200 },
-                          {
-                            title: '变更类型', dataIndex: 'changeType', width: 100,
-                            render: (v: string) => {
-                              const cfg: Record<string, { label: string; color: string }> = {
-                                added: { label: '新增', color: 'green' },
-                                deleted: { label: '删除', color: 'red' },
-                                changed: { label: '变更', color: 'orangered' },
-                                unchanged: { label: '无变化', color: 'default' },
-                              };
-                              const c = cfg[v] || { label: v, color: 'default' };
-                              return <Tag color={c.color}>{c.label}</Tag>;
-                            },
-                          },
-                          {
-                            title: '差异详情', dataIndex: 'changes',
-                            render: (changes: Array<{ field: string; from: unknown; to: unknown }>) => {
-                              if (!changes || changes.length === 0) return '-';
-                              return changes.map((c, i) => (
-                                <div key={i} style={{ fontSize: 12, marginBottom: 2 }}>
-                                  <span style={{ color: 'var(--color-text-3)' }}>{c.field}:</span>{' '}
-                                  <span style={{ textDecoration: 'line-through', color: 'var(--status-danger)' }}>{String(c.from ?? '-')}</span>
-                                  {' → '}
-                                  <span style={{ color: 'var(--status-success)' }}>{String(c.to ?? '-')}</span>
-                                </div>
-                              ));
-                            },
-                          },
-                        ]}
-                        data={compareDiffs}
-                        rowKey="name"
-                        pagination={false}
-                        size="small"
-                        scroll={{ x: 600 }}
-                        rowClassName={(record: any) => {
-                          if (record.changeType === 'added') return 'row-diff-added';
-                          if (record.changeType === 'deleted') return 'row-diff-deleted';
-                          if (record.changeType === 'changed') return 'row-diff-changed';
-                          return '';
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : !expandedArchiveId ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-4)' }}>
-                    <span style={{ fontSize: 14 }}>点击左侧归档查看详情</span>
-                  </div>
-                ) : archiveDetailLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><Spin /></div>
-                ) : archiveDetail?.snapshot?.length ? (
-                  <Table
-                    columns={[
-                      { title: 'ID', width: 56, render: (_: unknown, __: unknown, idx: number) => <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>{String(idx + 1).padStart(3, '0')}</span> },
-                      { title: '阶段', width: 70, dataIndex: 'phase', render: (v: string) => v ? <Tag size="small" color={PHASE_COLOR[v] || 'default'}>{v}</Tag> : '-' },
-                      {
-                        title: '活动名称', width: 180, dataIndex: 'name', render: (v: string) => (
-                          <Tooltip content={v} position="tl"><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span></Tooltip>
-                        )
-                      },
-                      { title: '类型', width: 80, dataIndex: 'type', render: (v: string) => { const cfg = ACTIVITY_TYPE_MAP[v as keyof typeof ACTIVITY_TYPE_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
-                      { title: '状态', width: 90, dataIndex: 'status', render: (v: string) => { const cfg = ACTIVITY_STATUS_MAP[v as keyof typeof ACTIVITY_STATUS_MAP]; return cfg ? <Tag size="small" color={cfg.color}>{cfg.label}</Tag> : v; } },
-                      {
-                        title: '负责人', width: 110, dataIndex: 'assignees', render: (v: Array<{ realName: string }>) => {
-                          const text = v?.length ? v.map(u => u.realName).join(', ') : '-';
-                          return <Tooltip content={text}><span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span></Tooltip>;
-                        }
-                      },
-                      { title: '计划工期', width: 90, dataIndex: 'planDuration', render: (v: number | null) => v != null ? `${v}d` : '-' },
-                      {
-                        title: '计划时间', width: 210, render: (_: unknown, r: Activity) => {
-                          const text = r.planStartDate && r.planEndDate ? `${dateFmt(r.planStartDate)} - ${dateFmt(r.planEndDate)}` : dateFmt(r.planStartDate) || dateFmt(r.planEndDate) || '-';
-                          return <span style={{ whiteSpace: 'nowrap' }}>{text}</span>;
-                        }
-                      },
-                      { title: '实际开始', width: 115, render: (_: unknown, r: Activity) => dateFmt(r.startDate) },
-                      {
-                        title: '实际结束', width: 115, render: (_: unknown, r: Activity) => {
-                          const overdue = r.planEndDate && r.endDate && dayjs(r.endDate).isAfter(dayjs(r.planEndDate));
-                          return <span style={overdue ? { color: 'var(--status-danger)' } : undefined}>{dateFmt(r.endDate)}</span>;
-                        }
-                      },
-                      {
-                        title: '备注', width: 200, dataIndex: 'notes', render: (v: string | null) => {
-                          if (!v) return '-';
-                          return <Tooltip content={<div style={{ maxWidth: 360, whiteSpace: 'pre-wrap' }}>{v}</div>} position="tl">
-                            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
-                          </Tooltip>;
-                        }
-                      },
-                    ]}
-                    data={archiveDetail.snapshot}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                    scroll={{ x: 1216 }}
-                    border={{ bodyCell: true }}
-                  />
-                ) : (
-                  <Empty description="该归档无活动数据" style={{ padding: '40px 0' }} />
-                )}
-              </div>
-            </div>
-          )}
-        </Drawer>
       </div>
     </MainLayout>
   );

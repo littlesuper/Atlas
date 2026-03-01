@@ -74,18 +74,20 @@
 - **反向调整：** 前端支持手动修改工期数值时，自动调整对应时间范围的结束日期
 - **节假日数据：** 前端内置中国法定节假日及调休数据（2026年），可按年度更新
 
-### ActivityArchive（活动归档快照表 `activity_archives`）
+### ProjectArchive（项目快照表 `project_archives`）
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
-| id | UUID | PK | 归档唯一标识 |
+| id | UUID | PK | 快照唯一标识 |
 | projectId | UUID | FK → projects.id, CASCADE | 所属项目 |
-| snapshot | JSON | NOT NULL | 活动数组快照（含 assignees 等完整数据） |
-| createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
+| snapshot | JSON | NOT NULL | 项目完整快照（含活动、产品、周报、风险评估等） |
+| archivedBy | String | NOT NULL | 创建者用户 ID |
+| archivedAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
+| remark | String | 可选 | 快照备注（如"EVT阶段完成"） |
 
 **索引：** `[projectId]`
 
-**说明：** 每次"创建归档"将项目当前所有活动的完整数据保存为一份只读快照。一个项目可以多次归档，形成历史版本列表。snapshot 字段存储创建归档时刻的活动数组，包含每个活动的全部字段及 assignees 关联数据。
+**说明：** 项目快照功能，类似在线文档的版本管理。每次创建快照将项目当前全量数据保存为只读版本。snapshot JSON 包含：`project`（项目基本信息及成员列表）、`activities`（所有活动及负责人）、`products`（所有产品）、`weeklyReports`（所有周报）、`riskAssessments`（所有风险评估）。查看快照时通过独立路由 `/projects/:id/snapshot/:snapshotId` 复用项目详情页，以只读模式展示快照数据。
 
 ### RiskAssessment（风险评估表 `risk_assessments`）
 
@@ -586,43 +588,58 @@ PUT /api/activities/project/:projectId/reorder
 }
 ```
 
-### 3.4 活动归档快照
+### 3.4 项目快照
 
-#### 创建归档快照
+#### 创建项目快照
 ```
-POST /api/activities/project/:projectId/archives
+POST /api/projects/:id/snapshot
 ```
 **认证：** Bearer Token
-**权限：** `activity:create` + 项目管理权限
+**权限：** `project:update` + 项目管理权限
 
-**操作：** 查询项目所有活动（含 assignees），将完整数据存入 snapshot JSON 字段。
-
-**响应（201）：**
+**请求体（可选）：**
 ```json
 {
-  "id": "uuid",
-  "createdAt": "2026-02-25T10:00:00.000Z",
-  "count": 15
+  "remark": "EVT阶段完成"
 }
 ```
 
-#### 获取项目归档列表
+**操作：** 查询项目全量数据（项目信息、成员、活动及负责人、产品、周报、风险评估），将完整数据存入 snapshot JSON 字段。
+
+**响应（200）：**
+```json
+{
+  "id": "uuid",
+  "projectId": "uuid",
+  "snapshot": { ... },
+  "archivedBy": "userId",
+  "archivedAt": "2026-03-01T10:00:00.000Z",
+  "remark": "EVT阶段完成"
+}
 ```
-GET /api/activities/project/:projectId/archives
+
+#### 获取项目快照列表
+```
+GET /api/projects/:id/archives
 ```
 **认证：** Bearer Token
 
-**响应（200）：** 按创建时间倒序，不含 snapshot 详情
+**响应（200）：** 按创建时间倒序，不含 snapshot 详情，含创建人信息
 ```json
 [
-  { "id": "uuid", "createdAt": "2026-02-25T10:00:00.000Z", "count": 15 },
-  { "id": "uuid", "createdAt": "2026-02-20T08:30:00.000Z", "count": 12 }
+  {
+    "id": "uuid",
+    "archivedBy": "userId",
+    "archivedAt": "2026-03-01T10:00:00.000Z",
+    "remark": "EVT阶段完成",
+    "creator": { "id": "userId", "realName": "管理员", "username": "admin" }
+  }
 ]
 ```
 
-#### 获取归档详情
+#### 获取快照详情
 ```
-GET /api/activities/archives/:id
+GET /api/projects/archives/:archiveId
 ```
 **认证：** Bearer Token
 
@@ -631,25 +648,18 @@ GET /api/activities/archives/:id
 {
   "id": "uuid",
   "projectId": "uuid",
-  "snapshot": [
-    {
-      "id": "uuid", "name": "原理图设计", "status": "COMPLETED",
-      "phase": "EVT", "assignees": [{ "id": "uuid", "realName": "张三" }],
-      "planStartDate": "2026-02-10T00:00:00.000Z",
-      "planEndDate": "2026-02-28T00:00:00.000Z"
-    }
-  ],
-  "createdAt": "2026-02-25T10:00:00.000Z"
+  "snapshot": {
+    "project": { "name": "...", "status": "IN_PROGRESS", "managerId": "...", ... },
+    "activities": [ { "id": "...", "name": "原理图设计", "status": "COMPLETED", "assignees": [...], ... } ],
+    "products": [ ... ],
+    "weeklyReports": [ ... ],
+    "riskAssessments": [ ... ]
+  },
+  "archivedBy": "userId",
+  "archivedAt": "2026-03-01T10:00:00.000Z",
+  "remark": "EVT阶段完成"
 }
 ```
-
-#### 删除归档
-```
-DELETE /api/activities/archives/:id
-```
-**认证：** Bearer Token
-**权限：** `activity:delete`
-**响应：** `{ "success": true }`
 
 ### 3.5 AI 风险评估
 
@@ -994,15 +1004,13 @@ DELETE /api/uploads/:filename
     - **文件名：** `{项目名}_活动列表_{YYYY-MM-DD}.csv`
     - **备注：** 服务端 ExcelJS 导出端点 `GET /api/activities/project/:projectId/export-excel` 保留可用，但前端默认使用客户端 CSV 导出（避免 Chrome HTTP 页面下载 xlsx 被阻止）
 
-    **归档管理：**
-    - **入口：** 活动列表右上角列设置 Popover 底部"归档管理"按钮（IconStorage 图标），点击打开归档管理抽屉
-    - **归档管理抽屉（Drawer，宽度 960px）：**
-      - 顶部：归档数量统计 + "创建归档"按钮（右侧，需 `activity:create` 权限 + 项目管理权限）
-      - 主体：归档历史列表，按创建时间倒序。每条显示创建时间（YYYY-MM-DD HH:mm）+ 活动数量
-      - 点击某条归档 → 展开为完整只读表格，列与活动列表一致：ID（序号）、阶段、活动名称、类型、状态、负责人、计划工期、计划时间（格式 `YY年MM月DD日 - YY年MM月DD日`）、实际开始、实际结束（超期红色）、备注。表格支持横向滚动，最大高度 360px
-      - 再次点击同一条归档 → 收起表格
-      - 每条归档右侧显示"删除"按钮（需 `activity:delete` 权限 + 项目管理权限）
-    - **快照概念：** 创建归档时，系统将项目当前所有活动的完整数据保存为一份只读快照。一个项目可多次归档，形成历史版本列表
+  - **项目快照（`SnapshotsTab` 组件，独立 Tab）：**
+    - **概念：** 类似在线文档的版本管理，保存项目某一时刻的全量数据快照
+    - **快照列表：** 顶部显示快照数量统计 + "创建快照"按钮（需 `project:update` 权限 + 项目管理权限）。使用 Timeline 组件展示快照历史，每条显示时间、创建人姓名、备注 Tag、"查看"按钮
+    - **创建快照：** 点击"创建快照"弹出 Modal，含备注输入框（TextArea，可选，200 字限制）。提交后保存项目全量数据（活动、产品、周报、风险评估）
+    - **查看快照：** 点击"查看"通过路由 `/projects/:id/snapshot/:snapshotId` 导航，复用项目详情页以只读模式展示快照数据。页面顶部显示蓝色信息横幅（Alert），包含"返回项目"按钮、快照时间和备注。排期工具和项目快照 Tab 在快照模式下隐藏
+    - **快照模式下默认选中活动列表 Tab**（因排期工具和项目快照 Tab 被隐藏）
+    - **空状态：** 无快照时显示 Empty 组件，提示"暂无快照，点击「创建快照」保存项目当前状态"
 
   - **甘特图：** 横向时间轴，支持多视图模式。每个任务显示双条：上方细虚线条为计划时间，下方粗实线条为实际时间（带进度填充和状态颜色）。里程碑用渐变菱形标记，红色竖线标记今天。
     - **图例显示：**

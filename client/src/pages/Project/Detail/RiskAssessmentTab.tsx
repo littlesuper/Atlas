@@ -30,6 +30,7 @@ echarts.use([LineChart, GridComponent, TooltipComponent, MarkAreaComponent, Canv
 interface Props {
   projectId: string;
   isArchived?: boolean;
+  snapshotData?: any[] | null;
 }
 
 const RISK_LEVEL_CONFIG: Record<string, { color: string; bgVar: string }> = {
@@ -57,7 +58,7 @@ const SOURCE_LABEL: Record<string, { text: string; color: string }> = {
   rule_engine: { text: '规则引擎', color: 'gray' },
 };
 
-const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived }) => {
+const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotData }) => {
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -100,10 +101,15 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived }) => {
   };
 
   useEffect(() => {
-    load(1);
-    loadTrend();
-    setPage(1);
-  }, [projectId]);
+    if (snapshotData) {
+      setAssessments(snapshotData as RiskAssessment[]);
+      setTotal(snapshotData.length);
+    } else {
+      load(1);
+      loadTrend();
+      setPage(1);
+    }
+  }, [projectId, snapshotData]);
 
   const handleDelete = (assessmentId: string) => {
     Modal.confirm({

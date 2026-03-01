@@ -121,14 +121,6 @@ export interface Activity {
   updatedAt: string;
 }
 
-export interface ActivityArchive {
-  id: string;
-  projectId: string;
-  label?: string | null;
-  snapshot: Activity[];
-  createdAt: string;
-}
-
 export interface ActivityComment {
   id: string;
   activityId: string;

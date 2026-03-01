@@ -22,7 +22,6 @@ import {
   IconEdit,
   IconDelete,
   IconFile,
-  IconSafe,
   IconUndo,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
@@ -428,7 +427,7 @@ const ProjectList: React.FC = () => {
     },
     {
       title: '操作',
-      width: 150,
+      width: 120,
       fixed: 'right' as const,
       render: (_: unknown, record: Project) => {
         const isArchived = record.status === 'ARCHIVED';
@@ -456,16 +455,6 @@ const ProjectList: React.FC = () => {
                       icon={<IconEdit />}
                       size="small"
                       onClick={() => handleOpenDrawer(record)}
-                    />
-                  </Tooltip>
-                )}
-                {hasPermission('project', 'update') && isProjectManager(record.managerId, record.id) && (
-                  <Tooltip content="归档">
-                    <Button
-                      type="text"
-                      icon={<IconSafe />}
-                      size="small"
-                      onClick={() => handleArchive(record)}
                     />
                   </Tooltip>
                 )}

@@ -5,7 +5,6 @@ import {
   Permission,
   Project,
   Activity,
-  ActivityArchive,
   ActivityComment,
   Notification,
   Product,
@@ -149,15 +148,18 @@ export const projectsApi = {
   removeMember: (projectId: string, userId: string) =>
     request.delete(`/projects/${projectId}/members/${userId}`),
 
-  // 项目归档
+  // 项目归档 & 快照
   archiveProject: (id: string, remark?: string) =>
     request.post(`/projects/${id}/archive`, { remark }),
 
   unarchiveProject: (id: string) =>
     request.post(`/projects/${id}/unarchive`),
 
+  createSnapshot: (id: string, remark?: string) =>
+    request.post(`/projects/${id}/snapshot`, { remark }),
+
   listProjectArchives: (id: string) =>
-    request.get<Array<{ id: string; archivedBy: string; archivedAt: string; remark?: string }>>(`/projects/${id}/archives`),
+    request.get<Array<{ id: string; archivedBy: string; archivedAt: string; remark?: string; creator?: { id: string; realName: string; username: string } }>>(`/projects/${id}/archives`),
 
   getProjectArchive: (archiveId: string) =>
     request.get(`/projects/archives/${archiveId}`),
@@ -222,23 +224,6 @@ export const activitiesApi = {
   // 批量排序
   reorder: (projectId: string, items: { id: string; sortOrder: number }[]) =>
     request.put(`/activities/project/${projectId}/reorder`, { items }),
-
-  // 归档快照 CRUD
-  createArchive: (projectId: string, label?: string) =>
-    request.post<{ id: string; label?: string; createdAt: string; count: number }>(`/activities/project/${projectId}/archives`, { label }),
-
-  listArchives: (projectId: string) =>
-    request.get<Array<{ id: string; label?: string; createdAt: string; count: number }>>(`/activities/project/${projectId}/archives`),
-
-  getArchive: (archiveId: string) =>
-    request.get<ActivityArchive>(`/activities/archives/${archiveId}`),
-
-  deleteArchive: (archiveId: string) =>
-    request.delete(`/activities/archives/${archiveId}`),
-
-  // 归档对比
-  compareArchives: (archiveId1: string, archiveId2: string, projectId: string) =>
-    request.post<{ diffs: Array<{ name: string; type: string; changes?: string[]; before?: any; current?: any }> }>('/activities/archives/compare', { archiveId1, archiveId2, projectId }),
 
   // 批量操作
   batchUpdate: (ids: string[], updates: { status?: string; assigneeIds?: string[]; phase?: string }) =>

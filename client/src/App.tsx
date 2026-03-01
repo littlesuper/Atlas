@@ -143,6 +143,16 @@ const App: React.FC = () => {
             }
           />
 
+          {/* 项目快照查看（复用项目详情页，只读模式） */}
+          <Route
+            path="/projects/:id/snapshot/:snapshotId"
+            element={
+              <ProtectedRoute>
+                <ProjectDetail />
+              </ProtectedRoute>
+            }
+          />
+
           {/* 产品管理 */}
           <Route
             path="/products"
