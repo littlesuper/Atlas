@@ -51,10 +51,10 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('short'));
 }
 
-// 登录接口限流：每 IP 每 15 分钟最多 20 次
+// 登录接口限流：每 IP 每 15 分钟最多 N 次（开发环境放宽以支持 E2E 测试）
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: process.env.NODE_ENV === 'production' ? 20 : 200,
   message: { error: '登录尝试过于频繁，请15分钟后重试' },
   standardHeaders: true,
   legacyHeaders: false,

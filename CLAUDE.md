@@ -85,6 +85,15 @@ User 模型支持两种使用场景：
 - 开发环境也可用 `npx prisma db push` 快速同步 schema（不生成迁移文件）
 - 种子数据包含 3 个测试账号：admin/admin123, zhangsan/123456, lisi/123456
 
+## 系统版本号
+
+版本号格式 `x.y.z`（存储在根目录 `package.json` 的 `version` 字段）：
+- **x（大版本）**：人工修改，重大功能变更或不兼容改动时递增
+- **y（小版本）**：人工修改，新功能或功能增强时递增
+- **z（提交版本）**：自动递增，每次 git commit 通过 `post-commit` Hook 自动 +1；当 x 或 y 变化时 z 重置为 1
+
+健康检查接口 `/api/health` 返回 `version` 格式为 `x.y.z-<gitHash>`
+
 ## 环境变量
 
 服务端环境变量位于 `server/.env`，关键配置：

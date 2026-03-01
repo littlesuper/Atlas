@@ -255,6 +255,33 @@ const ProjectDetail: React.FC = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importUploading, setImportUploading] = useState(false);
 
+  // 撤回操作栈
+  const [undoStack, setUndoStack] = useState<Array<{ description: string; execute: () => Promise<void> }>>([]);
+  const pushUndo = (item: { description: string; execute: () => Promise<void> }) => {
+    setUndoStack(prev => [...prev, item]);
+  };
+  const handleUndo = () => {
+    const last = undoStack[undoStack.length - 1];
+    if (!last) return;
+    Modal.confirm({
+      title: '确认撤回',
+      content: last.description,
+      okText: '确认撤回',
+      onOk: async () => {
+        Message.loading('正在撤回...');
+        try {
+          await last.execute();
+          setUndoStack(prev => prev.slice(0, -1));
+          Message.clear();
+          Message.success('撤回成功');
+        } catch {
+          Message.clear();
+          Message.error('撤回失败');
+        }
+      },
+    });
+  };
+
   // 表单中计划/实际工期
   const [planDuration, setPlanDuration] = useState<number | null>(null);
   const [actualDuration, setActualDuration] = useState<number | null>(null);
@@ -644,35 +671,17 @@ const ProjectDetail: React.FC = () => {
       const { data } = await activitiesApi.importExcel(id, file);
       const importedIds = (data.activities || []).map((a: any) => a.id);
       const msg = `导入成功，共 ${data.count} 条活动${data.skipped ? `，跳过 ${data.skipped} 条重复` : ''}`;
-      Message.success({
-        id: 'import-excel-undo',
-        content: (
-          <span>
-            {msg}
-            {importedIds.length > 0 && (
-              <a
-                style={{ marginLeft: 8, cursor: 'pointer' }}
-                onClick={async () => {
-                  Message.clear();
-                  Message.loading('正在撤销...');
-                  try {
-                    await activitiesApi.undoImport(id!, importedIds);
-                    Message.clear();
-                    Message.success('已撤销导入');
-                    loadActivities();
-                    loadProject();
-                  } catch {
-                    Message.clear();
-                  }
-                }}
-              >
-                <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤销
-              </a>
-            )}
-          </span>
-        ),
-        duration: 8000,
-      });
+      if (importedIds.length > 0) {
+        pushUndo({
+          description: `撤回批量导入的 ${importedIds.length} 条活动`,
+          execute: async () => {
+            await activitiesApi.undoImport(id!, importedIds);
+            loadActivities();
+            loadProject();
+          },
+        });
+      }
+      Message.success(msg);
       if (data.createdUsers && data.createdUsers.length > 0) {
         Message.info(`已自动创建 ${data.createdUsers.length} 个联系人账号：${data.createdUsers.join('、')}`);
       }
@@ -785,48 +794,33 @@ const ProjectDetail: React.FC = () => {
         // 保存更新前的原始数据，用于撤回
         const snapshot = { ...editingActivity };
         await activitiesApi.update(editingActivity.id, data);
-        Message.success({
-          id: 'activity-update-undo',
-          content: (
-            <span>
-              活动更新成功{' '}
-              <a
-                style={{ marginLeft: 8 }}
-                onClick={async () => {
-                  try {
-                    await activitiesApi.update(snapshot.id, {
-                      name: snapshot.name,
-                      description: snapshot.description,
-                      type: snapshot.type,
-                      phase: snapshot.phase,
-                      status: snapshot.status,
-                      priority: snapshot.priority,
-                      planStartDate: snapshot.planStartDate ? dayjs(snapshot.planStartDate).format('YYYY-MM-DD') : undefined,
-                      planEndDate: snapshot.planEndDate ? dayjs(snapshot.planEndDate).format('YYYY-MM-DD') : undefined,
-                      planDuration: snapshot.planDuration ?? undefined,
-                      startDate: snapshot.startDate ? dayjs(snapshot.startDate).format('YYYY-MM-DD') : undefined,
-                      endDate: snapshot.endDate ? dayjs(snapshot.endDate).format('YYYY-MM-DD') : undefined,
-                      duration: snapshot.duration ?? undefined,
-                      assigneeIds: snapshot.assignees?.map((a) => a.id) ?? [],
-                      notes: snapshot.notes,
-                      dependencies: Array.isArray(snapshot.dependencies)
-                        ? snapshot.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
-                        : undefined,
-                    });
-                    Message.success('已撤回修改');
-                    loadActivities();
-                    loadProject();
-                  } catch {
-                    Message.error('撤回失败');
-                  }
-                }}
-              >
-                <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤回修改
-              </a>
-            </span>
-          ),
-          duration: 5000,
+        pushUndo({
+          description: `撤回对活动「${snapshot.name}」的编辑`,
+          execute: async () => {
+            await activitiesApi.update(snapshot.id, {
+              name: snapshot.name,
+              description: snapshot.description,
+              type: snapshot.type,
+              phase: snapshot.phase,
+              status: snapshot.status,
+              priority: snapshot.priority,
+              planStartDate: snapshot.planStartDate ? dayjs(snapshot.planStartDate).format('YYYY-MM-DD') : undefined,
+              planEndDate: snapshot.planEndDate ? dayjs(snapshot.planEndDate).format('YYYY-MM-DD') : undefined,
+              planDuration: snapshot.planDuration ?? undefined,
+              startDate: snapshot.startDate ? dayjs(snapshot.startDate).format('YYYY-MM-DD') : undefined,
+              endDate: snapshot.endDate ? dayjs(snapshot.endDate).format('YYYY-MM-DD') : undefined,
+              duration: snapshot.duration ?? undefined,
+              assigneeIds: snapshot.assignees?.map((a) => a.id) ?? [],
+              notes: snapshot.notes,
+              dependencies: Array.isArray(snapshot.dependencies)
+                ? snapshot.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
+                : undefined,
+            });
+            loadActivities();
+            loadProject();
+          },
         });
+        Message.success('活动更新成功');
       } else {
         await activitiesApi.create(data);
         Message.success('活动创建成功');
@@ -872,36 +866,17 @@ const ProjectDetail: React.FC = () => {
         try {
           const snapshot = { ...activity };
           await activitiesApi.delete(activity.id);
+          pushUndo({
+            description: `撤回删除活动「${snapshot.name}」`,
+            execute: async () => {
+              await activitiesApi.create(activityToCreatePayload(snapshot));
+              loadActivities();
+              loadProject();
+            },
+          });
+          Message.success(`已删除活动「${snapshot.name}」`);
           loadActivities();
           loadProject();
-          Message.success({
-            id: 'delete-undo',
-            content: (
-              <span>
-                已删除活动「{snapshot.name}」{' '}
-                <a
-                  style={{ marginLeft: 8, cursor: 'pointer' }}
-                  onClick={async () => {
-                    Message.clear();
-                    Message.loading('正在撤销...');
-                    try {
-                      await activitiesApi.create(activityToCreatePayload(snapshot));
-                      Message.clear();
-                      Message.success('已撤销删除');
-                      loadActivities();
-                      loadProject();
-                    } catch {
-                      Message.clear();
-                      Message.error('撤销失败');
-                    }
-                  }}
-                >
-                  <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤销
-                </a>
-              </span>
-            ),
-            duration: 5000,
-          });
         } catch {
           Message.error('活动删除失败');
         }
@@ -968,9 +943,17 @@ const ProjectDetail: React.FC = () => {
     setActivities(reordered);
 
     if (!id) return;
+    const oldOrder = activities.map((a, i) => ({ id: a.id, sortOrder: (i + 1) * 10 }));
     setSaving(true);
     try {
       await activitiesApi.reorder(id, reordered.map((a, i) => ({ id: a.id, sortOrder: (i + 1) * 10 })));
+      pushUndo({
+        description: `撤回活动排序调整`,
+        execute: async () => {
+          await activitiesApi.reorder(id!, oldOrder);
+          loadActivities();
+        },
+      });
     } catch {
       Message.error('保存排序失败');
       loadActivities(); // 回滚
@@ -1053,32 +1036,16 @@ const ProjectDetail: React.FC = () => {
   };
 
   // 统一的"更新成功 + 撤回"提示
-  const showUndoMessage = (activityId: string, rollbackPayload: Record<string, unknown>) => {
-    Message.success({
-      id: 'activity-update-undo',
-      content: (
-        <span>
-          更新成功{' '}
-          <a
-            onClick={async () => {
-              try {
-                await activitiesApi.update(activityId, rollbackPayload);
-                Message.clear();
-                Message.success('已撤回');
-                loadActivities();
-                loadProject();
-              } catch {
-                Message.error('撤回失败');
-              }
-            }}
-            style={{ marginLeft: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
-          >
-            <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤回修改
-          </a>
-        </span>
-      ),
-      duration: 5000,
+  const showUndoMessage = (activityId: string, rollbackPayload: Record<string, unknown>, activityName?: string) => {
+    pushUndo({
+      description: `撤回对活动「${activityName || '未知'}」的修改`,
+      execute: async () => {
+        await activitiesApi.update(activityId, rollbackPayload);
+        loadActivities();
+        loadProject();
+      },
     });
+    Message.success('更新成功');
   };
 
   const commitInlineEdit = async (activity: Activity, field: string) => {
@@ -1088,7 +1055,7 @@ const ProjectDetail: React.FC = () => {
     try {
       await activitiesApi.update(activity.id, { [field]: inlineValue || undefined });
       setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: inlineValue } : a));
-      showUndoMessage(activity.id, { [field]: original ?? undefined });
+      showUndoMessage(activity.id, { [field]: original ?? undefined }, activity.name);
     } catch {
       Message.error('更新失败');
     }
@@ -1100,7 +1067,7 @@ const ProjectDetail: React.FC = () => {
     try {
       await activitiesApi.update(activity.id, { [field]: value });
       setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: value } : a));
-      showUndoMessage(activity.id, { [field]: oldValue });
+      showUndoMessage(activity.id, { [field]: oldValue }, activity.name);
     } catch {
       Message.error('更新失败');
     }
@@ -1110,7 +1077,19 @@ const ProjectDetail: React.FC = () => {
   const handleBatchStatusUpdate = async (status: string) => {
     if (selectedIds.size === 0) return;
     try {
-      await activitiesApi.batchUpdate(Array.from(selectedIds), { status });
+      const ids = Array.from(selectedIds);
+      const oldStatuses = ids.map(sid => ({ id: sid, status: activities.find(a => a.id === sid)?.status }));
+      await activitiesApi.batchUpdate(ids, { status });
+      pushUndo({
+        description: `撤回批量修改 ${ids.length} 个活动的状态`,
+        execute: async () => {
+          for (const item of oldStatuses) {
+            if (item.status) await activitiesApi.update(item.id, { status: item.status });
+          }
+          loadActivities();
+          loadProject();
+        },
+      });
       Message.success(`已更新 ${selectedIds.size} 个活动状态`);
       setSelectedIds(new Set());
       loadActivities();
@@ -1121,7 +1100,18 @@ const ProjectDetail: React.FC = () => {
   const handleBatchPhaseUpdate = async (phase: string) => {
     if (selectedIds.size === 0) return;
     try {
-      await activitiesApi.batchUpdate(Array.from(selectedIds), { phase });
+      const ids = Array.from(selectedIds);
+      const oldPhases = ids.map(sid => ({ id: sid, phase: activities.find(a => a.id === sid)?.phase }));
+      await activitiesApi.batchUpdate(ids, { phase });
+      pushUndo({
+        description: `撤回批量修改 ${ids.length} 个活动的阶段`,
+        execute: async () => {
+          for (const item of oldPhases) {
+            if (item.phase) await activitiesApi.update(item.id, { phase: item.phase });
+          }
+          loadActivities();
+        },
+      });
       Message.success(`已更新 ${selectedIds.size} 个活动阶段`);
       setSelectedIds(new Set());
       loadActivities();
@@ -1131,7 +1121,18 @@ const ProjectDetail: React.FC = () => {
   const handleBatchAssigneeUpdate = async (assigneeIds: string[]) => {
     if (selectedIds.size === 0) return;
     try {
-      await activitiesApi.batchUpdate(Array.from(selectedIds), { assigneeIds });
+      const ids = Array.from(selectedIds);
+      const oldAssignees = ids.map(sid => ({ id: sid, assigneeIds: activities.find(a => a.id === sid)?.assignees?.map(a => a.id) ?? [] }));
+      await activitiesApi.batchUpdate(ids, { assigneeIds });
+      pushUndo({
+        description: `撤回批量修改 ${ids.length} 个活动的负责人`,
+        execute: async () => {
+          for (const item of oldAssignees) {
+            await activitiesApi.update(item.id, { assigneeIds: item.assigneeIds });
+          }
+          loadActivities();
+        },
+      });
       Message.success(`已更新 ${selectedIds.size} 个活动负责人`);
       setSelectedIds(new Set());
       loadActivities();
@@ -1151,34 +1152,15 @@ const ProjectDetail: React.FC = () => {
           setSelectedIds(new Set());
           loadActivities();
           loadProject();
-          Message.success({
-            id: 'batch-delete-undo',
-            content: (
-              <span>
-                已删除 {count} 个活动{' '}
-                <a
-                  style={{ marginLeft: 8, cursor: 'pointer' }}
-                  onClick={async () => {
-                    Message.clear();
-                    Message.loading('正在撤销...');
-                    try {
-                      await activitiesApi.batchCreate(snapshots.map(activityToCreatePayload));
-                      Message.clear();
-                      Message.success(`已撤销删除 ${count} 个活动`);
-                      loadActivities();
-                      loadProject();
-                    } catch {
-                      Message.clear();
-                      Message.error('撤销失败');
-                    }
-                  }}
-                >
-                  <IconUndo style={{ marginRight: 2, fontSize: 12 }} />撤销
-                </a>
-              </span>
-            ),
-            duration: 8000,
+          pushUndo({
+            description: `撤回批量删除的 ${count} 个活动`,
+            execute: async () => {
+              await activitiesApi.batchCreate(snapshots.map(activityToCreatePayload));
+              loadActivities();
+              loadProject();
+            },
           });
+          Message.success(`已删除 ${count} 个活动`);
         } catch { Message.error('批量删除失败'); }
       },
     });
@@ -1258,7 +1240,7 @@ const ProjectDetail: React.FC = () => {
     try {
       await activitiesApi.update(activity.id, payload);
       loadActivities();
-      showUndoMessage(activity.id, rollback);
+      showUndoMessage(activity.id, rollback, activity.name);
     } catch {
       Message.error('更新失败');
     }
@@ -1280,7 +1262,7 @@ const ProjectDetail: React.FC = () => {
     try {
       await activitiesApi.update(activity.id, { dependencies: deps.length > 0 ? deps : null });
       loadActivities();
-      showUndoMessage(activity.id, { dependencies: oldDeps });
+      showUndoMessage(activity.id, { dependencies: oldDeps }, activity.name);
     } catch {
       Message.error('更新失败');
     }
@@ -1474,7 +1456,7 @@ const ProjectDetail: React.FC = () => {
                 const oldIds = record.assignees?.map((a) => a.id) ?? [];
                 activitiesApi.update(record.id, { assigneeIds: v }).then(() => {
                   loadActivities();
-                  showUndoMessage(record.id, { assigneeIds: oldIds });
+                  showUndoMessage(record.id, { assigneeIds: oldIds }, record.name);
                 }).catch(() => Message.error('更新失败'));
               }}
             >
@@ -1550,10 +1532,10 @@ const ProjectDetail: React.FC = () => {
                   }
                   const rollback: Record<string, unknown> = { planStartDate: record.planStartDate || undefined };
                   if (record.planEndDate) rollback.planDuration = record.planDuration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 } else {
                   const rollback: Record<string, unknown> = { planStartDate: record.planStartDate || undefined, planDuration: record.planDuration ?? undefined };
-                  activitiesApi.update(record.id, { planStartDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, { planStartDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 }
               }}
             />
@@ -1596,10 +1578,10 @@ const ProjectDetail: React.FC = () => {
                   }
                   const rollback: Record<string, unknown> = { planEndDate: record.planEndDate || undefined };
                   if (record.planStartDate) rollback.planDuration = record.planDuration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 } else {
                   const rollback: Record<string, unknown> = { planEndDate: record.planEndDate || undefined, planDuration: record.planDuration ?? undefined };
-                  activitiesApi.update(record.id, { planEndDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, { planEndDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 }
               }}
             />
@@ -1640,10 +1622,10 @@ const ProjectDetail: React.FC = () => {
                   }
                   const rollback: Record<string, unknown> = { startDate: record.startDate || undefined };
                   if (record.endDate) rollback.duration = record.duration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 } else {
                   const rollback: Record<string, unknown> = { startDate: record.startDate || undefined, duration: record.duration ?? undefined };
-                  activitiesApi.update(record.id, { startDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, { startDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 }
               }}
             />
@@ -1684,10 +1666,10 @@ const ProjectDetail: React.FC = () => {
                   }
                   const rollback: Record<string, unknown> = { endDate: record.endDate || undefined };
                   if (record.startDate) rollback.duration = record.duration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 } else {
                   const rollback: Record<string, unknown> = { endDate: record.endDate || undefined, duration: record.duration ?? undefined };
-                  activitiesApi.update(record.id, { endDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback); });
+                  activitiesApi.update(record.id, { endDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
                 }
               }}
             />
@@ -2066,6 +2048,13 @@ const ProjectDetail: React.FC = () => {
                       <IconNav /> 活动 <IconLeft style={{ transform: 'rotate(-90deg)', marginLeft: 4, fontSize: 12 }} />
                     </Button>
                   </Dropdown>
+                  <Tooltip content={undoStack.length > 0 ? undoStack[undoStack.length - 1].description : '没有可撤回的操作'}>
+                    <Button
+                      icon={<IconUndo />}
+                      disabled={undoStack.length === 0}
+                      onClick={handleUndo}
+                    />
+                  </Tooltip>
                   <ColumnSettings
                     columnDefs={ACTIVITY_COLUMN_DEFS}
                     prefs={columnPrefs}
@@ -2852,6 +2841,7 @@ const ProjectDetail: React.FC = () => {
             <div>重复活动（名称+阶段+日期相同）将自动跳过</div>
           </div>
         </Modal>
+
 
       </div>
     </MainLayout>
