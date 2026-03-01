@@ -124,6 +124,10 @@ body {
   background-color: transparent;
 }
 
+/* body 也强制显示滚动条占位，与 header 对齐 */
+.arco-table-body {
+  overflow-y: scroll !important;
+}
 /* 表格 body 滚动条样式 */
 .arco-table-body::-webkit-scrollbar {
   width: 8px;
