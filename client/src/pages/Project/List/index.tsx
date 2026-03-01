@@ -319,7 +319,6 @@ const ProjectList: React.FC = () => {
       title: '项目名称',
       dataIndex: 'name',
       width: 250,
-      sorter: (a: Project, b: Project) => a.name.localeCompare(b.name),
       render: (name: string, record: Project) => (
         <a
           onClick={() => navigate(`/projects/${record.id}`)}
@@ -342,7 +341,6 @@ const ProjectList: React.FC = () => {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      sorter: (a: Project, b: Project) => a.status.localeCompare(b.status),
       render: (status: string) => {
         const config = STATUS_MAP[status as keyof typeof STATUS_MAP] ?? { label: status, color: 'default' };
         return <Tag color={config.color}>{config.label}</Tag>;

@@ -113,17 +113,17 @@ const COLUMN_WIDTH_MAP: Record<string, number> = {
   id: 60,
   predecessor: 100,
   phase: 80,
-  name: 0, // 自适应，不设固定宽度
+  name: 240,
   type: 80,
   status: 100,
   assignee: 120,
   planDuration: 70,
-  planStartDate: 120,
-  planEndDate: 120,
-  actualStartDate: 120,
-  actualEndDate: 120,
+  planStartDate: 140,
+  planEndDate: 140,
+  actualStartDate: 140,
+  actualEndDate: 140,
   actualDuration: 80,
-  notes: 140,
+  notes: 240,
 };
 
 // 格式化3位序号
@@ -252,6 +252,8 @@ const ProjectDetail: React.FC = () => {
   // 归档标签 & 对比
   const [archiveLabelInput, setArchiveLabelInput] = useState('');
   const [archiveLabelModalVisible, setArchiveLabelModalVisible] = useState(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importUploading, setImportUploading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelections, setCompareSelections] = useState<[string | null, string | null]>([null, null]);
   const [compareDiffs, setCompareDiffs] = useState<any[] | null>(null);
@@ -562,12 +564,10 @@ const ProjectDetail: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // 打开创建/编辑抽屉
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !id) return;
-    // 重置 input 以便再次选择同一文件
-    e.target.value = '';
+  // 导入 Excel 核心逻辑
+  const doImportFile = async (file: File) => {
+    if (!id) return;
+    setImportUploading(true);
     try {
       const { data } = await activitiesApi.importExcel(id, file);
       const importedIds = (data.activities || []).map((a: any) => a.id);
@@ -604,12 +604,23 @@ const ProjectDetail: React.FC = () => {
       if (data.createdUsers && data.createdUsers.length > 0) {
         Message.info(`已自动创建 ${data.createdUsers.length} 个联系人账号：${data.createdUsers.join('、')}`);
       }
+      setImportModalVisible(false);
       setDrawerVisible(false);
       loadActivities();
       loadProject();
     } catch (err: any) {
       Message.error(err?.response?.data?.error || '导入失败');
+    } finally {
+      setImportUploading(false);
     }
+  };
+
+  // 从 <input type="file"> 触发导入（新建抽屉中使用）
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    doImportFile(file);
   };
 
   const handleOpenDrawer = (activity?: Activity) => {
@@ -1339,6 +1350,7 @@ const ProjectDetail: React.FC = () => {
     },
     name: {
       title: '活动名称',
+      width: 200,
       dataIndex: 'name',
       render: (name: string, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
@@ -1508,14 +1520,14 @@ const ProjectDetail: React.FC = () => {
     },
     planStartDate: {
       title: '计划开始',
-      width: 120,
+      width: 140,
       render: (_: unknown, record: Activity) => {
         const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planStartDate') {
           return (
             <AutoOpenDatePicker
               size="small"
-              style={{ width: 110 }}
+              style={{ width: 130 }}
               format="YYYY-MM-DD"
               value={record.planStartDate ? dayjs(record.planStartDate) : undefined}
               onDismiss={() => setInlineEditing(null)}
@@ -1553,7 +1565,7 @@ const ProjectDetail: React.FC = () => {
     },
     planEndDate: {
       title: '计划结束',
-      width: 120,
+      width: 140,
       render: (_: unknown, record: Activity) => {
         const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
         const isOverdue = record.planEndDate && record.status !== 'COMPLETED' && dayjs(record.planEndDate).isBefore(dayjs(), 'day');
@@ -1561,7 +1573,7 @@ const ProjectDetail: React.FC = () => {
           return (
             <AutoOpenDatePicker
               size="small"
-              style={{ width: 110 }}
+              style={{ width: 130 }}
               format="YYYY-MM-DD"
               value={record.planEndDate ? dayjs(record.planEndDate) : undefined}
               onDismiss={() => setInlineEditing(null)}
@@ -1599,13 +1611,13 @@ const ProjectDetail: React.FC = () => {
     },
     actualStartDate: {
       title: '实际开始',
-      width: 120,
+      width: 140,
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'actualStartDate') {
           return (
             <AutoOpenDatePicker
               size="small"
-              style={{ width: 110 }}
+              style={{ width: 130 }}
               format="YYYY-MM-DD"
               value={record.startDate ? dayjs(record.startDate) : undefined}
               onDismiss={() => setInlineEditing(null)}
@@ -1642,14 +1654,14 @@ const ProjectDetail: React.FC = () => {
     },
     actualEndDate: {
       title: '实际结束',
-      width: 120,
+      width: 140,
       render: (_: unknown, record: Activity) => {
         const isOverdue = record.planEndDate && record.endDate && dayjs(record.endDate).isAfter(dayjs(record.planEndDate), 'day');
         if (inlineEditing?.id === record.id && inlineEditing.field === 'actualEndDate') {
           return (
             <AutoOpenDatePicker
               size="small"
-              style={{ width: 110 }}
+              style={{ width: 130 }}
               format="YYYY-MM-DD"
               value={record.endDate ? dayjs(record.endDate) : undefined}
               onDismiss={() => setInlineEditing(null)}
@@ -1699,7 +1711,7 @@ const ProjectDetail: React.FC = () => {
     notes: {
       title: '备注',
       dataIndex: 'notes',
-      width: 140,
+      width: 160,
       render: (notes: string | null, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
           return (
@@ -1807,15 +1819,15 @@ const ProjectDetail: React.FC = () => {
       width: 100,
       fixed: 'right' as const,
       render: (_: unknown, record: Activity) => (
-        <Space>
+        <Space size={4}>
           {hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && (
             <Tooltip content="编辑">
-              <Button type="text" icon={<IconEdit />} size="small" onClick={() => handleOpenDrawer(record)} />
+              <IconEdit style={{ cursor: 'pointer', color: 'rgb(var(--primary-6))' }} onClick={() => handleOpenDrawer(record)} />
             </Tooltip>
           )}
           {hasPermission('activity', 'delete') && isProjectManager(project?.managerId ?? '', project?.id) && (
             <Tooltip content="删除">
-              <Button type="text" status="danger" icon={<IconDelete />} size="small" onClick={() => handleDeleteActivity(record)} />
+              <IconDelete style={{ cursor: 'pointer', color: 'rgb(var(--danger-6))' }} onClick={() => handleDeleteActivity(record)} />
             </Tooltip>
           )}
         </Space>
@@ -1837,7 +1849,7 @@ const ProjectDetail: React.FC = () => {
     const dynamicWidth = columnPrefs.order
       .filter((key) => visibleSet.has(key))
       .reduce((sum, key) => sum + (COLUMN_WIDTH_MAP[key] || 100), 0);
-    return dynamicWidth + 50 + 100; // drag(50) + actions(100)
+    return dynamicWidth + 36 + 50 + 100; // checkbox(36) + drag(50) + actions(100)
   }, [columnPrefs]);
 
   if (loading || !project) {
@@ -1986,7 +1998,7 @@ const ProjectDetail: React.FC = () => {
                           </Menu.Item>
                         )}
                         {hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && (
-                          <Menu.Item key="2" onClick={() => Message.info('批量导入功能开发中')}>
+                          <Menu.Item key="2" onClick={() => setImportModalVisible(true)}>
                             <IconUpload style={{ marginRight: 8 }} />
                             批量导入
                           </Menu.Item>
@@ -2078,7 +2090,7 @@ const ProjectDetail: React.FC = () => {
                 </div>
               )}
 
-              <div ref={tableWrapRef} style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
+              <div ref={tableWrapRef} className="compact-table" style={{ paddingTop: theadFixed ? theadFixedPos.height : 0 }}>
                 {/* 自定义表格行（支持拖拽） */}
                 <Table
                   columns={activityColumns}
@@ -2091,7 +2103,7 @@ const ProjectDetail: React.FC = () => {
                   loading={activitiesLoading}
                   rowKey="id"
                   pagination={false}
-                  scroll={{ x: scrollX }}
+                  scroll={{ x: scrollX, y: 'calc(100vh - 280px)' }}
                   components={{
                     body: {
                       row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number;[key: string]: unknown }) => {
@@ -2741,6 +2753,66 @@ const ProjectDetail: React.FC = () => {
             onChange={setArchiveLabelInput}
             maxLength={50}
           />
+        </Modal>
+
+        {/* 批量导入 Modal */}
+        <Modal
+          title="批量导入活动"
+          visible={importModalVisible}
+          onCancel={() => setImportModalVisible(false)}
+          footer={null}
+          style={{ width: 640 }}
+          unmountOnExit
+        >
+          <div
+            style={{
+              border: '2px dashed var(--color-border-3)',
+              borderRadius: 8,
+              background: 'var(--color-fill-1)',
+              padding: '50px 20px',
+              margin: '0 32px',
+              textAlign: 'center',
+              cursor: importUploading ? 'default' : 'pointer',
+              transition: 'border-color 0.2s',
+            }}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const file = e.dataTransfer?.files?.[0];
+              if (file && !importUploading) doImportFile(file);
+            }}
+            onClick={() => {
+              if (importUploading) return;
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.xlsx,.xls';
+              input.onchange = () => {
+                const file = input.files?.[0];
+                if (file) doImportFile(file);
+              };
+              input.click();
+            }}
+          >
+            {importUploading ? (
+              <Spin tip="正在导入..." />
+            ) : (
+              <>
+                <IconUpload style={{ fontSize: 36, color: 'var(--color-text-3)' }} />
+                <p style={{ marginTop: 12, fontSize: 15, color: 'var(--color-text-2)' }}>
+                  拖拽 Excel 文件到此处
+                </p>
+                <p style={{ marginTop: 4, fontSize: 13, color: 'var(--color-text-3)' }}>
+                  或点击选择文件（.xlsx / .xls，最大 5MB）
+                </p>
+              </>
+            )}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-text-3)', lineHeight: 1.8 }}>
+            <div>Excel 表头自动识别以下列名：</div>
+            <div>活动名称/任务描述、阶段、负责人、工期、计划开始/结束、状态、备注</div>
+            <div>重复活动（名称+阶段+日期相同）将自动跳过</div>
+          </div>
         </Modal>
 
         {/* 归档管理抽屉 */}

@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
+  globalTeardown: './e2e/global-teardown.ts',
   testDir: './e2e/specs',
   fullyParallel: false,
   workers: 1,

@@ -187,7 +187,7 @@ const WeeklyReportsSummary: React.FC = () => {
     {
       title: '项目名称',
       dataIndex: 'project.name',
-      width: 200,
+      width: 210,
       sorter: (a: WeeklyReport, b: WeeklyReport) => {
         const nameA = a.project?.name || '';
         const nameB = b.project?.name || '';
@@ -213,7 +213,8 @@ const WeeklyReportsSummary: React.FC = () => {
     },
     {
       title: '状态',
-      width: 80,
+      width: 100,
+      align: 'center' as const,
       sorter: (a: WeeklyReport, b: WeeklyReport) => a.progressStatus.localeCompare(b.progressStatus),
       render: (_: unknown, record: WeeklyReport) => {
         const icon = PROGRESS_ICON[record.progressStatus] || '?';

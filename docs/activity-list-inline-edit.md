@@ -16,8 +16,9 @@
 | 6 | assignee | 负责人 | Select 多选下拉 | 选择即提交 | 点击空白关闭 |
 | 7 | planDuration | 计划工期 | InputNumber | 回车 / 失焦 | 失焦自动提交 |
 | 8 | planDates | 计划时间 | DatePicker.RangePicker | 选完日期范围自动提交 | 点击空白关闭 |
-| 9 | actualDates | 实际时间 | DatePicker.RangePicker | 选完日期范围自动提交 | 点击空白关闭 |
-| 10 | notes | 备注 | Input 文本框 | 回车 / 原生失焦 | 失焦自动提交 |
+| 9 | actualStartDate | 实际开始 | DatePicker | 选择日期后自动提交 | 点击空白关闭 |
+| 10 | actualEndDate | 实际结束 | DatePicker | 选择日期后自动提交 | 点击空白关闭 |
+| 11 | notes | 备注 | Input 文本框 | 回车 / 原生失焦 | 失焦自动提交 |
 
 ## 3. 交互规范
 
@@ -45,11 +46,15 @@
 - 点击空白处关闭下拉列表（document mousedown 监听 → 退出编辑态）
 - 负责人为多选模式，关闭下拉列表时提交已选值
 
-#### DatePicker.RangePicker 类（planDates、actualDates）
-- 计划时间与实际时间均单击后显示 `<RangePicker />` 并自动弹出日历面板
+#### DatePicker.RangePicker 类（planDates）
+- 计划时间单击后显示 `<RangePicker />` 并自动弹出日历面板
 - 选完开始和结束日期后自动提交
 - 点击空白处触发全局 `mousedown` 监听关闭日历面板并退出编辑态（组件卸载）
-- *附设增强*：实际时间（`actualDates`）非编辑态展示时会自动基于开始与结束计算并附带展示工期（如：`3天`灰色小字）
+
+#### DatePicker 类（actualStartDate、actualEndDate）
+- 实际开始/实际结束为独立列，单击后显示 `<DatePicker />` 并自动弹出日历面板（受控 `popupVisible`）
+- 选择日期后 API 更新完成再关闭弹窗
+- 实际结束超期时显示红色
 
 ### 3.3 特殊规则
 
