@@ -211,7 +211,7 @@ test.describe.serial('Activity Archive Management', () => {
       await expect(headerContainer.getByText(headerText, { exact: false })).toBeVisible();
     }
     // Optional columns may be scrolled off-screen
-    const optionalHeaders = ['负责人', '计划工期', '计划时间', '实际时间', '备注'];
+    const optionalHeaders = ['负责人', '计划工期', '计划开始', '计划结束', '实际开始', '实际结束', '实际工期', '备注'];
     let visibleOptional = 0;
     for (const headerText of optionalHeaders) {
       if (await headerContainer.getByText(headerText, { exact: false }).isVisible().catch(() => false)) {
