@@ -140,14 +140,16 @@
 | IMP-010 | 撤销删除单条活动 | 删除单条活动 | 点击提示中"撤销" | 活动恢复，可在列表中找到 |
 | IMP-011 | 撤销批量删除 | 批量删除多条活动 | 点击提示中"撤销" | 所有活动快速批量恢复，不可重复点击 |
 
-### 3.6 活动归档
+### 3.6 项目快照
 
 | 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
 |------|---------|---------|---------|---------|
-| ARCH-001 | 创建归档快照 | 项目有活动 | POST `/api/activities/project/:projectId/archives` | 201，snapshot 含完整活动数据 |
-| ARCH-002 | 获取归档列表 | 已有归档 | GET `/api/activities/project/:projectId/archives` | 200，按时间倒序 |
-| ARCH-003 | 获取归档详情 | 归档存在 | GET `/api/activities/archives/:id` | 200，snapshot 只读 |
-| ARCH-004 | 删除归档 | 归档存在 | DELETE `/api/activities/archives/:id` | 200 |
+| SNAP-001 | 创建项目快照 | 项目有活动 | POST `/api/projects/:id/snapshot` | 200，snapshot 含项目全量数据（活动、产品、周报、风险评估） |
+| SNAP-002 | 创建带备注的快照 | 项目存在 | POST `/api/projects/:id/snapshot` body: `{ remark: "EVT完成" }` | 200，remark 字段保存 |
+| SNAP-003 | 获取快照列表 | 已有快照 | GET `/api/projects/:id/archives` | 200，按时间倒序，含创建人信息，不含 snapshot 详情 |
+| SNAP-004 | 获取快照详情 | 快照存在 | GET `/api/projects/archives/:archiveId` | 200，含完整 snapshot 数据 |
+| SNAP-005 | 查看快照只读页面 | 快照存在 | 访问 `/projects/:id/snapshot/:snapshotId` | 复用项目详情页，所有内容只读，隐藏排期工具和项目快照 Tab |
+| SNAP-006 | 快照返回导航 | 在快照页面 | 点击"返回项目" | 跳转到项目详情的快照 Tab |
 
 ### 3.7 风险评估
 

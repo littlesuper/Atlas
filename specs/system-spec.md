@@ -199,7 +199,7 @@ users ──┬── user_roles ──── roles ──── role_permission
 | project_members | 项目协作者 | N:N 关联表（users ↔ projects），复合主键 [projectId, userId] |
 | activities | 活动/任务 | 自引用（parentId）, N:1 → projects, N:N → users（assignees） |
 | _ActivityAssignees | 活动-负责人 | N:N 隐式关联表（activities ↔ users） |
-| activity_archives | 活动归档快照 | N:1 → projects |
+| project_archives | 项目快照 | N:1 → projects，含全量 snapshot JSON（活动、产品、周报、风险评估） |
 | activity_comments | 活动评论 | N:1 → activities, users |
 | products | 产品 | N:1 → projects |
 | product_change_logs | 产品变更日志 | N:1 → products |
@@ -222,7 +222,7 @@ users ──┬── user_roles ──── roles ──── role_permission
 | 排程工具 | 资源冲突检测、What-If 延期模拟、一键重排、AI 工期建议 | `activities.ts`, `SchedulingTools.tsx` |
 | 关键路径计算 (CPM) | 前向/后向遍历算法，甘特图标记关键路径 | `activities.ts` |
 | 批量操作 | 批量更新活动状态/阶段/负责人，批量删除 | `activities.ts` |
-| 基线对比 | 对比两个存档快照或存档 vs 当前状态的差异 | `activities.ts` |
+| 项目快照 | 保存项目全量数据快照，通过独立路由复用项目详情页只读查看 | `projects.ts`, `SnapshotsTab.tsx` |
 | 活动评论 | 活动级别的评论 CRUD | `activityComments.ts`, `ActivityComments.tsx` |
 | 通知系统 | 活动到期、周报提醒、里程碑临近通知 | `notifications.ts`, `Notification` model |
 | 审计日志 | 活动 CRUD 操作全链路日志记录 | `auditLogs.ts`, `AuditLog` model |
@@ -232,7 +232,7 @@ users ──┬── user_roles ──── roles ──── role_permission
 | 列设置偏好 | 用户可自定义活动表列可见性和排序，持久化到 `User.preferences` | `ColumnSettings.tsx` |
 | 企微集成 | 企业微信配置管理 | `wecomConfig.ts` |
 | 资源看板 | 三段式仪表盘：统计卡片（逾期/无人负责/超载）+ 人员负载堆叠条形图 + 需关注问题表格 | `activities.ts`, `Workload/index.tsx` |
-| 存档标签 | 存档快照可命名 | `ActivityArchive.label` |
+| 项目归档 | 项目归档/取消归档，归档时自动创建快照 | `projects.ts`, `Detail/index.tsx` |
 | 暗色主题 | 支持 light/dark 主题切换，持久化偏好 | `themeStore.ts`, `global.css` |
 
 ## 11. 环境变量
