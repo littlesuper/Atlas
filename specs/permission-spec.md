@@ -210,7 +210,7 @@ GET /api/users?page=1&pageSize=20&keyword=张
 |------|------|------|
 | page | Number | 页码，默认 1 |
 | pageSize | Number | 每页数量，默认 20 |
-| keyword | String | 按用户名/姓名/邮箱模糊搜索（不区分大小写） |
+| keyword | String | 按用户名/姓名模糊搜索（不区分大小写） |
 
 **响应（200）：**
 ```json
@@ -219,9 +219,8 @@ GET /api/users?page=1&pageSize=20&keyword=张
     {
       "id": "uuid",
       "username": "zhangsan",
-      "email": "zhangsan@hwsystem.com",
       "realName": "张三",
-      "phone": "13800138001",
+      "canLogin": true,
       "status": "ACTIVE",
       "createdAt": "...",
       "roles": [{ "id": "uuid", "name": "项目经理", "description": "..." }]
@@ -240,20 +239,27 @@ POST /api/users
 **认证：** Bearer Token
 **权限：** `user:create`
 
-**请求体：**
+**请求体（可登录用户）：**
 ```json
 {
-  "username": "wangwu",
-  "email": "wangwu@hwsystem.com",
-  "password": "123456",
   "realName": "王五",
-  "phone": "13800138003",
+  "canLogin": true,
+  "password": "123456",
   "roleIds": ["uuid1", "uuid2"]
+}
+```
+> `username` 由系统根据 `realName` 自动生成拼音（pinyin-pro），创建后不可修改。
+
+**请求体（仅联系人）：**
+```json
+{
+  "realName": "赵六",
+  "canLogin": false
 }
 ```
 
 **错误响应：**
-- `400` - 用户名或邮箱已存在
+- `400` - 用户名已存在
 
 #### 更新用户
 ```
@@ -265,15 +271,14 @@ PUT /api/users/:id
 **请求体：**
 ```json
 {
-  "email": "new@hwsystem.com",
   "realName": "王五五",
-  "phone": "13900139000",
+  "canLogin": true,
   "status": "DISABLED",
   "roleIds": ["uuid1"],
   "password": "newpassword（可选，留空不修改）"
 }
 ```
-- 邮箱格式校验：`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`，格式不正确返回 400
+- `username` 创建后不可修改
 - 更新角色时先删除旧关联再创建新关联（全量替换）
 
 #### 删除用户
@@ -425,7 +430,7 @@ GET /api/ai-config/usage-stats?startDate=2025-01-01&endDate=2025-12-31
 Tab 切换三个子页面：
 
 #### 用户管理 Tab
-- 用户列表表格：用户名、姓名、邮箱、手机、角色标签、状态标签、创建时间
+- 用户列表表格：用户名、姓名、允许登录、角色标签、状态标签、创建时间
 - 搜索框
 - 新建用户按钮
 - 编辑/删除按钮

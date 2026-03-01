@@ -278,3 +278,5 @@ cd .. && npm run dev
 | [product-spec.md](./product-spec.md) | 产品管理模块（产品信息、规格、性能） |
 | [permission-spec.md](./permission-spec.md) | 权限管理模块（用户、角色、权限 RBAC） |
 | [system-spec.md](./system-spec.md) | 系统整体规格（本文档） |
+| [e2e-test-suite.md](./e2e-test-suite.md) | E2E 测试用例集（Playwright，32 文件 / 157 用例） |
+| [test-cases.md](./test-cases.md) | API / 功能测试用例（五模块覆盖） |

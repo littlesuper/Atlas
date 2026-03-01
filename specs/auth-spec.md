@@ -11,14 +11,18 @@
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | UUID | PK | 用户唯一标识 |
-| username | String | UNIQUE, NOT NULL | 用户名（登录账号） |
-| email | String | UNIQUE, NOT NULL | 邮箱 |
-| password | String | NOT NULL | 密码（bcrypt 哈希） |
+| username | String | UNIQUE, NULLABLE | 用户名（登录账号，创建时根据姓名自动生成拼音，创建后不可修改） |
+| password | String | NULLABLE | 密码（bcrypt 哈希，仅 canLogin=true 的用户需要） |
 | realName | String | NOT NULL | 真实姓名 |
-| phone | String | NULLABLE | 手机号 |
+| wecomUserId | String | UNIQUE, NULLABLE | 企业微信用户ID，用于企微扫码登录 |
+| canLogin | Boolean | NOT NULL, DEFAULT: true | 是否允许登录（false 表示仅联系人，无法登录） |
 | status | Enum | NOT NULL, DEFAULT: ACTIVE | 账号状态 |
 | createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
 | updatedAt | DateTime | NOT NULL, AUTO | 更新时间 |
+
+**两种用户类型：**
+- **可登录用户**（`canLogin: true`）：需要 username + password，可分配角色和权限，可登录系统
+- **仅联系人**（`canLogin: false`）：只需 realName，可被分配为活动负责人，但无法登录
 
 ### UserStatus 枚举
 
@@ -53,8 +57,8 @@ POST /api/auth/login
   "user": {
     "id": "uuid",
     "username": "admin",
-    "email": "admin@hwsystem.com",
     "realName": "系统管理员",
+    "canLogin": true,
     "roles": ["系统管理员"],
     "permissions": ["*:*"],
     "collaboratingProjectIds": ["project-uuid-1", "project-uuid-2"]
@@ -63,7 +67,7 @@ POST /api/auth/login
 ```
 
 **错误响应：**
-- `401` - 用户名或密码错误
+- `401` - 用户名或密码错误，或用户 `canLogin: false`
 - `403` - 账号已被禁用
 
 ### 3.2 刷新令牌
@@ -104,9 +108,8 @@ GET /api/auth/me
 {
   "id": "uuid",
   "username": "admin",
-  "email": "admin@hwsystem.com",
   "realName": "系统管理员",
-  "phone": null,
+  "canLogin": true,
   "roles": ["系统管理员"],
   "permissions": ["*:*"],
   "collaboratingProjectIds": ["project-uuid-1", "project-uuid-2"]
