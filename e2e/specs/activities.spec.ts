@@ -63,7 +63,7 @@ test.describe.serial('Activity Management', () => {
 
     // ── Step 4: Delete activity ──
     const row = page.locator('.arco-table-tr').filter({ hasText: activityName });
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('.arco-icon-delete').click();
 
     await confirmModal(page);
     await expectMessage(page, '已删除活动');
