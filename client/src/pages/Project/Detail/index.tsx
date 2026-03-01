@@ -84,7 +84,7 @@ const DEFAULT_COLUMN_VISIBLE = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
 const ProjectDetail: React.FC = () => {
   const { id, snapshotId } = useParams<{ id: string; snapshotId?: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission, isProjectManager } = useAuthStore();
 
   // UI 状态
@@ -809,7 +809,18 @@ const ProjectDetail: React.FC = () => {
         <Card>
           <Tabs
             activeTab={activeTab}
-            onChange={setActiveTab}
+            onChange={(tab) => {
+              setActiveTab(tab);
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                if (tab === 'activities') {
+                  next.delete('tab');
+                } else {
+                  next.set('tab', tab);
+                }
+                return next;
+              }, { replace: true });
+            }}
             style={{ '--tab-bar-style': 'sticky' } as React.CSSProperties}
             {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: 'var(--color-bg-1)', marginBottom: 0 } } as any}
           >

@@ -40,6 +40,12 @@ body {
   --status-in-progress: #4080ff;
   --status-not-started: #86909c;
 
+  /* 风险标签文字色（深色，确保在浅色底上可读） */
+  --risk-low-color: #0a6e1a;
+  --risk-medium-color: #b25000;
+  --risk-high-color: #cb2634;
+  --risk-critical-color: #8e0e17;
+
   /* 分隔线 / 浅背景 */
   --divider-color: #f2f3f5;
   --subtle-bg: #fafafa;
@@ -575,6 +581,12 @@ body[arco-theme='dark'] {
   --status-on-track: #5cc080;
   --status-in-progress: #7ea8e8;
   --status-not-started: #6b7280;
+
+  /* 风险标签文字色（亮色，确保在深色底上可读） */
+  --risk-low-color: #5cc080;
+  --risk-medium-color: #e0a050;
+  --risk-high-color: #e08080;
+  --risk-critical-color: #d06868;
 
   /* 分隔线 / 浅背景 */
   --divider-color: rgba(255, 255, 255, 0.06);

@@ -34,10 +34,10 @@ interface Props {
 }
 
 const RISK_LEVEL_CONFIG: Record<string, { color: string; bgVar: string }> = {
-  LOW:      { color: 'var(--status-success)', bgVar: 'var(--risk-low-bg)' },
-  MEDIUM:   { color: 'var(--status-warning)', bgVar: 'var(--risk-medium-bg)' },
-  HIGH:     { color: 'var(--status-danger)', bgVar: 'var(--risk-high-bg)' },
-  CRITICAL: { color: 'var(--status-danger-dark)', bgVar: 'var(--risk-high-bg)' },
+  LOW:      { color: 'var(--risk-low-color)', bgVar: 'var(--risk-low-bg)' },
+  MEDIUM:   { color: 'var(--risk-medium-color)', bgVar: 'var(--risk-medium-bg)' },
+  HIGH:     { color: 'var(--risk-high-color)', bgVar: 'var(--risk-high-bg)' },
+  CRITICAL: { color: 'var(--risk-critical-color)', bgVar: 'var(--risk-high-bg)' },
 };
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -45,6 +45,14 @@ const SEVERITY_COLOR: Record<string, string> = {
   MEDIUM: 'orange',
   HIGH: 'red',
 };
+
+/** Normalize Chinese / English / mixed-case risk level to canonical UPPERCASE key */
+function normalizeRiskLevel(level: string): string {
+  const upper = level?.toUpperCase?.() || '';
+  if (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(upper)) return upper;
+  const cnMap: Record<string, string> = { '低': 'LOW', '低风险': 'LOW', '中': 'MEDIUM', '中风险': 'MEDIUM', '高': 'HIGH', '高风险': 'HIGH', '严重': 'CRITICAL', '严重风险': 'CRITICAL' };
+  return cnMap[level] || upper;
+}
 
 const RISK_LEVEL_VALUE: Record<string, number> = {
   LOW: 1,
@@ -215,7 +223,7 @@ const RiskTrendChart: React.FC<{ data: RiskAssessment[] }> = ({ data }) => {
     );
 
     const xData = sorted.map((d) => dayjs(d.assessedAt).format('MM-DD HH:mm'));
-    const yData = sorted.map((d) => RISK_LEVEL_VALUE[d.riskLevel] || 1);
+    const yData = sorted.map((d) => RISK_LEVEL_VALUE[normalizeRiskLevel(d.riskLevel)] || 1);
     const sourceData = sorted.map((d) => d.source || 'rule_engine');
     const levelData = sorted.map((d) => d.riskLevel);
 
@@ -227,7 +235,7 @@ const RiskTrendChart: React.FC<{ data: RiskAssessment[] }> = ({ data }) => {
           const idx = params[0]?.dataIndex;
           if (idx == null) return '';
           const date = dayjs(sorted[idx].assessedAt).format('YYYY-MM-DD HH:mm');
-          const level = RISK_LEVEL_MAP[levelData[idx] as keyof typeof RISK_LEVEL_MAP]?.label ?? levelData[idx];
+          const level = RISK_LEVEL_MAP[normalizeRiskLevel(levelData[idx]) as keyof typeof RISK_LEVEL_MAP]?.label ?? levelData[idx];
           const src = SOURCE_LABEL[sourceData[idx]]?.text || sourceData[idx];
           return `${date}<br/>风险等级: <b>${level}</b><br/>来源: ${src}`;
         },
@@ -319,7 +327,8 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
     setExpandedFactors((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
-  const cfg = RISK_LEVEL_CONFIG[assessment.riskLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
+  const normalizedLevel = normalizeRiskLevel(assessment.riskLevel);
+  const cfg = RISK_LEVEL_CONFIG[normalizedLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
   const sourceInfo = SOURCE_LABEL[assessment.source || 'rule_engine'] || SOURCE_LABEL.rule_engine;
 
   return (
@@ -346,7 +355,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
               padding: isLatest ? '2px 12px' : '1px 8px',
             }}
           >
-            {RISK_LEVEL_MAP[assessment.riskLevel as keyof typeof RISK_LEVEL_MAP]?.label ?? assessment.riskLevel}
+            {RISK_LEVEL_MAP[normalizedLevel as keyof typeof RISK_LEVEL_MAP]?.label ?? assessment.riskLevel}
           </Tag>
           <Tag color={sourceInfo.color} size="small">
             {sourceInfo.text}
@@ -379,8 +388,8 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
                   borderRadius: 6,
                 }}
               >
-                <Tag size="small" color={SEVERITY_COLOR[f.severity] || 'default'} style={{ flexShrink: 0 }}>
-                  {RISK_LEVEL_MAP[f.severity as keyof typeof RISK_LEVEL_MAP]?.label?.replace('风险', '') ?? f.severity}
+                <Tag size="small" color={SEVERITY_COLOR[normalizeRiskLevel(f.severity)] || 'default'} style={{ flexShrink: 0 }}>
+                  {RISK_LEVEL_MAP[normalizeRiskLevel(f.severity) as keyof typeof RISK_LEVEL_MAP]?.label?.replace('风险', '') ?? f.severity}
                 </Tag>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 500, fontSize: 13 }}>{f.factor}</div>
