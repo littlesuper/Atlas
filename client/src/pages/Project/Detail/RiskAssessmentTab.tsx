@@ -54,6 +54,7 @@ const SEVERITY_COLOR: Record<string, string> = {
   LOW: 'green',
   MEDIUM: 'orange',
   HIGH: 'red',
+  CRITICAL: 'red',
 };
 
 /** Normalize Chinese / English / mixed-case risk level to canonical UPPERCASE key */
