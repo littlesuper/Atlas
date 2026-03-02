@@ -78,6 +78,8 @@ const NotificationBell: React.FC = () => {
     if (notification.relatedId) {
       if (notification.type === 'REPORT_REMINDER') {
         navigate(`/projects/${notification.relatedId}?tab=weekly`);
+      } else if (notification.type === 'RISK_ESCALATION' || notification.type === 'RISK_ALERT') {
+        navigate(`/projects/${notification.relatedId}?tab=risk`);
       } else {
         // ACTIVITY_DUE and MILESTONE_APPROACHING - navigate to project detail
         navigate(`/projects/${notification.relatedId}`);
@@ -100,6 +102,8 @@ const NotificationBell: React.FC = () => {
     ACTIVITY_DUE: '⏰',
     MILESTONE_APPROACHING: '🎯',
     REPORT_REMINDER: '📝',
+    RISK_ESCALATION: '🔺',
+    RISK_ALERT: '⚠️',
   };
 
   // 计算面板位置（基于铃铛按钮）

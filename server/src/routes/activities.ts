@@ -10,6 +10,7 @@ import { auditLog, diffFields } from '../utils/auditLog';
 import { callAi } from '../utils/aiClient';
 import { parseExcelActivities } from '../utils/excelActivityParser';
 import { detectCircularDependency } from '../utils/dependencyValidator';
+import { calculateCriticalPath } from '../utils/criticalPath';
 import { pinyin } from 'pinyin-pro';
 
 const router = express.Router();
@@ -842,86 +843,7 @@ router.get('/project/:projectId/critical-path', authenticate, async (req: Reques
       select: { id: true, planStartDate: true, planEndDate: true, planDuration: true, dependencies: true },
     });
 
-    if (activities.length === 0) {
-      res.json({ criticalActivityIds: [] }); return;
-    }
-
-    // Build dependency graph
-    const actMap = new Map(activities.map(a => [a.id, a]));
-    const successors = new Map<string, string[]>();
-    const predecessors = new Map<string, string[]>();
-
-    for (const a of activities) {
-      if (!a.dependencies || !Array.isArray(a.dependencies)) continue;
-      for (const dep of a.dependencies as any[]) {
-        if (!actMap.has(dep.id)) continue;
-        const succ = successors.get(dep.id);
-        if (succ) succ.push(a.id);
-        else successors.set(dep.id, [a.id]);
-        const pred = predecessors.get(a.id);
-        if (pred) pred.push(dep.id);
-        else predecessors.set(a.id, [dep.id]);
-      }
-    }
-
-    // Forward pass: Early Start (ES) and Early Finish (EF)
-    const es = new Map<string, number>();
-    const ef = new Map<string, number>();
-    const duration = new Map<string, number>();
-
-    for (const a of activities) {
-      duration.set(a.id, a.planDuration || 1);
-    }
-
-    // Topological sort
-    const inDegree = new Map<string, number>();
-    for (const a of activities) {
-      inDegree.set(a.id, (predecessors.get(a.id) || []).length);
-    }
-    const queue: string[] = [];
-    for (const [id, deg] of inDegree) {
-      if (deg === 0) queue.push(id);
-    }
-
-    const topoOrder: string[] = [];
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      topoOrder.push(id);
-      for (const succId of (successors.get(id) || [])) {
-        const newDeg = (inDegree.get(succId) || 1) - 1;
-        inDegree.set(succId, newDeg);
-        if (newDeg === 0) queue.push(succId);
-      }
-    }
-
-    // Forward pass
-    for (const id of topoOrder) {
-      const preds = predecessors.get(id) || [];
-      const earlyStart = preds.length > 0 ? Math.max(...preds.map(p => ef.get(p) || 0)) : 0;
-      es.set(id, earlyStart);
-      ef.set(id, earlyStart + (duration.get(id) || 1));
-    }
-
-    // Backward pass: Late Start (LS) and Late Finish (LF)
-    const projectEnd = Math.max(...activities.map(a => ef.get(a.id) || 0));
-    const ls = new Map<string, number>();
-    const lf = new Map<string, number>();
-
-    for (const id of topoOrder.slice().reverse()) {
-      const succs = successors.get(id) || [];
-      const lateFinish = succs.length > 0 ? Math.min(...succs.map(s => ls.get(s) || projectEnd)) : projectEnd;
-      lf.set(id, lateFinish);
-      ls.set(id, lateFinish - (duration.get(id) || 1));
-    }
-
-    // Critical path: float = 0
-    const criticalActivityIds = activities
-      .filter(a => {
-        const float = (ls.get(a.id) || 0) - (es.get(a.id) || 0);
-        return float === 0;
-      })
-      .map(a => a.id);
-
+    const criticalActivityIds = calculateCriticalPath(activities);
     res.json({ criticalActivityIds });
   } catch (error) {
     console.error('计算关键路径错误:', error);

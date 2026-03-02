@@ -37,6 +37,7 @@ model User {
   createdReports         WeeklyReport[]   @relation("ReportCreator")
   activityComments       ActivityComment[]
   notifications          Notification[]
+  ownedRiskItems         RiskItem[]       @relation("RiskItemOwner")
 
   @@map("users")
 }
@@ -129,6 +130,7 @@ model Project {
   projectArchives  ProjectArchive[]
   products         Product[]
   riskAssessments  RiskAssessment[]
+  riskItems        RiskItem[]
   weeklyReports    WeeklyReport[]
   aiUsageLogs      AiUsageLog[]
 
@@ -240,18 +242,61 @@ model TemplateActivity {
 }
 
 model RiskAssessment {
-  id           String   @id @default(uuid())
-  projectId    String
-  riskLevel    String
-  riskFactors  Json
-  suggestions  Json
-  source       String   @default("rule_engine") // "ai" | "rule_engine"
-  assessedAt   DateTime @default(now())
+  id             String   @id @default(uuid())
+  projectId      String
+  riskLevel      String
+  riskFactors    Json
+  suggestions    Json
+  source         String   @default("rule_engine") // "ai" | "rule_engine" | "scheduled_ai" | "scheduled_rule"
+  aiInsights     String?
+  aiEnhancedData Json?
+  assessedAt     DateTime @default(now())
 
   // 关联关系
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  riskItems RiskItem[]
 
+  @@index([projectId])
   @@map("risk_assessments")
+}
+
+model RiskItem {
+  id            String    @id @default(uuid())
+  projectId     String
+  assessmentId  String?
+  title         String
+  description   String?
+  severity      String    // LOW | MEDIUM | HIGH | CRITICAL
+  status        String    @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | ACCEPTED
+  ownerId       String?
+  dueDate       DateTime?
+  source        String    @default("manual") // ai | rule_engine | manual | weekly_report
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+
+  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assessment RiskAssessment?  @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  owner      User?            @relation("RiskItemOwner", fields: [ownerId], references: [id])
+  logs       RiskItemLog[]
+
+  @@index([projectId])
+  @@index([status])
+  @@map("risk_items")
+}
+
+model RiskItemLog {
+  id         String   @id @default(uuid())
+  riskItemId String
+  action     String   // CREATED | STATUS_CHANGED | COMMENTED | ASSIGNED | SEVERITY_CHANGED
+  content    String?
+  userId     String
+  createdAt  DateTime @default(now())
+
+  riskItem RiskItem @relation(fields: [riskItemId], references: [id], onDelete: Cascade)
+
+  @@index([riskItemId])
+  @@map("risk_item_logs")
 }
 
 enum ReportStatus {

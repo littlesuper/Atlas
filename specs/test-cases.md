@@ -187,12 +187,73 @@
 
 | 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
 |------|---------|---------|---------|---------|
-| RISK-001 | 发起风险评估 | 项目有活动 | POST `/api/risk/project/:projectId/assess` | 200，返回 riskLevel + riskFactors + suggestions |
+| RISK-001 | 发起风险评估 | 项目有活动 | POST `/api/risk/project/:projectId/assess` | 200，返回 riskLevel + riskFactors + suggestions + source |
 | RISK-002 | 低风险项目 | 所有活动按时进行 | POST assess | riskLevel=LOW（得分 < 2） |
 | RISK-003 | 高风险项目 | 多个活动逾期 | POST assess | riskLevel=HIGH 或 CRITICAL |
-| RISK-004 | 获取评估历史 | 已有评估记录 | GET `/api/risk/project/:projectId` | 200，历史记录列表 |
+| RISK-004 | 获取评估历史 | 已有评估记录 | GET `/api/risk/project/:projectId` | 200，历史记录列表含 source 字段 |
 | RISK-005 | 空状态展示 | 项目无评估记录 | 打开 AI 风险评估 Tab | 页面仅显示一条 Empty 提示，工具栏计数区域为空，无重复文字 |
 | RISK-006 | 风险趋势图显示 | 已有 ≥ 2 条评估记录 | 打开 AI 风险评估 Tab | 评估卡片上方显示折线趋势图 |
+| RISK-007 | 规则引擎 fallback | AI 未配置 | POST assess | 200，source=rule_engine，aiInsights 为 null |
+| RISK-008 | AI 增强输出字段 | AI 已配置 | POST assess | aiInsights 非空，aiEnhancedData 含 trendPrediction/actionItems |
+| RISK-009 | riskScore 返回 | — | POST assess | riskFactors 每条含 score 字段 |
+
+### 3.7b 风险仪表盘
+
+| 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
+|------|---------|---------|---------|---------|
+| DASH-001 | 获取风险仪表盘 | 有进行中项目且有评估 | GET `/api/risk/dashboard` | 200，返回 projects + riskDistribution + topActionItems |
+| DASH-002 | 仪表盘空状态 | 无评估记录 | GET `/api/risk/dashboard` | 200，projects 为空数组，distribution 全为 0 |
+| DASH-003 | 趋势方向计算 | 项目有多次评估 | GET `/api/risk/dashboard` | trendDirection 正确（IMPROVING/WORSENING/STABLE） |
+| DASH-004 | AI 洞察 | 有评估数据 | GET `/api/risk/dashboard/insights` | 200，topConcerns 非空 |
+| DASH-005 | AI 洞察 fallback | AI 不可用 | GET `/api/risk/dashboard/insights` | 200，基于规则引擎生成 topConcerns |
+| DASH-006 | 风险变化对比 | 项目有两次评估 | GET `/api/risk/project/:projectId/comparison` | 200，changes 含 levelChange/newRisks/resolvedRisks |
+| DASH-007 | 变化对比-首次评估 | 仅一次评估 | GET comparison | 200，previous 为 null，changes.levelChange = 'UNCHANGED' |
+| DASH-008 | 页面渲染 | 有评估数据 | 访问 /risk-dashboard | 显示统计卡片、矩阵表、行动项面板 |
+| DASH-009 | 页面空态 | 无评估数据 | 访问 /risk-dashboard | 显示空数据提示 |
+| DASH-010 | 点击项目行跳转 | 矩阵表有数据 | 点击项目行 | 跳转到 /projects/:id?tab=risk |
+
+### 3.7c 风险项管理
+
+| 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
+|------|---------|---------|---------|---------|
+| RITEM-001 | 获取风险项列表 | 项目有风险项 | GET `/api/risk-items?projectId=xxx` | 200，返回分页列表含 owner |
+| RITEM-002 | 按状态筛选 | 有不同状态风险项 | GET `/api/risk-items?status=OPEN` | 仅返回 OPEN 状态 |
+| RITEM-003 | 创建风险项 | 登录 | POST `/api/risk-items` `{ projectId, title, severity }` | 201，自动写 CREATED 日志 |
+| RITEM-004 | 创建缺必填字段 | — | POST `/api/risk-items` `{ projectId }` | 400 |
+| RITEM-005 | 获取风险项详情 | 风险项存在 | GET `/api/risk-items/:id` | 200，含 logs（附带 user 信息） |
+| RITEM-006 | 更新状态 | 风险项 OPEN | PUT `/api/risk-items/:id` `{ status: 'IN_PROGRESS' }` | 200，自动写 STATUS_CHANGED 日志 |
+| RITEM-007 | 解决风险项 | 风险项 IN_PROGRESS | PUT `{ status: 'RESOLVED' }` | 200，resolvedAt 非空 |
+| RITEM-008 | 更新严重度 | 风险项存在 | PUT `{ severity: 'CRITICAL' }` | 200，自动写 SEVERITY_CHANGED 日志 |
+| RITEM-009 | 分配负责人 | 风险项存在 | PUT `{ ownerId: 'uuid' }` | 200，自动写 ASSIGNED 日志 |
+| RITEM-010 | 删除风险项 | 风险项存在 | DELETE `/api/risk-items/:id` | 200 |
+| RITEM-011 | 删除不存在风险项 | — | DELETE `/api/risk-items/nonexist` | 404 |
+| RITEM-012 | 添加评论 | 风险项存在 | POST `/api/risk-items/:id/comment` `{ content: '已确认' }` | 201，action=COMMENTED |
+| RITEM-013 | 空评论 | — | POST comment `{ content: '' }` | 400 |
+| RITEM-014 | 从评估导入 | 评估有 actionItems | POST `/api/risk-items/from-assessment/:assessmentId` | 201，created 数等于 actionItems 数 |
+| RITEM-015 | 从评估导入-去重 | 已存在同名 OPEN 风险项 | POST from-assessment | 跳过已存在项 |
+| RITEM-016 | 从评估导入-无 actionItems | 评估无 aiEnhancedData | POST from-assessment | 400，提示无可导入行动项 |
+
+### 3.7d 定时任务与预警
+
+| 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
+|------|---------|---------|---------|---------|
+| SCHED-001 | 定时评估触发 | RISK_SCHEDULER_ENABLED=true | 等待 cron 触发 | IN_PROGRESS 项目生成新评估 |
+| SCHED-002 | 风险升级通知 | 评估等级上升 | 定时评估后 | 项目经理收到 RISK_ESCALATION 通知 |
+| SCHED-003 | 逾期预警 | 活动逾期 > 7 天 | 阈值检查触发 | 负责人收到 RISK_ALERT 通知 |
+| SCHED-004 | 即将到期预警 | 活动 3 天内到期且未开始 | 阈值检查触发 | 负责人收到 RISK_ALERT 通知 |
+| SCHED-005 | 24h 通知去重 | 同类通知 24h 内已发 | 再次触发 | 不创建重复通知 |
+| SCHED-006 | scheduler 禁用 | RISK_SCHEDULER_ENABLED=false | 服务启动 | 无 cron 任务注册 |
+
+### 3.7e 周报-风险联动
+
+| 编号 | 用例名称 | 前置条件 | 操作步骤 | 预期结果 |
+|------|---------|---------|---------|---------|
+| LINK-001 | 风险预填充 | 项目有评估+开放风险项 | GET `/api/weekly-reports/project/:projectId/risk-prefill` | 200，riskWarning 含 HTML 内容 |
+| LINK-002 | 风险预填充-无数据 | 项目无评估 | GET risk-prefill | 200，riskWarning 为空 |
+| LINK-003 | 提交周报自动创建风险项 | 周报 risks 数组有条目 | POST submit | risks 中的条目自动创建 RiskItem（source=weekly_report） |
+| LINK-004 | 提交周报-风险项去重 | 已存在同名 OPEN 风险项 | POST submit | 不创建重复 RiskItem |
+| LINK-005 | AI 建议融合风险上下文 | 项目有评估+风险项 | POST ai-suggestions | AI 建议考虑风险数据 |
+| LINK-006 | "从风险评估导入"按钮 | 周报表单编辑中 | 点击"从风险评估导入" | 风险预警编辑器填入预填充内容 |
 
 ### 3.8 周报管理
 

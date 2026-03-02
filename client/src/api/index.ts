@@ -414,20 +414,46 @@ export const riskApi = {
     request.get<any>(`/risk/project/${projectId}`, { params: { pageSize: 50 } }),
 
   assess: (projectId: string) =>
-    request.post<{
-      id: string;
-      riskLevel: string;
-      riskFactors: Array<{ factor: string; severity: string; description: string }>;
-      suggestions: string[];
-      source?: string;
-      assessedAt: string;
-    }>(`/risk/project/${projectId}/assess`),
+    request.post<any>(`/risk/project/${projectId}/assess`),
 
   delete: (id: string) =>
     request.delete(`/risk/${id}`),
 
   getSummary: () =>
     request.get<Array<{ projectId: string; projectName: string; riskLevel: string; assessedAt: string }>>('/risk/summary'),
+
+  getDashboard: () =>
+    request.get<any>('/risk/dashboard'),
+
+  getInsights: () =>
+    request.get<any>('/risk/dashboard/insights'),
+
+  getComparison: (projectId: string) =>
+    request.get<any>(`/risk/project/${projectId}/comparison`),
+};
+
+// ============ 风险项 API ============
+export const riskItemsApi = {
+  list: (params?: { projectId?: string; status?: string; page?: number; pageSize?: number }) =>
+    request.get<any>('/risk-items', { params }),
+
+  create: (data: any) =>
+    request.post<any>('/risk-items', data),
+
+  get: (id: string) =>
+    request.get<any>(`/risk-items/${id}`),
+
+  update: (id: string, data: any) =>
+    request.put<any>(`/risk-items/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/risk-items/${id}`),
+
+  comment: (id: string, content: string) =>
+    request.post<any>(`/risk-items/${id}/comment`, { content }),
+
+  fromAssessment: (assessmentId: string) =>
+    request.post<any>(`/risk-items/from-assessment/${assessmentId}`),
 };
 
 // ============ 周报管理 API ============
@@ -490,6 +516,9 @@ export const weeklyReportsApi = {
       `/weekly-reports/project/${projectId}/ai-suggestions`,
       { weekStart, weekEnd }
     ),
+
+  getRiskPrefill: (projectId: string) =>
+    request.get<{ riskWarning: string; risks: any[] }>(`/weekly-reports/project/${projectId}/risk-prefill`),
 };
 
 // ============ 文件上传 API ============

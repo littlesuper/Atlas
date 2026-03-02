@@ -27,6 +27,8 @@ import wecomConfigRoutes from './routes/wecomConfig';
 import activityCommentsRoutes from './routes/activityComments';
 import notificationsRoutes from './routes/notifications';
 import templatesRoutes from './routes/templates';
+import riskItemsRoutes from './routes/riskItems';
+import { startScheduledJobs } from './utils/scheduler';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -130,6 +132,9 @@ app.use('/api/notifications', notificationsRoutes);
 // 项目模板路由
 app.use('/api/templates', templatesRoutes);
 
+// 风险项路由
+app.use('/api/risk-items', riskItemsRoutes);
+
 // ==================== 错误处理中间件 ====================
 
 // 404处理
@@ -152,6 +157,11 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`服务器运行在端口 ${PORT}`);
   console.log(`健康检查: http://localhost:${PORT}/api/health`);
   console.log(`环境: ${process.env.NODE_ENV || 'development'}`);
+
+  // Start scheduled jobs (only in non-test environment)
+  if (process.env.NODE_ENV !== 'test') {
+    startScheduledJobs();
+  }
 });
 
 // ==================== 优雅关闭 ====================

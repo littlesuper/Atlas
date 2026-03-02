@@ -680,6 +680,39 @@ router.post(
       },
     });
 
+    // Auto-create RiskItems from weekly report risks array
+    try {
+      const risks = existingReport.risks as any[] | null;
+      if (risks && Array.isArray(risks)) {
+        for (const risk of risks) {
+          const title = risk.type || risk.description?.slice(0, 50);
+          if (!title) continue;
+          // Dedup by title
+          const existing2 = await prisma.riskItem.findFirst({
+            where: {
+              projectId: existingReport.projectId,
+              title,
+              status: { in: ['OPEN', 'IN_PROGRESS'] },
+            },
+          });
+          if (!existing2) {
+            await prisma.riskItem.create({
+              data: {
+                projectId: existingReport.projectId,
+                title,
+                description: risk.description || null,
+                severity: risk.severity || 'MEDIUM',
+                source: 'weekly_report',
+              },
+            });
+          }
+        }
+      }
+    } catch (riskError) {
+      console.error('周报提交同步风险项失败:', riskError);
+      // Non-blocking: don't fail the submit
+    }
+
     res.json(report);
   } catch (error) {
     console.error('提交周报错误:', error);
@@ -795,6 +828,70 @@ router.delete(
 );
 
 /**
+ * GET /api/weekly-reports/project/:projectId/risk-prefill
+ * 从风险评估生成预填充的风险预警内容
+ */
+router.get('/project/:projectId/risk-prefill', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+
+    // Get latest risk assessment
+    const latestAssessment = await prisma.riskAssessment.findFirst({
+      where: { projectId },
+      orderBy: { assessedAt: 'desc' },
+    });
+
+    // Get open risk items
+    const openRiskItems = await prisma.riskItem.findMany({
+      where: { projectId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      orderBy: { severity: 'asc' },
+      take: 10,
+    });
+
+    let riskWarning = '';
+    const risks: Array<{ type: string; description: string; status: string }> = [];
+
+    // Build from assessment insights
+    if (latestAssessment?.aiInsights) {
+      riskWarning += `<p>${latestAssessment.aiInsights}</p>`;
+    }
+
+    // Build from risk factors
+    if (latestAssessment?.riskFactors) {
+      const factors = latestAssessment.riskFactors as any[];
+      if (factors.length > 0) {
+        riskWarning += '<ul>';
+        for (const f of factors) {
+          if (f.severity !== 'LOW') {
+            riskWarning += `<li><strong>[${f.severity}]</strong> ${f.factor}：${f.description}</li>`;
+            risks.push({
+              type: f.factor,
+              description: f.description,
+              status: 'OPEN',
+            });
+          }
+        }
+        riskWarning += '</ul>';
+      }
+    }
+
+    // Add open risk items
+    if (openRiskItems.length > 0) {
+      riskWarning += '<p>待处理风险项：</p><ul>';
+      for (const item of openRiskItems) {
+        riskWarning += `<li>[${item.severity}] ${item.title}${item.description ? '：' + item.description : ''}</li>`;
+      }
+      riskWarning += '</ul>';
+    }
+
+    res.json({ riskWarning, risks });
+  } catch (error) {
+    console.error('获取风险预填充错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * POST /api/weekly-reports/project/:projectId/ai-suggestions
  * AI智能建议
  */
@@ -862,6 +959,28 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
     let nextWeekPlan = '';
     let riskWarning = '';
 
+    // Fetch risk context for AI suggestions
+    let riskContextStr = '';
+    try {
+      const latestAssessment = await prisma.riskAssessment.findFirst({
+        where: { projectId },
+        orderBy: { assessedAt: 'desc' },
+        select: { riskLevel: true, aiInsights: true, riskFactors: true },
+      });
+      const openRiskItems = await prisma.riskItem.findMany({
+        where: { projectId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+        select: { title: true, severity: true, status: true },
+        take: 5,
+      });
+      if (latestAssessment) {
+        riskContextStr += `\n\n最新风险评估等级: ${latestAssessment.riskLevel}`;
+        if (latestAssessment.aiInsights) riskContextStr += `\nAI风险洞察: ${latestAssessment.aiInsights}`;
+      }
+      if (openRiskItems.length > 0) {
+        riskContextStr += `\n待处理风险项: ${openRiskItems.map(r => `[${r.severity}]${r.title}`).join('; ')}`;
+      }
+    } catch { /* risk context optional */ }
+
     // 尝试 AI 生成
     try {
       const analysisData = {
@@ -887,8 +1006,8 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
         feature: 'weekly_report',
         projectId,
         systemPrompt:
-          '你是一个项目管理助手。请根据提供的活动数据，生成周报内容。返回JSON格式：{"keyProgress": "本周重要进展HTML", "nextWeekPlan": "下周工作计划HTML", "riskWarning": "风险预警HTML"}。使用<ul><li>标签组织内容。',
-        userPrompt: `请为以下项目生成周报建议：\n${JSON.stringify(analysisData, null, 2)}`,
+          '你是一个项目管理助手。请根据提供的活动数据和风险信息，生成周报内容。返回JSON格式：{"keyProgress": "本周重要进展HTML", "nextWeekPlan": "下周工作计划HTML", "riskWarning": "风险预警HTML"}。使用<ul><li>标签组织内容。风险预警部分应结合风险评估数据生成更准确的内容。',
+        userPrompt: `请为以下项目生成周报建议：\n${JSON.stringify(analysisData, null, 2)}${riskContextStr}`,
       });
 
       if (aiResult?.content) {

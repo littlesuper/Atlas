@@ -12,11 +12,13 @@ interface RiskFactor {
   factor: string;
   severity: string;
   description: string;
+  score?: number;
   triggeredActivities?: TriggeredActivity[];
 }
 
 interface RiskAssessmentResult {
   riskLevel: string;
+  riskScore: number;
   riskFactors: RiskFactor[];
   suggestions: string[];
 }
@@ -55,10 +57,12 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   if (totalActivities === 0) {
     return {
       riskLevel: 'LOW',
+      riskScore: 0,
       riskFactors: [
         {
           factor: '项目初期',
           severity: 'LOW',
+          score: 0,
           description: '项目暂无活动，处于初期阶段',
         },
       ],
@@ -84,6 +88,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '进度严重滞后',
         severity: 'HIGH',
+        score: 3,
         description: `时间进度${timeProgress.toFixed(0)}%，实际进度${actualProgress.toFixed(0)}%，差距超过30%`,
       });
       suggestions.push('建议召开项目紧急评审会议，分析滞后原因并制定追赶计划');
@@ -92,6 +97,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '进度滞后',
         severity: 'MEDIUM',
+        score: 2,
         description: `时间进度${timeProgress.toFixed(0)}%，实际进度${actualProgress.toFixed(0)}%，差距超过15%`,
       });
       suggestions.push('分析延期任务原因，制定追赶计划');
@@ -121,6 +127,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '大量任务延期',
         severity: 'HIGH',
+        score: 3,
         description: `${delayedActivities.length}个任务延期，延期率${delayRate.toFixed(0)}%，超过30%`,
         triggeredActivities: delayedTriggered,
       });
@@ -130,6 +137,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '部分任务延期',
         severity: 'MEDIUM',
+        score: 1,
         description: `${delayedActivities.length}个任务延期，延期率${delayRate.toFixed(0)}%，超过10%`,
         triggeredActivities: delayedTriggered,
       });
@@ -156,6 +164,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     riskFactors.push({
       factor: '存在逾期任务',
       severity: 'HIGH',
+      score: 3,
       description: `${overdueActivities.length}个任务已逾期未完成`,
       triggeredActivities: overdueTriggered,
     });
@@ -165,6 +174,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     riskFactors.push({
       factor: '存在逾期任务',
       severity: 'LOW',
+      score: 1,
       description: `${overdueActivities.length}个任务已逾期未完成`,
       triggeredActivities: overdueTriggered,
     });
@@ -185,6 +195,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     riskFactors.push({
       factor: '资源分配不足',
       severity: 'MEDIUM',
+      score: 2,
       description: `${unassignedActivities.length}个任务未分配负责人，占比${unassignedRate.toFixed(0)}%`,
       triggeredActivities: unassignedActivities.slice(0, 20).map((a) => ({
         id: a.id,
@@ -223,6 +234,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '工期偏差严重',
         severity: 'HIGH',
+        score: 2,
         description: `已完成活动平均工期偏差${avgDeviation.toFixed(0)}%，超过30%`,
         triggeredActivities: deviationTriggered,
       });
@@ -232,6 +244,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '工期偏差偏高',
         severity: 'MEDIUM',
+        score: 1,
         description: `已完成活动平均工期偏差${avgDeviation.toFixed(0)}%，超过15%`,
         triggeredActivities: deviationTriggered,
       });
@@ -285,6 +298,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     riskFactors.push({
       factor: '依赖链过长',
       severity: 'HIGH',
+      score: 2,
       description: `最长依赖链长度为${longestChain}，超过5级`,
     });
     suggestions.push('简化依赖关系，考虑将长链任务拆分或并行化');
@@ -293,6 +307,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
     riskFactors.push({
       factor: '存在较长依赖链',
       severity: 'MEDIUM',
+      score: 1,
       description: `最长依赖链长度为${longestChain}，超过3级`,
     });
     suggestions.push('关注依赖链上的关键活动，避免连锁延期');
@@ -317,6 +332,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '活动集中在单一阶段',
         severity: 'MEDIUM',
+        score: 1,
         description: `${maxPhase}阶段占进行中活动的${(concentration * 100).toFixed(0)}%（${maxPhaseCount}/${inProgressActivities.length}）`,
         triggeredActivities: phaseActivities.slice(0, 20).map((a) => ({
           id: a.id,
@@ -375,6 +391,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '多人跨项目资源冲突',
         severity: 'HIGH',
+        score: 2,
         description: `${conflictUserDetails.length}人同时参与其他项目的活跃任务`,
         triggeredActivities: conflictUserDetails.slice(0, 20),
       });
@@ -384,6 +401,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       riskFactors.push({
         factor: '存在跨项目资源冲突',
         severity: 'LOW',
+        score: 1,
         description: `${conflictUserDetails.length}人同时参与其他项目的活跃任务`,
         triggeredActivities: conflictUserDetails,
       });
@@ -415,6 +433,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
 
   return {
     riskLevel,
+    riskScore,
     riskFactors,
     suggestions,
   };

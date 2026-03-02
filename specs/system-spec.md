@@ -52,7 +52,7 @@ HWSystem/
 │   ├── src/
 │   │   ├── index.ts           # Express 入口
 │   │   ├── middleware/        # auth.ts, permission.ts
-│   │   ├── routes/            # auth, users, projects, activities, products, roles, risk, weeklyReports, uploads, aiConfig, notifications, activityComments, templates, auditLogs, wecomConfig
+│   │   ├── routes/            # auth, users, projects, activities, products, roles, risk, riskItems, weeklyReports, uploads, aiConfig, notifications, activityComments, templates, auditLogs, wecomConfig
 │   │   └── prisma/            # schema.prisma, seed.ts
 │   └── .env                   # 环境变量
 └── .gitignore
@@ -73,7 +73,7 @@ HWSystem/
 ```
 
 - **左上角：** 自定义 LOGO 图片（`/logo.png`，透明底 PNG），点击跳转首页
-- **导航菜单（从左到右）：** 项目管理、项目周报、项目资源、产品管理、系统管理（需 `user:read` 权限）
+- **导航菜单（从左到右）：** 项目管理、风险总览、项目周报、项目资源、产品管理、系统管理（需 `user:read` 权限）
 - **最右侧：** 通知铃铛（消息提醒）、主题切换按钮（明/暗模式）、当前用户姓名（下拉含退出登录）
 - **内容区域：** 灰色背景（#f4f6f9），内嵌 Card 组件
 
@@ -129,6 +129,7 @@ HWSystem/
 | /weekly-reports/new | 创建周报 | 已登录 |
 | /weekly-reports/:id/edit | 编辑周报 | 已登录 |
 | /workload | 项目资源（资源看板） | 已登录 |
+| /risk-dashboard | 风险总览（跨项目风险全景） | 已登录 |
 | /products | 产品管理 | 已登录 |
 | /admin | 系统管理（账号管理） | 已登录 + user:read |
 
@@ -203,7 +204,9 @@ users ──┬── user_roles ──── roles ──── role_permission
 | activity_comments | 活动评论 | N:1 → activities, users |
 | products | 产品 | N:1 → projects |
 | product_change_logs | 产品变更日志 | N:1 → products |
-| risk_assessments | 风险评估 | N:1 → projects |
+| risk_assessments | 风险评估 | N:1 → projects, 1:N → risk_items |
+| risk_items | 风险项（可跟踪闭环管理） | N:1 → projects, risk_assessments, users(owner) |
+| risk_item_logs | 风险项操作日志 | N:1 → risk_items |
 | weekly_reports | 项目周报 | N:1 → projects, users |
 | notifications | 用户通知 | N:1 → users |
 | project_templates | 项目模板 | 独立表 |
@@ -234,6 +237,11 @@ users ──┬── user_roles ──── roles ──── role_permission
 | 资源看板 | 三段式仪表盘：统计卡片（逾期/无人负责/超载）+ 人员负载堆叠条形图 + 需关注问题表格 | `activities.ts`, `Workload/index.tsx` |
 | 项目归档 | 项目归档/取消归档，归档时自动创建快照 | `projects.ts`, `Detail/index.tsx` |
 | 暗色主题 | 支持 light/dark 主题切换，持久化偏好 | `themeStore.ts`, `global.css` |
+| AI 增强风险评估 | 完整结构化上下文（规则引擎 + 关键路径 + 历史趋势 + 周报）、多层分析 prompt、AI 洞察摘要、行动项 | `riskContext.ts`, `riskPrompts.ts`, `risk.ts` |
+| 风险定时评估 | 工作日自动评估 + 阈值预警（逾期 > 7 天、3 天到期未开始）+ 风险升级通知 | `scheduler.ts`, `node-cron` |
+| 风险仪表盘 | 跨项目风险全景视图：AI 洞察、分布统计、矩阵表、行动项面板 | `RiskDashboard/index.tsx` |
+| 风险处置闭环 | RiskItem 生命周期管理（OPEN → IN_PROGRESS → RESOLVED/ACCEPTED）、操作日志、评论、从 AI 评估批量导入 | `riskItems.ts`, `RiskItemsPanel.tsx` |
+| 风险-周报联动 | 周报"从风险评估导入"、提交周报自动创建 RiskItem、AI 建议融合风险上下文 | `weeklyReports.ts`, `Form.tsx` |
 
 ## 11. 环境变量
 
@@ -245,6 +253,8 @@ users ──┬── user_roles ──── roles ──── role_permission
 | PORT | 后端服务端口 | 3000 |
 | AI_API_KEY | 外部 AI API 密钥 | （空） |
 | AI_API_URL | 外部 AI API 地址 | （空） |
+| RISK_SCHEDULER_ENABLED | 是否启用风险定时评估 | false |
+| RISK_SCHEDULER_CRON | 定时评估 cron 表达式 | 0 8 * * 1-5（工作日 8:00） |
 
 ## 12. 启动流程
 

@@ -312,6 +312,7 @@ export interface RiskFactor {
   factor: string;
   severity: string;
   description: string;
+  score?: number;
   triggeredActivities?: TriggeredActivity[];
 }
 
@@ -321,8 +322,75 @@ export interface RiskAssessment {
   riskLevel: string;
   riskFactors: RiskFactor[];
   suggestions: string[];
-  source?: string; // 'ai' | 'rule_engine'
+  source?: string; // 'ai' | 'rule_engine' | 'scheduled_ai' | 'scheduled_rule'
+  aiInsights?: string;
+  aiEnhancedData?: {
+    trendPrediction?: string;
+    criticalPathAnalysis?: string;
+    actionItems?: Array<{ action: string; assignee?: string; relatedActivityId?: string; priority: string; deadline?: string }>;
+    resourceBottlenecks?: Array<{ person: string; issue: string; suggestion: string }>;
+  };
   assessedAt: string;
+}
+
+// ============ 风险项相关类型 ============
+
+export interface RiskItem {
+  id: string;
+  projectId: string;
+  assessmentId?: string;
+  title: string;
+  description?: string;
+  severity: string;
+  status: string; // OPEN | IN_PROGRESS | RESOLVED | ACCEPTED
+  ownerId?: string;
+  owner?: { id: string; realName: string };
+  dueDate?: string;
+  source: string; // ai | rule_engine | manual | weekly_report
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  logs?: RiskItemLog[];
+}
+
+export interface RiskItemLog {
+  id: string;
+  riskItemId: string;
+  action: string;
+  content?: string;
+  userId: string;
+  user?: { id: string; realName: string };
+  createdAt: string;
+}
+
+// ============ 风险仪表盘类型 ============
+
+export interface RiskDashboardData {
+  projects: Array<{
+    projectId: string;
+    projectName: string;
+    productLine: string | null;
+    riskLevel: string;
+    assessedAt: string;
+    source: string;
+    aiInsights: string | null;
+    trendDirection: string;
+  }>;
+  riskDistribution: { LOW: number; MEDIUM: number; HIGH: number; CRITICAL: number };
+  topActionItems: Array<{ projectId: string; projectName: string; action: string; priority: string }>;
+}
+
+export interface RiskDashboardInsights {
+  topConcerns: string[];
+  improvements: string[];
+  deteriorations: string[];
+  generatedAt: string;
+}
+
+export interface RiskComparison {
+  previous: { riskLevel: string; assessedAt: string; keyFactors: string[] } | null;
+  current: { riskLevel: string; assessedAt: string; keyFactors: string[] } | null;
+  changes: { levelChange: string; newRisks: string[]; resolvedRisks: string[]; persistingRisks: string[] } | null;
 }
 
 // ============ AI 管理相关类型 ============

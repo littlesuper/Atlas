@@ -571,15 +571,34 @@ const WeeklyReportForm: React.FC = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontWeight: 500, color: 'var(--status-danger)' }}>风险预警</span>
-                {aiSuggestions?.riskWarning !== undefined && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
-                    <Button size="mini" type="primary"
-                      onClick={() => adoptAiSuggestion('riskWarning', aiSuggestions.riskWarning || '', riskWarningRef)}>
-                      采用
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {projectId && (
+                    <Button size="mini" type="outline"
+                      onClick={async () => {
+                        try {
+                          const res = await weeklyReportsApi.getRiskPrefill(projectId);
+                          if (res.data.riskWarning) {
+                            setRiskWarning(res.data.riskWarning);
+                            riskWarningRef.current?.setHtml(res.data.riskWarning);
+                            Message.success('已导入风险评估内容');
+                          } else {
+                            Message.info('暂无风险评估数据可导入');
+                          }
+                        } catch { Message.error('导入失败'); }
+                      }}>
+                      从风险评估导入
                     </Button>
-                  </div>
-                )}
+                  )}
+                  {aiSuggestions?.riskWarning !== undefined && (
+                    <>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
+                      <Button size="mini" type="primary"
+                        onClick={() => adoptAiSuggestion('riskWarning', aiSuggestions.riskWarning || '', riskWarningRef)}>
+                        采用
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
               {prevReport && (
                 <PrevReferenceBlock

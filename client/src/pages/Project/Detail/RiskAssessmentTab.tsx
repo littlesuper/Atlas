@@ -10,7 +10,16 @@ import {
   Pagination,
   Modal,
 } from '@arco-design/web-react';
-import { IconThunderbolt, IconDelete } from '@arco-design/web-react/icon';
+import {
+  IconThunderbolt,
+  IconDelete,
+  IconArrowRise,
+  IconArrowFall,
+  IconMinus,
+  IconBulb,
+  IconUser,
+  IconExclamationCircle,
+} from '@arco-design/web-react/icon';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
@@ -21,8 +30,9 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { riskApi } from '../../../api';
-import { RiskAssessment } from '../../../types';
+import { RiskAssessment, RiskComparison } from '../../../types';
 import { RISK_LEVEL_MAP } from '../../../utils/constants';
+import RiskItemsPanel from './RiskItemsPanel';
 import dayjs from 'dayjs';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkAreaComponent, CanvasRenderer]);
@@ -64,6 +74,8 @@ const RISK_LEVEL_VALUE: Record<string, number> = {
 const SOURCE_LABEL: Record<string, { text: string; color: string }> = {
   ai: { text: 'AI 评估', color: 'arcoblue' },
   rule_engine: { text: '规则引擎', color: 'gray' },
+  scheduled_ai: { text: '定时 AI', color: 'purple' },
+  scheduled_rule: { text: '定时规则', color: 'gray' },
 };
 
 const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotData }) => {
@@ -74,6 +86,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
   const [loading, setLoading] = useState(false);
   const [assessing, setAssessing] = useState(false);
   const [trendData, setTrendData] = useState<RiskAssessment[]>([]);
+  const [comparison, setComparison] = useState<RiskComparison | null>(null);
 
   const load = async (p = page) => {
     setLoading(true);
@@ -108,6 +121,15 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
     }
   };
 
+  const loadComparison = async () => {
+    try {
+      const res = await riskApi.getComparison(projectId);
+      setComparison(res.data);
+    } catch {
+      // silent
+    }
+  };
+
   useEffect(() => {
     if (snapshotData) {
       setAssessments(snapshotData as RiskAssessment[]);
@@ -115,6 +137,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
     } else {
       load(1);
       loadTrend();
+      loadComparison();
       setPage(1);
     }
   }, [projectId, snapshotData]);
@@ -129,6 +152,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
           Message.success('已删除');
           load();
           loadTrend();
+          loadComparison();
         } catch {
           Message.error('删除失败');
         }
@@ -141,7 +165,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
     try {
       await riskApi.assess(projectId);
       Message.success('风险评估完成');
-      await Promise.all([load(), loadTrend()]);
+      await Promise.all([load(), loadTrend(), loadComparison()]);
     } catch {
       // axios 拦截器已显示后端错误信息
     } finally {
@@ -178,10 +202,13 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
       {/* 风险趋势图 */}
       {trendData.length >= 2 && <RiskTrendChart data={trendData} />}
 
+      {/* 风险变化对比 */}
+      {comparison?.changes && <RiskComparisonCard comparison={comparison} />}
+
       {/* 最新评估结果 */}
       {latest ? (
         <div>
-          <RiskCard assessment={latest} isLatest />
+          <RiskCard assessment={latest} isLatest projectId={projectId} />
           {/* 历史记录 */}
           {history.length > 0 && (
             <div style={{ marginTop: 24 }}>
@@ -209,7 +236,57 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
       ) : (
         <Empty description="暂无评估记录，点击「发起评估」开始" />
       )}
+
+      {/* 风险项管理面板 */}
+      {!snapshotData && (
+        <RiskItemsPanel
+          projectId={projectId}
+          latestAssessment={latest}
+          isArchived={isArchived}
+        />
+      )}
     </div>
+  );
+};
+
+/* ============ 风险变化对比卡片 ============ */
+
+const RiskComparisonCard: React.FC<{ comparison: RiskComparison }> = ({ comparison }) => {
+  if (!comparison.changes) return null;
+  const { levelChange, newRisks, resolvedRisks } = comparison.changes;
+  if (levelChange === 'UNCHANGED' && newRisks.length === 0 && resolvedRisks.length === 0) return null;
+
+  return (
+    <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
+      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>
+        风险变化
+      </div>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        {levelChange !== 'UNCHANGED' && (
+          <Tag
+            color={levelChange === 'IMPROVED' ? 'green' : 'red'}
+            style={{ fontSize: 13 }}
+          >
+            {levelChange === 'IMPROVED' ? '风险等级下降' : '风险等级上升'}
+            {comparison.previous && comparison.current && (
+              <span style={{ marginLeft: 4 }}>
+                {comparison.previous.riskLevel} → {comparison.current.riskLevel}
+              </span>
+            )}
+          </Tag>
+        )}
+        {resolvedRisks.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--color-success-6)' }}>
+            已改善：{resolvedRisks.join('、')}
+          </span>
+        )}
+        {newRisks.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--color-danger-6)' }}>
+            新增风险：{newRisks.join('、')}
+          </span>
+        )}
+      </div>
+    </Card>
   );
 };
 
@@ -316,12 +393,18 @@ const RiskTrendChart: React.FC<{ data: RiskAssessment[] }> = ({ data }) => {
 
 /* ============ 风险卡片 ============ */
 
-const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDelete?: () => void }> = ({
+const RiskCard: React.FC<{
+  assessment: RiskAssessment;
+  isLatest?: boolean;
+  onDelete?: () => void;
+  projectId?: string;
+}> = ({
   assessment,
   isLatest,
   onDelete,
 }) => {
   const [expandedFactors, setExpandedFactors] = useState<Record<number, boolean>>({});
+  const [showAIDetail, setShowAIDetail] = useState(false);
 
   const toggleFactor = (index: number) => {
     setExpandedFactors((prev) => ({ ...prev, [index]: !prev[index] }));
@@ -330,6 +413,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
   const normalizedLevel = normalizeRiskLevel(assessment.riskLevel);
   const cfg = RISK_LEVEL_CONFIG[normalizedLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
   const sourceInfo = SOURCE_LABEL[assessment.source || 'rule_engine'] || SOURCE_LABEL.rule_engine;
+  const hasAIEnhanced = (assessment.source === 'ai' || assessment.source === 'scheduled_ai') && assessment.aiEnhancedData;
 
   return (
     <Card
@@ -370,6 +454,26 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
           )}
         </Space>
       </div>
+
+      {/* AI 洞察总结 */}
+      {isLatest && assessment.aiInsights && (
+        <div style={{
+          padding: '12px 16px',
+          marginBottom: 16,
+          background: 'var(--color-primary-light-1)',
+          borderLeft: '4px solid var(--color-primary-6)',
+          borderRadius: '0 6px 6px 0',
+          fontSize: 13,
+          lineHeight: 1.7,
+          color: 'var(--color-text-1)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 500 }}>
+            <IconBulb style={{ color: 'var(--color-primary-6)' }} />
+            AI 洞察
+          </div>
+          {assessment.aiInsights}
+        </div>
+      )}
 
       {/* 风险因素 */}
       {assessment.riskFactors && assessment.riskFactors.length > 0 && (
@@ -437,7 +541,7 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
 
       {/* 改进建议 */}
       {assessment.suggestions && assessment.suggestions.length > 0 && (
-        <div>
+        <div style={{ marginBottom: hasAIEnhanced && isLatest ? 16 : 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>改进建议</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {assessment.suggestions.map((s, i) => (
@@ -446,7 +550,123 @@ const RiskCard: React.FC<{ assessment: RiskAssessment; isLatest?: boolean; onDel
           </ul>
         </div>
       )}
+
+      {/* AI 深度分析（可展开） */}
+      {hasAIEnhanced && isLatest && (
+        <div>
+          <div
+            style={{ fontSize: 13, color: 'var(--color-primary-6)', cursor: 'pointer', userSelect: 'none', marginTop: 8 }}
+            onClick={() => setShowAIDetail(!showAIDetail)}
+          >
+            {showAIDetail ? 'AI 深度分析 ▾' : 'AI 深度分析 ▸'}
+          </div>
+          {showAIDetail && (
+            <div style={{ marginTop: 12 }}>
+              <AIEnhancedSection data={assessment.aiEnhancedData!} />
+            </div>
+          )}
+        </div>
+      )}
     </Card>
+  );
+};
+
+/* ============ AI 增强分析区 ============ */
+
+const AIEnhancedSection: React.FC<{
+  data: NonNullable<RiskAssessment['aiEnhancedData']>;
+}> = ({ data }) => {
+  const trendIcon = data.trendPrediction?.startsWith('IMPROVING')
+    ? <IconArrowFall style={{ color: 'var(--color-success-6)' }} />
+    : data.trendPrediction?.startsWith('WORSENING')
+    ? <IconArrowRise style={{ color: 'var(--color-danger-6)' }} />
+    : <IconMinus style={{ color: 'var(--color-text-3)' }} />;
+
+  const trendText = data.trendPrediction?.replace(/^(IMPROVING|STABLE|WORSENING)\s*-?\s*/, '') || '';
+  const trendLabel = data.trendPrediction?.startsWith('IMPROVING')
+    ? '趋势改善'
+    : data.trendPrediction?.startsWith('WORSENING')
+    ? '趋势恶化'
+    : '趋势稳定';
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      {/* Trend prediction */}
+      {data.trendPrediction && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--color-fill-1)', borderRadius: 6 }}>
+          {trendIcon}
+          <span style={{ fontWeight: 500, fontSize: 13 }}>{trendLabel}</span>
+          {trendText && <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{trendText}</span>}
+        </div>
+      )}
+
+      {/* Critical path analysis */}
+      {data.criticalPathAnalysis && (
+        <div style={{ padding: '8px 12px', background: 'var(--color-fill-1)', borderRadius: 6 }}>
+          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 4 }}>关键路径分析</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-2)', lineHeight: 1.7 }}>{data.criticalPathAnalysis}</div>
+        </div>
+      )}
+
+      {/* Action items */}
+      {data.actionItems && data.actionItems.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8 }}>
+            <IconExclamationCircle style={{ marginRight: 4 }} />
+            行动项
+          </div>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            {data.actionItems.map((item, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                padding: '6px 12px',
+                background: 'var(--color-fill-1)',
+                borderRadius: 6,
+              }}>
+                <Tag size="small" color={
+                  item.priority === 'HIGH' ? 'red' : item.priority === 'MEDIUM' ? 'orange' : 'green'
+                } style={{ flexShrink: 0 }}>{item.priority}</Tag>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13 }}>{item.action}</div>
+                  {(item.assignee || item.deadline) && (
+                    <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
+                      {item.assignee && <span>负责人: {item.assignee}</span>}
+                      {item.assignee && item.deadline && <span> · </span>}
+                      {item.deadline && <span>期限: {item.deadline}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </Space>
+        </div>
+      )}
+
+      {/* Resource bottlenecks */}
+      {data.resourceBottlenecks && data.resourceBottlenecks.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8 }}>
+            <IconUser style={{ marginRight: 4 }} />
+            资源瓶颈
+          </div>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            {data.resourceBottlenecks.map((rb, i) => (
+              <div key={i} style={{
+                padding: '6px 12px',
+                background: 'var(--color-fill-1)',
+                borderRadius: 6,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{rb.person}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>{rb.issue}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-success-6)', marginTop: 2 }}>建议: {rb.suggestion}</div>
+              </div>
+            ))}
+          </Space>
+        </div>
+      )}
+    </Space>
   );
 };
 

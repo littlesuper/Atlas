@@ -33,6 +33,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       path: '/projects',
     },
     {
+      key: '/risk-dashboard',
+      label: '风险总览',
+      path: '/risk-dashboard',
+    },
+    {
       key: '/weekly-reports',
       label: '项目周报',
       path: '/weekly-reports',

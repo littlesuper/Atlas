@@ -190,6 +190,26 @@ export const RISK_LEVEL_MAP = {
   },
 } as const;
 
+// ============ 风险项状态映射 ============
+export const RISK_ITEM_STATUS_MAP = {
+  OPEN: {
+    label: '待处理',
+    color: 'red',
+  },
+  IN_PROGRESS: {
+    label: '处理中',
+    color: 'blue',
+  },
+  RESOLVED: {
+    label: '已解决',
+    color: 'green',
+  },
+  ACCEPTED: {
+    label: '已接受',
+    color: 'gray',
+  },
+} as const;
+
 // ============ 权限资源映射 ============
 export const PERMISSION_RESOURCE_MAP: Record<string, string> = {
   '*': '全部',

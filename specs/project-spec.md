@@ -98,7 +98,45 @@
 | riskLevel | String | NOT NULL | 风险等级：LOW/MEDIUM/HIGH/CRITICAL |
 | riskFactors | JSON | NOT NULL | 风险因素列表 |
 | suggestions | JSON | NOT NULL | 改进建议列表 |
+| source | String | DEFAULT: 'rule_engine' | 评估来源：ai / rule_engine / scheduled_ai / scheduled_rule |
+| aiInsights | String | NULLABLE | AI 自然语言总结（2-3 句） |
+| aiEnhancedData | JSON | NULLABLE | AI 增强数据（趋势预测、关键路径分析、行动项、资源瓶颈） |
 | assessedAt | DateTime | NOT NULL, DEFAULT: now() | 评估时间 |
+
+**索引：** `[projectId]`
+
+### RiskItem（风险项表 `risk_items`）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | UUID | PK | 风险项唯一标识 |
+| projectId | UUID | FK → projects.id, CASCADE | 所属项目 |
+| assessmentId | UUID | FK → risk_assessments.id, SET NULL, NULLABLE | 关联评估 |
+| title | String | NOT NULL | 风险项标题 |
+| description | String | NULLABLE | 描述 |
+| severity | String | NOT NULL | 严重度：LOW / MEDIUM / HIGH / CRITICAL |
+| status | String | NOT NULL, DEFAULT: 'OPEN' | 状态：OPEN / IN_PROGRESS / RESOLVED / ACCEPTED |
+| ownerId | UUID | FK → users.id, NULLABLE | 负责人 |
+| dueDate | DateTime | NULLABLE | 截止日期 |
+| source | String | DEFAULT: 'manual' | 来源：ai / rule_engine / manual / weekly_report |
+| createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
+| updatedAt | DateTime | NOT NULL, AUTO | 更新时间 |
+| resolvedAt | DateTime | NULLABLE | 解决时间 |
+
+**索引：** `[projectId]`, `[status]`
+
+### RiskItemLog（风险项日志表 `risk_item_logs`）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | UUID | PK | 日志唯一标识 |
+| riskItemId | UUID | FK → risk_items.id, CASCADE | 所属风险项 |
+| action | String | NOT NULL | 操作：CREATED / STATUS_CHANGED / COMMENTED / ASSIGNED / SEVERITY_CHANGED |
+| content | String | NULLABLE | 日志内容 |
+| userId | String | NOT NULL | 操作人 |
+| createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
+
+**索引：** `[riskItemId]`
 
 ### WeeklyReport（项目周报表 `weekly_reports`）
 
@@ -192,8 +230,23 @@ type 定义：`0`=完成-开始(FS), `1`=开始-开始(SS), `2`=完成-完成(FF
 ### riskFactors JSON 结构
 ```json
 [
-  { "factor": "进度严重滞后", "severity": "高", "description": "时间进度65%，实际进度35%，差距超过30%" }
+  { "factor": "进度严重滞后", "severity": "高", "description": "时间进度65%，实际进度35%，差距超过30%", "score": 3 }
 ]
+```
+
+### aiEnhancedData JSON 结构
+```json
+{
+  "trendPrediction": "WORSENING - 过去三次评估风险持续上升，建议立即干预",
+  "criticalPathAnalysis": "关键路径上有3个活动延期，整体工期可能延长2周",
+  "actionItems": [
+    { "action": "召开紧急项目评审会议", "priority": "HIGH", "deadline": "2026-03-05" },
+    { "action": "增派人手支援PCB布局任务", "assignee": "李四", "priority": "MEDIUM" }
+  ],
+  "resourceBottlenecks": [
+    { "person": "张三", "issue": "同时负责5个进行中任务", "suggestion": "将低优先级任务分配给其他成员" }
+  ]
+}
 ```
 
 ### suggestions JSON 结构
@@ -683,8 +736,18 @@ POST /api/risk/project/:projectId/assess
 **请求体：** 无
 
 **评估逻辑：**
-1. 若配置了 `AI_API_KEY` 和 `AI_API_URL`，调用外部 AI（默认 gpt-4o-mini）进行分析
-2. 若 AI 调用失败或未配置，回退到内置规则引擎
+1. 构建完整上下文：规则引擎量化指标 + 关键路径 + 历史趋势 + 最新周报 + 活动详情
+2. 若配置了 AI，使用结构化多层分析 prompt（6 维度：进度排期、资源负载、依赖关键路径、阶段集中度、趋势、跨项目影响）
+3. AI 返回增强输出：riskLevel + riskFactors + suggestions + aiInsights + trendPrediction + actionItems + resourceBottlenecks
+4. 若 AI 调用失败或未配置，回退到内置规则引擎（aiInsights 和 aiEnhancedData 为 null）
+
+**评估来源（source）：**
+| 值 | 说明 |
+|------|------|
+| ai | 手动触发 + AI 评估成功 |
+| rule_engine | 手动触发 + AI 不可用回退 |
+| scheduled_ai | 定时任务 + AI 评估成功 |
+| scheduled_rule | 定时任务 + AI 不可用回退 |
 
 **规则引擎评估因素：**
 | 因素 | 条件 | 风险分值 |
@@ -713,13 +776,130 @@ POST /api/risk/project/:projectId/assess
   "id": "uuid",
   "projectId": "uuid",
   "riskLevel": "MEDIUM",
+  "source": "ai",
   "riskFactors": [
-    { "factor": "进度滞后", "severity": "MEDIUM", "description": "时间进度50%，实际进度35%" }
+    { "factor": "进度滞后", "severity": "MEDIUM", "description": "时间进度50%，实际进度35%", "score": 2 }
   ],
   "suggestions": ["分析延期任务原因，制定追赶计划"],
+  "aiInsights": "项目整体进度滞后15%，主要受PCB布局任务延期影响。关键路径上有2个活动逾期，建议优先处理。",
+  "aiEnhancedData": {
+    "trendPrediction": "WORSENING - 连续两次评估风险上升",
+    "actionItems": [{ "action": "加派PCB布局人手", "priority": "HIGH" }],
+    "resourceBottlenecks": [{ "person": "张三", "issue": "负载过高", "suggestion": "分担低优先级任务" }]
+  },
   "assessedAt": "2026-02-14T04:21:26.824Z"
 }
 ```
+
+#### 风险仪表盘
+```
+GET /api/risk/dashboard
+```
+**认证：** Bearer Token
+**响应（200）：**
+```json
+{
+  "projects": [
+    { "projectId": "uuid", "projectName": "传感器V2", "productLine": "DANDELION", "riskLevel": "HIGH", "assessedAt": "...", "source": "ai", "aiInsights": "...", "trendDirection": "WORSENING" }
+  ],
+  "riskDistribution": { "LOW": 3, "MEDIUM": 2, "HIGH": 1, "CRITICAL": 0 },
+  "topActionItems": [
+    { "projectId": "uuid", "projectName": "传感器V2", "action": "加派PCB人手", "priority": "HIGH" }
+  ]
+}
+```
+**说明：** `trendDirection` 通过对比最近两次评估计算：等级上升=WORSENING，下降=IMPROVING，不变=STABLE
+
+#### 风险仪表盘 AI 洞察
+```
+GET /api/risk/dashboard/insights
+```
+**认证：** Bearer Token
+**响应（200）：**
+```json
+{
+  "topConcerns": ["传感器V2项目进度严重滞后，关键路径受阻", "..."],
+  "improvements": ["路由器项目风险从HIGH降至MEDIUM"],
+  "deteriorations": ["传感器V2从MEDIUM升至HIGH"],
+  "generatedAt": "2026-03-02T08:00:00.000Z"
+}
+```
+
+#### 风险变化对比
+```
+GET /api/risk/project/:projectId/comparison
+```
+**认证：** Bearer Token
+**响应（200）：**
+```json
+{
+  "previous": { "riskLevel": "MEDIUM", "assessedAt": "...", "keyFactors": ["进度滞后"] },
+  "current": { "riskLevel": "HIGH", "assessedAt": "...", "keyFactors": ["进度严重滞后", "逾期任务"] },
+  "changes": {
+    "levelChange": "WORSENED",
+    "newRisks": ["逾期任务增加"],
+    "resolvedRisks": [],
+    "persistingRisks": ["进度问题"]
+  }
+}
+```
+
+### 3.5b 风险项管理
+
+#### 风险项列表
+```
+GET /api/risk-items?projectId=uuid&status=OPEN&page=1&pageSize=20
+```
+**认证：** Bearer Token
+**响应（200）：**
+```json
+{
+  "data": [
+    { "id": "uuid", "projectId": "uuid", "title": "PCB布局延期风险", "severity": "HIGH", "status": "OPEN", "owner": { "id": "uuid", "realName": "张三" }, "dueDate": null, "source": "ai", "createdAt": "..." }
+  ],
+  "total": 5, "page": 1, "pageSize": 20
+}
+```
+
+#### 创建风险项
+```
+POST /api/risk-items
+```
+**认证：** Bearer Token
+**请求体：**
+```json
+{ "projectId": "uuid", "title": "需跟进供应商交期", "severity": "MEDIUM", "description": "...", "ownerId": "uuid", "dueDate": "2026-03-15" }
+```
+**必填：** projectId、title、severity
+
+#### 获取风险项详情（含操作日志）
+```
+GET /api/risk-items/:id
+```
+
+#### 更新风险项
+```
+PUT /api/risk-items/:id
+```
+**说明：** 状态和严重度变更自动写入 RiskItemLog
+
+#### 删除风险项
+```
+DELETE /api/risk-items/:id
+```
+
+#### 添加评论
+```
+POST /api/risk-items/:id/comment
+```
+**请求体：** `{ "content": "已与供应商确认，预计延期3天" }`
+
+#### 从评估批量导入风险项
+```
+POST /api/risk-items/from-assessment/:assessmentId
+```
+**说明：** 解析评估 `aiEnhancedData.actionItems`，按 title 去重后批量创建 RiskItem（source='ai'）
+**响应：** `{ "created": 3, "items": [...] }`
 
 ### 3.6 项目周报
 
@@ -840,6 +1020,22 @@ DELETE /api/weekly-reports/:id
 ```
 **认证：** Bearer Token
 **权限：** `weekly_report:delete`
+
+#### 风险评估预填充
+```
+GET /api/weekly-reports/project/:projectId/risk-prefill
+```
+**认证：** Bearer Token
+**响应（200）：**
+```json
+{
+  "riskWarning": "<ul><li>⚠️ 进度滞后15%，关键路径受阻</li><li>待处理风险项：PCB布局延期（HIGH）</li></ul>",
+  "risks": [
+    { "description": "PCB布局延期", "level": "HIGH", "mitigation": "加派人手" }
+  ]
+}
+```
+**说明：** 从最新 AI 评估的 aiInsights + 开放状态的 RiskItems 生成预填充内容。提交周报时，`risks` 数组中的风险项会自动创建对应 RiskItem（source='weekly_report'，按 title 去重）
 
 #### AI 智能建议
 ```
@@ -1050,9 +1246,11 @@ DELETE /api/uploads/:filename
     - **时间轴冻结（sticky header）：** 甘特图时间轴表头在页面纵向滚动时保持固定在导航栏下方（`position: sticky; top: 56px`）。实现采用 header/body 分离方案——表头独立于可横向滚动的 body 区域，通过 JS `onScroll` 将 body 的 `scrollLeft` 同步到 header。由于 Ant Design Card/Tabs 内部设置了 `overflow: hidden`，需在 `global.css` 中通过 `.gantt-card` 类对 Card → card-body → tabs-content → active tabpane 添加 `overflow: visible !important` 覆盖，使 sticky 能穿透祖先容器生效。该 className 仅在甘特图 Tab 激活时添加到 Card 上。
   - **AI风险评估（`RiskAssessmentTab` 组件）：**
     - **顶部工具栏：** 左侧评估记录计数（有记录时显示"共 N 次评估记录"，无记录时为空），右侧"发起评估"主按钮（闪电图标，loading 状态）
-    - **最新评估卡片（`RiskCard`）：** 左侧 4px 彩色边框（低=绿色、中=橙色、高=红色、极高=深红），标题行显示"最新评估"标签 + 风险等级 Tag + 评估来源 Tag + 评估时间；风险因素列表（灰色背景条目，每条含严重程度 Tag + 因素名 + 描述，可点击展开关联任务列表）；改进建议（有序列表）
+    - **风险变化对比卡片（`RiskComparisonCard`）：** 当存在前后两次评估时显示，展示等级变化（箭头 + 颜色标注：绿色=改善、红色=恶化、灰色=不变），新增风险、已解决风险、持续风险列表
+    - **最新评估卡片（`RiskCard`）：** 左侧 4px 彩色边框（低=绿色、中=橙色、高=红色、极高=深红），标题行显示"最新评估"标签 + 风险等级 Tag + 评估来源 Tag（含 scheduled_ai / scheduled_rule 标签）+ 评估时间；**AI 洞察摘要**（蓝色左边框区域，仅 AI 评估且有数据时显示）；风险因素列表（灰色背景条目，每条含严重程度 Tag + 因素名 + 描述）；改进建议（有序列表）；**可展开"AI 深度分析"区域**（仅 AI 评估时显示）：趋势预测（带箭头图标）、关键路径分析、行动项表格（含优先级 Tag）、资源瓶颈卡片
     - **历史记录区域：** 历史评估卡片列表（样式更紧凑，无左侧彩色边框高亮，每条右侧有删除按钮）
     - **风险趋势图：** 当历史记录 ≥ 2 条时，在最新评估卡片上方展示折线趋势图（ECharts），X 轴为评估时间，Y 轴为风险等级（低/中/高/严重），悬浮提示显示时间 + 等级 + 来源
+    - **风险项管理面板（`RiskItemsPanel`）：** 嵌入底部，表格展示：严重度 Tag、标题（可点击打开详情抽屉）、负责人、状态 Tag、到期日、操作（编辑/删除）。顶部操作栏含"新建风险项"按钮、"从评估导入"按钮（从最新评估的 actionItems 批量创建）、状态筛选器。详情抽屉包含编辑表单 + 操作时间线 + 评论输入区
     - **空状态：** 无评估记录时，工具栏计数区域为空，页面主体显示单一 Empty 组件（提示："暂无评估记录，点击「发起评估」开始"）
   - **项目周报：** 周报列表、创建/编辑周报、AI 智能分析。
 
@@ -1099,6 +1297,7 @@ DELETE /api/uploads/:filename
         - 卡片内容：HTML 渲染的 AI 建议
     - **下周工作计划**（同上布局，含附件功能）
     - **风险预警**（选填，同上布局，minHeight 120px）
+      - 标题行右侧增加"从风险评估导入"按钮（仅有 projectId 时显示），点击调用 `GET /api/weekly-reports/project/:projectId/risk-prefill` 将 AI 评估 + 开放 RiskItems 生成的内容填入编辑器
       - AI 建议卡片特殊处理：如无风险显示绿色"✓ 未发现明显风险"提示
     - **附件功能（内联于各编辑区）：**
       - 每个编辑区（keyProgress / nextWeekPlan / riskWarning）独立管理附件
@@ -1376,9 +1575,43 @@ interface AttachmentListProps {
 
 **删除：** 调用 `uploadApi.delete(filename)` 清理服务器文件（静默处理失败），然后从列表移除。
 
-## 10. 环境变量
+## 10. 风险总览页面
+
+**路由：** `/risk-dashboard`
+**文件位置：** `/client/src/pages/RiskDashboard/index.tsx`
+
+**页面布局（从上到下）：**
+
+1. **AI 洞察卡片**（顶部全宽）：标题"本周最需关注"+ 灯泡图标，蓝色左边框，显示 topConcerns 列表。底部显示改善项（绿色）和恶化项（红色）
+2. **风险分布统计行**：4 张 StatCard（LOW/MEDIUM/HIGH/CRITICAL 项目数），每张右侧圆形背景图标
+3. **项目风险矩阵表**（Arco Table）：项目名称（可点击跳转）、产品线、风险等级 Tag（彩色）、趋势箭头（↑红/↓绿/—灰）、评估时间、AI 摘要（截断60字）。点击行跳转 `/projects/:id?tab=risk`
+4. **行动项面板**（仅有数据时显示）：跨项目 AI 行动项列表，每条含优先级 Tag + 行动内容 + 项目链接
+
+**API 数据源：**
+- `GET /api/risk/dashboard` → 项目列表 + 分布统计 + 行动项
+- `GET /api/risk/dashboard/insights` → AI 洞察（容错处理，失败不影响主体）
+
+## 11. 定时任务
+
+**文件位置：** `server/src/utils/scheduler.ts`
+**控制变量：** `RISK_SCHEDULER_ENABLED`（默认 false）、`RISK_SCHEDULER_CRON`（默认 `0 8 * * 1-5`）
+
+| 任务 | cron | 说明 |
+|------|------|------|
+| 每日风险评估 | `RISK_SCHEDULER_CRON` | 遍历 IN_PROGRESS 项目逐个评估，风险升级时创建 RISK_ESCALATION 通知 |
+| 阈值预警检查 | 每日 9:00 | 逾期 > 7 天 / 3 天内到期未开始 → RISK_ALERT 通知负责人（24h 去重） |
+
+**通知类型：**
+| 类型 | 图标 | 导航 |
+|------|------|------|
+| RISK_ESCALATION | 🔺 | `/projects/:id?tab=risk` |
+| RISK_ALERT | ⚠️ | `/projects/:id?tab=risk` |
+
+## 12. 环境变量
 
 | 变量 | 说明 |
 |------|------|
 | AI_API_KEY | 外部 AI API 密钥（为空则使用规则引擎） |
 | AI_API_URL | 外部 AI API 地址（为空则使用规则引擎） |
+| RISK_SCHEDULER_ENABLED | 是否启用风险定时评估（默认 false） |
+| RISK_SCHEDULER_CRON | 定时评估 cron 表达式（默认 `0 8 * * 1-5`，工作日 8:00） |
