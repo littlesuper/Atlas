@@ -189,9 +189,25 @@ model Activity {
   project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignees  User[]            @relation("ActivityAssignees")
   comments   ActivityComment[]
+  checkItems CheckItem[]
 
   @@index([projectId])
   @@map("activities")
+}
+
+model CheckItem {
+  id         String   @id @default(uuid())
+  activityId String
+  title      String
+  checked    Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@map("check_items")
 }
 
 model ProjectArchive {

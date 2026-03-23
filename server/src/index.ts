@@ -28,6 +28,7 @@ import activityCommentsRoutes from './routes/activityComments';
 import notificationsRoutes from './routes/notifications';
 import templatesRoutes from './routes/templates';
 import riskItemsRoutes from './routes/riskItems';
+import checkItemsRoutes from './routes/checkItems';
 import { startScheduledJobs } from './utils/scheduler';
 
 const app = express();
@@ -134,6 +135,9 @@ app.use('/api/templates', templatesRoutes);
 
 // 风险项路由
 app.use('/api/risk-items', riskItemsRoutes);
+
+// 检查项路由
+app.use('/api/check-items', checkItemsRoutes);
 
 // ==================== 错误处理中间件 ====================
 

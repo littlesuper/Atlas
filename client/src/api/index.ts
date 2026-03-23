@@ -6,6 +6,7 @@ import {
   Project,
   Activity,
   ActivityComment,
+  CheckItem,
   Notification,
   Product,
   ProductChangeLog,
@@ -549,6 +550,27 @@ export const wecomConfigApi = {
 
   update: (data: { corpId?: string; agentId?: string; secret?: string; redirectUri?: string }) =>
     request.put<WecomConfig>('/wecom-config', data),
+};
+
+// ============ 检查项 API ============
+export const checkItemsApi = {
+  list: (activityId: string) =>
+    request.get<CheckItem[]>(`/check-items/activity/${activityId}`),
+
+  create: (data: { activityId: string; title: string }) =>
+    request.post<CheckItem>('/check-items', data),
+
+  batchCreate: (activityId: string, items: Array<{ title: string; checked?: boolean }>) =>
+    request.post<CheckItem[]>('/check-items/batch', { activityId, items }),
+
+  update: (id: string, data: { title?: string; checked?: boolean }) =>
+    request.put<CheckItem>(`/check-items/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/check-items/${id}`),
+
+  reorder: (activityId: string, items: Array<{ id: string; sortOrder: number }>) =>
+    request.put(`/check-items/activity/${activityId}/reorder`, { items }),
 };
 
 // ============ 活动评论 API ============

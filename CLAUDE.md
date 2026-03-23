@@ -22,10 +22,10 @@ client/src/           # 前端源码
   utils/constants.ts  # 状态/优先级/类别映射常量
 
 server/src/           # 后端源码
-  routes/             # Express 路由（15 个模块）
+  routes/             # Express 路由（17 个模块）
   middleware/         # auth.ts（JWT）、permission.ts（RBAC）
   utils/              # 工具函数（workday, dependencyScheduler, riskEngine, aiClient 等）
-  prisma/             # schema.prisma（21 个模型）、seed.ts
+  prisma/             # schema.prisma（22 个模型）、seed.ts
 
 e2e/                  # Playwright E2E 测试
 specs/                # 需求规格文档
@@ -79,7 +79,7 @@ User 模型支持两种使用场景：
 
 ## 数据库
 
-- Schema 位于 `server/prisma/schema.prisma`，包含 21 个模型
+- Schema 位于 `server/prisma/schema.prisma`，包含 22 个模型
 - 开发环境使用 SQLite，生产环境切换为 PostgreSQL
 - 修改 schema 后需运行 `npx prisma migrate dev --name <描述>` 创建迁移
 - 开发环境也可用 `npx prisma db push` 快速同步 schema（不生成迁移文件）
@@ -122,3 +122,5 @@ User 模型支持两种使用场景：
 - `/api/wecom-config` - 企微配置
 - `/api/activity-comments` - 活动评论
 - `/api/notifications` - 通知
+- `/api/check-items` - 活动检查项
+- `/api/risk-items` - 风险项管理

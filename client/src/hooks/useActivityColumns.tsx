@@ -76,6 +76,28 @@ const AutoOpenDatePicker: React.FC<React.ComponentProps<typeof DatePicker> & { o
   );
 };
 
+// 自动展开的 RangePicker 包装
+const AutoOpenRangePicker: React.FC<React.ComponentProps<typeof DatePicker.RangePicker> & { onDismiss: () => void }> = ({ onDismiss, ...props }) => {
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const [popupVisible, setPopupVisible] = React.useState(true);
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!document.contains(target)) return;
+      if (wrapRef.current?.contains(target)) return;
+      if (target.closest('.arco-picker-dropdown, .arco-picker-panel, .arco-picker-container')) return;
+      onDismiss();
+    };
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
+  }, [onDismiss]);
+  return (
+    <div ref={wrapRef} style={{ display: 'inline-block' }}>
+      <DatePicker.RangePicker {...props} popupVisible={popupVisible} onVisibleChange={(v) => { setPopupVisible(!!v); if (!v) onDismiss(); }} />
+    </div>
+  );
+};
+
 // 阶段颜色配置
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
 
@@ -86,7 +108,7 @@ function formatSeq(n: number): string {
 
 const dateFmt = (d?: string | null) => d ? dayjs(d).format('YY年MM月DD日') : '-';
 
-export { AutoOpenSelect, AutoOpenDatePicker, PHASE_COLOR, formatSeq, dateFmt };
+export { AutoOpenSelect, AutoOpenDatePicker, AutoOpenRangePicker, PHASE_COLOR, formatSeq, dateFmt };
 
 interface UseActivityColumnsOptions {
   activities: Activity[];
@@ -131,11 +153,9 @@ export const COLUMN_WIDTH_MAP: Record<string, number> = {
   status: 100,
   assignee: 120,
   planDuration: 70,
-  planStartDate: 140,
-  planEndDate: 140,
-  actualStartDate: 140,
-  actualEndDate: 140,
-  actualDuration: 80,
+  planDates: 230,
+  actualDates: 260,
+  checkItems: 100,
   notes: 300,
 };
 
@@ -279,6 +299,11 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       </div>
     );
   }, [activities, activitySeqMap]);
+
+  // 判断是否有前置依赖
+  const hasDependencies = useCallback((record: Activity): boolean => {
+    return !!(record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })()));
+  }, []);
 
   // 表格列配置
   const columnMap = useMemo<Record<string, { title: string; width?: number; dataIndex?: string; fixed?: 'right'; onHeaderCell?: () => Record<string, unknown>; render?: (...args: any[]) => React.ReactNode }>>(() => ({
@@ -527,211 +552,135 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         );
       },
     },
-    planStartDate: {
-      title: '计划开始',
-      width: columnWidths.planStartDate,
-      onHeaderCell: () => ({ 'data-column-key': 'planStartDate' }),
+    planDates: {
+      title: "计划时间",
+      width: columnWidths.planDates,
+      onHeaderCell: () => ({ "data-column-key": "planDates" }),
       render: (_: unknown, record: Activity) => {
-        const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'planStartDate') {
+        const hasDeps = hasDependencies(record);
+        const isOverdue = record.planEndDate && record.status !== "COMPLETED" && dayjs(record.planEndDate).isBefore(dayjs(), "day");
+        if (inlineEditing?.id === record.id && inlineEditing.field === "planDates") {
           return (
-            <AutoOpenDatePicker
+            <AutoOpenRangePicker
               size="small"
-              style={{ width: 130 }}
+              style={{ width: 240 }}
               format="YYYY-MM-DD"
-              value={record.planStartDate ? dayjs(record.planStartDate) : undefined}
+              value={record.planStartDate && record.planEndDate ? [dayjs(record.planStartDate), dayjs(record.planEndDate)] : undefined}
               onDismiss={() => setInlineEditing(null)}
               onChange={(dateStr) => {
-                if (dateStr) {
-                  const startVal = dayjs(dateStr).format('YYYY-MM-DD');
-                  if (record.planEndDate && dayjs(record.planEndDate).isBefore(dayjs(startVal), 'day')) {
-                    Message.error('开始时间不能晚于结束时间');
-                    setInlineEditing(null);
-                    return;
-                  }
-                  const payload: Record<string, unknown> = { planStartDate: startVal };
-                  if (record.planEndDate) {
-                    payload.planDuration = calcWorkdays(dayjs(startVal), dayjs(record.planEndDate));
-                  }
-                  const rollback: Record<string, unknown> = { planStartDate: record.planStartDate || undefined };
-                  if (record.planEndDate) rollback.planDuration = record.planDuration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
-                } else {
-                  const rollback: Record<string, unknown> = { planStartDate: record.planStartDate || undefined, planDuration: record.planDuration ?? undefined };
-                  activitiesApi.update(record.id, { planStartDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
+                setInlineEditing(null);
+                if (dateStr && dateStr[0] && dateStr[1]) {
+                  const startVal = dateStr[0] as string;
+                  const endVal = dateStr[1] as string;
+                  const duration = calcWorkdays(dayjs(startVal), dayjs(endVal));
+                  const payload: Record<string, unknown> = { planStartDate: startVal, planEndDate: endVal, planDuration: duration };
+                  const rollback: Record<string, unknown> = {
+                    planStartDate: record.planStartDate || undefined,
+                    planEndDate: record.planEndDate || undefined,
+                    planDuration: record.planDuration ?? undefined,
+                  };
+                  activitiesApi.update(record.id, payload).then(() => {
+                    loadActivities();
+                    showUndoMessage(record.id, rollback, record.name);
+                  }).catch(() => Message.error("更新失败"));
                 }
               }}
             />
           );
         }
+        const hasAnyDate = record.planStartDate || record.planEndDate;
         return (
           <span
-            style={{ whiteSpace: 'nowrap', cursor: !hasDeps && canManage ? 'pointer' : 'default' }}
+            style={{
+              whiteSpace: "nowrap",
+              color: isOverdue ? "rgb(var(--danger-6))" : undefined,
+              cursor: !hasDeps && canManage ? "pointer" : "default",
+            }}
             onClick={() => {
-              if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
-              if (canManage) setInlineEditing({ id: record.id, field: 'planStartDate' });
+              if (hasDeps) { Message.info("已设置前置依赖，计划时间由系统自动计算"); return; }
+              if (canManage) setInlineEditing({ id: record.id, field: "planDates" });
             }}
           >
-            {dateFmt(record.planStartDate)}
+            {hasAnyDate ? `${dateFmt(record.planStartDate)} ~ ${dateFmt(record.planEndDate)}` : "-"}
           </span>
         );
       },
     },
-    planEndDate: {
-      title: '计划结束',
-      width: columnWidths.planEndDate,
-      onHeaderCell: () => ({ 'data-column-key': 'planEndDate' }),
+    actualDates: {
+      title: "实际时间",
+      width: columnWidths.actualDates,
+      onHeaderCell: () => ({ "data-column-key": "actualDates" }),
       render: (_: unknown, record: Activity) => {
-        const hasDeps = record.dependencies && (Array.isArray(record.dependencies) ? record.dependencies.length > 0 : (() => { try { const d = JSON.parse(record.dependencies as unknown as string); return Array.isArray(d) && d.length > 0; } catch { return false; } })());
-        const isOverdue = record.planEndDate && record.status !== 'COMPLETED' && dayjs(record.planEndDate).isBefore(dayjs(), 'day');
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'planEndDate') {
+        if (inlineEditing?.id === record.id && inlineEditing.field === "actualDates") {
           return (
-            <AutoOpenDatePicker
+            <AutoOpenRangePicker
               size="small"
-              style={{ width: 130 }}
+              style={{ width: 240 }}
               format="YYYY-MM-DD"
-              value={record.planEndDate ? dayjs(record.planEndDate) : undefined}
+              value={record.startDate && record.endDate ? [dayjs(record.startDate), dayjs(record.endDate)] : undefined}
               onDismiss={() => setInlineEditing(null)}
               onChange={(dateStr) => {
-                if (dateStr) {
-                  const endVal = dayjs(dateStr).format('YYYY-MM-DD');
-                  if (record.planStartDate && dayjs(endVal).isBefore(dayjs(record.planStartDate), 'day')) {
-                    Message.error('结束时间不能早于开始时间');
-                    setInlineEditing(null);
-                    return;
-                  }
-                  const payload: Record<string, unknown> = { planEndDate: endVal };
-                  if (record.planStartDate) {
-                    payload.planDuration = calcWorkdays(dayjs(record.planStartDate), dayjs(endVal));
-                  }
-                  const rollback: Record<string, unknown> = { planEndDate: record.planEndDate || undefined };
-                  if (record.planStartDate) rollback.planDuration = record.planDuration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
-                } else {
-                  const rollback: Record<string, unknown> = { planEndDate: record.planEndDate || undefined, planDuration: record.planDuration ?? undefined };
-                  activitiesApi.update(record.id, { planEndDate: undefined, planDuration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
+                setInlineEditing(null);
+                if (dateStr && dateStr[0] && dateStr[1]) {
+                  const startVal = dateStr[0] as string;
+                  const endVal = dateStr[1] as string;
+                  const dur = calcWorkdays(dayjs(startVal), dayjs(endVal));
+                  const payload: Record<string, unknown> = { startDate: startVal, endDate: endVal, duration: dur };
+                  const rollback: Record<string, unknown> = {
+                    startDate: record.startDate || undefined,
+                    endDate: record.endDate || undefined,
+                    duration: record.duration ?? undefined,
+                  };
+                  activitiesApi.update(record.id, payload).then(() => {
+                    loadActivities();
+                    showUndoMessage(record.id, rollback, record.name);
+                  }).catch(() => Message.error("更新失败"));
                 }
               }}
             />
           );
         }
-        return (
-          <span
-            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'rgb(var(--danger-6))' : undefined, cursor: !hasDeps && canManage ? 'pointer' : 'default' }}
-            onClick={() => {
-              if (hasDeps) { Message.info('已设置前置依赖，计划时间由系统自动计算'); return; }
-              if (canManage) setInlineEditing({ id: record.id, field: 'planEndDate' });
-            }}
-          >
-            {dateFmt(record.planEndDate)}
-          </span>
-        );
-      },
-    },
-    actualStartDate: {
-      title: '实际开始',
-      width: columnWidths.actualStartDate,
-      onHeaderCell: () => ({ 'data-column-key': 'actualStartDate' }),
-      render: (_: unknown, record: Activity) => {
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'actualStartDate') {
-          return (
-            <AutoOpenDatePicker
-              size="small"
-              style={{ width: 130 }}
-              format="YYYY-MM-DD"
-              value={record.startDate ? dayjs(record.startDate) : undefined}
-              onDismiss={() => setInlineEditing(null)}
-              onChange={(dateStr) => {
-                if (dateStr) {
-                  const startVal = dayjs(dateStr).format('YYYY-MM-DD');
-                  if (record.endDate && dayjs(record.endDate).isBefore(dayjs(startVal), 'day')) {
-                    Message.error('开始时间不能晚于结束时间');
-                    setInlineEditing(null);
-                    return;
-                  }
-                  const payload: Record<string, unknown> = { startDate: startVal };
-                  if (record.endDate) {
-                    payload.duration = calcWorkdays(dayjs(startVal), dayjs(record.endDate));
-                  }
-                  const rollback: Record<string, unknown> = { startDate: record.startDate || undefined };
-                  if (record.endDate) rollback.duration = record.duration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
-                } else {
-                  const rollback: Record<string, unknown> = { startDate: record.startDate || undefined, duration: record.duration ?? undefined };
-                  activitiesApi.update(record.id, { startDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
-                }
-              }}
-            />
-          );
-        }
-        const isLate = record.planStartDate && record.startDate && dayjs(record.startDate).isAfter(dayjs(record.planStartDate), 'day');
-        return (
-          <span
-            style={{ whiteSpace: 'nowrap', color: isLate ? 'rgb(var(--danger-6))' : undefined, cursor: canManage ? 'pointer' : 'default' }}
-            onClick={() => canManage && setInlineEditing({ id: record.id, field: 'actualStartDate' })}
-          >
-            {dateFmt(record.startDate)}
-          </span>
-        );
-      },
-    },
-    actualEndDate: {
-      title: '实际结束',
-      width: columnWidths.actualEndDate,
-      onHeaderCell: () => ({ 'data-column-key': 'actualEndDate' }),
-      render: (_: unknown, record: Activity) => {
-        const isOverdue = record.planEndDate && record.endDate && dayjs(record.endDate).isAfter(dayjs(record.planEndDate), 'day');
-        if (inlineEditing?.id === record.id && inlineEditing.field === 'actualEndDate') {
-          return (
-            <AutoOpenDatePicker
-              size="small"
-              style={{ width: 130 }}
-              format="YYYY-MM-DD"
-              value={record.endDate ? dayjs(record.endDate) : undefined}
-              onDismiss={() => setInlineEditing(null)}
-              onChange={(dateStr) => {
-                if (dateStr) {
-                  const endVal = dayjs(dateStr).format('YYYY-MM-DD');
-                  if (record.startDate && dayjs(endVal).isBefore(dayjs(record.startDate), 'day')) {
-                    Message.error('结束时间不能早于开始时间');
-                    setInlineEditing(null);
-                    return;
-                  }
-                  const payload: Record<string, unknown> = { endDate: endVal };
-                  if (record.startDate) {
-                    payload.duration = calcWorkdays(dayjs(record.startDate), dayjs(endVal));
-                  }
-                  const rollback: Record<string, unknown> = { endDate: record.endDate || undefined };
-                  if (record.startDate) rollback.duration = record.duration ?? undefined;
-                  activitiesApi.update(record.id, payload).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
-                } else {
-                  const rollback: Record<string, unknown> = { endDate: record.endDate || undefined, duration: record.duration ?? undefined };
-                  activitiesApi.update(record.id, { endDate: undefined, duration: undefined }).then(() => { loadActivities(); setInlineEditing(null); showUndoMessage(record.id, rollback, record.name); });
-                }
-              }}
-            />
-          );
-        }
-        return (
-          <span
-            style={{ whiteSpace: 'nowrap', color: isOverdue ? 'rgb(var(--danger-6))' : undefined, cursor: canManage ? 'pointer' : 'default' }}
-            onClick={() => canManage && setInlineEditing({ id: record.id, field: 'actualEndDate' })}
-          >
-            {dateFmt(record.endDate)}
-          </span>
-        );
-      },
-    },
-    actualDuration: {
-      title: '实际工期',
-      width: columnWidths.actualDuration,
-      onHeaderCell: () => ({ 'data-column-key': 'actualDuration' }),
-      render: (_: unknown, record: Activity) => {
+        const isLate = record.planStartDate && record.startDate && dayjs(record.startDate).isAfter(dayjs(record.planStartDate), "day");
+        const isOverdue = record.planEndDate && record.endDate && dayjs(record.endDate).isAfter(dayjs(record.planEndDate), "day");
+        const hasColor = isLate || isOverdue;
         const days = record.startDate && record.endDate ? calcWorkdays(dayjs(record.startDate), dayjs(record.endDate)) : record.duration;
+        const hasAnyDate = record.startDate || record.endDate;
         return (
-          <span>
-            {days != null ? <>{days}<span style={{ fontSize: 12, color: 'var(--color-text-3)', paddingLeft: 2 }}>天</span></> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              color: hasColor ? "rgb(var(--danger-6))" : undefined,
+              cursor: canManage ? "pointer" : "default",
+            }}
+            onClick={() => canManage && setInlineEditing({ id: record.id, field: "actualDates" })}
+          >
+            {hasAnyDate ? (
+              <>
+                {dateFmt(record.startDate)} ~ {dateFmt(record.endDate)}
+                {days != null && <span style={{ fontSize: 12, color: "var(--color-text-3)", marginLeft: 4 }}>{days}天</span>}
+              </>
+            ) : "-"}
           </span>
+        );
+      },
+    },
+    checkItems: {
+      title: '检查项',
+      dataIndex: 'checkItems',
+      width: columnWidths.checkItems,
+      onHeaderCell: () => ({ 'data-column-key': 'checkItems' }),
+      render: (_: unknown, record: Activity) => {
+        const items = record.checkItems;
+        if (!items || items.length === 0) return <span style={{ color: 'var(--color-text-4)' }}>-</span>;
+        const checked = items.filter((i) => i.checked).length;
+        const total = items.length;
+        const allDone = checked === total;
+        return (
+          <Tooltip content={`${checked}/${total} 已完成`}>
+            <span style={{ fontSize: 12, color: allDone ? 'rgb(var(--green-6))' : 'var(--color-text-2)' }}>
+              {allDone ? '\u2705 ' : ''}{checked}/{total}
+            </span>
+          </Tooltip>
         );
       },
     },
@@ -775,7 +724,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
   }), [
     inlineEditing, inlineValue, users, project, activities, activitySeqMap,
-    canManage, criticalActivityIds, columnWidths,
+    canManage, criticalActivityIds, columnWidths, hasDependencies,
     getSeq, getPredecessorSeq, getPredecessorTooltip, commitPredecessorEdit, commitPlanDurationEdit,
     startInlineEdit, setInlineEditing, setInlineValue, commitInlineEdit, commitSelectEdit,
     showUndoMessage, loadActivities,

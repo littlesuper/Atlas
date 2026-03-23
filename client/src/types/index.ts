@@ -117,6 +117,8 @@ export interface Activity {
   notes?: string | null;
   sortOrder: number;
   children?: Activity[];
+  checkItems?: Array<{ id: string; checked: boolean }>;
+  _count?: { checkItems: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -127,6 +129,16 @@ export interface ActivityComment {
   userId: string;
   content: string;
   user?: Pick<User, 'id' | 'realName' | 'username'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CheckItem {
+  id: string;
+  activityId: string;
+  title: string;
+  checked: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }

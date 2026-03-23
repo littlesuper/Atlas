@@ -26,6 +26,7 @@ import {
 } from '../../../utils/constants';
 import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/workday';
 import ActivityComments from './ActivityComments';
+import CheckItems from './CheckItems';
 import dayjs from 'dayjs';
 
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
@@ -423,6 +424,13 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
           <Input.TextArea placeholder="请输入备注" rows={3} maxLength={500} showWordLimit />
         </Form.Item>
       </Form>
+
+      {/* 检查项 */}
+      {editingActivity && (
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--color-border-2)', paddingTop: 16 }}>
+          <CheckItems activityId={editingActivity.id} />
+        </div>
+      )}
 
       {/* 评论 & 变更历史 */}
       {editingActivity && (

@@ -70,11 +70,9 @@ const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
   { key: 'status', label: '状态', removable: true },
   { key: 'assignee', label: '负责人', removable: true },
   { key: 'planDuration', label: '计划工期', removable: true },
-  { key: 'planStartDate', label: '计划开始', removable: true },
-  { key: 'planEndDate', label: '计划结束', removable: true },
-  { key: 'actualStartDate', label: '实际开始', removable: true },
-  { key: 'actualEndDate', label: '实际结束', removable: true },
-  { key: 'actualDuration', label: '实际工期', removable: true },
+  { key: 'planDates', label: '计划时间', removable: true },
+  { key: 'actualDates', label: '实际时间', removable: true },
+  { key: 'checkItems', label: '检查项', removable: true },
   { key: 'notes', label: '备注', removable: true },
 ];
 

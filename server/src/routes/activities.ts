@@ -144,6 +144,12 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
           username: true,
         },
       },
+      _count: {
+        select: { checkItems: true },
+      },
+      checkItems: {
+        select: { id: true, checked: true },
+      },
     };
 
     // 分页模式：当请求携带 page 或 pageSize 参数时返回扁平分页结果
