@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Atlas 服务管理脚本
-# 用法: ./atlas.sh {start|stop|restart|status|logs|db:push|db:studio|db:seed}
+# 用法: ./atlas.sh {start|stop|restart|status|logs|db:push|db:studio|db:seed|db:backup|db:restore}
 #
 
 set -e
@@ -251,6 +251,66 @@ db_seed() {
   log_info "种子数据已导入"
 }
 
+# ─── 数据库备份/恢复 ──────────────────────────────────────────
+
+db_backup() {
+  local backup_dir="$PROJECT_DIR/server/prisma/backups"
+  local timestamp=$(date +%Y%m%d_%H%M%S)
+  local db_file="$PROJECT_DIR/server/prisma/dev.db"
+  local backup_file="$backup_dir/dev_${timestamp}.db"
+  local max_backups=${1:-10}
+
+  mkdir -p "$backup_dir"
+
+  if [ ! -f "$db_file" ]; then
+    log_error "数据库文件不存在: $db_file"
+    exit 1
+  fi
+
+  log_info "备份数据库..."
+  cp "$db_file" "$backup_file"
+
+  local size
+  size=$(du -h "$backup_file" | cut -f1)
+  log_info "备份完成: $backup_file ($size)"
+
+  # 清理旧备份，保留最近 N 个
+  local count
+  count=$(ls -1 "$backup_dir"/dev_*.db 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$count" -gt "$max_backups" ]; then
+    local to_delete=$((count - max_backups))
+    log_info "清理旧备份（保留最近 ${max_backups} 个）..."
+    ls -1t "$backup_dir"/dev_*.db | tail -n "$to_delete" | xargs rm -f
+    log_info "已删除 $to_delete 个旧备份"
+  fi
+
+  log_info "当前备份数: $(ls -1 "$backup_dir"/dev_*.db 2>/dev/null | wc -l | tr -d ' ')/$max_backups"
+}
+
+db_restore() {
+  local backup_dir="$PROJECT_DIR/server/prisma/backups"
+  local db_file="$PROJECT_DIR/server/prisma/dev.db"
+
+  if [ -n "$1" ]; then
+    local restore_file="$1"
+  else
+    # 默认恢复最新备份
+    local restore_file
+    restore_file=$(ls -1t "$backup_dir"/dev_*.db 2>/dev/null | head -1)
+  fi
+
+  if [ -z "$restore_file" ] || [ ! -f "$restore_file" ]; then
+    log_error "找不到备份文件"
+    ls -la "$backup_dir"/dev_*.db 2>/dev/null || log_warn "备份目录为空"
+    exit 1
+  fi
+
+  log_info "恢复数据库: $restore_file"
+  cp "$db_file" "${db_file}.pre_restore_$(date +%Y%m%d_%H%M%S)"
+  cp "$restore_file" "$db_file"
+  log_info "数据库已恢复，建议重启后端: ./atlas.sh restart:server"
+}
+
 # ─── 帮助 ────────────────────────────────────────────────────
 
 show_help() {
@@ -271,6 +331,8 @@ show_help() {
   echo "  db:push          同步 Schema 到数据库 + 重新生成 Prisma Client"
   echo "  db:studio        打开 Prisma Studio 数据库 GUI"
   echo "  db:seed          导入种子数据"
+  echo "  db:backup [N]    备份 SQLite 数据库（保留最近 N 个，默认 10）"
+  echo "  db:restore [file] 恢复数据库（默认恢复最新备份）"
   echo ""
   echo "示例:"
   echo "  ./atlas.sh start           # 启动所有服务"
@@ -293,6 +355,8 @@ case "${1:-}" in
   db:push)        db_push ;;
   db:studio)      db_studio ;;
   db:seed)        db_seed ;;
+  db:backup)      db_backup "${2:-10}" ;;
+  db:restore)     db_restore "$2" ;;
   help|--help|-h) show_help ;;
   *)
     show_help

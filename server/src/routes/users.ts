@@ -9,9 +9,54 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 /**
- * GET /api/users
- * 获取用户列表(分页、搜索)
- * 权限: user:read
+ * @openapi
+ * /users:
+ *   get:
+ *     tags: [用户管理]
+ *     summary: 获取用户列表
+ *     description: 分页获取用户列表，支持关键字搜索和登录类型过滤
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 页码
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: 每页数量
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: 搜索关键字（匹配用户名或姓名）
+ *       - in: query
+ *         name: canLogin
+ *         schema:
+ *           type: string
+ *           enum: ['true', 'false']
+ *         description: 按登录权限过滤
+ *     responses:
+ *       200:
+ *         description: 用户列表
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/PaginatedResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/User'
+ *       401:
+ *         description: 未认证
+ *       403:
+ *         description: 无权限
  */
 router.get(
   '/',
@@ -97,9 +142,50 @@ router.get(
 );
 
 /**
- * POST /api/users
- * 创建用户
- * 权限: user:create
+ * @openapi
+ * /users:
+ *   post:
+ *     tags: [用户管理]
+ *     summary: 创建用户
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [realName]
+ *             properties:
+ *               realName:
+ *                 type: string
+ *                 description: 姓名
+ *               username:
+ *                 type: string
+ *                 description: 用户名（允许登录时必填）
+ *               password:
+ *                 type: string
+ *                 description: 密码（允许登录时必填）
+ *               canLogin:
+ *                 type: boolean
+ *                 default: true
+ *                 description: 是否允许登录
+ *               roleIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: 角色 ID 列表
+ *     responses:
+ *       201:
+ *         description: 创建成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: 参数错误或用户名已存在
+ *       401:
+ *         description: 未认证
+ *       403:
+ *         description: 无权限
  */
 router.post(
   '/',
@@ -196,9 +282,59 @@ router.post(
 );
 
 /**
- * PUT /api/users/:id
- * 更新用户
- * 权限: user:update
+ * @openapi
+ * /users/{id}:
+ *   put:
+ *     tags: [用户管理]
+ *     summary: 更新用户
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 用户 ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               realName:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               wecomUserId:
+ *                 type: string
+ *                 nullable: true
+ *               canLogin:
+ *                 type: boolean
+ *               status:
+ *                 type: string
+ *                 enum: [ACTIVE, DISABLED]
+ *               roleIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: 参数错误
+ *       401:
+ *         description: 未认证
+ *       403:
+ *         description: 无权限
+ *       404:
+ *         description: 用户不存在
  */
 router.put(
   '/:id',
@@ -307,9 +443,37 @@ router.put(
 );
 
 /**
- * DELETE /api/users/:id
- * 删除用户
- * 权限: user:delete
+ * @openapi
+ * /users/{id}:
+ *   delete:
+ *     tags: [用户管理]
+ *     summary: 删除用户
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 用户 ID
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *       400:
+ *         description: 用户是项目经理，无法删除
+ *       401:
+ *         description: 未认证
+ *       403:
+ *         description: 无权限
+ *       404:
+ *         description: 用户不存在
  */
 router.delete(
   '/:id',

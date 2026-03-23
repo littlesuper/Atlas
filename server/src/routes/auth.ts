@@ -24,8 +24,31 @@ const ACCESS_TOKEN_EXPIRES_IN = '8h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 /**
- * POST /api/auth/login
- * 用户登录
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     tags: [认证]
+ *     summary: 用户登录
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: 登录成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         description: 参数错误
+ *       401:
+ *         description: 用户名或密码错误
+ *       403:
+ *         description: 账号被禁用或无登录权限
  */
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -149,8 +172,37 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
- * POST /api/auth/refresh
- * 刷新访问令牌
+ * @openapi
+ * /auth/refresh:
+ *   post:
+ *     tags: [认证]
+ *     summary: 刷新访问令牌
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: 刷新令牌
+ *     responses:
+ *       200:
+ *         description: 刷新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *       401:
+ *         description: 刷新令牌无效
+ *       403:
+ *         description: 账号已被禁用
  */
 router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -212,8 +264,22 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
- * GET /api/auth/me
- * 获取当前用户信息
+ * @openapi
+ * /auth/me:
+ *   get:
+ *     tags: [认证]
+ *     summary: 获取当前用户信息
+ *     responses:
+ *       200:
+ *         description: 成功返回用户信息
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       401:
+ *         description: 未认证
+ *       404:
+ *         description: 用户不存在
  */
 router.get('/me', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -292,8 +358,43 @@ router.put('/profile', authenticate, async (req: Request, res: Response): Promis
 });
 
 /**
- * POST /api/auth/change-password
- * 修改密码（需验证当前密码）
+ * @openapi
+ * /auth/change-password:
+ *   post:
+ *     tags: [认证]
+ *     summary: 修改密码
+ *     description: 修改当前用户密码，需验证当前密码
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 description: 当前密码
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 6
+ *                 description: 新密码（至少6位）
+ *     responses:
+ *       200:
+ *         description: 密码修改成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: 参数错误或当前密码不正确
+ *       401:
+ *         description: 未认证
  */
 router.post('/change-password', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {

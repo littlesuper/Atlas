@@ -6,9 +6,10 @@ Atlas 是一套面向硬件团队的 Web 项目管理平台，使用 npm workspa
 
 ## 技术栈
 
-- **前端:** React 18 + TypeScript + Vite 7 + Arco Design + Zustand + React Router 7
-- **后端:** Express 4 + TypeScript + Prisma 6 + SQLite(dev)/PostgreSQL(prod)
-- **测试:** Vitest(单元) + Playwright(E2E)
+- **前端:** React 18 + TypeScript + Vite 7 + Arco Design + Zustand + React Router 7 + i18next
+- **后端:** Express 4 + TypeScript + Prisma 6 + Zod + Pino + SQLite(dev)/PostgreSQL(prod)
+- **测试:** Vitest(单元) + Playwright(E2E) + axe-core(无障碍)
+- **工具链:** ESLint + Prettier + Swagger/OpenAPI
 
 ## 项目结构
 
@@ -23,11 +24,13 @@ client/src/           # 前端源码
 
 server/src/           # 后端源码
   routes/             # Express 路由（17 个模块）
-  middleware/         # auth.ts（JWT）、permission.ts（RBAC）
-  utils/              # 工具函数（workday, dependencyScheduler, riskEngine, aiClient 等）
+  middleware/         # auth, permission, validate(Zod), requestId, httpLogger, cache
+  schemas/            # Zod 校验 schema（auth, users, projects）
+  utils/              # 工具函数（workday, dependencyScheduler, riskEngine, logger, circuitBreaker 等）
+  swagger.ts          # OpenAPI/Swagger 文档配置
   prisma/             # schema.prisma（22 个模型）、seed.ts
 
-e2e/                  # Playwright E2E 测试
+e2e/                  # Playwright E2E 测试（含 axe-core 无障碍审计）
 specs/                # 需求规格文档
 ```
 
@@ -46,7 +49,9 @@ npx prisma studio              # 打开数据库 GUI
 npx tsx src/prisma/seed.ts     # 初始化种子数据
 
 cd client && npm test          # 前端单元测试
+cd server && npm test          # 后端单元测试
 npx playwright test            # E2E 测试
+npm run lint                   # ESLint 检查
 ```
 
 ## 开发规范
@@ -60,6 +65,12 @@ npx playwright test            # E2E 测试
 - 中文姓名转拼音使用 pinyin-pro（`client` 依赖）
 - 开发环境数据库为 SQLite（`server/prisma/dev.db`），无需安装 PostgreSQL
 - 工作日计算考虑中国法定节假日（`server/src/utils/workday.ts`）
+- 后端输入校验使用 Zod（`server/src/schemas/`），通过 `validate` 中间件统一处理
+- 后端日志使用 Pino（`server/src/utils/logger.ts`），每个请求自动分配 requestId
+- API 文档通过 Swagger UI 访问：`/api/docs`（仅非生产环境）
+- 国际化使用 i18next（`client/src/i18n/`），默认中文，预留英文翻译
+- ESLint 使用 flat config（`eslint.config.mjs`），含 TypeScript + React Hooks 规则
+- AI API 调用受熔断器保护（`server/src/utils/circuitBreaker.ts`）
 
 ## 用户模型
 
@@ -124,3 +135,5 @@ User 模型支持两种使用场景：
 - `/api/notifications` - 通知
 - `/api/check-items` - 活动检查项
 - `/api/risk-items` - 风险项管理
+- `/api/docs` - Swagger API 文档（仅开发环境）
+- `/api/docs.json` - OpenAPI JSON 规范

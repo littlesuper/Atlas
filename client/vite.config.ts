@@ -8,6 +8,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-arco': ['@arco-design/web-react'],
+          'vendor-echarts': ['echarts', 'echarts-for-react'],
+          'vendor-editor': ['@wangeditor/editor', '@wangeditor/editor-for-react'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',

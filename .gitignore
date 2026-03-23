@@ -38,3 +38,6 @@ server/src/prisma/migrations/
 
 # Uploads
 server/uploads/
+
+# Database backups
+server/prisma/backups/

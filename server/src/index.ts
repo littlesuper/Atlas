@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import morgan from 'morgan';
+// morgan replaced by pino-based httpLogger
 import path from 'path';
 import { readFileSync } from 'fs';
 import { PrismaClient } from '@prisma/client';
@@ -30,6 +30,10 @@ import templatesRoutes from './routes/templates';
 import riskItemsRoutes from './routes/riskItems';
 import checkItemsRoutes from './routes/checkItems';
 import { startScheduledJobs } from './utils/scheduler';
+import { logger } from './utils/logger';
+import { requestId } from './middleware/requestId';
+import { httpLogger } from './middleware/httpLogger';
+import { setupSwagger } from './swagger';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -50,9 +54,10 @@ const allowedOrigins = process.env.CORS_ORIGINS
   : ['http://localhost:5173', 'http://localhost:3000'];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 
-// 请求日志
+// 请求 ID + 结构化日志
+app.use(requestId);
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('short'));
+  app.use(httpLogger);
 }
 
 // 登录接口限流：每 IP 每 15 分钟最多 N 次（开发环境放宽以支持 E2E 测试）
@@ -69,6 +74,11 @@ app.use(express.json({ limit: '10mb' }));
 
 // 解析URL编码的请求体（限制 10MB）
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// API 文档（仅非生产环境）
+if (process.env.NODE_ENV !== 'production') {
+  setupSwagger(app);
+}
 
 // 静态文件服务 - /uploads目录
 const uploadsPath = path.join(__dirname, '..', 'uploads');
@@ -148,7 +158,7 @@ app.use((req: Request, res: Response) => {
 
 // 全局错误处理
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error('服务器错误:', err);
+  logger.error({ err, requestId: req.id }, '服务器错误');
   res.status(500).json({
     error: '服务器内部错误',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined,
@@ -158,9 +168,8 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // ==================== 启动服务器 ====================
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`服务器运行在端口 ${PORT}`);
-  console.log(`健康检查: http://localhost:${PORT}/api/health`);
-  console.log(`环境: ${process.env.NODE_ENV || 'development'}`);
+  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, `服务器运行在端口 ${PORT}`);
+  logger.info(`健康检查: http://localhost:${PORT}/api/health`);
 
   // Start scheduled jobs (only in non-test environment)
   if (process.env.NODE_ENV !== 'test') {
@@ -171,10 +180,10 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 // ==================== 优雅关闭 ====================
 
 const shutdown = async (signal: string) => {
-  console.log(`\n收到 ${signal} 信号，正在关闭服务器...`);
+  logger.info(`收到 ${signal} 信号，正在关闭服务器...`);
   server.close(async () => {
     await prisma.$disconnect();
-    console.log('数据库连接已关闭');
+    logger.info('数据库连接已关闭');
     process.exit(0);
   });
   // 10 秒超时强制退出
