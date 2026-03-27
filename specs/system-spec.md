@@ -313,11 +313,13 @@ users ──┬── user_roles ──── roles ──── role_permission
 | 措施 | 说明 |
 |------|------|
 | Helmet | 安全 HTTP 响应头（X-Content-Type-Options, X-Frame-Options 等） |
-| CORS | 可配置的跨域白名单（`CORS_ORIGINS` 环境变量） |
+| CORS | 可配置的跨域白名单（`CORS_ORIGINS` 环境变量），生产环境未设置则拒绝启动 |
 | 登录限流 | 生产环境 20 次/15分钟，开发环境 200 次/15分钟 |
 | HTML 清洗 | `utils/sanitize.ts`，XSS 防护，保留安全标签 |
 | 路径安全 | 文件上传/删除使用 `path.basename` 防止目录遍历 |
 | Trust Proxy | Express 信任一层代理，正确获取客户端 IP |
+| 启动校验 | 生产环境启动时强制校验 JWT 密钥非默认值、CORS_ORIGINS 已设置，否则拒绝启动 |
+| 密码变更 | 修改密码后自动清除认证缓存，使已签发 Token 在下次验证时重新查库 |
 
 ### 无障碍
 
@@ -345,12 +347,41 @@ E2E 测试集成 axe-core WCAG 2.0 AA 审计：
 - Store：authStore（登录/权限/协作者）、themeStore（主题切换/持久化）
 - 页面：Login、AiManagement、ActivityComments、GanttArrows、DragReorder
 
+### 代码质量
+
+| 工具 | 说明 |
+|------|------|
+| husky | Git hooks 管理，`pre-commit` 触发 lint-staged |
+| lint-staged | 提交前对暂存的 `.ts/.tsx` 文件自动执行 `eslint --fix` |
+| Pino 结构化日志 | 全部路由和中间件使用 `logger.error/info/warn`，不再使用 `console.*`，每条日志自动携带 requestId |
+
 ### CI/CD
 
-GitHub Actions 流水线包含三个 Job：
-- `test` — 前后端单元测试（Vitest，46 文件 / 866 用例）
+GitHub Actions 流水线（`.github/workflows/ci.yml`）包含四个 Job：
 - `lint` — ESLint 代码检查
+- `security` — `npm audit --audit-level=high` 依赖安全扫描
+- `test` — 前后端单元测试（Vitest，46 文件 / 866 用例）+ 测试覆盖率报告 + 构建验证
 - `e2e` — Playwright E2E 测试（48 文件 / 254 用例，失败自动上传报告）
+
+### Docker 部署
+
+| 文件 | 说明 |
+|------|------|
+| `Dockerfile` | 多阶段构建（build → production），非 root 用户运行，最终镜像基于 `node:20-alpine` |
+| `docker-compose.yml` | PostgreSQL 17 + 应用服务，健康检查，数据卷持久化（pgdata + uploads） |
+| `.dockerignore` | 排除 node_modules、.git、测试文件、开发数据库等 |
+
+```bash
+# Docker 部署
+cp .env.example .env  # 配置必要环境变量
+docker compose up -d   # 启动 PostgreSQL + 应用
+
+# 首次部署需执行数据库迁移和种子数据
+docker compose exec app npx prisma migrate deploy --schema=server/prisma/schema.prisma
+docker compose exec app npx tsx server/src/prisma/seed.ts
+```
+
+`docker-compose.yml` 通过 `${VAR:?error}` 语法强制要求设置 `JWT_SECRET`、`JWT_REFRESH_SECRET`、`CORS_ORIGINS`。
 
 ### 优雅关机
 
@@ -376,6 +407,8 @@ GitHub Actions 流水线包含三个 Job：
 
 ## 13. 启动流程
 
+### 本地开发
+
 ```bash
 # 1. 安装依赖
 npm install
@@ -383,8 +416,8 @@ npm install
 # 2. 生成 Prisma Client
 cd server && npx prisma generate
 
-# 3. 数据库迁移
-npx prisma migrate dev --name init
+# 3. 数据库同步（开发环境用 SQLite）
+npx prisma db push
 
 # 4. 初始化种子数据
 npx tsx src/prisma/seed.ts
@@ -395,7 +428,27 @@ cd .. && npm run dev
 
 - 前端：http://localhost:5173
 - 后端：http://localhost:3000
+- API 文档：http://localhost:3000/api/docs
 - 健康检查：GET http://localhost:3000/api/health
+
+### Docker 部署（生产环境）
+
+```bash
+# 设置环境变量（必须）
+export JWT_SECRET=<安全随机密钥>
+export JWT_REFRESH_SECRET=<安全随机密钥>
+export CORS_ORIGINS=https://your-domain.com
+export DB_PASSWORD=<数据库密码>
+
+# 构建并启动
+docker compose up -d --build
+
+# 首次部署：迁移 + 种子数据
+docker compose exec app npx prisma migrate deploy --schema=server/prisma/schema.prisma
+docker compose exec app npx tsx server/src/prisma/seed.ts
+```
+
+- 应用：http://localhost:3000
 - 健康检查返回版本号格式：`x.y.z`（如 `1.2.3`）
 
 ### 版本号规则
