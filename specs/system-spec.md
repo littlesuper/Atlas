@@ -331,13 +331,13 @@ E2E 测试集成 axe-core WCAG 2.0 AA 审计：
 
 | 层级 | 测试文件 | 测试用例 | 覆盖范围 |
 |------|---------|---------|---------|
-| 后端 | 22 | 448 | 路由（7/17）、工具函数（14/18）、中间件（3/6） |
+| 后端 | 28 | 630 | 路由（13/17）、工具函数（15/18）、中间件（3/6） |
 | 前端 | 18 | 236 | 页面（7）、组件（2）、Hooks（3/8）、Store（2/2）、工具（2） |
-| **合计** | **40** | **684** | — |
+| **合计** | **46** | **866** | — |
 
 后端关键覆盖：
-- 路由：auth, users, projects, checkItems, products, notifications, templates
-- 算法：circuitBreaker（状态机）、dependencyValidator（DFS 环检测）、criticalPath（CPM）、projectProgress（加权进度）
+- 路由：auth, users, projects, activities(68), weeklyReports(38), products(27), checkItems, notifications, templates, risk(15), riskItems, roles(15), aiConfig(14)
+- 工具：circuitBreaker（状态机）、dependencyValidator（DFS 环检测）、criticalPath（CPM）、projectProgress（加权进度）、excelActivityParser（Excel 解析 32 用例）
 - 中间件：auth（JWT + 缓存）、permission（RBAC + 通配符）、validate（Zod 校验）
 
 前端关键覆盖：
@@ -348,7 +348,7 @@ E2E 测试集成 axe-core WCAG 2.0 AA 审计：
 ### CI/CD
 
 GitHub Actions 流水线包含三个 Job：
-- `test` — 前后端单元测试（Vitest，40 文件 / 684 用例）
+- `test` — 前后端单元测试（Vitest，46 文件 / 866 用例）
 - `lint` — ESLint 代码检查
 - `e2e` — Playwright E2E 测试（48 文件 / 254 用例，失败自动上传报告）
 
