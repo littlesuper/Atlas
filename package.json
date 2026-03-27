@@ -13,7 +13,8 @@
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build --workspace=client && npm run build --workspace=server",
     "start": "npm run start --workspace=server",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
@@ -22,7 +23,17 @@
     "@typescript-eslint/parser": "^8.57.2",
     "concurrently": "^9.1.0",
     "eslint": "^9.39.4",
-    "eslint-plugin-react-hooks": "^7.0.1"
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  },
+  "lint-staged": {
+    "client/src/**/*.{ts,tsx}": [
+      "eslint --fix"
+    ],
+    "server/src/**/*.ts": [
+      "eslint --fix"
+    ]
   },
   "engines": {
     "node": ">=18.0.0",

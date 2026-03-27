@@ -5,6 +5,7 @@ import { requirePermission, isAdmin } from '../middleware/permission';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
 import { offsetWorkdays, calculateWorkdays } from '../utils/workday';
 import { updateProjectProgress } from '../utils/projectProgress';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -25,7 +26,7 @@ router.get('/', authenticate, async (_req: Request, res: Response): Promise<void
     });
     res.json(templates);
   } catch (error) {
-    console.error('获取模板列表错误:', error);
+    logger.error({ err: error }, '获取模板列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -50,7 +51,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
     }
     res.json(template);
   } catch (error) {
-    console.error('获取模板详情错误:', error);
+    logger.error({ err: error }, '获取模板详情错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -98,7 +99,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
 
     res.status(201).json(template);
   } catch (error) {
-    console.error('创建模板错误:', error);
+    logger.error({ err: error }, '创建模板错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -162,7 +163,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
 
     res.json(template);
   } catch (error) {
-    console.error('更新模板错误:', error);
+    logger.error({ err: error }, '更新模板错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -188,7 +189,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
     await prisma.projectTemplate.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('删除模板错误:', error);
+    logger.error({ err: error }, '删除模板错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -333,7 +334,7 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
       activities: createdActivities,
     });
   } catch (error) {
-    console.error('模板实例化错误:', error);
+    logger.error({ err: error }, '模板实例化错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

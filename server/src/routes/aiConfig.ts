@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -53,7 +54,7 @@ router.get(
 
       res.json(configs.map((c) => ({ ...c, apiKey: maskApiKey(c.apiKey) })));
     } catch (error) {
-      console.error('获取AI配置列表错误:', error);
+      logger.error({ err: error }, '获取AI配置列表错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -208,7 +209,7 @@ router.post(
 
       res.status(201).json({ ...config, apiKey: maskApiKey(config.apiKey) });
     } catch (error) {
-      console.error('创建AI配置错误:', error);
+      logger.error({ err: error }, '创建AI配置错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -251,7 +252,7 @@ router.put(
 
       res.json({ ...config, apiKey: maskApiKey(config.apiKey) });
     } catch (error) {
-      console.error('更新AI配置错误:', error);
+      logger.error({ err: error }, '更新AI配置错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -277,7 +278,7 @@ router.delete(
       await prisma.aiConfig.delete({ where: { id } });
       res.json({ success: true });
     } catch (error) {
-      console.error('删除AI配置错误:', error);
+      logger.error({ err: error }, '删除AI配置错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -356,7 +357,7 @@ router.get(
         recentLogs,
       });
     } catch (error) {
-      console.error('获取AI使用统计错误:', error);
+      logger.error({ err: error }, '获取AI使用统计错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

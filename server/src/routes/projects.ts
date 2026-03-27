@@ -3,6 +3,7 @@ import { PrismaClient, ProjectStatus } from '@prisma/client';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, canDeleteProject, sanitizePagination } from '../middleware/permission';
 import { VALID_PROJECT_STATUSES, VALID_PRIORITIES, isValidProjectStatus, isValidPriority, isValidDateRange, isValidProgress } from '../utils/validation';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -127,7 +128,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       },
     });
   } catch (error) {
-    console.error('获取项目列表错误:', error);
+    logger.error({ err: error }, '获取项目列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -148,7 +149,7 @@ router.get('/archives/:archiveId', authenticate, async (req: Request, res: Respo
     }
     res.json(archive);
   } catch (error) {
-    console.error('获取归档快照错误:', error);
+    logger.error({ err: error }, '获取归档快照错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -198,7 +199,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
 
     res.json(project);
   } catch (error) {
-    console.error('获取项目详情错误:', error);
+    logger.error({ err: error }, '获取项目详情错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -290,7 +291,7 @@ router.post(
 
       res.status(201).json(project);
     } catch (error) {
-      console.error('创建项目错误:', error);
+      logger.error({ err: error }, '创建项目错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -418,7 +419,7 @@ router.put(
 
       res.json(project);
     } catch (error) {
-      console.error('更新项目错误:', error);
+      logger.error({ err: error }, '更新项目错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -460,7 +461,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('删除项目错误:', error);
+      logger.error({ err: error }, '删除项目错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -491,7 +492,7 @@ router.get('/:id/members', authenticate, async (req: Request, res: Response): Pr
 
     res.json(members);
   } catch (error) {
-    console.error('获取协作者列表错误:', error);
+    logger.error({ err: error }, '获取协作者列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -574,7 +575,7 @@ router.post(
 
       res.status(201).json(member);
     } catch (error) {
-      console.error('添加协作者错误:', error);
+      logger.error({ err: error }, '添加协作者错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -627,7 +628,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('移除协作者错误:', error);
+      logger.error({ err: error }, '移除协作者错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -732,7 +733,7 @@ router.post(
 
       res.json(archive);
     } catch (error) {
-      console.error('归档项目错误:', error);
+      logger.error({ err: error }, '归档项目错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -789,7 +790,7 @@ router.post(
 
       res.json(updated);
     } catch (error) {
-      console.error('取消归档错误:', error);
+      logger.error({ err: error }, '取消归档错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -878,7 +879,7 @@ router.post(
 
       res.json(archive);
     } catch (error) {
-      console.error('创建项目快照错误:', error);
+      logger.error({ err: error }, '创建项目快照错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -917,7 +918,7 @@ router.get('/:id/archives', authenticate, async (req: Request, res: Response): P
 
     res.json(result);
   } catch (error) {
-    console.error('获取归档历史错误:', error);
+    logger.error({ err: error }, '获取归档历史错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

@@ -52,6 +52,11 @@ if (process.env.NODE_ENV === 'production') {
     logger.fatal('生产环境禁止使用默认 JWT 密钥，请设置安全的随机密钥');
     process.exit(1);
   }
+
+  if (!process.env.CORS_ORIGINS) {
+    logger.fatal('生产环境必须设置 CORS_ORIGINS 环境变量（逗号分隔的允许域名）');
+    process.exit(1);
+  }
 }
 
 const app = express();

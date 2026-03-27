@@ -12,6 +12,7 @@ import { parseExcelActivities } from '../utils/excelActivityParser';
 import { detectCircularDependency } from '../utils/dependencyValidator';
 import { calculateCriticalPath } from '../utils/criticalPath';
 import { pinyin } from 'pinyin-pro';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -181,7 +182,7 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
 
     res.json(activities);
   } catch (error) {
-    console.error('获取活动列表错误:', error);
+    logger.error({ err: error }, '获取活动列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -262,7 +263,7 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
 
     res.json({ tasks, links });
   } catch (error) {
-    console.error('获取甘特图数据错误:', error);
+    logger.error({ err: error }, '获取甘特图数据错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -320,7 +321,7 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
     await updateProjectProgress(projectId);
     res.status(201).json({ success: true, count: created.length });
   } catch (error) {
-    console.error('批量创建活动错误:', error);
+    logger.error({ err: error }, '批量创建活动错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -452,7 +453,7 @@ router.post(
 
       res.status(201).json(activity);
     } catch (error) {
-      console.error('创建活动错误:', error);
+      logger.error({ err: error }, '创建活动错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -498,7 +499,7 @@ router.put('/batch-update', authenticate, requirePermission('activity', 'update'
     await updateProjectProgress(projectId);
     res.json({ success: true, count: ids.length });
   } catch (error) {
-    console.error('批量更新错误:', error);
+    logger.error({ err: error }, '批量更新错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -693,7 +694,7 @@ router.put(
 
       res.json(activity);
     } catch (error) {
-      console.error('更新活动错误:', error);
+      logger.error({ err: error }, '更新活动错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -729,7 +730,7 @@ router.delete('/batch-delete', authenticate, requirePermission('activity', 'dele
     await updateProjectProgress(projectId);
     res.json({ success: true, count: ids.length });
   } catch (error) {
-    console.error('批量删除错误:', error);
+    logger.error({ err: error }, '批量删除错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -782,7 +783,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('删除活动错误:', error);
+      logger.error({ err: error }, '删除活动错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -832,7 +833,7 @@ router.put('/project/:projectId/reorder', authenticate, requirePermission('activ
 
     res.json({ success: true });
   } catch (error) {
-    console.error('批量排序错误:', error);
+    logger.error({ err: error }, '批量排序错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -852,7 +853,7 @@ router.get('/project/:projectId/critical-path', authenticate, async (req: Reques
     const criticalActivityIds = calculateCriticalPath(activities);
     res.json({ criticalActivityIds });
   } catch (error) {
-    console.error('计算关键路径错误:', error);
+    logger.error({ err: error }, '计算关键路径错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -969,7 +970,7 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
 
     res.json({ summary, members, issues });
   } catch (error) {
-    console.error('获取资源负载错误:', error);
+    logger.error({ err: error }, '获取资源负载错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1110,7 +1111,7 @@ ${JSON.stringify(historyData, null, 2)}`,
         : '暂无历史数据，建议手动设定工期后积累数据',
     });
   } catch (error) {
-    console.error('AI 排计划建议错误:', error);
+    logger.error({ err: error }, 'AI 排计划建议错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1211,7 +1212,7 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
 
     res.json(conflicts);
   } catch (error) {
-    console.error('资源冲突检测错误:', error);
+    logger.error({ err: error }, '资源冲突检测错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1355,7 +1356,7 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
       projectEndDateAfter: maxNewEnd?.toISOString() || null,
     });
   } catch (error) {
-    console.error('What-if 模拟错误:', error);
+    logger.error({ err: error }, 'What-if 模拟错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1414,7 +1415,7 @@ router.post('/project/:projectId/what-if/apply', authenticate, requirePermission
 
     res.json({ success: true, updatedCount });
   } catch (error) {
-    console.error('应用 What-If 模拟结果错误:', error);
+    logger.error({ err: error }, '应用 What-If 模拟结果错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1518,7 +1519,7 @@ router.post('/project/:projectId/reschedule', authenticate, async (req: Request,
 
     res.json({ success: true, updatedCount: updatedIds.length });
   } catch (error) {
-    console.error('一键重排错误:', error);
+    logger.error({ err: error }, '一键重排错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1625,7 +1626,7 @@ router.get(
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${fileName}`);
       await wb.xlsx.write(res);
     } catch (error) {
-      console.error('导出 Excel 错误:', error);
+      logger.error({ err: error }, '导出 Excel 错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -1803,7 +1804,7 @@ router.post(
         activities,
       });
     } catch (error: any) {
-      console.error('导入 Excel 活动错误:', error?.message, error?.stack);
+      logger.error({ err: error }, '导入 Excel 活动错误');
       res.status(500).json({ error: error?.message || '服务器内部错误' });
     }
   }
@@ -1846,7 +1847,7 @@ router.post(
 
       res.json({ success: true, count: ids.length });
     } catch (error) {
-      console.error('撤销导入错误:', error);
+      logger.error({ err: error }, '撤销导入错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

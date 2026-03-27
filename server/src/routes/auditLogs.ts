@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -82,7 +83,7 @@ router.get(
         pageSize: pageSizeNum,
       });
     } catch (error) {
-      console.error('获取审计日志错误:', error);
+      logger.error({ err: error }, '获取审计日志错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -110,7 +111,7 @@ router.get(
 
       res.json(users);
     } catch (error) {
-      console.error('获取审计用户列表错误:', error);
+      logger.error({ err: error }, '获取审计用户列表错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

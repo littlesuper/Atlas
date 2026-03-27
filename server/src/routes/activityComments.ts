@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination, isAdmin } from '../middleware/permission';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -32,7 +33,7 @@ router.get('/activity/:activityId', authenticate, async (req: Request, res: Resp
 
     res.json({ data: comments, total, page: pageNum, pageSize: pageSizeNum });
   } catch (error) {
-    console.error('获取评论列表错误:', error);
+    logger.error({ err: error }, '获取评论列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -68,7 +69,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
 
     res.status(201).json(comment);
   } catch (error) {
-    console.error('创建评论错误:', error);
+    logger.error({ err: error }, '创建评论错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -95,7 +96,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
     await prisma.activityComment.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('删除评论错误:', error);
+    logger.error({ err: error }, '删除评论错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

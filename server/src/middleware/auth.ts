@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
@@ -76,7 +77,7 @@ export const authenticate = async (
     // 2. 验证token
     const JWT_SECRET = process.env.JWT_SECRET;
     if (!JWT_SECRET) {
-      console.error('JWT_SECRET 环境变量未设置');
+      logger.error('JWT_SECRET 环境变量未设置');
       res.status(500).json({ error: '服务器配置错误' });
       return;
     }
@@ -171,7 +172,7 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    console.error('认证中间件错误:', error);
+    logger.error({ err: error }, '认证中间件错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 };

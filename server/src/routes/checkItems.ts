@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createCheckItemSchema, batchCreateCheckItemSchema, updateCheckItemSchema, reorderCheckItemSchema } from '../schemas/checkItems';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -20,7 +21,7 @@ router.get('/activity/:activityId', authenticate, async (req: Request, res: Resp
     });
     res.json(items);
   } catch (error) {
-    console.error('获取检查项列表错误:', error);
+    logger.error({ err: error }, '获取检查项列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -48,7 +49,7 @@ router.post('/', authenticate, validate({ body: createCheckItemSchema }), async 
     });
     res.status(201).json(item);
   } catch (error) {
-    console.error('创建检查项错误:', error);
+    logger.error({ err: error }, '创建检查项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -83,7 +84,7 @@ router.post('/batch', authenticate, validate({ body: batchCreateCheckItemSchema 
 
     res.status(201).json(created);
   } catch (error) {
-    console.error('批量创建检查项错误:', error);
+    logger.error({ err: error }, '批量创建检查项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -111,7 +112,7 @@ router.put('/:id', authenticate, validate({ body: updateCheckItemSchema }), asyn
       res.status(404).json({ error: '检查项不存在' });
       return;
     }
-    console.error('更新检查项错误:', error);
+    logger.error({ err: error }, '更新检查项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -130,7 +131,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
       res.status(404).json({ error: '检查项不存在' });
       return;
     }
-    console.error('删除检查项错误:', error);
+    logger.error({ err: error }, '删除检查项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -154,7 +155,7 @@ router.put('/activity/:activityId/reorder', authenticate, validate({ body: reord
 
     res.json({ success: true });
   } catch (error) {
-    console.error('重排检查项错误:', error);
+    logger.error({ err: error }, '重排检查项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

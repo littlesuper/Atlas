@@ -5,6 +5,7 @@ import { requirePermission, isAdmin, canManageProject, sanitizePagination } from
 import { getWeekNumber } from '../utils/weekNumber';
 import { callAi } from '../utils/aiClient';
 import { sanitizeRichText } from '../utils/sanitize';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -89,7 +90,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       pageSize: pageSizeNum,
     });
   } catch (error) {
-    console.error('获取周报列表错误:', error);
+    logger.error({ err: error }, '获取周报列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -112,7 +113,7 @@ router.get('/latest-status', authenticate, async (_req: Request, res: Response):
     }));
     res.json(map);
   } catch (error) {
-    console.error('获取最新周报状态错误:', error);
+    logger.error({ err: error }, '获取最新周报状态错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -149,7 +150,7 @@ router.get('/drafts', authenticate, async (req: Request, res: Response): Promise
 
     res.json(reports);
   } catch (error) {
-    console.error('获取草稿列表错误:', error);
+    logger.error({ err: error }, '获取草稿列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -189,7 +190,7 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
 
     res.json(reports);
   } catch (error) {
-    console.error('获取项目周报错误:', error);
+    logger.error({ err: error }, '获取项目周报错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -234,7 +235,7 @@ router.get('/project/:projectId/latest', authenticate, async (req: Request, res:
 
     res.json(report);
   } catch (error) {
-    console.error('获取最新周报错误:', error);
+    logger.error({ err: error }, '获取最新周报错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -292,7 +293,7 @@ router.get('/project/:projectId/previous', authenticate, async (req: Request, re
 
     res.json(report);
   } catch (error) {
-    console.error('获取上一周次周报错误:', error);
+    logger.error({ err: error }, '获取上一周次周报错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -333,7 +334,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
 
     res.json(report);
   } catch (error) {
-    console.error('获取周报详情错误:', error);
+    logger.error({ err: error }, '获取周报详情错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -386,7 +387,7 @@ router.get('/week/:year/:weekNumber', authenticate, async (req: Request, res: Re
 
     res.json(reports);
   } catch (error) {
-    console.error('获取指定周次周报错误:', error);
+    logger.error({ err: error }, '获取指定周次周报错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -488,7 +489,7 @@ router.post(
 
       res.status(201).json(report);
     } catch (error) {
-      console.error('创建周报错误:', error);
+      logger.error({ err: error }, '创建周报错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -610,7 +611,7 @@ router.put(
 
       res.json(report);
     } catch (error) {
-      console.error('更新周报错误:', error);
+      logger.error({ err: error }, '更新周报错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -709,13 +710,13 @@ router.post(
         }
       }
     } catch (riskError) {
-      console.error('周报提交同步风险项失败:', riskError);
+      logger.error({ err: riskError }, '周报提交同步风险项失败');
       // Non-blocking: don't fail the submit
     }
 
     res.json(report);
   } catch (error) {
-    console.error('提交周报错误:', error);
+    logger.error({ err: error }, '提交周报错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -770,7 +771,7 @@ router.post(
 
     res.json(report);
   } catch (error) {
-    console.error('归档周报错误:', error);
+    logger.error({ err: error }, '归档周报错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -821,7 +822,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('删除周报错误:', error);
+      logger.error({ err: error }, '删除周报错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -886,7 +887,7 @@ router.get('/project/:projectId/risk-prefill', authenticate, async (req: Request
 
     res.json({ riskWarning, risks });
   } catch (error) {
-    console.error('获取风险预填充错误:', error);
+    logger.error({ err: error }, '获取风险预填充错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -1021,7 +1022,7 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
         riskWarning = parsed.riskWarning || '';
       }
     } catch (aiError) {
-      console.error('AI生成失败，回退到规则引擎:', aiError);
+      logger.error({ err: aiError }, 'AI生成失败，回退到规则引擎');
     }
 
     // 如果AI未生成内容，使用规则引擎
@@ -1081,7 +1082,7 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
       riskWarning,
     });
   } catch (error) {
-    console.error('生成AI建议错误:', error);
+    logger.error({ err: error }, '生成AI建议错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

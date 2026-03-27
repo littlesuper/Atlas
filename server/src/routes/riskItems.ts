@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { sanitizePagination } from '../middleware/permission';
 import { validate } from '../middleware/validate';
 import { createRiskItemSchema, updateRiskItemSchema, riskItemCommentSchema } from '../schemas/riskItems';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -37,7 +38,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     res.json({ data: items, total, page: pageNum, pageSize: pageSizeNum });
   } catch (error) {
-    console.error('获取风险项列表错误:', error);
+    logger.error({ err: error }, '获取风险项列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -83,7 +84,7 @@ router.post('/', authenticate, validate({ body: createRiskItemSchema }), async (
 
     res.status(201).json(item);
   } catch (error) {
-    console.error('创建风险项错误:', error);
+    logger.error({ err: error }, '创建风险项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -127,7 +128,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
 
     res.json({ ...item, logs: logsWithUser });
   } catch (error) {
-    console.error('获取风险项详情错误:', error);
+    logger.error({ err: error }, '获取风险项详情错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -206,7 +207,7 @@ router.put('/:id', authenticate, validate({ body: updateRiskItemSchema }), async
 
     res.json(item);
   } catch (error) {
-    console.error('更新风险项错误:', error);
+    logger.error({ err: error }, '更新风险项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -226,7 +227,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
     await prisma.riskItem.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('删除风险项错误:', error);
+    logger.error({ err: error }, '删除风险项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -268,7 +269,7 @@ router.post('/:id/comment', authenticate, validate({ body: riskItemCommentSchema
 
     res.status(201).json({ ...log, user });
   } catch (error) {
-    console.error('添加评论错误:', error);
+    logger.error({ err: error }, '添加评论错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -340,7 +341,7 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
 
     res.status(201).json({ created: created.length, items: created });
   } catch (error) {
-    console.error('从评估创建风险项错误:', error);
+    logger.error({ err: error }, '从评估创建风险项错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

@@ -6,6 +6,7 @@ import { assessProjectRisk } from '../utils/riskEngine';
 import { callAi } from '../utils/aiClient';
 import { buildRiskContext, trimContextForAI, RiskContext } from '../utils/riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from '../utils/riskPrompts';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -41,7 +42,7 @@ router.get('/summary', authenticate, async (req: Request, res: Response): Promis
 
     res.json(summaries);
   } catch (error) {
-    console.error('获取风险概览错误:', error);
+    logger.error({ err: error }, '获取风险概览错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -130,7 +131,7 @@ router.get('/dashboard', authenticate, async (req: Request, res: Response): Prom
       topActionItems: topActionItems.slice(0, 10),
     });
   } catch (error) {
-    console.error('获取风险仪表盘错误:', error);
+    logger.error({ err: error }, '获取风险仪表盘错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -184,7 +185,7 @@ router.get('/dashboard/insights', authenticate, async (req: Request, res: Respon
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('获取风险洞察错误:', error);
+    logger.error({ err: error }, '获取风险洞察错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -246,7 +247,7 @@ router.get('/project/:projectId/comparison', authenticate, async (req: Request, 
       },
     });
   } catch (error) {
-    console.error('获取风险对比错误:', error);
+    logger.error({ err: error }, '获取风险对比错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -298,7 +299,7 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
 
     res.json(assessments);
   } catch (error) {
-    console.error('获取评估历史错误:', error);
+    logger.error({ err: error }, '获取评估历史错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -318,7 +319,7 @@ router.delete('/:id', authenticate, requirePermission('activity', 'delete'), asy
     await prisma.riskAssessment.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('删除评估记录错误:', error);
+    logger.error({ err: error }, '删除评估记录错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -377,7 +378,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
         throw new Error('AI 未配置或返回为空');
       }
     } catch (aiError) {
-      console.error('AI评估失败，回退到规则引擎:', aiError);
+      logger.error({ err: aiError }, 'AI评估失败，回退到规则引擎');
       // Use rule engine results from context (already computed)
       riskLevel = context.ruleEngineMetrics.riskLevel;
       riskFactors = context.ruleEngineMetrics.factors;
@@ -394,7 +395,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
 
     res.json(assessment);
   } catch (error) {
-    console.error('风险评估错误:', error);
+    logger.error({ err: error }, '风险评估错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

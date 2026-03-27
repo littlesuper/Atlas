@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../utils/logger';
 
 /**
  * 权限检查中间件工厂函数
@@ -55,7 +56,7 @@ export const requirePermission = (resource: string, action: string) => {
       // 5. 权限验证通过,继续执行
       next();
     } catch (error) {
-      console.error('权限检查中间件错误:', error);
+      logger.error({ err: error }, '权限检查中间件错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   };

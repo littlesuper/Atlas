@@ -3,6 +3,8 @@
  * 当外部服务（如 AI API）连续失败达到阈值时，自动熔断一段时间
  */
 
+import { logger } from './logger';
+
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 interface CircuitBreakerOptions {
@@ -72,7 +74,7 @@ export class CircuitBreaker {
 
     if (this.state === 'HALF_OPEN' || this.failureCount >= this.options.failureThreshold) {
       this.state = 'OPEN';
-      console.warn(
+      logger.warn(
         `熔断器 [${this.name}] 开启: 连续失败 ${this.failureCount} 次, ` +
         `将在 ${this.options.resetTimeout / 1000}s 后尝试恢复`
       );

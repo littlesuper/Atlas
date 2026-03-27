@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { auditLog, diffFields } from '../utils/auditLog';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -135,7 +136,7 @@ router.get(
         pageSize: pageSizeNum,
       });
     } catch (error) {
-      console.error('获取用户列表错误:', error);
+      logger.error({ err: error }, '获取用户列表错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -275,7 +276,7 @@ router.post(
         roles: userWithRoles!.userRoles.map((ur) => ur.role.name),
       });
     } catch (error) {
-      console.error('创建用户错误:', error);
+      logger.error({ err: error }, '创建用户错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -436,7 +437,7 @@ router.put(
         roles: updatedUser!.userRoles.map((ur) => ur.role.name),
       });
     } catch (error) {
-      console.error('更新用户错误:', error);
+      logger.error({ err: error }, '更新用户错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -506,7 +507,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('删除用户错误:', error);
+      logger.error({ err: error }, '删除用户错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

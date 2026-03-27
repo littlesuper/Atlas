@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { auditLog, diffFields } from '../utils/auditLog';
 import { invalidateWecomConfigCache } from '../utils/wecom';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -31,7 +32,7 @@ router.get(
       }
       res.json({ ...config, secret: maskSecret(config.secret) });
     } catch (error) {
-      console.error('获取企微配置错误:', error);
+      logger.error({ err: error }, '获取企微配置错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -107,7 +108,7 @@ router.put(
       invalidateWecomConfigCache();
       res.json({ ...config, secret: maskSecret(config.secret) });
     } catch (error) {
-      console.error('更新企微配置错误:', error);
+      logger.error({ err: error }, '更新企微配置错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

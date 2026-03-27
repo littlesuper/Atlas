@@ -9,6 +9,7 @@ import {
 } from '../utils/validation';
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -136,7 +137,7 @@ router.get('/export', authenticate, async (req: Request, res: Response): Promise
     res.setHeader('Content-Disposition', `attachment; filename=products_${today}.csv`);
     res.send(csvContent);
   } catch (error) {
-    console.error('导出产品错误:', error);
+    logger.error({ err: error }, '导出产品错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -249,7 +250,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       },
     });
   } catch (error) {
-    console.error('获取产品列表错误:', error);
+    logger.error({ err: error }, '获取产品列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -282,7 +283,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
 
     res.json(product);
   } catch (error) {
-    console.error('获取产品详情错误:', error);
+    logger.error({ err: error }, '获取产品详情错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -303,7 +304,7 @@ router.get('/:id/changelog', authenticate, async (req: Request, res: Response): 
 
     res.json(logs);
   } catch (error) {
-    console.error('获取变更记录错误:', error);
+    logger.error({ err: error }, '获取变更记录错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -415,7 +416,7 @@ router.post(
 
       res.status(201).json(product);
     } catch (error) {
-      console.error('创建产品错误:', error);
+      logger.error({ err: error }, '创建产品错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -491,7 +492,7 @@ router.post(
 
       res.status(201).json(newProduct);
     } catch (error) {
-      console.error('复制产品错误:', error);
+      logger.error({ err: error }, '复制产品错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -638,7 +639,7 @@ router.put(
 
       res.json(product);
     } catch (error) {
-      console.error('更新产品错误:', error);
+      logger.error({ err: error }, '更新产品错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -685,7 +686,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('删除产品错误:', error);
+      logger.error({ err: error }, '删除产品错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

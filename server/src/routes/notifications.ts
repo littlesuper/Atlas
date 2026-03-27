@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination, isAdmin } from '../middleware/permission';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -30,7 +31,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
 
     res.json({ data: notifications, total, page: pageNum, pageSize: pageSizeNum, unreadCount });
   } catch (error) {
-    console.error('获取通知列表错误:', error);
+    logger.error({ err: error }, '获取通知列表错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -50,7 +51,7 @@ router.put('/:id/read', authenticate, async (req: Request, res: Response): Promi
     await prisma.notification.update({ where: { id }, data: { isRead: true } });
     res.json({ success: true });
   } catch (error) {
-    console.error('标记通知已读错误:', error);
+    logger.error({ err: error }, '标记通知已读错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -67,7 +68,7 @@ router.put('/read-all', authenticate, async (req: Request, res: Response): Promi
     });
     res.json({ success: true });
   } catch (error) {
-    console.error('全部标记已读错误:', error);
+    logger.error({ err: error }, '全部标记已读错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -87,7 +88,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
     await prisma.notification.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('删除通知错误:', error);
+    logger.error({ err: error }, '删除通知错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -233,7 +234,7 @@ router.post('/generate', authenticate, async (req: Request, res: Response): Prom
 
     res.json({ success: true, generatedCount });
   } catch (error) {
-    console.error('生成通知错误:', error);
+    logger.error({ err: error }, '生成通知错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

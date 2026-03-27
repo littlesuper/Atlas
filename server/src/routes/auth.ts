@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { auditLog } from '../utils/auditLog';
 import { isWecomEnabled, getWecomConfig, getUserInfoByCode, getUserDetail } from '../utils/wecom';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -14,7 +15,7 @@ const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
-  console.error('错误：JWT_SECRET 和 JWT_REFRESH_SECRET 环境变量必须设置');
+  logger.error('JWT_SECRET 和 JWT_REFRESH_SECRET 环境变量必须设置');
   process.exit(1);
 }
 
@@ -166,7 +167,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('登录错误:', error);
+    logger.error({ err: error }, '登录错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -258,7 +259,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       accessToken: newAccessToken,
     });
   } catch (error) {
-    console.error('刷新令牌错误:', error);
+    logger.error({ err: error }, '刷新令牌错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -312,7 +313,7 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
       collaboratingProjectIds: req.user.collaboratingProjectIds,
     });
   } catch (error) {
-    console.error('获取用户信息错误:', error);
+    logger.error({ err: error }, '获取用户信息错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -352,7 +353,7 @@ router.put('/profile', authenticate, async (req: Request, res: Response): Promis
 
     res.json(updatedUser);
   } catch (error) {
-    console.error('更新个人信息错误:', error);
+    logger.error({ err: error }, '更新个人信息错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -445,7 +446,7 @@ router.post('/change-password', authenticate, async (req: Request, res: Response
 
     res.json({ success: true, message: '密码修改成功' });
   } catch (error) {
-    console.error('修改密码错误:', error);
+    logger.error({ err: error }, '修改密码错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -470,7 +471,7 @@ router.get('/preferences', authenticate, async (req: Request, res: Response): Pr
 
     res.json(user?.preferences || {});
   } catch (error) {
-    console.error('获取偏好设置错误:', error);
+    logger.error({ err: error }, '获取偏好设置错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -508,7 +509,7 @@ router.put('/preferences', authenticate, async (req: Request, res: Response): Pr
 
     res.json(merged);
   } catch (error) {
-    console.error('更新偏好设置错误:', error);
+    logger.error({ err: error }, '更新偏好设置错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -669,7 +670,7 @@ router.post('/wecom/login', async (req: Request, res: Response): Promise<void> =
       },
     });
   } catch (error) {
-    console.error('企微登录错误:', error);
+    logger.error({ err: error }, '企微登录错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

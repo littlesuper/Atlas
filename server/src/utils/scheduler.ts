@@ -10,6 +10,7 @@ import { assessProjectRisk } from './riskEngine';
 import { callAi } from './aiClient';
 import { buildRiskContext, trimContextForAI } from './riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from './riskPrompts';
+import { logger } from './logger';
 
 const prisma = new PrismaClient();
 
@@ -21,7 +22,7 @@ const LEVEL_ORDER: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITIC
 export function startScheduledJobs(): void {
   const enabled = process.env.RISK_SCHEDULER_ENABLED === 'true';
   if (!enabled) {
-    console.log('[Scheduler] 定时风险评估未启用（RISK_SCHEDULER_ENABLED !== true）');
+    logger.info('[Scheduler] 定时风险评估未启用（RISK_SCHEDULER_ENABLED !== true）');
     return;
   }
 
@@ -30,19 +31,19 @@ export function startScheduledJobs(): void {
 
   // Daily risk assessment
   cron.schedule(riskCron, async () => {
-    console.log('[Scheduler] 开始每日风险评估...');
+    logger.info('[Scheduler] 开始每日风险评估...');
     await runDailyRiskAssessment();
-    console.log('[Scheduler] 每日风险评估完成');
+    logger.info('[Scheduler] 每日风险评估完成');
   });
 
   // Threshold alert check
   cron.schedule(alertCron, async () => {
-    console.log('[Scheduler] 开始阈值预警检查...');
+    logger.info('[Scheduler] 开始阈值预警检查...');
     await runThresholdAlerts();
-    console.log('[Scheduler] 阈值预警检查完成');
+    logger.info('[Scheduler] 阈值预警检查完成');
   });
 
-  console.log(`[Scheduler] 已启动定时任务 - 风险评估: ${riskCron}, 预警检查: ${alertCron}`);
+  logger.info(`[Scheduler] 已启动定时任务 - 风险评估: ${riskCron}, 预警检查: ${alertCron}`);
 }
 
 /**
@@ -59,7 +60,7 @@ async function runDailyRiskAssessment(): Promise<void> {
     try {
       await assessSingleProject(project.id, project.name, project.managerId);
     } catch (error) {
-      console.error(`[Scheduler] 项目 ${project.name} 评估失败:`, error);
+      logger.error({ err: error }, `[Scheduler] 项目 ${project.name} 评估失败`);
     }
   }
 }

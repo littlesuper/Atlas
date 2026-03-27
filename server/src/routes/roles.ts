@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, invalidateAllUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin } from '../middleware/permission';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -48,7 +49,7 @@ router.get(
 
       res.json(result);
     } catch (error) {
-      console.error('获取角色列表错误:', error);
+      logger.error({ err: error }, '获取角色列表错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -79,7 +80,7 @@ router.get(
 
       res.json(permissions);
     } catch (error) {
-      console.error('获取权限列表错误:', error);
+      logger.error({ err: error }, '获取权限列表错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -166,7 +167,7 @@ router.post(
 
       res.status(201).json(roleWithPermissions);
     } catch (error) {
-      console.error('创建角色错误:', error);
+      logger.error({ err: error }, '创建角色错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -267,7 +268,7 @@ router.put(
 
       res.json(updatedRole);
     } catch (error) {
-      console.error('更新角色错误:', error);
+      logger.error({ err: error }, '更新角色错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }
@@ -312,7 +313,7 @@ router.delete(
 
       res.json({ success: true });
     } catch (error) {
-      console.error('删除角色错误:', error);
+      logger.error({ err: error }, '删除角色错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
   }

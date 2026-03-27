@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { authenticate } from '../middleware/auth';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -88,7 +89,7 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
       mimetype: req.file.mimetype,
     });
   } catch (error) {
-    console.error('文件上传错误:', error);
+    logger.error({ err: error }, '文件上传错误');
     if (error instanceof multer.MulterError) {
       if (error.code === 'LIMIT_FILE_SIZE') {
         res.status(400).json({ error: '文件大小超过10MB限制' });
@@ -122,7 +123,7 @@ router.delete('/:filename', authenticate, async (req: Request, res: Response): P
 
     res.json({ message: '文件已删除' });
   } catch (error) {
-    console.error('删除文件错误:', error);
+    logger.error({ err: error }, '删除文件错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
