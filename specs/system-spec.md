@@ -325,12 +325,32 @@ E2E 测试集成 axe-core WCAG 2.0 AA 审计：
 - 测试文件：`e2e/specs/accessibility.spec.ts`
 - 自动检测颜色对比度、ARIA 属性、键盘可访问性等
 
+### 单元测试
+
+使用 Vitest 作为测试框架，前后端统一：
+
+| 层级 | 测试文件 | 测试用例 | 覆盖范围 |
+|------|---------|---------|---------|
+| 后端 | 22 | 448 | 路由（7/17）、工具函数（14/18）、中间件（3/6） |
+| 前端 | 18 | 236 | 页面（7）、组件（2）、Hooks（3/8）、Store（2/2）、工具（2） |
+| **合计** | **40** | **684** | — |
+
+后端关键覆盖：
+- 路由：auth, users, projects, checkItems, products, notifications, templates
+- 算法：circuitBreaker（状态机）、dependencyValidator（DFS 环检测）、criticalPath（CPM）、projectProgress（加权进度）
+- 中间件：auth（JWT + 缓存）、permission（RBAC + 通配符）、validate（Zod 校验）
+
+前端关键覆盖：
+- Hooks：useDebouncedCallback、useColumnPrefs、useUndoStack
+- Store：authStore（登录/权限/协作者）、themeStore（主题切换/持久化）
+- 页面：Login、AiManagement、ActivityComments、GanttArrows、DragReorder
+
 ### CI/CD
 
 GitHub Actions 流水线包含三个 Job：
-- `test` — 前后端单元测试（Vitest）
+- `test` — 前后端单元测试（Vitest，40 文件 / 684 用例）
 - `lint` — ESLint 代码检查
-- `e2e` — Playwright E2E 测试（失败自动上传报告）
+- `e2e` — Playwright E2E 测试（48 文件 / 254 用例，失败自动上传报告）
 
 ### 优雅关机
 
