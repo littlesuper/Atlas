@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockFindUnique, mockActivityFindMany } = vi.hoisted(() => ({
+const { mockFindUnique, mockActivityFindMany, mockActivityCount } = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
   mockActivityFindMany: vi.fn(),
+  mockActivityCount: vi.fn(),
 }));
 
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
     project = { findUnique: mockFindUnique };
-    activity = { findMany: mockActivityFindMany };
+    activity = { findMany: mockActivityFindMany, count: mockActivityCount };
   },
   ActivityStatus: {
     COMPLETED: 'COMPLETED',
@@ -30,18 +31,29 @@ function makeProject(overrides = {}) {
   };
 }
 
-function makeActivity(overrides = {}) {
+function makeActivity(overrides: Record<string, any> = {}) {
+  const { assigneeId, ...rest } = overrides;
   return {
     id: Math.random().toString(),
+    name: '测试活动',
     status: 'NOT_STARTED',
-    assigneeId: 'user-1',
+    assignees: assigneeId === null ? [] : [{ id: assigneeId || 'user-1', realName: '测试用户' }],
+    planStartDate: null,
     planEndDate: null,
-    ...overrides,
+    planDuration: null,
+    startDate: null,
+    endDate: null,
+    duration: null,
+    ...rest,
   };
 }
 
 describe('assessProjectRisk', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: no cross-project conflicts
+    mockActivityCount.mockResolvedValue(0);
+  });
 
   it('项目不存在时抛出错误', async () => {
     mockFindUnique.mockResolvedValue(null);

@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination } from '../middleware/permission';
+import { validate } from '../middleware/validate';
+import { createRiskItemSchema, updateRiskItemSchema, riskItemCommentSchema } from '../schemas/riskItems';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -44,7 +46,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
  * POST /api/risk-items
  * 创建风险项
  */
-router.post('/', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.post('/', authenticate, validate({ body: createRiskItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId, assessmentId, title, description, severity, ownerId, dueDate, source } = req.body;
 
@@ -134,7 +136,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
  * PUT /api/risk-items/:id
  * 更新风险项（状态变更自动写 log）
  */
-router.put('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.put('/:id', authenticate, validate({ body: updateRiskItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { title, description, severity, status, ownerId, dueDate } = req.body;
@@ -233,7 +235,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
  * POST /api/risk-items/:id/comment
  * 添加评论
  */
-router.post('/:id/comment', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/comment', authenticate, validate({ body: riskItemCommentSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { content } = req.body;

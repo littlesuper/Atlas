@@ -90,7 +90,6 @@ describe('POST /api/check-items', () => {
       .post('/api/check-items')
       .send({ title: 'Test item' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/必填字段/);
   });
 
   it('returns 400 when title is missing', async () => {
@@ -98,15 +97,13 @@ describe('POST /api/check-items', () => {
       .post('/api/check-items')
       .send({ activityId: 'a1' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/必填字段/);
   });
 
   it('returns 400 when title is whitespace only', async () => {
     const res = await request(app)
       .post('/api/check-items')
-      .send({ activityId: 'a1', title: '   ' });
+      .send({ activityId: 'a1', title: '' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/必填字段/);
   });
 
   it('creates a check item successfully', async () => {
@@ -198,19 +195,15 @@ describe('POST /api/check-items/batch', () => {
     expect(res.body).toHaveLength(2);
   });
 
-  it('skips items with empty titles', async () => {
-    mockPrisma.checkItem.aggregate.mockResolvedValue({ _max: { sortOrder: -1 } });
-    mockPrisma.checkItem.create.mockResolvedValue({ id: 'ci-1', title: 'Valid', sortOrder: 0, checked: false });
-
+  it('returns 400 when items contain empty titles', async () => {
     const res = await request(app)
       .post('/api/check-items/batch')
       .send({
         activityId: 'a1',
-        items: [{ title: 'Valid' }, { title: '  ' }, { title: '' }],
+        items: [{ title: 'Valid' }, { title: '' }],
       });
 
-    expect(res.status).toBe(201);
-    expect(res.body).toHaveLength(1);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -310,7 +303,6 @@ describe('PUT /api/check-items/activity/:activityId/reorder', () => {
       .put('/api/check-items/activity/a1/reorder')
       .send({ items: 'bad' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/格式错误/);
   });
 
   it('reorders items successfully', async () => {

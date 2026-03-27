@@ -29,6 +29,7 @@ import jwt from 'jsonwebtoken';
 function mockReq(authHeader?: string): Request {
   return {
     headers: { authorization: authHeader },
+    query: {},
   } as unknown as Request;
 }
 

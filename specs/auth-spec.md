@@ -17,6 +17,7 @@
 | wecomUserId | String | UNIQUE, NULLABLE | 企业微信用户ID，用于企微扫码登录 |
 | canLogin | Boolean | NOT NULL, DEFAULT: true | 是否允许登录（false 表示仅联系人，无法登录） |
 | status | Enum | NOT NULL, DEFAULT: ACTIVE | 账号状态 |
+| preferences | JSON | NULLABLE | 用户偏好（列设置、主题等） |
 | createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
 | updatedAt | DateTime | NOT NULL, AUTO | 更新时间 |
 
@@ -116,6 +117,142 @@ GET /api/auth/me
 }
 ```
 
+### 3.4 更新个人资料
+
+```
+PUT /api/auth/profile
+```
+
+**认证要求：** Bearer Token
+
+**请求体：**
+```json
+{
+  "realName": "新姓名"
+}
+```
+
+**成功响应（200）：** 更新后的用户对象
+
+### 3.5 修改密码
+
+```
+POST /api/auth/change-password
+```
+
+**认证要求：** Bearer Token
+
+**请求体：**
+```json
+{
+  "currentPassword": "当前密码",
+  "newPassword": "新密码"
+}
+```
+
+**成功响应（200）：**
+```json
+{
+  "success": true,
+  "message": "密码修改成功"
+}
+```
+
+**错误响应：**
+- `400` - 当前密码不正确
+
+### 3.6 获取用户偏好
+
+```
+GET /api/auth/preferences
+```
+
+**认证要求：** Bearer Token
+
+**成功响应（200）：** 用户偏好 JSON 对象（如列设置、主题等），若无偏好返回 `{}`
+
+### 3.7 更新用户偏好
+
+```
+PUT /api/auth/preferences
+```
+
+**认证要求：** Bearer Token
+
+**请求体：** 偏好 JSON 对象（与已有偏好合并）
+```json
+{
+  "columnPrefs": { "visible": [...], "order": [...] },
+  "theme": "dark"
+}
+```
+
+**成功响应（200）：** 合并后的完整偏好对象
+
+### 3.8 获取企微登录配置
+
+```
+GET /api/auth/wecom/config
+```
+
+**认证要求：** 无（公开接口）
+
+**成功响应（200）：**
+```json
+{
+  "enabled": true,
+  "corpId": "ww1234567890",
+  "agentId": "1000001",
+  "redirectUri": "https://example.com/login",
+  "state": "随机字符串"
+}
+```
+
+**说明：** 前端根据 `enabled` 判断是否显示企微登录 Tab。`corpId` 和 `agentId` 用于生成企微扫码登录 URL。
+
+### 3.9 企微扫码登录
+
+```
+POST /api/auth/wecom/login
+```
+
+**认证要求：** 无（公开接口）
+
+**请求体：**
+```json
+{
+  "code": "企微OAuth回调code"
+}
+```
+
+**成功响应（200）：**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": "uuid",
+    "username": null,
+    "realName": "张三",
+    "canLogin": false,
+    "roles": [],
+    "permissions": [],
+    "collaboratingProjectIds": []
+  }
+}
+```
+
+**处理逻辑：**
+1. 使用 `code` 向企微 API 换取 `userId`
+2. 按 `wecomUserId` 查找已有用户
+3. 若用户不存在，自动创建 `canLogin: false` 的联系人用户（realName 从企微获取）
+4. 生成 JWT 令牌对返回
+
+**错误响应：**
+- `401` - OAuth code 无效
+- `403` - 用户已被禁用
+- `500` - 企微配置未设置或 API 调用失败
+
 ## 4. 认证机制
 
 ### JWT Payload 结构
@@ -166,8 +303,14 @@ Authorization: Bearer <accessToken>
 ## 7. 前端页面
 
 ### 登录页 `/login`
-- 用户名输入框
-- 密码输入框
-- 登录按钮
+- **Tab 切换：** 账号密码登录 / 企微扫码登录（URL 含 `code` 参数时自动切换到企微 Tab）
+- **账号密码 Tab：**
+  - 用户名输入框
+  - 密码输入框
+  - 登录按钮
+- **企微扫码 Tab：**
+  - 根据 `GET /api/auth/wecom/config` 返回的 `corpId`、`agentId`、`redirectUri` 渲染企微扫码二维码
+  - 扫码成功后企微回调携带 `code` 参数，前端调用 `POST /api/auth/wecom/login` 完成登录
+  - 若企微配置未启用（`enabled: false`），不显示企微 Tab
 - 登录成功后跳转至 `/projects`（项目列表首页）
 - 未登录状态下访问其他页面自动跳转至登录页

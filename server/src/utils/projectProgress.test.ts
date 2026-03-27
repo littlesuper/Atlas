@@ -1,20 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockCount, mockProjectUpdate } = vi.hoisted(() => ({
-  mockCount: vi.fn(),
+const { mockFindMany, mockProjectUpdate } = vi.hoisted(() => ({
+  mockFindMany: vi.fn(),
   mockProjectUpdate: vi.fn(),
 }));
 
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
-    activity = { count: mockCount };
+    activity = { findMany: mockFindMany };
     project = { update: mockProjectUpdate };
   },
   ActivityStatus: {
     COMPLETED: 'COMPLETED',
     IN_PROGRESS: 'IN_PROGRESS',
     NOT_STARTED: 'NOT_STARTED',
-    DELAYED: 'DELAYED',
     CANCELLED: 'CANCELLED',
   },
 }));
@@ -28,95 +27,104 @@ describe('calculateProjectProgress', () => {
   });
 
   it('没有活动时返回 0', async () => {
-    // total=0, completed=0, inProgress=0
-    mockCount.mockResolvedValue(0);
+    mockFindMany.mockResolvedValue([]);
     expect(await calculateProjectProgress('proj-001')).toBe(0);
   });
 
-  it('全部 COMPLETED → 100%', async () => {
-    // total=3, completed=3, inProgress=0
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(3);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(0);
-      return Promise.resolve(3); // total
-    });
+  it('全部 COMPLETED（无工期）→ 100%', async () => {
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'COMPLETED', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(100);
   });
 
-  it('全部 IN_PROGRESS → 50%', async () => {
-    // total=2, completed=0, inProgress=2
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(0);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(2);
-      return Promise.resolve(2); // total
-    });
+  it('全部 IN_PROGRESS（无工期）→ 50%', async () => {
+    mockFindMany.mockResolvedValue([
+      { status: 'IN_PROGRESS', planDuration: null },
+      { status: 'IN_PROGRESS', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(50);
   });
 
   it('全部 NOT_STARTED → 0%', async () => {
-    // total=2, completed=0, inProgress=0
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(0);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(0);
-      return Promise.resolve(2); // total
-    });
-    expect(await calculateProjectProgress('proj-001')).toBe(0);
-  });
-
-  it('全部 DELAYED → 0%', async () => {
-    // total=1, completed=0, inProgress=0
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(0);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(0);
-      return Promise.resolve(1); // total
-    });
+    mockFindMany.mockResolvedValue([
+      { status: 'NOT_STARTED', planDuration: null },
+      { status: 'NOT_STARTED', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(0);
   });
 
   it('全部 CANCELLED → 0%', async () => {
-    // total=1, completed=0, inProgress=0
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(0);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(0);
-      return Promise.resolve(1); // total
-    });
+    mockFindMany.mockResolvedValue([
+      { status: 'CANCELLED', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(0);
   });
 
-  it('1 COMPLETED + 1 NOT_STARTED → 50%', async () => {
-    // total=2, completed=1, inProgress=0
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(1);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(0);
-      return Promise.resolve(2); // total
-    });
+  it('1 COMPLETED + 1 NOT_STARTED（等权重）→ 50%', async () => {
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'NOT_STARTED', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(50);
   });
 
-  it('1 COMPLETED + 1 IN_PROGRESS → 75%', async () => {
-    // total=2, completed=1, inProgress=1
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(1);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(1);
-      return Promise.resolve(2); // total
-    });
+  it('1 COMPLETED + 1 IN_PROGRESS（等权重）→ 75%', async () => {
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'IN_PROGRESS', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(75);
   });
 
-  it('4 COMPLETED + 1 IN_PROGRESS → 90%', async () => {
-    // total=5, completed=4, inProgress=1
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(4);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(1);
-      return Promise.resolve(5); // total
-    });
+  it('4 COMPLETED + 1 IN_PROGRESS（等权重）→ 90%', async () => {
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'COMPLETED', planDuration: null },
+      { status: 'IN_PROGRESS', planDuration: null },
+    ]);
     expect(await calculateProjectProgress('proj-001')).toBe(90);
   });
 
-  it('调用 count 3 次（total / completed / inProgress）', async () => {
-    mockCount.mockResolvedValue(0);
+  it('按 planDuration 加权：长任务完成影响更大', async () => {
+    // COMPLETED(10天) + NOT_STARTED(2天) → (100*10 + 0*2) / 12 = 83.33
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: 10 },
+      { status: 'NOT_STARTED', planDuration: 2 },
+    ]);
+    expect(await calculateProjectProgress('proj-001')).toBe(83.33);
+  });
+
+  it('无 planDuration 的活动回退权重为 1', async () => {
+    // COMPLETED(5天) + IN_PROGRESS(null=1天) → (100*5 + 50*1) / 6 = 91.67
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: 5 },
+      { status: 'IN_PROGRESS', planDuration: null },
+    ]);
+    expect(await calculateProjectProgress('proj-001')).toBe(91.67);
+  });
+
+  it('planDuration=0 回退权重为 1', async () => {
+    // COMPLETED(0→1) + NOT_STARTED(0→1) → 50%
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: 0 },
+      { status: 'NOT_STARTED', planDuration: 0 },
+    ]);
+    expect(await calculateProjectProgress('proj-001')).toBe(50);
+  });
+
+  it('调用 findMany 一次', async () => {
+    mockFindMany.mockResolvedValue([]);
     await calculateProjectProgress('proj-abc');
-    expect(mockCount).toHaveBeenCalledTimes(3);
+    expect(mockFindMany).toHaveBeenCalledTimes(1);
+    expect(mockFindMany).toHaveBeenCalledWith({
+      where: { projectId: 'proj-abc' },
+      select: { status: true, planDuration: true },
+    });
   });
 });
 
@@ -127,12 +135,9 @@ describe('updateProjectProgress', () => {
   });
 
   it('调用 project.update 写入进度', async () => {
-    // total=1, completed=1, inProgress=0 → 100%
-    mockCount.mockImplementation(({ where }: any) => {
-      if (where.status === 'COMPLETED') return Promise.resolve(1);
-      if (where.status === 'IN_PROGRESS') return Promise.resolve(0);
-      return Promise.resolve(1); // total
-    });
+    mockFindMany.mockResolvedValue([
+      { status: 'COMPLETED', planDuration: null },
+    ]);
     await updateProjectProgress('proj-001');
     expect(mockProjectUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'proj-001' }, data: { progress: 100 } })
@@ -140,7 +145,7 @@ describe('updateProjectProgress', () => {
   });
 
   it('空项目时写入 progress: 0', async () => {
-    mockCount.mockResolvedValue(0);
+    mockFindMany.mockResolvedValue([]);
     await updateProjectProgress('proj-empty');
     expect(mockProjectUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: { progress: 0 } })

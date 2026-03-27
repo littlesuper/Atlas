@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { authenticate } from '../middleware/auth';
+import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { auditLog } from '../utils/auditLog';
 import { isWecomEnabled, getWecomConfig, getUserInfoByCode, getUserDetail } from '../utils/wecom';
 
@@ -439,6 +439,9 @@ router.post('/change-password', authenticate, async (req: Request, res: Response
       where: { id: req.user.id },
       data: { password: hashedPassword },
     });
+
+    // 清除认证缓存，使旧 token 在下次验证时重新查库
+    invalidateUserCache(req.user.id);
 
     res.json({ success: true, message: '密码修改成功' });
   } catch (error) {

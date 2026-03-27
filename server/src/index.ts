@@ -35,6 +35,25 @@ import { requestId } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
 import { setupSwagger } from './swagger';
 
+// ==================== 安全校验 ====================
+
+const DEFAULT_JWT_SECRETS = ['hw-system-jwt-secret', 'hw-system-refresh-secret'];
+
+if (process.env.NODE_ENV === 'production') {
+  const jwtSecret = process.env.JWT_SECRET || '';
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || '';
+
+  if (!jwtSecret || !jwtRefreshSecret) {
+    logger.fatal('生产环境必须设置 JWT_SECRET 和 JWT_REFRESH_SECRET 环境变量');
+    process.exit(1);
+  }
+
+  if (DEFAULT_JWT_SECRETS.includes(jwtSecret) || DEFAULT_JWT_SECRETS.includes(jwtRefreshSecret)) {
+    logger.fatal('生产环境禁止使用默认 JWT 密钥，请设置安全的随机密钥');
+    process.exit(1);
+  }
+}
+
 const app = express();
 const prisma = new PrismaClient();
 const PORT = Number(process.env.PORT) || 3000;

@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { createCheckItemSchema, batchCreateCheckItemSchema, updateCheckItemSchema, reorderCheckItemSchema } from '../schemas/checkItems';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -27,13 +29,9 @@ router.get('/activity/:activityId', authenticate, async (req: Request, res: Resp
  * POST /api/check-items
  * 创建检查项
  */
-router.post('/', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.post('/', authenticate, validate({ body: createCheckItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { activityId, title } = req.body;
-    if (!activityId || !title?.trim()) {
-      res.status(400).json({ error: '缺少必填字段' });
-      return;
-    }
 
     // 获取当前最大 sortOrder
     const maxSort = await prisma.checkItem.aggregate({
@@ -59,13 +57,9 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
  * POST /api/check-items/batch
  * 批量创建检查项
  */
-router.post('/batch', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.post('/batch', authenticate, validate({ body: batchCreateCheckItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { activityId, items } = req.body;
-    if (!activityId || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: '缺少必填字段' });
-      return;
-    }
 
     const maxSort = await prisma.checkItem.aggregate({
       where: { activityId },
@@ -98,7 +92,7 @@ router.post('/batch', authenticate, async (req: Request, res: Response): Promise
  * PUT /api/check-items/:id
  * 更新检查项（修改标题、切换勾选状态）
  */
-router.put('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.put('/:id', authenticate, validate({ body: updateCheckItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
     const { title, checked } = req.body;
@@ -145,13 +139,9 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
  * PUT /api/check-items/activity/:activityId/reorder
  * 重新排序检查项
  */
-router.put('/activity/:activityId/reorder', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.put('/activity/:activityId/reorder', authenticate, validate({ body: reorderCheckItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
-    const { items } = req.body; // [{ id, sortOrder }]
-    if (!Array.isArray(items)) {
-      res.status(400).json({ error: '参数格式错误' });
-      return;
-    }
+    const { items } = req.body;
 
     await prisma.$transaction(
       items.map((item: { id: string; sortOrder: number }) =>

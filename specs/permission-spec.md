@@ -211,6 +211,7 @@ GET /api/users?page=1&pageSize=20&keyword=张
 | page | Number | 页码，默认 1 |
 | pageSize | Number | 每页数量，默认 20 |
 | keyword | String | 按用户名/姓名模糊搜索（不区分大小写） |
+| canLogin | String | 按登录权限筛选（`true` / `false`） |
 
 **响应（200）：**
 ```json
@@ -349,6 +350,49 @@ DELETE /api/users/:id
 | DELETE /api/ai-config/:id | user:update |
 | POST /api/ai-config/test-connection | user:update |
 | GET /api/ai-config/usage-stats | user:read |
+| POST /api/activities/batch-create | activity:create |
+| PUT /api/activities/batch-update | activity:update |
+| DELETE /api/activities/batch-delete | activity:delete |
+| POST /api/activities/project/:id/import-excel | activity:create |
+| POST /api/activities/project/:id/undo-import | activity:create |
+| GET /api/activities/project/:id/export-excel | 已认证 |
+| GET /api/activities/project/:id/critical-path | 已认证 |
+| GET /api/activities/resource-conflicts | 已认证 |
+| POST /api/activities/project/:id/what-if | 已认证 |
+| POST /api/activities/project/:id/what-if/apply | activity:update |
+| POST /api/activities/project/:id/reschedule | 已认证 |
+| POST /api/activities/project/:id/ai-schedule | 已认证 |
+| GET /api/activities/workload | 已认证 |
+| POST /api/projects/:id/archive | project:update |
+| POST /api/projects/:id/unarchive | project:update |
+| POST /api/projects/:id/snapshot | project:update |
+| GET /api/projects/:id/archives | 已认证 |
+| GET /api/projects/archives/:archiveId | 已认证 |
+| GET /api/check-items/activity/:id | 已认证 |
+| POST /api/check-items | 已认证 |
+| POST /api/check-items/batch | 已认证 |
+| PUT /api/check-items/:id | 已认证 |
+| DELETE /api/check-items/:id | 已认证 |
+| PUT /api/check-items/activity/:id/reorder | 已认证 |
+| GET /api/risk/project/:id | 已认证 |
+| POST /api/risk/project/:id/assess | 已认证 |
+| GET /api/risk/dashboard | 已认证 |
+| GET /api/risk/dashboard/insights | 已认证 |
+| GET /api/risk-items | 已认证 |
+| POST /api/risk-items | 已认证 |
+| PUT /api/risk-items/:id | 已认证 |
+| DELETE /api/risk-items/:id | 已认证 |
+| GET /api/templates | 已认证 |
+| POST /api/templates | 已认证 + 管理员 |
+| PUT /api/templates/:id | 已认证 + 管理员 |
+| DELETE /api/templates/:id | 已认证 + 管理员 |
+| GET /api/audit-logs | 已认证 + 管理员 |
+| GET /api/wecom-config | system:ai |
+| PUT /api/wecom-config | system:ai |
+| PUT /api/auth/profile | 已认证 |
+| POST /api/auth/change-password | 已认证 |
+| GET /api/auth/preferences | 已认证 |
+| PUT /api/auth/preferences | 已认证 |
 
 ### 5.3 AI 配置管理
 
@@ -427,14 +471,14 @@ GET /api/ai-config/usage-stats?startDate=2025-01-01&endDate=2025-12-31
 
 ### 7.1 账号管理页 `/admin`
 
-Tab 切换三个子页面：
+Tab 切换多个子页面：
 
 #### 用户管理 Tab
-- 用户列表表格：用户名、姓名、允许登录、角色标签、状态标签、创建时间
-- 搜索框
+- 用户列表表格：用户名、姓名、允许登录（Switch）、角色标签、状态标签、创建时间
+- 搜索框 + 登录状态筛选（canLogin）
 - 新建用户按钮
 - 编辑/删除按钮
-- 创建/编辑抽屉（Drawer，宽度 600px）：用户名（编辑时不可改）、姓名、邮箱、密码（编辑时可选）、手机号、角色多选、状态，底部取消/确定按钮
+- 创建/编辑抽屉（Drawer，宽度 600px）：姓名（必填）、允许登录（Switch）和账号状态（Switch）并排一行、用户名（创建时自动生成拼音，编辑时不可改）、密码（编辑时可选）、角色多选，底部取消/确定按钮
 
 #### 角色管理 Tab
 - 角色列表表格：角色名称、描述、权限标签列表、用户数
@@ -447,6 +491,26 @@ Tab 切换三个子页面：
 - **Token 使用统计** Card：顶部四列统计（总调用次数、Prompt Tokens、Completion Tokens、Total Tokens）；下方明细表格（时间、功能 Tag、项目、模型、Prompt/Completion/Total Tokens），分页 10 条/页
 - 创建/编辑 Drawer（宽度 480px）：服务商下拉选择（预设 OpenAI、Anthropic Claude、DeepSeek、智谱 GLM、通义千问、豆包、Moonshot、MiniMax、零一万物、百川智能、硅基流动、自定义）→ 自动填充 API URL 和模型；配置名称、API URL、API Key（密码框）、模型名称、"验证连接"按钮、关联功能多选（风险评估/周报建议）
 - **功能绑定规则**：每个功能（risk/weekly_report）只能绑定一个配置，绑定新配置时自动从旧配置移除
+
+#### 审计日志 Tab
+- 操作日志表格：时间、用户名、操作类型（Tag：LOGIN/CREATE/UPDATE/DELETE）、资源类型、资源名称、IP 地址
+- 筛选：按用户下拉、操作类型下拉、资源类型下拉、日期范围选择器、关键词搜索
+- 分页：每页 20 条
+- 权限：仅管理员可见
+
+#### 模板管理 Tab
+- 模板列表表格：名称、描述、活动数、创建时间、操作（编辑/复制/删除）
+- 新建模板按钮
+- 编辑页面：模板基本信息 + 活动表格（直接表单控件编辑，ID 使用 3 位补零序号）
+- 模板活动表格列：ID、活动名称（Input）、类型（Select）、阶段（Select）、工期（InputNumber）、前置依赖（MS Project 格式文本如 `003FS+2`）、备注（Input）
+- 复制模板：创建副本，名称添加"(副本)"后缀
+- 权限：仅管理员可见
+
+#### 企微配置 Tab
+- 配置表单：企业 ID（corpId）、应用 ID（agentId）、应用密钥（secret，密码框）、回调地址（redirectUri）
+- 保存按钮
+- 密钥脱敏显示（`****` + 末4位）
+- 权限：仅管理员可见
 
 ### 7.2 导航栏权限控制
 - "账号管理"菜单项仅对拥有 `user:read` 权限的用户显示

@@ -213,6 +213,7 @@ users ──┬── user_roles ──── roles ──── role_permission
 | template_activities | 模板活动 | N:1 → project_templates |
 | ai_configs | AI 配置（多配置，按功能绑定） | 独立表 |
 | ai_usage_logs | AI 调用日志（token 用量） | N:1 → projects |
+| check_items | 活动检查项 | N:1 → activities |
 | audit_logs | 审计日志 | N:1 → users |
 | wecom_configs | 企微配置 | 独立表 |
 
@@ -242,21 +243,118 @@ users ──┬── user_roles ──── roles ──── role_permission
 | 风险仪表盘 | 跨项目风险全景视图：AI 洞察、分布统计、矩阵表、行动项面板 | `RiskDashboard/index.tsx` |
 | 风险处置闭环 | RiskItem 生命周期管理（OPEN → IN_PROGRESS → RESOLVED/ACCEPTED）、操作日志、评论、从 AI 评估批量导入 | `riskItems.ts`, `RiskItemsPanel.tsx` |
 | 风险-周报联动 | 周报"从风险评估导入"、提交周报自动创建 RiskItem、AI 建议融合风险上下文 | `weeklyReports.ts`, `Form.tsx` |
+| 检查项 | 每个活动可关联多个检查项，支持勾选/排序/内联编辑/批量创建，表格显示完成进度 | `checkItems.ts`, `CheckItems.tsx` |
+| Excel 导入导出 | 活动批量导入（自动识别列、创建联系人、去重）+ 导出 Excel | `activities.ts`, `excelActivityParser.ts` |
+| 用户偏好 | 列设置/主题等偏好持久化到 `User.preferences` JSON 字段，通过 `/api/auth/preferences` 读写 | `auth.ts`, `themeStore.ts` |
+| 修改密码 | 已登录用户可修改自身密码（需验证当前密码） | `auth.ts` |
+| 个人资料 | 已登录用户可修改自身姓名 | `auth.ts` |
 
-## 11. 环境变量
+## 11. 工程基础设施
+
+### 后端中间件栈
+
+| 中间件 | 文件 | 说明 |
+|--------|------|------|
+| requestId | `middleware/requestId.ts` | 为每个请求分配唯一 ID（UUID），注入 `req.requestId`，用于全链路追踪 |
+| httpLogger | `middleware/httpLogger.ts` | 基于 Pino 的结构化 HTTP 访问日志，自动记录请求方法、路径、状态码、耗时 |
+| authenticate | `middleware/auth.ts` | JWT 验证 + 5 分钟 TTL 内存缓存 |
+| requirePermission | `middleware/permission.ts` | RBAC 权限检查（resource:action，支持通配符） |
+| validate | `middleware/validate.ts` | 基于 Zod Schema 的请求校验（body/query/params），校验失败返回 400 + 详细错误 |
+| apiCache | `middleware/cache.ts` | GET 请求内存缓存，按用户隔离，TTL 过期自动清理 |
+
+### Zod 输入校验
+
+校验 Schema 位于 `server/src/schemas/` 目录，通过 `validate` 中间件统一处理：
+- `auth.ts` — 登录、刷新令牌、密码修改的请求体校验
+- `users.ts` — 用户创建/更新的字段校验
+- `projects.ts` — 项目创建/更新的字段校验
+
+### 结构化日志
+
+使用 Pino 替代 morgan，日志格式为结构化 JSON：
+- 开发环境使用 `pino-pretty` 格式化输出
+- 每条日志自动携带 `requestId`，支持跨服务追踪
+- 配置文件：`server/src/utils/logger.ts`
+
+### API 文档
+
+通过 Swagger UI 提供交互式 API 文档（仅非生产环境）：
+- 访问地址：`/api/docs`（Swagger UI）
+- JSON 规范：`/api/docs.json`（OpenAPI 3.0.0）
+- 配置文件：`server/src/swagger.ts`
+- 支持 Bearer Token 认证调试
+
+### 国际化 (i18n)
+
+前端使用 i18next + react-i18next：
+- 默认语言：简体中文（zh-CN）
+- 预留英文翻译（en-US）
+- 翻译文件：`client/src/i18n/locales/`
+- 覆盖范围：通用操作（保存/取消/删除）、导航菜单、认证提示、模块标签等
+
+### ESLint
+
+使用 flat config 格式（`eslint.config.mjs`）：
+- TypeScript 规则（`@typescript-eslint`）
+- React Hooks 规则（`eslint-plugin-react-hooks`）
+- 运行命令：`npm run lint`
+
+### 性能优化
+
+| 措施 | 说明 |
+|------|------|
+| Vite manualChunks | 前端构建分包：arco-design / react-dom / echarts 等大依赖独立 chunk |
+| API 缓存 | `middleware/cache.ts`，按用户隔离的 GET 请求内存缓存 |
+| 认证缓存 | `middleware/auth.ts`，5 分钟 TTL 用户信息缓存 |
+| 熔断器 | `utils/circuitBreaker.ts`，保护 AI API 调用：失败阈值触发熔断 → 半开探测 → 恢复 |
+
+### 安全措施
+
+| 措施 | 说明 |
+|------|------|
+| Helmet | 安全 HTTP 响应头（X-Content-Type-Options, X-Frame-Options 等） |
+| CORS | 可配置的跨域白名单（`CORS_ORIGINS` 环境变量） |
+| 登录限流 | 生产环境 20 次/15分钟，开发环境 200 次/15分钟 |
+| HTML 清洗 | `utils/sanitize.ts`，XSS 防护，保留安全标签 |
+| 路径安全 | 文件上传/删除使用 `path.basename` 防止目录遍历 |
+| Trust Proxy | Express 信任一层代理，正确获取客户端 IP |
+
+### 无障碍
+
+E2E 测试集成 axe-core WCAG 2.0 AA 审计：
+- 测试文件：`e2e/specs/accessibility.spec.ts`
+- 自动检测颜色对比度、ARIA 属性、键盘可访问性等
+
+### CI/CD
+
+GitHub Actions 流水线包含三个 Job：
+- `test` — 前后端单元测试（Vitest）
+- `lint` — ESLint 代码检查
+- `e2e` — Playwright E2E 测试（失败自动上传报告）
+
+### 优雅关机
+
+服务端监听 SIGTERM / SIGINT 信号，收到后：
+1. 停止接受新请求
+2. 等待进行中的请求完成（最长 10 秒超时）
+3. 关闭数据库连接
+4. 退出进程
+
+## 12. 环境变量
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| DATABASE_URL | PostgreSQL 连接字符串 | postgresql://littlesuper@localhost:5432/hwsystem |
+| DATABASE_URL | 数据库连接字符串 | file:./dev.db（SQLite） |
 | JWT_SECRET | Access Token 签名密钥 | hw-system-jwt-secret |
 | JWT_REFRESH_SECRET | Refresh Token 签名密钥 | hw-system-refresh-secret |
 | PORT | 后端服务端口 | 3000 |
+| CORS_ORIGINS | 允许的跨域来源（逗号分隔） | http://localhost:5173 |
 | AI_API_KEY | 外部 AI API 密钥 | （空） |
 | AI_API_URL | 外部 AI API 地址 | （空） |
 | RISK_SCHEDULER_ENABLED | 是否启用风险定时评估 | false |
 | RISK_SCHEDULER_CRON | 定时评估 cron 表达式 | 0 8 * * 1-5（工作日 8:00） |
 
-## 12. 启动流程
+## 13. 启动流程
 
 ```bash
 # 1. 安装依赖
@@ -299,7 +397,7 @@ cd .. && npm run dev
 - 后端 `/api/health` 接口每次请求时实时读取 `package.json`，无需重启服务端
 - 前端右上角用户下拉菜单底部显示 `vx.y.z` 格式的版本号
 
-## 12. 模块规格文档索引
+## 14. 模块规格文档索引
 
 | 文档 | 说明 |
 |------|------|
@@ -308,5 +406,5 @@ cd .. && npm run dev
 | [product-spec.md](./product-spec.md) | 产品管理模块（产品信息、规格、性能） |
 | [permission-spec.md](./permission-spec.md) | 权限管理模块（用户、角色、权限 RBAC） |
 | [system-spec.md](./system-spec.md) | 系统整体规格（本文档） |
-| [e2e-test-suite.md](./e2e-test-suite.md) | E2E 测试用例集（Playwright，32 文件 / 157 用例） |
+| [e2e-test-suite.md](./e2e-test-suite.md) | E2E 测试用例集（Playwright，48 文件 / 254 用例） |
 | [test-cases.md](./test-cases.md) | API / 功能测试用例（五模块覆盖） |

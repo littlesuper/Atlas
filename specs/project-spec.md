@@ -166,6 +166,22 @@
 **唯一约束：** `[projectId, year, weekNumber]` - 每个项目每周只能有一份周报
 **索引：** `[weekStart, weekEnd]`
 
+### CheckItem（检查项表 `check_items`）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | UUID | PK | 检查项唯一标识 |
+| activityId | UUID | FK → activities.id, CASCADE | 所属活动 |
+| title | String | NOT NULL | 检查项标题 |
+| checked | Boolean | NOT NULL, DEFAULT: false | 是否已勾选 |
+| sortOrder | Int | NOT NULL, DEFAULT: 0 | 排序序号 |
+| createdAt | DateTime | NOT NULL, DEFAULT: now() | 创建时间 |
+| updatedAt | DateTime | NOT NULL, AUTO | 更新时间 |
+
+**索引：** `[activityId]`
+
+**说明：** 每个活动可关联多个检查项，用于细化任务跟踪。活动删除时级联删除关联检查项。活动列表查询时自动 include `checkItems` 和 `_count.checkItems`，表格中显示「已完成/总数」。
+
 ### 枚举定义
 
 **ProductLine（产品线，非枚举，字符串常量）：**
@@ -181,6 +197,7 @@
 | IN_PROGRESS | 进行中 |
 | COMPLETED | 已完成 |
 | ON_HOLD | 已搁置 |
+| ARCHIVED | 已归档 |
 
 **ActivityType：**
 | 值 | 说明 |
@@ -407,6 +424,39 @@ DELETE /api/projects/:id
 **认证：** Bearer Token
 **权限：** `project:delete` + 项目管理权限（管理员、负责人或协作者）
 **响应：** `{ "success": true }`
+
+#### 归档项目
+```
+POST /api/projects/:id/archive
+```
+**认证：** Bearer Token
+**权限：** `project:update` + 项目管理权限
+
+**请求体（可选）：**
+```json
+{
+  "remark": "EVT阶段完成，归档保存"
+}
+```
+
+**操作：**
+1. 保存项目全量数据快照（活动、产品、周报、风险评估、评论）到 `project_archives`
+2. 将项目状态改为 `ARCHIVED`
+
+**响应（200）：** 创建的 `ProjectArchive` 对象
+
+#### 取消归档
+```
+POST /api/projects/:id/unarchive
+```
+**认证：** Bearer Token
+**权限：** `project:update` + 项目管理权限
+
+**操作：** 读取最新归档快照中的原始状态，恢复项目为归档前的状态
+
+**响应（200）：** 更新后的项目对象
+
+**说明：** 已归档的项目拒绝所有修改操作（编辑活动、创建周报等），后端通过 `rejectIfArchived` 中间件统一拦截。
 
 ### 3.2 项目协作者管理
 
@@ -645,6 +695,343 @@ PUT /api/activities/project/:projectId/reorder
   ]
 }
 ```
+
+#### 批量创建活动
+```
+POST /api/activities/batch-create
+```
+**认证：** Bearer Token
+**权限：** `activity:create`
+
+**请求体：**
+```json
+{
+  "activities": [
+    { "projectId": "uuid", "name": "...", "type": "TASK", "phase": "EVT", "status": "NOT_STARTED", "sortOrder": 1, ... }
+  ]
+}
+```
+
+**响应（200）：**
+```json
+{ "success": true, "count": 5 }
+```
+
+**说明：** 主要用于撤回删除操作时恢复已删除的活动。前端撤回栈在删除活动时保存完整数据，撤回时通过此接口批量恢复。
+
+#### 批量更新活动
+```
+PUT /api/activities/batch-update
+```
+**认证：** Bearer Token
+**权限：** `activity:update`
+
+**请求体：**
+```json
+{
+  "ids": ["uuid1", "uuid2", "uuid3"],
+  "updates": {
+    "status": "COMPLETED",
+    "phase": "DVT",
+    "assigneeIds": ["uuid"]
+  }
+}
+```
+
+**响应（200）：**
+```json
+{ "success": true, "count": 3 }
+```
+
+**说明：** 支持批量更新状态、阶段、负责人。所有活动必须属于同一项目。更新完成后自动重新计算项目进度。
+
+#### 批量删除活动
+```
+DELETE /api/activities/batch-delete
+```
+**认证：** Bearer Token
+**权限：** `activity:delete`
+
+**请求体：**
+```json
+{
+  "ids": ["uuid1", "uuid2", "uuid3"]
+}
+```
+
+**响应（200）：**
+```json
+{ "success": true, "count": 3 }
+```
+
+**说明：** 所有活动必须属于同一项目。删除后自动重新计算项目进度。
+
+#### 撤回导入
+```
+POST /api/activities/project/:projectId/undo-import
+```
+**认证：** Bearer Token
+**权限：** `activity:create`
+
+**请求体：**
+```json
+{
+  "ids": ["uuid1", "uuid2"]
+}
+```
+
+**响应（200）：**
+```json
+{ "success": true, "count": 2 }
+```
+
+**说明：** 删除通过批量导入创建的活动，用于支持导入后的撤回操作。
+
+#### 导出活动（Excel）
+```
+GET /api/activities/project/:projectId/export-excel
+```
+**认证：** Bearer Token
+
+**响应：** Excel 文件（`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`）
+- 文件名：`{项目名}_活动列表_{YYYY-MM-DD}.xlsx`
+- 列：ID、活动名称、阶段、类型、状态、负责人、计划工期、计划开始、计划结束、实际开始、实际结束、实际工期、备注
+
+### 3.3b 排程工具
+
+#### 关键路径计算
+```
+GET /api/activities/project/:projectId/critical-path
+```
+**认证：** Bearer Token
+
+**响应（200）：**
+```json
+{
+  "criticalActivityIds": ["uuid1", "uuid2", "uuid3"]
+}
+```
+
+**说明：** 使用前向/后向遍历算法（CPM）计算项目关键路径，返回关键路径上的活动 ID 列表。甘特图中关键路径活动以红色高亮标记。
+
+**实现文件：** `server/src/utils/criticalPath.ts`
+
+#### 资源冲突检测
+```
+GET /api/activities/resource-conflicts?projectId=uuid
+```
+**认证：** Bearer Token
+
+**查询参数：**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| projectId | String | 可选，限定检测范围为单个项目。不传则检测所有项目 |
+
+**响应（200）：** 冲突列表，每项包含冲突用户和重叠活动
+```json
+[
+  {
+    "userId": "uuid",
+    "realName": "张三",
+    "conflicts": [
+      {
+        "activity1": { "id": "uuid", "name": "PCB布局", "projectName": "传感器V2", "planStartDate": "...", "planEndDate": "..." },
+        "activity2": { "id": "uuid", "name": "原理图审核", "projectName": "网关V3", "planStartDate": "...", "planEndDate": "..." },
+        "overlapDays": 5
+      }
+    ]
+  }
+]
+```
+
+**说明：** 检测同一个负责人在时间上重叠的活动。支持「所有项目」和「仅当前项目」两种范围。
+
+#### What-If 假设分析
+```
+POST /api/activities/project/:projectId/what-if
+```
+**认证：** Bearer Token
+
+**请求体：**
+```json
+{
+  "activityId": "uuid",
+  "delayDays": 5
+}
+```
+`delayDays` 为正数表示延期，负数表示提前。
+
+**响应（200）：**
+```json
+{
+  "affectedCount": 3,
+  "affected": [
+    { "id": "uuid", "name": "PCB布局", "originalStart": "2026-02-10", "originalEnd": "2026-02-20", "newStart": "2026-02-15", "newEnd": "2026-02-25" }
+  ],
+  "projectEndDateBefore": "2026-06-30T00:00:00.000Z",
+  "projectEndDateAfter": "2026-07-05T00:00:00.000Z"
+}
+```
+
+**说明：** 只读模拟，不修改实际数据。基于依赖关系计算级联影响，展示延期/提前对下游活动和项目结束日期的影响。
+
+#### 应用假设分析结果
+```
+POST /api/activities/project/:projectId/what-if/apply
+```
+**认证：** Bearer Token
+**权限：** `activity:update`
+
+**请求体：**
+```json
+{
+  "affected": [
+    { "id": "uuid", "newStart": "2026-02-15", "newEnd": "2026-02-25" }
+  ],
+  "archiveLabel": "延期5天模拟应用"
+}
+```
+
+**响应（200）：**
+```json
+{ "success": true, "updatedCount": 3 }
+```
+
+**说明：** 将 What-If 模拟结果写入实际活动数据。可选 `archiveLabel` 用于创建快照备份。
+
+#### 一键重排
+```
+POST /api/activities/project/:projectId/reschedule
+```
+**认证：** Bearer Token
+
+**请求体（可选）：**
+```json
+{
+  "baseDate": "2026-03-01"
+}
+```
+`baseDate` 默认为当天日期。
+
+**响应（200）：**
+```json
+{ "success": true, "updatedCount": 8 }
+```
+
+**说明：** 基于拓扑排序，自动重新排列未完成活动的计划日期。已完成的活动不受影响。从 `baseDate` 开始，按依赖关系和工期顺序排列。
+
+#### AI 工期建议
+```
+POST /api/activities/project/:projectId/ai-schedule
+```
+**认证：** Bearer Token
+
+**响应（200）：**
+```json
+{
+  "suggestions": [
+    { "name": "PCB布局", "suggestedDuration": 12, "reason": "根据历史数据，类似任务平均工期为12天" }
+  ],
+  "risks": [
+    { "activity": "元器件选型", "risk": "供应商交期不确定", "severity": "MEDIUM" }
+  ],
+  "summary": "建议总工期约45个工作日，关键路径集中在PCB设计和测试阶段"
+}
+```
+
+**说明：** 基于活动类型和历史数据，AI 生成工期建议和风险提示。需配置 AI API。
+
+### 3.3c 检查项管理
+
+#### 获取活动检查项
+```
+GET /api/check-items/activity/:activityId
+```
+**认证：** Bearer Token
+
+**响应（200）：** 按 `sortOrder` 升序排列的检查项数组
+```json
+[
+  { "id": "uuid", "activityId": "uuid", "title": "确认原理图无误", "checked": true, "sortOrder": 0 },
+  { "id": "uuid", "activityId": "uuid", "title": "PCB文件输出", "checked": false, "sortOrder": 1 }
+]
+```
+
+#### 创建检查项
+```
+POST /api/check-items
+```
+**认证：** Bearer Token
+
+**请求体：**
+```json
+{
+  "activityId": "uuid",
+  "title": "确认原理图无误"
+}
+```
+
+**响应（201）：** 创建的检查项对象
+
+#### 批量创建检查项
+```
+POST /api/check-items/batch
+```
+**认证：** Bearer Token
+
+**请求体：**
+```json
+{
+  "activityId": "uuid",
+  "items": [
+    { "title": "确认原理图无误" },
+    { "title": "PCB文件输出" }
+  ]
+}
+```
+
+**响应（201）：** 创建的检查项数组
+
+#### 更新检查项
+```
+PUT /api/check-items/:id
+```
+**认证：** Bearer Token
+
+**请求体：**
+```json
+{
+  "title": "确认原理图无误（已审核）",
+  "checked": true
+}
+```
+
+**响应（200）：** 更新后的检查项对象
+
+#### 删除检查项
+```
+DELETE /api/check-items/:id
+```
+**认证：** Bearer Token
+**响应（200）：** `{ "success": true }`
+
+#### 检查项重排序
+```
+PUT /api/check-items/activity/:activityId/reorder
+```
+**认证：** Bearer Token
+
+**请求体：**
+```json
+{
+  "items": [
+    { "id": "uuid", "sortOrder": 0 },
+    { "id": "uuid", "sortOrder": 1 }
+  ]
+}
+```
+
+**响应（200）：** `{ "success": true }`
 
 ### 3.4 项目快照
 
