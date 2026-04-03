@@ -173,9 +173,24 @@ app.use('/api/risk-items', riskItemsRoutes);
 // 检查项路由
 app.use('/api/check-items', checkItemsRoutes);
 
+// ==================== 前端静态文件（生产环境） ====================
+
+if (process.env.NODE_ENV === 'production') {
+  const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
+  app.use(express.static(clientDistPath));
+
+  // SPA fallback：非 /api 且非 /uploads 的请求返回 index.html
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
 // ==================== 错误处理中间件 ====================
 
-// 404处理
+// 404处理（仅捕获未匹配的 /api 路由）
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: '接口不存在' });
 });
