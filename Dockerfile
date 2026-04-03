@@ -32,34 +32,34 @@ WORKDIR /app
 # Install only production dependencies
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
-# client package.json needed for workspace resolution but no install
 COPY client/package.json ./client/
 
 RUN npm ci --omit=dev --workspace=server && npm cache clean --force
 
-# Copy Prisma schema and generate client for production
+# Copy Prisma schema + migrations and generate client
 COPY server/prisma/ ./server/prisma/
 RUN cd server && npx prisma generate
 
 # Copy built backend
 COPY --from=builder /app/server/dist/ ./server/dist/
 
-# Copy built frontend (served by Express static or reverse proxy)
+# Copy built frontend
 COPY --from=builder /app/client/dist/ ./client/dist/
 
 # Copy root package.json for version reading
 COPY package.json ./
 
-# Create uploads directory
-RUN mkdir -p server/uploads
+# Create data directories
+RUN mkdir -p /data server/uploads
 
-# Non-root user for security
+# Non-root user
 RUN addgroup -g 1001 -S atlas && adduser -S atlas -u 1001
-RUN chown -R atlas:atlas /app
+RUN chown -R atlas:atlas /app /data
 USER atlas
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
+ENV DATABASE_URL=file:/data/atlas.db
 
 CMD ["node", "server/dist/index.js"]

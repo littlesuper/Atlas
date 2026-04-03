@@ -367,21 +367,35 @@ GitHub Actions 流水线（`.github/workflows/ci.yml`）包含四个 Job：
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile` | 多阶段构建（build → production），非 root 用户运行，最终镜像基于 `node:20-alpine` |
-| `docker-compose.yml` | PostgreSQL 17 + 应用服务，健康检查，数据卷持久化（pgdata + uploads） |
+| `Dockerfile` | 多阶段构建（build → production），非 root 用户运行，`node:20-alpine` 基础镜像 |
+| `docker-compose.yml` | 单容器应用 + SQLite，健康检查，数据卷持久化（atlas-data + atlas-uploads） |
 | `.dockerignore` | 排除 node_modules、.git、测试文件、开发数据库等 |
+| `deploy.sh` | 一键部署工具（setup/update/status/logs/stop/backup/restore） |
+| `.env.production` | 环境变量模板 |
 
 ```bash
-# Docker 部署
-cp .env.example .env  # 配置必要环境变量
-docker compose up -d   # 启动 PostgreSQL + 应用
+# 一键部署（自动生成安全密钥）
+./deploy.sh setup
 
-# 首次部署需执行数据库迁移和种子数据
-docker compose exec app npx prisma migrate deploy --schema=server/prisma/schema.prisma
-docker compose exec app npx tsx server/src/prisma/seed.ts
+# 日常运维
+./deploy.sh update   # 拉代码 + 自动备份 + 重建
+./deploy.sh status   # 查看版本、运行时间、数据量
+./deploy.sh backup   # 备份数据库（保留 30 天）
+./deploy.sh restore  # 恢复数据库
 ```
 
 `docker-compose.yml` 通过 `${VAR:?error}` 语法强制要求设置 `JWT_SECRET`、`JWT_REFRESH_SECRET`、`CORS_ORIGINS`。
+
+### 数据安全
+
+| 措施 | 说明 |
+|------|------|
+| 数据卷隔离 | SQLite 数据库存储在 Docker volume `atlas-data`，与容器生命周期解耦 |
+| 自动备份 | 每次 `update` 前自动备份；备份使用 SQLite `.backup` 命令保证一致性 |
+| 备份保留 | `backups/` 目录保留 30 天备份，自动清理过期文件 |
+| 密钥自动生成 | `deploy.sh setup` 自动用 `openssl rand -hex 32` 生成 JWT 密钥 |
+| 非 root 运行 | Docker 容器内以 `atlas:1001` 用户运行，降低提权风险 |
+| 启动校验 | 生产环境启动时强制校验 JWT 密钥非默认值 + CORS 已配置 |
 
 ### 优雅关机
 
@@ -393,17 +407,17 @@ docker compose exec app npx tsx server/src/prisma/seed.ts
 
 ## 12. 环境变量
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| DATABASE_URL | 数据库连接字符串 | file:./dev.db（SQLite） |
-| JWT_SECRET | Access Token 签名密钥 | hw-system-jwt-secret |
-| JWT_REFRESH_SECRET | Refresh Token 签名密钥 | hw-system-refresh-secret |
-| PORT | 后端服务端口 | 3000 |
-| CORS_ORIGINS | 允许的跨域来源（逗号分隔） | http://localhost:5173 |
-| AI_API_KEY | 外部 AI API 密钥 | （空） |
-| AI_API_URL | 外部 AI API 地址 | （空） |
-| RISK_SCHEDULER_ENABLED | 是否启用风险定时评估 | false |
-| RISK_SCHEDULER_CRON | 定时评估 cron 表达式 | 0 8 * * 1-5（工作日 8:00） |
+| 变量 | 说明 | 默认值 | 必填（生产） |
+|------|------|--------|-------------|
+| DATABASE_URL | SQLite 数据库路径 | file:./dev.db | 自动设置 |
+| JWT_SECRET | Access Token 签名密钥 | hw-system-jwt-secret | ✅ 必改 |
+| JWT_REFRESH_SECRET | Refresh Token 签名密钥 | hw-system-refresh-secret | ✅ 必改 |
+| PORT | 后端服务端口 | 3000 | 否 |
+| CORS_ORIGINS | 允许的跨域来源（逗号分隔） | http://localhost:5173 | ✅ 必改 |
+| AI_API_KEY | 外部 AI API 密钥 | （空） | 否 |
+| AI_API_URL | 外部 AI API 地址 | （空） | 否 |
+| RISK_SCHEDULER_ENABLED | 是否启用风险定时评估 | false | 否 |
+| RISK_SCHEDULER_CRON | 定时评估 cron 表达式 | 0 8 * * 1-5（工作日 8:00） | 否 |
 
 ## 13. 启动流程
 
@@ -434,21 +448,15 @@ cd .. && npm run dev
 ### Docker 部署（生产环境）
 
 ```bash
-# 设置环境变量（必须）
-export JWT_SECRET=<安全随机密钥>
-export JWT_REFRESH_SECRET=<安全随机密钥>
-export CORS_ORIGINS=https://your-domain.com
-export DB_PASSWORD=<数据库密码>
-
-# 构建并启动
-docker compose up -d --build
-
-# 首次部署：迁移 + 种子数据
-docker compose exec app npx prisma migrate deploy --schema=server/prisma/schema.prisma
-docker compose exec app npx tsx server/src/prisma/seed.ts
+# 在 Ubuntu 服务器上：
+git clone https://github.com/littlesuper/Atlas.git
+cd Atlas
+./deploy.sh setup    # 自动生成密钥、构建镜像、初始化数据库
 ```
 
-- 应用：http://localhost:3000
+- 应用：http://服务器IP:3000
+- 默认账号：admin / admin123（首次登录后请立即修改密码）
+- 数据库：SQLite（存储在 Docker volume，容器重建不丢失）
 - 健康检查返回版本号格式：`x.y.z`（如 `1.2.3`）
 
 ### 版本号规则
