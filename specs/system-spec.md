@@ -363,38 +363,43 @@ GitHub Actions 流水线（`.github/workflows/ci.yml`）包含四个 Job：
 - `test` — 前后端单元测试（Vitest，46 文件 / 866 用例）+ 测试覆盖率报告 + 构建验证
 - `e2e` — Playwright E2E 测试（48 文件 / 254 用例，失败自动上传报告）
 
-### Docker 部署
+### 生产部署
+
+使用 systemd 管理进程，直接在 Ubuntu Server 上运行，无需容器。
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile` | 多阶段构建（build → production），非 root 用户运行，`node:20-alpine` 基础镜像 |
-| `docker-compose.yml` | 单容器应用 + SQLite，健康检查，数据卷持久化（atlas-data + atlas-uploads） |
-| `.dockerignore` | 排除 node_modules、.git、测试文件、开发数据库等 |
-| `deploy.sh` | 一键部署工具（setup/update/status/logs/stop/backup/restore） |
-| `.env.production` | 环境变量模板 |
+| `deploy.sh` | 一键部署工具（setup/update/start/stop/restart/status/logs/backup/restore） |
+| `.env.production` | 环境变量模板（`deploy.sh setup` 会自动生成 `.env` 并填入安全密钥） |
 
 ```bash
-# 一键部署（自动生成安全密钥）
-./deploy.sh setup
+# 一键部署
+./deploy.sh setup    # 安装 Node.js → npm ci → 构建 → 初始化 DB → 注册 systemd 服务
 
 # 日常运维
-./deploy.sh update   # 拉代码 + 自动备份 + 重建
-./deploy.sh status   # 查看版本、运行时间、数据量
-./deploy.sh backup   # 备份数据库（保留 30 天）
-./deploy.sh restore  # 恢复数据库
+./deploy.sh update   # 自动备份 → git pull → 重建 → 重启
+./deploy.sh status   # 版本、运行时间、数据库/上传/备份大小
+./deploy.sh logs     # 实时日志
+./deploy.sh backup   # 手动备份
+./deploy.sh restore  # 恢复到某个备份
 ```
 
-`docker-compose.yml` 通过 `${VAR:?error}` 语法强制要求设置 `JWT_SECRET`、`JWT_REFRESH_SECRET`、`CORS_ORIGINS`。
+systemd 服务特性：
+- 崩溃自动重启（`Restart=always`，间隔 5 秒）
+- 开机自启（`enable`）
+- 安全沙箱（`NoNewPrivileges`、`ProtectSystem=strict`、`PrivateTmp`）
+- 日志文件：`.logs/app.log` + `.logs/error.log`
 
 ### 数据安全
 
 | 措施 | 说明 |
 |------|------|
-| 数据卷隔离 | SQLite 数据库存储在 Docker volume `atlas-data`，与容器生命周期解耦 |
-| 自动备份 | 每次 `update` 前自动备份；备份使用 SQLite `.backup` 命令保证一致性 |
-| 备份保留 | `backups/` 目录保留 30 天备份，自动清理过期文件 |
-| 密钥自动生成 | `deploy.sh setup` 自动用 `openssl rand -hex 32` 生成 JWT 密钥 |
-| 非 root 运行 | Docker 容器内以 `atlas:1001` 用户运行，降低提权风险 |
+| 数据库隔离 | SQLite 存储在独立的 `data/` 目录，权限 700（仅属主可读写） |
+| 自动备份 | 每次 `update` 前自动备份；使用 SQLite `.backup` 命令保证一致性 |
+| 备份保留 | `backups/` 目录保留 30 天，自动清理过期文件 |
+| 密钥自动生成 | `deploy.sh setup` 用 `openssl rand -hex 32` 生成 JWT 密钥 |
+| .env 权限 | `.env` 文件权限设为 600（仅属主可读） |
+| systemd 沙箱 | `ProtectSystem=strict` 禁止写入系统目录，`ReadWritePaths` 仅开放 data/uploads |
 | 启动校验 | 生产环境启动时强制校验 JWT 密钥非默认值 + CORS 已配置 |
 
 ### 优雅关机
@@ -445,19 +450,21 @@ cd .. && npm run dev
 - API 文档：http://localhost:3000/api/docs
 - 健康检查：GET http://localhost:3000/api/health
 
-### Docker 部署（生产环境）
+### 服务器部署（生产环境）
 
 ```bash
-# 在 Ubuntu 服务器上：
+# 在 Ubuntu Server 上：
 git clone https://github.com/littlesuper/Atlas.git
 cd Atlas
-./deploy.sh setup    # 自动生成密钥、构建镜像、初始化数据库
+./deploy.sh setup
+# 全自动：安装 Node.js → 构建 → 初始化 DB → 注册 systemd 服务 → 启动
 ```
 
 - 应用：http://服务器IP:3000
 - 默认账号：admin / admin123（首次登录后请立即修改密码）
-- 数据库：SQLite（存储在 Docker volume，容器重建不丢失）
-- 健康检查返回版本号格式：`x.y.z`（如 `1.2.3`）
+- 数据库：SQLite（`data/atlas.db`）
+- 日志：`.logs/app.log`
+- 服务管理：`sudo systemctl start|stop|restart atlas`
 
 ### 版本号规则
 
