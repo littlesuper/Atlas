@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { isTokenBlacklisted } from '../utils/tokenBlacklist';
 
 const prisma = new PrismaClient();
 
@@ -71,6 +72,12 @@ export const authenticate = async (
     }
     if (!token) {
       res.status(401).json({ error: '未提供认证令牌' });
+      return;
+    }
+
+    // 1.5 检查 token 黑名单（退出登录/改密码后的 token）
+    if (isTokenBlacklisted(token)) {
+      res.status(401).json({ error: '令牌已失效，请重新登录' });
       return;
     }
 

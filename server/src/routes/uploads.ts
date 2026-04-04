@@ -74,10 +74,47 @@ const upload = multer({
  * POST /api/uploads
  * 上传文件
  */
+// 文件头 magic bytes 校验（防止 MIME 欺骗）
+const MAGIC_BYTES: Record<string, Buffer[]> = {
+  'image/png': [Buffer.from([0x89, 0x50, 0x4e, 0x47])],
+  'image/jpeg': [Buffer.from([0xff, 0xd8, 0xff])],
+  'image/gif': [Buffer.from('GIF87a'), Buffer.from('GIF89a')],
+  'image/webp': [Buffer.from('RIFF')], // RIFF....WEBP
+  'application/pdf': [Buffer.from('%PDF')],
+  'application/zip': [Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+  'application/x-zip-compressed': [Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+  // Office 2007+ (docx/xlsx) 也是 ZIP 格式
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+  // 老版 Office (doc/xls) 是 OLE2
+  'application/msword': [Buffer.from([0xd0, 0xcf, 0x11, 0xe0])],
+  'application/vnd.ms-excel': [Buffer.from([0xd0, 0xcf, 0x11, 0xe0])],
+};
+
+function validateFileContent(filePath: string, mimetype: string): boolean {
+  const expectedSignatures = MAGIC_BYTES[mimetype];
+  if (!expectedSignatures) return true; // text/plain, svg 等无固定头的类型直接放行
+
+  const fd = fs.openSync(filePath, 'r');
+  const header = Buffer.alloc(8);
+  fs.readSync(fd, header, 0, 8, 0);
+  fs.closeSync(fd);
+
+  return expectedSignatures.some(sig => header.subarray(0, sig.length).equals(sig));
+}
+
 router.post('/', authenticate, upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ error: '未上传文件' });
+      return;
+    }
+
+    // 验证文件内容是否与声明的 MIME 类型一致
+    if (!validateFileContent(req.file.path, req.file.mimetype)) {
+      // 删除可疑文件
+      fs.unlinkSync(req.file.path);
+      res.status(400).json({ error: '文件内容与类型不匹配，已拒绝' });
       return;
     }
 

@@ -190,10 +190,10 @@ async function main() {
     update: {},
     create: {
       username: 'admin',
-      email: 'admin@hwsystem.com',
       password: await bcrypt.hash('admin123', 10),
       realName: '系统管理员',
       status: 'ACTIVE',
+      mustChangePassword: true,
     },
   });
 

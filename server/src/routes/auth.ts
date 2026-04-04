@@ -7,6 +7,7 @@ import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { auditLog } from '../utils/auditLog';
 import { isWecomEnabled, getWecomConfig, getUserInfoByCode, getUserDetail } from '../utils/wecom';
 import { logger } from '../utils/logger';
+import { blacklistToken } from '../utils/tokenBlacklist';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -164,6 +165,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         roles,
         permissions,
         collaboratingProjectIds,
+        mustChangePassword: user.mustChangePassword ?? false,
       },
     });
   } catch (error) {
@@ -319,6 +321,24 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
 });
 
 /**
+ * POST /api/auth/logout
+ * 退出登录（将当前 token 加入黑名单）
+ */
+router.post('/logout', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      blacklistToken(token);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ err: error }, '退出登录错误');
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
  * PUT /api/auth/profile
  * 修改个人信息（仅限当前用户自己）
  */
@@ -434,15 +454,19 @@ router.post('/change-password', authenticate, async (req: Request, res: Response
       return;
     }
 
-    // 更新密码
+    // 更新密码并清除强制改密码标记
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { password: hashedPassword },
+      data: { password: hashedPassword, mustChangePassword: false },
     });
 
-    // 清除认证缓存，使旧 token 在下次验证时重新查库
+    // 清除认证缓存 + 将当前 token 加入黑名单
     invalidateUserCache(req.user.id);
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      blacklistToken(authHeader.substring(7));
+    }
 
     res.json({ success: true, message: '密码修改成功' });
   } catch (error) {

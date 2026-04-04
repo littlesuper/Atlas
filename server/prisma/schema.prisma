@@ -23,9 +23,10 @@ model User {
   password    String?
   realName    String
   wecomUserId String?    @unique
-  canLogin    Boolean    @default(true)
-  status      UserStatus @default(ACTIVE)
-  preferences Json?
+  canLogin           Boolean    @default(true)
+  mustChangePassword Boolean    @default(false)
+  status             UserStatus @default(ACTIVE)
+  preferences        Json?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
