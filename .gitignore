@@ -41,3 +41,15 @@ server/uploads/
 
 # Database backups
 server/prisma/backups/
+
+# Local SQLite DB (never commit)
+server/prisma/*.db
+server/prisma/*.db-journal
+server/prisma/dev.db.backup_*
+
+# Runtime / deploy artifacts
+.pids/
+.logs/
+data/
+backups/
+review.md
