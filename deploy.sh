@@ -78,8 +78,7 @@ ENVEOF
   log "构建前端..."
   npm run build --workspace=client
 
-  log "构建后端..."
-  npm run build --workspace=server
+  # 后端使用 tsx 运行时，无需预编译
 
   # 7. 初始化数据库
   log "初始化数据库..."
@@ -127,7 +126,7 @@ Type=simple
 User=$(whoami)
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${APP_DIR}/.env
-ExecStart=$(which node) ${APP_DIR}/server/dist/index.js
+ExecStart=$(which node) ${APP_DIR}/node_modules/tsx/dist/cli.mjs ${APP_DIR}/server/src/index.ts
 Restart=always
 RestartSec=5
 
@@ -165,7 +164,7 @@ update() {
   log "构建..."
   cd server && npx prisma generate && cd ..
   npm run build --workspace=client
-  npm run build --workspace=server
+  # 后端使用 tsx 运行时，无需预编译
 
   log "同步数据库结构..."
   cd server
