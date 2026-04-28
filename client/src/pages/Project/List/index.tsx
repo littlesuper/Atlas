@@ -465,7 +465,7 @@ const ProjectList: React.FC = () => {
     },
     {
       title: '操作',
-      width: 120,
+      width: 150,
       fixed: 'right' as const,
       render: (_: unknown, record: Project) => {
         const isArchived = record.status === 'ARCHIVED';
@@ -504,6 +504,16 @@ const ProjectList: React.FC = () => {
                       icon={<IconDelete />}
                       size="small"
                       onClick={() => handleDelete(record)}
+                    />
+                  </Tooltip>
+                )}
+                {hasPermission('project', 'update') && isProjectManager(record.managerId, record.id) && (
+                  <Tooltip content="归档">
+                    <Button
+                      type="text"
+                      icon={<IconStorage />}
+                      size="small"
+                      onClick={() => handleArchive(record)}
                     />
                   </Tooltip>
                 )}
