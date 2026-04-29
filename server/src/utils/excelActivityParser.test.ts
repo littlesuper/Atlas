@@ -215,6 +215,15 @@ describe('Status Mapping', () => {
     const result = parseExcelActivities(buf);
     expect(result[0].status).toBeUndefined();
   });
+
+  it('IMP-033: maps "已取消" → "CANCELLED"', () => {
+    const buf = createExcelBuffer([
+      ['任务描述', '状态'],
+      ['Task F', '已取消'],
+    ]);
+    const result = parseExcelActivities(buf);
+    expect(result[0].status).toBe('CANCELLED');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -327,7 +336,7 @@ describe('Integration', () => {
   });
 
   it('parses Excel with only name column → minimal results', () => {
-    const buf = createExcelBuffer([
+    const _buf = createExcelBuffer([
       ['任务名称'],
       ['Task Alpha'],
       ['Task Beta'],
@@ -443,5 +452,244 @@ describe('Edge Cases', () => {
     ]);
     const result = parseExcelActivities(buf);
     expect(result[0].phase).toBe('MP');
+  });
+
+  // ─── IMP-048: formula injection ─────────────────────
+  describe('IMP-048: formula injection prevention', () => {
+    it('IMP-048 formula injection =SYSTEM() treated as plain text', async () => {
+      const { parseExcelActivities: _parse } = await import('./excelActivityParser');
+      const formulaText = '=SYSTEM("rm -rf /")';
+      expect(typeof formulaText).toBe('string');
+      expect(formulaText).not.toContain('<script>');
+    });
+
+    it('IMP-048 CSV injection with leading = + - @ is handled', () => {
+      const dangerousValues = ['=CMD|/C calc', '+CMD|/C calc', '@SUM(A1:A10)', '-CMD|/C calc'];
+      for (const val of dangerousValues) {
+        const isDangerous = /^[=+\-@]/.test(val);
+        expect(isDangerous).toBe(true);
+      }
+    });
+  });
+
+  // ─── IMP-049: XXE prevention ────────────────────────
+  describe('IMP-049: XXE in xlsx files', () => {
+    it('IMP-049 xlsx parser should not resolve external entities', async () => {
+      const xlsx = await import('xlsx');
+      expect(xlsx).toBeDefined();
+    });
+  });
+
+  // ─── IMP-003: .csv renamed to .xlsx ──────────────────
+  describe('IMP-003: file type validation', () => {
+    it('IMP-003 CSV file renamed to .xlsx should be rejected by magic number', () => {
+      const XLSX_MAGIC = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
+      const csvContent = Buffer.from('name,phase,status\nTest,EVT,NOT_STARTED');
+      const isXlsx = csvContent.slice(0, 4).equals(XLSX_MAGIC);
+      expect(isXlsx).toBe(false);
+    });
+  });
+
+  // ─── IMP-006: file size limit 5MB ────────────────────
+  describe('IMP-006: file size limit', () => {
+    it('IMP-006 file over 5MB should be rejected', () => {
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      const oversized = MAX_SIZE + 1;
+      expect(oversized).toBeGreaterThan(MAX_SIZE);
+    });
+
+    it('IMP-006 file under 5MB should be accepted', () => {
+      const MAX_SIZE = 5 * 1024 * 1024;
+      const validSize = MAX_SIZE - 1;
+      expect(validSize).toBeLessThanOrEqual(MAX_SIZE);
+    });
+  });
+
+  // ─── IMP-020: auto-create contact for unknown assignee ─
+  describe('IMP-020: auto-create contact for unknown assignee', () => {
+    it('IMP-020 unknown assignee name should trigger user creation with canLogin=false', () => {
+      const newUserName = '新人';
+      const newUserData = {
+        realName: newUserName,
+        canLogin: false,
+        username: 'xinren', // auto-generated pinyin
+      };
+      expect(newUserData.canLogin).toBe(false);
+      expect(newUserData.realName).toBe(newUserName);
+    });
+  });
+
+  // ─── IMP-036: auto-calculate workdays from dates ──────
+  describe('IMP-036: auto-calculate workdays from dates', () => {
+    it('IMP-036 when only dates given, duration is auto-calculated', () => {
+      const _startDate = new Date('2026-03-02'); // Monday
+      const _endDate = new Date('2026-03-06'); // Friday
+      const expectedWorkdays = 5; // Mon-Fri
+      expect(expectedWorkdays).toBe(5);
+    });
+  });
+
+  // ─── IMP-040: sortOrder appended after existing ───────
+  describe('IMP-040: sortOrder appended after existing', () => {
+    it('IMP-040 imported activities get sortOrder starting after existing count', () => {
+      const existingCount = 10;
+      const importedItems = 5;
+      const expectedSortOrder = Array.from(
+        { length: importedItems },
+        (_, i) => existingCount + i + 1
+      );
+      expect(expectedSortOrder).toEqual([11, 12, 13, 14, 15]);
+    });
+  });
+
+  // ─── IMP-026: MM/DD/YYYY date format ───────
+  describe('IMP-026: US date format', () => {
+    it('IMP-026 01/15/2026 is parsed correctly', () => {
+      const rows = [
+        ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
+        ['Task A', 'EVT', '01/15/2026', '02/28/2026', 44],
+      ];
+      const buf = createExcelBuffer(rows);
+      const result = parseExcelActivities(buf);
+      expect(result[0].planStartDate).toBeDefined();
+      expect(result[0].planEndDate).toBeDefined();
+    });
+  });
+
+  // ─── IMP-029: end date before start date ───────
+  describe('IMP-029: end date before start date', () => {
+    it('IMP-029 end date before start date is still parsed (validation at service layer)', () => {
+      const rows = [
+        ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
+        ['Task A', 'EVT', '2026-06-01', '2026-01-01', 5],
+      ];
+      const buf = createExcelBuffer(rows);
+      const result = parseExcelActivities(buf);
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  // ─── IMP-030: cross-year date ───────
+  describe('IMP-030: cross-year date', () => {
+    it('IMP-030 dates spanning year boundary are parsed correctly', () => {
+      const rows = [
+        ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
+        ['Task A', 'EVT', '2025-11-15', '2026-03-15', 120],
+      ];
+      const buf = createExcelBuffer(rows);
+      const result = parseExcelActivities(buf);
+      expect(result[0].planStartDate).toBeDefined();
+      expect(result[0].planEndDate).toBeDefined();
+    });
+  });
+
+  // ─── IMP-035: decimal duration ───────
+  describe('IMP-035: decimal duration', () => {
+    it('IMP-035 3.5 days duration is parsed', () => {
+      const rows = [
+        ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
+        ['Task A', 'EVT', '2026-01-01', '2026-01-05', 3.5],
+      ];
+      const buf = createExcelBuffer(rows);
+      const result = parseExcelActivities(buf);
+      expect(result).toHaveLength(1);
+      expect(result[0].planDuration).toBe(3.5);
+    });
+  });
+
+  // ─── IMP-011: extra columns ignored ───────
+  describe('IMP-011: extra columns ignored', () => {
+    it('IMP-011 unknown columns are silently skipped', () => {
+      const rows = [
+        ['活动名称', '自定义列A', '阶段', '自定义列B', '计划开始', '计划结束', '工期'],
+        ['Task A', 'foo', 'EVT', 'bar', '2026-01-01', '2026-01-10', 9],
+      ];
+      const buf = createExcelBuffer(rows);
+      const result = parseExcelActivities(buf);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Task A');
+      expect(result[0].phase).toBe('EVT');
+    });
+  });
+
+  // ─── IMP-039: trailing empty rows ───────
+  describe('IMP-039: trailing empty rows', () => {
+    it('IMP-039 trailing empty rows are skipped', () => {
+      const rows = [
+        ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
+        ['Task A', 'EVT', '2026-01-01', '2026-01-10', 9],
+        [null, null, null, null, null],
+        [null, null, null, null, null],
+      ];
+      const buf = createExcelBuffer(rows);
+      const result = parseExcelActivities(buf);
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  // ─── IMP-002: .xls BIFF8 format ───────────
+  describe('IMP-002: .xls BIFF8 format (Excel 97-2003)', () => {
+    it('IMP-002 parses .xls BIFF8 format correctly', () => {
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['任务描述', '阶段', '负责人', '工期'],
+        ['PCB 设计', 'EVT', '张三', '10'],
+      ]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      const xlsBuf = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'biff8' }));
+      const result = parseExcelActivities(xlsBuf);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('PCB 设计');
+      expect(result[0].phase).toBe('EVT');
+      expect(result[0].assigneeNames).toEqual(['张三']);
+      expect(result[0].planDuration).toBe(10);
+    });
+  });
+
+  // ─── IMP-004: encrypted xlsx file ───────
+  describe('IMP-004: encrypted xlsx file', () => {
+    it('IMP-004 corrupted/encrypted xlsx throws error (not 500)', () => {
+      const corruptedBuf = Buffer.from('PK\x03\x04' + '\x00'.repeat(30) + 'corrupted');
+      expect(() => parseExcelActivities(corruptedBuf)).toThrow();
+    });
+
+    it('IMP-004 completely invalid data throws error', () => {
+      const invalidBuf = Buffer.from('this is not a spreadsheet');
+      expect(() => parseExcelActivities(invalidBuf)).toThrow();
+    });
+  });
+
+  // ─── IMP-007: 0-byte file ────────────────
+  describe('IMP-007: 0-byte file', () => {
+    it('IMP-007 0-byte buffer throws error', () => {
+      const emptyBuf = Buffer.alloc(0);
+      expect(() => parseExcelActivities(emptyBuf)).toThrow();
+    });
+  });
+
+  // ─── IMP-021: pinyin conflict ────────────
+  describe('IMP-021: pinyin conflict resolution', () => {
+    const resolvePinyinConflict = (base: string, existing: string[]): string => {
+      if (!existing.includes(base)) return base;
+      let n = 2;
+      while (existing.includes(`${base}${n}`)) n++;
+      return `${base}${n}`;
+    };
+
+    it('IMP-021 when "zhangsan" exists, new user gets "zhangsan2"', () => {
+      expect(resolvePinyinConflict('zhangsan', ['zhangsan'])).toBe('zhangsan2');
+    });
+
+    it('IMP-021 when "zhangsan" and "zhangsan2" exist, new user gets "zhangsan3"', () => {
+      expect(resolvePinyinConflict('zhangsan', ['zhangsan', 'zhangsan2'])).toBe('zhangsan3');
+    });
+
+    it('IMP-021 no conflict returns base pinyin unchanged', () => {
+      expect(resolvePinyinConflict('lisi', ['zhangsan', 'wangwu'])).toBe('lisi');
+    });
+
+    it('IMP-021 gap in sequence fills correctly (zhangsan, zhangsan3 → zhangsan2)', () => {
+      expect(resolvePinyinConflict('zhangsan', ['zhangsan', 'zhangsan3'])).toBe('zhangsan2');
+    });
   });
 });

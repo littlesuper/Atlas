@@ -49,7 +49,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('shows retry button that resets error state', () => {
-    const { rerender } = render(
+    const { rerender: _rerender } = render(
       <ErrorBoundary>
         <ThrowError shouldThrow={true} />
       </ErrorBoundary>

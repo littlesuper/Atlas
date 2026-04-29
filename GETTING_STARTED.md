@@ -133,16 +133,16 @@ Atlas/
 ├── server/          # 后端应用（Express + Prisma）
 │   ├── src/
 │   │   ├── middleware/      # 中间件（认证、权限）
-│   │   ├── routes/          # 路由处理（15 个模块）
+│   │   ├── routes/          # 路由处理（18 个模块）
 │   │   ├── utils/           # 工具函数
-│   │   ├── prisma/          # Prisma Schema（21 个模型）和 Seed
+│   │   ├── prisma/          # Prisma Schema（25 个模型）和 Seed
 │   │   └── index.ts         # Express 入口
 │   └── uploads/             # 上传文件存储目录
 │
 ├── e2e/             # Playwright 端到端测试
 │   ├── fixtures/            # 测试 fixture 与数据
 │   ├── helpers/             # UI 交互工具函数
-│   └── specs/               # 测试用例（7 个文件）
+│   └── specs/               # 测试用例（55 个文件）
 │
 ├── specs/           # 需求规格文档（5 个文件）
 ├── docs/            # 补充文档
@@ -184,19 +184,67 @@ npx playwright test --headed      # 带浏览器界面运行（调试）
 ```
 e2e/
 ├── auth.setup.ts        # 登录并缓存认证状态（只执行一次）
+├── global-teardown.ts   # 测试结束后清理数据
 ├── fixtures/
 │   ├── auth.ts          # authedPage fixture（已登录页面）
 │   └── test-data.ts     # 测试数据常量
 ├── helpers/
-│   └── arco.ts          # Arco Design UI 交互工具函数
+│   └── arco.ts          # Arco Design UI 交互工具函数（Drawer 创建、日期选择等）
 └── specs/
-    ├── auth.spec.ts          # 登录、登出、未认证重定向
-    ├── navigation.spec.ts    # 侧边栏导航、Tab 切换
-    ├── projects.spec.ts      # 项目 CRUD
-    ├── activities.spec.ts    # 活动 CRUD
-    ├── products.spec.ts      # 产品 CRUD
-    ├── admin.spec.ts         # 系统管理（AI、用户、角色、日志）
-    └── weekly-reports.spec.ts # 项目周报
+    ├── auth.spec.ts                    # 登录、登出、未认证重定向
+    ├── auth-validation.spec.ts         # 登录表单验证
+    ├── navigation.spec.ts              # 侧边栏导航、Tab 切换
+    ├── projects.spec.ts                # 项目 CRUD
+    ├── project-archive.spec.ts         # 项目归档与恢复
+    ├── project-detail-tabs.spec.ts     # 项目详情 Tab 切换
+    ├── project-edit-search.spec.ts     # 项目编辑与搜索
+    ├── project-filters.spec.ts         # 项目列表筛选
+    ├── activities.spec.ts              # 活动 CRUD
+    ├── activity-inline-edit.spec.ts    # 活动内联编辑
+    ├── activity-date-edit.spec.ts      # 活动日期内联编辑
+    ├── activity-dependencies.spec.ts   # 活动前置依赖
+    ├── activity-drag-sort.spec.ts      # 活动拖拽排序
+    ├── activity-export.spec.ts         # 活动 Excel 导入导出
+    ├── activity-import.spec.ts         # 活动 Excel 批量导入
+    ├── activity-filters.spec.ts        # 活动列表筛选
+    ├── comments.spec.ts                # 活动评论
+    ├── products.spec.ts                # 产品 CRUD
+    ├── product-advanced.spec.ts        # 产品高级功能
+    ├── product-comparison.spec.ts      # 产品对比
+    ├── product-filters.spec.ts         # 产品列表筛选
+    ├── gantt-chart.spec.ts             # 甘特图
+    ├── snapshots.spec.ts               # 项目快照
+    ├── scheduling-tools.spec.ts        # 排期工具
+    ├── risk.spec.ts                    # 风险评估
+    ├── risk-items.spec.ts              # 风险项管理
+    ├── risk-dashboard.spec.ts          # 风险仪表盘
+    ├── risk-tag-contrast.spec.ts       # WCAG 色彩对比度
+    ├── weekly-reports.spec.ts          # 周报汇总
+    ├── weekly-report-crud.spec.ts      # 周报 CRUD
+    ├── weekly-report-form.spec.ts      # 周报表单
+    ├── workload.spec.ts                # 资源负载
+    ├── workload-advanced.spec.ts       # 资源负载高级
+    ├── workload-navigation.spec.ts     # 资源负载导航
+    ├── admin.spec.ts                   # 系统管理（AI、用户、角色、日志）
+    ├── user-management.spec.ts         # 用户管理（联系人、搜索）
+    ├── user-role-assignment.spec.ts    # 用户角色分配
+    ├── role-management.spec.ts         # 角色管理
+    ├── template-management.spec.ts     # 项目模板管理
+    ├── notifications.spec.ts           # 通知系统
+    ├── accessibility.spec.ts           # 无障碍审计（axe-core）
+    ├── column-settings.spec.ts         # 列设置
+    ├── column-resize.spec.ts           # 列宽拖拽
+    ├── table-header-nowrap.spec.ts     # 表头不换行
+    ├── responsive-layout.spec.ts       # 响应式布局
+    ├── permission-access.spec.ts       # 权限访问控制
+    ├── permission-buttons.spec.ts      # 权限按钮可见性
+    ├── form-validation.spec.ts         # 表单验证
+    ├── refactor-smoke.spec.ts          # 重构冒烟测试
+    ├── p1-ui-interactions.spec.ts      # P1 UI 交互
+    ├── p1-product-ui.spec.ts           # P1 产品 UI
+    ├── p1-project-activity-ui.spec.ts  # P1 项目活动 UI
+    ├── inline-editing-comprehensive.spec.ts  # 内联编辑全覆盖（13 交互点）
+    └── ...（共 55 个测试文件，300+ 测试用例）
 ```
 
 **运行要求：**

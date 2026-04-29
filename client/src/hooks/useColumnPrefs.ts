@@ -22,8 +22,8 @@ export function useColumnPrefs({ columnDefs, defaultVisible, defaultOrder }: Use
         const validKeys = new Set(columnDefs.map((d) => d.key));
         const nonRemovableKeys = columnDefs.filter((d) => !d.removable).map((d) => d.key);
 
-        let visible = (saved.visible || defaultVisible).filter((k) => validKeys.has(k));
-        let order = (saved.order || defaultOrder).filter((k) => validKeys.has(k));
+        const visible = (saved.visible || defaultVisible).filter((k) => validKeys.has(k));
+        const order = (saved.order || defaultOrder).filter((k) => validKeys.has(k));
 
         for (const key of nonRemovableKeys) {
           if (!visible.includes(key)) visible.push(key);

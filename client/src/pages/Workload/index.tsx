@@ -94,7 +94,7 @@ const WorkloadPage: React.FC = () => {
     {
       title: '详情',
       dataIndex: 'type',
-      width: 160,
+      width: 190,
       render: (_: string, record: WorkloadIssue) => {
         if (record.type === 'overdue') {
           return <span style={{ color: 'var(--status-danger)', fontWeight: 500 }}>逾期 {record.overdueDays} 天</span>;

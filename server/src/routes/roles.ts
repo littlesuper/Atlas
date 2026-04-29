@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, invalidateAllUserCache } from '../middleware/auth';
-import { requirePermission, isAdmin } from '../middleware/permission';
+import { requirePermission } from '../middleware/permission';
 import { logger } from '../utils/logger';
 
 const router = express.Router();

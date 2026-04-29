@@ -22,6 +22,8 @@ import {
   WhatIfResult,
   AiScheduleSuggestion,
   WorkloadResponse,
+  RoleMember,
+  RoleMemberPreview,
 } from '../types';
 
 // 分页响应结构
@@ -102,6 +104,26 @@ export const rolesApi = {
   delete: (id: string) => request.delete(`/roles/${id}`),
 };
 
+export const roleMembersApi = {
+  list: (params?: { roleId?: string; userId?: string; includeInactive?: boolean }) =>
+    request.get<{ data: RoleMember[] }>('/role-members', { params }),
+
+  create: (data: { roleId: string; userId: string; sortOrder?: number }) =>
+    request.post<RoleMember>('/role-members', data),
+
+  update: (id: string, data: { sortOrder?: number; isActive?: boolean }) =>
+    request.patch<RoleMember>(`/role-members/${id}`, data),
+
+  delete: (id: string, params?: { cascadeMode?: string; cascadeActivityIds?: string[] }) =>
+    request.delete(`/role-members/${id}`, { params }),
+
+  batchSet: (data: { roleId: string; members: Array<{ userId: string; sortOrder: number }> }) =>
+    request.post<RoleMember[]>('/role-members/batch-set', data),
+
+  preview: (roleId: string) =>
+    request.get<RoleMemberPreview>(`/role-members/preview/${roleId}`),
+};
+
 // ============ 项目管理 API ============
 export const projectsApi = {
   list: (params?: {
@@ -139,15 +161,19 @@ export const projectsApi = {
 
   delete: (id: string) => request.delete(`/projects/${id}`),
 
-  // 协作者管理
+  // 协作者管理（支持按角色分组）
   getMembers: (projectId: string) =>
-    request.get<Array<{ user: { id: string; realName: string; username: string } }>>(`/projects/${projectId}/members`),
+    request.get<Array<{ projectId: string; userId: string; role: string; user: { id: string; realName: string; username: string } }>>(`/projects/${projectId}/members`),
 
-  addMember: (projectId: string, userId: string) =>
-    request.post<{ user: { id: string; realName: string; username: string } }>(`/projects/${projectId}/members`, { userId }),
+  addMember: (projectId: string, userId: string, role?: string) =>
+    request.post<{ projectId: string; userId: string; role: string; user: { id: string; realName: string; username: string } }>(`/projects/${projectId}/members`, { userId, role }),
 
-  removeMember: (projectId: string, userId: string) =>
-    request.delete(`/projects/${projectId}/members/${userId}`),
+  removeMember: (projectId: string, userId: string, role?: string) =>
+    request.delete(`/projects/${projectId}/members/${userId}`, { params: role ? { role } : undefined }),
+
+  /** 批量替换项目成员（按角色分组），用于全屏编辑页一次性提交 */
+  replaceMembers: (projectId: string, members: Array<{ userId: string; role: string }>) =>
+    request.put<Array<{ projectId: string; userId: string; role: string; user: { id: string; realName: string; username: string } }>>(`/projects/${projectId}/members`, { members }),
 
   // 项目归档 & 快照
   archiveProject: (id: string, remark?: string) =>
@@ -191,11 +217,11 @@ export const activitiesApi = {
     startDate?: string;
     endDate?: string;
     duration?: number;
-    assigneeId?: string;
-    assigneeIds?: string[];
     notes?: string;
     sortOrder?: number;
     dependencies?: Array<{ id: string; type: string; lag?: number }>;
+    roleId?: string | null;
+    executorIds?: string[];
   }) => request.post<Activity>('/activities', data),
 
   // 更新活动
@@ -212,10 +238,11 @@ export const activitiesApi = {
     startDate?: string;
     endDate?: string;
     duration?: number;
-    assigneeId?: string | null;
-    assigneeIds?: string[];
     notes?: string | null;
     dependencies?: Array<{ id: string; type: string; lag?: number }> | null;
+    roleId?: string | null;
+    executorIds?: string[];
+    resetExecutorsByRole?: boolean;
     [key: string]: unknown;
   }) => request.put<Activity>(`/activities/${activityId}`, data),
 
@@ -227,7 +254,7 @@ export const activitiesApi = {
     request.put(`/activities/project/${projectId}/reorder`, { items }),
 
   // 批量操作
-  batchUpdate: (ids: string[], updates: { status?: string; assigneeIds?: string[]; phase?: string }) =>
+  batchUpdate: (ids: string[], updates: { status?: string; executorIds?: string[]; phase?: string }) =>
     request.put<{ success: boolean; count: number }>('/activities/batch-update', { ids, updates }),
 
   batchDelete: (ids: string[]) =>
@@ -267,7 +294,7 @@ export const activitiesApi = {
     phase?: string; status?: string; priority?: string;
     planStartDate?: string; planEndDate?: string; planDuration?: number;
     startDate?: string; endDate?: string; duration?: number;
-    assigneeIds?: string[]; notes?: string; sortOrder?: number;
+    executorIds?: string[]; notes?: string; sortOrder?: number;
     dependencies?: Array<{ id: string; type: string; lag?: number }>;
   }>) => request.post<{ success: boolean; count: number }>('/activities/batch-create', { activities }),
 
@@ -571,6 +598,49 @@ export const checkItemsApi = {
 
   reorder: (activityId: string, items: Array<{ id: string; sortOrder: number }>) =>
     request.put(`/check-items/activity/${activityId}/reorder`, { items }),
+};
+
+// ============ 节假日 API ============
+export interface Holiday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  type: 'HOLIDAY' | 'MAKEUP';
+  year: number;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const holidaysApi = {
+  list: (params?: { year?: number }) =>
+    request.get<Holiday[]>('/holidays', { params }),
+
+  knownYears: () =>
+    request.get<{ knownYears: number[] }>('/holidays/known-years'),
+
+  create: (data: { date: string; name: string; type?: 'HOLIDAY' | 'MAKEUP' }) =>
+    request.post<Holiday>('/holidays', data),
+
+  update: (id: string, data: { date?: string; name?: string; type?: 'HOLIDAY' | 'MAKEUP' }) =>
+    request.put<Holiday>(`/holidays/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/holidays/${id}`),
+
+  deleteYear: (year: number) =>
+    request.delete(`/holidays/year/${year}`),
+
+  generate: (year: number, replaceExisting = true) =>
+    request.post<{
+      success: boolean;
+      year: number;
+      known: boolean;
+      inserted: number;
+      skipped: number;
+      deleted: number;
+      message: string;
+    }>('/holidays/generate', { year, replaceExisting }),
 };
 
 // ============ 活动评论 API ============

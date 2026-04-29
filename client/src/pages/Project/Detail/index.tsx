@@ -165,14 +165,13 @@ const ProjectDetail: React.FC = () => {
     type: s.type,
     phase: s.phase,
     status: s.status,
-    priority: s.priority,
     planStartDate: s.planStartDate || undefined,
     planEndDate: s.planEndDate || undefined,
     planDuration: s.planDuration ?? undefined,
     startDate: s.startDate || undefined,
     endDate: s.endDate || undefined,
     duration: s.duration ?? undefined,
-    assigneeIds: s.assignees?.map(a => a.id) || [],
+    executorIds: (s.executors || []).map((e: any) => e.userId),
     notes: s.notes || undefined,
     sortOrder: s.sortOrder,
     dependencies: Array.isArray(s.dependencies)
@@ -245,14 +244,14 @@ const ProjectDetail: React.FC = () => {
       type: values.type,
       phase: values.phase,
       status: values.status,
-      priority: values.priority,
       planStartDate: values.planStart ? dayjs(values.planStart).format('YYYY-MM-DD') : undefined,
       planEndDate: values.planEnd ? dayjs(values.planEnd).format('YYYY-MM-DD') : undefined,
       planDuration: planDuration ?? undefined,
       startDate: values.actualStart ? dayjs(values.actualStart).format('YYYY-MM-DD') : undefined,
       endDate: values.actualEnd ? dayjs(values.actualEnd).format('YYYY-MM-DD') : undefined,
       duration: actualDuration ?? undefined,
-      assigneeIds: values.assigneeIds || [],
+      roleId: values.roleId ?? null,
+      executorIds: values.executorIds || [],
       notes: values.notes,
       sortOrder: editingActivity
         ? editingActivity.sortOrder
@@ -283,14 +282,14 @@ const ProjectDetail: React.FC = () => {
             type: snapshot.type,
             phase: snapshot.phase,
             status: snapshot.status,
-            priority: snapshot.priority,
             planStartDate: snapshot.planStartDate ? dayjs(snapshot.planStartDate).format('YYYY-MM-DD') : undefined,
             planEndDate: snapshot.planEndDate ? dayjs(snapshot.planEndDate).format('YYYY-MM-DD') : undefined,
             planDuration: snapshot.planDuration ?? undefined,
             startDate: snapshot.startDate ? dayjs(snapshot.startDate).format('YYYY-MM-DD') : undefined,
             endDate: snapshot.endDate ? dayjs(snapshot.endDate).format('YYYY-MM-DD') : undefined,
             duration: snapshot.duration ?? undefined,
-            assigneeIds: snapshot.assignees?.map((a) => a.id) ?? [],
+            roleId: snapshot.roleId ?? null,
+            executorIds: snapshot.executors?.map((e: any) => e.userId) ?? [],
             notes: snapshot.notes,
             dependencies: Array.isArray(snapshot.dependencies)
               ? snapshot.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
@@ -377,7 +376,7 @@ const ProjectDetail: React.FC = () => {
       a.name,
       typeMap[a.type] || a.type,
       statusMap[a.status] || a.status,
-      (a.assignees || []).map((u: any) => u.realName).join(', '),
+      (a.executors || []).map((e: any) => e.user?.realName).filter(Boolean).join(', ') || '-',
       a.planDuration != null ? String(a.planDuration) : '',
       fmtDate(a.planStartDate),
       fmtDate(a.planEndDate),
@@ -506,13 +505,13 @@ const ProjectDetail: React.FC = () => {
     if (selectedIds.size === 0) return;
     try {
       const ids = Array.from(selectedIds);
-      const oldAssignees = ids.map(sid => ({ id: sid, assigneeIds: activities.find(a => a.id === sid)?.assignees?.map(a => a.id) ?? [] }));
-      await activitiesApi.batchUpdate(ids, { assigneeIds });
+      const oldAssignees = ids.map(sid => ({ id: sid, executorIds: (activities.find(a => a.id === sid)?.executors || []).map((e: any) => e.userId) }));
+      await activitiesApi.batchUpdate(ids, { executorIds: assigneeIds });
       pushUndo({
         description: `撤回批量修改 ${ids.length} 个活动的负责人`,
         execute: async () => {
           for (const item of oldAssignees) {
-            await activitiesApi.update(item.id, { assigneeIds: item.assigneeIds });
+            await activitiesApi.update(item.id, { executorIds: item.executorIds });
           }
           loadActivities();
         },
@@ -563,6 +562,50 @@ const ProjectDetail: React.FC = () => {
   );
 
   // Column resize handler
+  // 稳定的 Table 组件覆写：避免每次 render 重建 row 组件导致整张表重新挂载、
+  // 进而把正在编辑的输入框光标重置到末端
+  const tableComponents = useMemo(() => ({
+    header: {
+      th: (props: React.HTMLAttributes<HTMLTableCellElement>) => (
+        <ResizableHeaderCell
+          {...props}
+          onResize={(key: string, width: number) => handleColumnResizeRef.current?.(key, width)}
+          fixedKeys={fixedColumnKeysRef.current}
+        />
+      ),
+    },
+    body: {
+      row: ({ children, record: _record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number; [key: string]: unknown }) => {
+        const isSource = dragFromRef.current === index;
+        const isTarget = dragOverRef.current === index && dragOverRef.current !== dragFromRef.current;
+        const insertAbove = isTarget && dragFromRef.current > index;
+        const insertBelow = isTarget && dragFromRef.current < index;
+        const cls = [
+          typeof rest.className === 'string' ? rest.className : '',
+          isSource ? 'drag-source' : '',
+          insertAbove ? 'drag-insert-above' : '',
+          insertBelow ? 'drag-insert-below' : '',
+        ].filter(Boolean).join(' ');
+        return (
+          <tr
+            {...rest}
+            className={cls}
+            onMouseMove={(e) => handleMouseMoveRef.current?.(e, index)}
+            onMouseUp={(e) => handleMouseUpRef.current?.(e, index)}
+          >
+            {children}
+          </tr>
+        );
+      },
+    },
+  }), []);
+
+  // 把变动函数收纳到 ref，给 tableComponents 提供稳定引用同时保持最新闭包
+  const handleColumnResizeRef = useRef<((key: string, width: number) => void) | null>(null);
+  const fixedColumnKeysRef = useRef<Set<string>>(new Set<string>());
+  const handleMouseMoveRef = useRef<((e: React.MouseEvent, index: number) => void) | null>(null);
+  const handleMouseUpRef = useRef<((e: React.MouseEvent, index: number) => void) | null>(null);
+
   const handleColumnResize = useCallback((key: string, width: number) => {
     const newWidths = { ...columnPrefs.widths, [key]: Math.round(width) };
     updateWidthsLocal(newWidths);
@@ -571,6 +614,11 @@ const ProjectDetail: React.FC = () => {
 
   // Fixed column keys that should not be resizable
   const fixedColumnKeys = useMemo(() => new Set<string>(), []);
+
+  handleColumnResizeRef.current = handleColumnResize;
+  fixedColumnKeysRef.current = fixedColumnKeys;
+  handleMouseMoveRef.current = handleMouseMove;
+  handleMouseUpRef.current = handleMouseUp;
 
   // Activity columns hook
   const {
@@ -984,41 +1032,7 @@ const ProjectDetail: React.FC = () => {
                   rowKey="id"
                   pagination={false}
                   scroll={{ x: scrollX, y: 'calc(100vh - 280px)' }}
-                  components={{
-                    header: {
-                      th: (props: React.HTMLAttributes<HTMLTableCellElement>) => (
-                        <ResizableHeaderCell
-                          {...props}
-                          onResize={handleColumnResize}
-                          fixedKeys={fixedColumnKeys}
-                        />
-                      ),
-                    },
-                    body: {
-                      row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: Activity; index: number;[key: string]: unknown }) => {
-                        const isSource = dragFromRef.current === index;
-                        const isTarget = dragOverRef.current === index && dragOverRef.current !== dragFromRef.current;
-                        const insertAbove = isTarget && dragFromRef.current > index;
-                        const insertBelow = isTarget && dragFromRef.current < index;
-                        const cls = [
-                          typeof rest.className === 'string' ? rest.className : '',
-                          isSource ? 'drag-source' : '',
-                          insertAbove ? 'drag-insert-above' : '',
-                          insertBelow ? 'drag-insert-below' : '',
-                        ].filter(Boolean).join(' ');
-                        return (
-                          <tr
-                            {...rest}
-                            className={cls}
-                            onMouseMove={(e) => handleMouseMove(e, index)}
-                            onMouseUp={(e) => handleMouseUp(e, index)}
-                          >
-                            {children}
-                          </tr>
-                        );
-                      },
-                    },
-                  }}
+                  components={tableComponents}
                 />
               </div>
             </Tabs.TabPane>
@@ -1082,6 +1096,7 @@ const ProjectDetail: React.FC = () => {
           activities={activities}
           users={users}
           activitySeqMap={activitySeqMap}
+          defaultAssigneeId={project?.managerId}
           onSubmit={handleDrawerSubmit}
           onImportFile={doImportFile}
         />
@@ -1263,7 +1278,7 @@ const MilestoneTimeline: React.FC<{ activities: Activity[]; handleOpenDrawer: (a
           const above = idx % 2 === 0;
           const color = statusColor[m.status] || 'var(--gantt-milestone-pending)';
           const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
-          const names = m.assignees?.map(a => a.realName).join('、') || '-';
+          const names = (m.executors || []).map((e: any) => e.user?.realName).filter(Boolean).join('、') || '-';
           const dateStr = getMsDate(m)!.format('YYYY-MM-DD');
           const cardTop = above ? axisY - stemLen - cardH : axisY + stemLen;
 

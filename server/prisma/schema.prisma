@@ -34,7 +34,10 @@ model User {
   userRoles              UserRole[]
   managedProjects        Project[]        @relation("ProjectManager")
   collaboratingProjects  ProjectMember[]
-  assignedActivities     Activity[]       @relation("ActivityAssignees")
+   roleMembers            RoleMember[]     @relation("RoleMemberUser")
+  createdRoleMembers     RoleMember[]     @relation("RoleMemberCreator")
+  activityExecutors      ActivityExecutor[] @relation("ActivityExecutorUser")
+  assignedActivitiesNew  ActivityExecutor[] @relation("ActivityExecutorAssigner")
   createdReports         WeeklyReport[]   @relation("ReportCreator")
   activityComments       ActivityComment[]
   notifications          Notification[]
@@ -54,6 +57,8 @@ model Role {
   // 关联关系
   userRoles       UserRole[]
   rolePermissions RolePermission[]
+  members         RoleMember[]
+  activities      Activity[]   @relation("ActivityRole")
 
   @@map("roles")
 }
@@ -142,14 +147,30 @@ model Project {
 model ProjectMember {
   projectId String
   userId    String
+  role      String   @default("OTHER") // 项目内职责角色：PROJECT_MANAGER / COLLABORATOR / HW_PRODUCT / SW_PRODUCT / HW_DEV / SW_DEV / HW_QA / SW_QA / STRUCTURE / QUALITY / DESIGNER / PROCUREMENT / LEGAL / SUPPLY_CHAIN / OTHER
   createdAt DateTime @default(now())
 
   // 关联关系
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([projectId, userId])
+  @@id([projectId, userId, role])
+  @@index([projectId, role])
   @@map("project_members")
+}
+
+model Holiday {
+  id        String   @id @default(uuid())
+  date      DateTime @unique
+  name      String
+  type      String   @default("HOLIDAY") // HOLIDAY 放假 / MAKEUP 调休补班
+  year      Int
+  source    String   @default("manual") // manual / generated
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([year])
+  @@map("holidays")
 }
 
 enum ActivityType {
@@ -163,6 +184,12 @@ enum ActivityStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum ExecutorSource {
+  ROLE_AUTO
+  MANUAL_KEEP
+  MANUAL_ADD
 }
 
 model Activity {
@@ -183,17 +210,59 @@ model Activity {
   dependencies  Json?
   notes         String?
   sortOrder     Int            @default(0)
+  roleId        String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   // 关联关系
   project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignees  User[]            @relation("ActivityAssignees")
+  role       Role?             @relation("ActivityRole", fields: [roleId], references: [id], onDelete: SetNull)
+  executors  ActivityExecutor[]
   comments   ActivityComment[]
   checkItems CheckItem[]
 
   @@index([projectId])
+  @@index([roleId])
   @@map("activities")
+}
+
+model RoleMember {
+  id        String   @id @default(cuid())
+  roleId    String
+  userId    String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  createdBy String?
+  updatedAt DateTime @updatedAt
+
+  role    Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user    User  @relation("RoleMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  creator User? @relation("RoleMemberCreator", fields: [createdBy], references: [id])
+
+  @@unique([roleId, userId])
+  @@index([roleId, isActive, sortOrder])
+  @@index([userId, isActive])
+  @@map("role_members")
+}
+
+model ActivityExecutor {
+  id             String         @id @default(cuid())
+  activityId     String
+  userId         String
+  source         ExecutorSource @default(ROLE_AUTO)
+  snapshotRoleId String?
+  assignedAt     DateTime       @default(now())
+  assignedBy     String?
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation("ActivityExecutorUser", fields: [userId], references: [id], onDelete: Cascade)
+  assigner User?    @relation("ActivityExecutorAssigner", fields: [assignedBy], references: [id])
+
+  @@unique([activityId, userId])
+  @@index([activityId])
+  @@index([userId])
+  @@map("activity_executors")
 }
 
 model CheckItem {

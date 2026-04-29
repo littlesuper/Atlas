@@ -1,5 +1,11 @@
 # Atlas 硬件项目管理平台 - 部署指南
 
+> ⚠️ **本文档已过时。** 当前生产部署使用 `deploy.sh`（systemd + tsx + SQLite），不再使用 PostgreSQL + PM2 方案。
+> 请参考以下文档：
+> - **部署脚本:** `deploy.sh`（执行 `./deploy.sh setup` 即可一键部署）
+> - **部署验证:** `docs/qa/prod-deploy-validation.md`
+> - **验证报告:** `docs/qa/reports/prod-deploy-20260428.md`
+
 ## 生产环境部署
 
 本指南将帮助您将系统从开发环境（SQLite）部署到生产环境（PostgreSQL）。

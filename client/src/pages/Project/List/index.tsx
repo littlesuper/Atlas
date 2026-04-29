@@ -8,10 +8,6 @@ import {
   Space,
   Tag,
   Progress,
-  Drawer,
-  Form,
-  Select,
-  DatePicker,
   Message,
   Modal,
   Tooltip,
@@ -33,9 +29,10 @@ import {
   IconCloseCircleFill,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, usersApi, weeklyReportsApi, templatesApi } from '../../../api';
+import ProjectFormDrawer from '../Edit/ProjectFormDrawer';
+import { projectsApi, weeklyReportsApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
-import { Project, User, ProjectTemplate } from '../../../types';
+import { Project } from '../../../types';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
@@ -44,7 +41,6 @@ import {
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
-const { RangePicker } = DatePicker;
 
 // 统计卡片组件
 interface StatCardDecor {
@@ -56,13 +52,14 @@ interface StatCardProps {
   title: string;
   count: number;
   color: string;
+  textColor?: string;
   decors: StatCardDecor[];
   glowStyle?: React.CSSProperties;
   selected: boolean;
   onClick: () => void;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, count, color, decors, glowStyle, selected, onClick }) => (
+const StatCard: React.FC<StatCardProps> = ({ title, count, color, textColor, decors, glowStyle, selected, onClick }) => (
   <Card
     hoverable
     onClick={onClick}
@@ -75,7 +72,6 @@ const StatCard: React.FC<StatCardProps> = ({ title, count, color, decors, glowSt
     }}
   >
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-      {/* Glow blob */}
       <div style={{
         position: 'absolute',
         width: 120,
@@ -87,7 +83,6 @@ const StatCard: React.FC<StatCardProps> = ({ title, count, color, decors, glowSt
         pointerEvents: 'none',
         ...glowStyle,
       }} />
-      {/* Decorative icons */}
       {decors.map((d, i) => (
         <span key={i} style={{
           position: 'absolute',
@@ -99,8 +94,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, count, color, decors, glowSt
           {d.icon}
         </span>
       ))}
-      <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8, position: 'relative' }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color, position: 'relative' }}>{count}</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8, position: 'relative' }}>{title}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: textColor || color, position: 'relative' }}>{count}</div>
     </div>
   </Card>
 );
@@ -109,24 +104,14 @@ const ProjectList: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission, isProjectManager } = useAuthStore();
-  const [form] = Form.useForm();
 
   // 数据状态
   const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [stats, setStats] = useState({ all: 0, planning: 0, inProgress: 0, completed: 0, onHold: 0, archived: 0 });
-
-  // 表单联动：追踪当前选中的项目经理
-  const [selectedManagerId, setSelectedManagerId] = useState<string>('');
 
   // 最新周报进展状态
   const [latestStatus, setLatestStatus] = useState<Record<string, string>>({});
-
-  // 模板列表
-  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
 
   // 筛选状态 — 从 URL 初始化
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '');
@@ -186,20 +171,10 @@ const ProjectList: React.FC = () => {
         archived: s.archived ?? 0,
       });
       setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
-    } catch (error) {
+    } catch {
       Message.error('加载项目列表失败');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 加载用户列表
-  const loadUsers = async () => {
-    try {
-      const response = await usersApi.list();
-      setUsers(response.data.data || []);
-    } catch (error) {
-      console.error('加载用户列表失败', error);
     }
   };
 
@@ -209,9 +184,7 @@ const ProjectList: React.FC = () => {
   }, [selectedStatus, selectedProductLines, searchKeyword]);
 
   useEffect(() => {
-    loadUsers();
     weeklyReportsApi.getLatestStatus().then(res => setLatestStatus(res.data || {})).catch(() => { });
-    templatesApi.list().then(res => setTemplates(res.data || [])).catch(() => { });
   }, []);
 
   // 统计数据（来自服务端）
@@ -237,89 +210,6 @@ const ProjectList: React.FC = () => {
     };
   }, []);
 
-  // 打开新建/编辑抽屉
-  const handleOpenDrawer = (project?: Project) => {
-    if (project) {
-      setEditingProject(project);
-      setSelectedManagerId(project.managerId);
-      form.setFieldsValue({
-        name: project.name,
-        description: project.description,
-        productLine: project.productLine,
-        status: project.status,
-        priority: project.priority,
-        dateRange: [dayjs(project.startDate), project.endDate ? dayjs(project.endDate) : undefined],
-        managerId: project.managerId,
-        memberIds: project.members?.map((m) => m.user.id) || [],
-      });
-    } else {
-      setEditingProject(null);
-      setSelectedManagerId('');
-      form.resetFields();
-    }
-    setDrawerVisible(true);
-  };
-
-  // 同步协作者：对比新旧列表，增删差异
-  const syncMembers = async (projectId: string, newMemberIds: string[], oldMemberIds: string[]) => {
-    const toAdd = newMemberIds.filter((id) => !oldMemberIds.includes(id));
-    const toRemove = oldMemberIds.filter((id) => !newMemberIds.includes(id));
-    await Promise.all([
-      ...toAdd.map((userId) => projectsApi.addMember(projectId, userId)),
-      ...toRemove.map((userId) => projectsApi.removeMember(projectId, userId)),
-    ]);
-  };
-
-  // 提交表单
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validate();
-      const data = {
-        name: values.name,
-        description: values.description,
-        productLine: values.productLine,
-        status: values.status,
-        priority: values.priority,
-        startDate: dayjs(values.dateRange[0]).format('YYYY-MM-DD'),
-        endDate: values.dateRange[1] ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
-        managerId: values.managerId,
-      };
-      const memberIds: string[] = values.memberIds || [];
-
-      if (editingProject) {
-        await projectsApi.update(editingProject.id, data);
-        const oldMemberIds = editingProject.members?.map((m) => m.user.id) || [];
-        await syncMembers(editingProject.id, memberIds, oldMemberIds);
-        Message.success('项目更新成功');
-      } else {
-        const res = await projectsApi.create(data);
-        if (memberIds.length > 0) {
-          await syncMembers(res.data.id, memberIds, []);
-        }
-        // If a template was selected, instantiate it
-        const templateId = values.templateId;
-        if (templateId) {
-          try {
-            const instRes = await templatesApi.instantiate(templateId, {
-              projectId: res.data.id,
-              startDate: data.startDate,
-            });
-            Message.success(`项目创建成功，已从模板生成 ${instRes.data.count} 个活动`);
-          } catch {
-            Message.warning('项目已创建，但模板实例化失败');
-          }
-        } else {
-          Message.success('项目创建成功');
-        }
-      }
-
-      setDrawerVisible(false);
-      loadProjects();
-    } catch (error) {
-      console.error('提交失败', error);
-    }
-  };
-
   // 删除项目
   const handleDelete = (project: Project) => {
     Modal.confirm({
@@ -330,12 +220,52 @@ const ProjectList: React.FC = () => {
           await projectsApi.delete(project.id);
           Message.success('项目删除成功');
           loadProjects();
-        } catch (error) {
+        } catch {
           Message.error('项目删除失败');
         }
       },
     });
   };
+
+  // 项目编辑抽屉
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerProjectId, setDrawerProjectId] = useState<string | undefined>(undefined);
+
+  const openCreateDrawer = () => {
+    setDrawerProjectId(undefined);
+    setDrawerVisible(true);
+  };
+
+  const openEditDrawer = (id: string) => {
+    setDrawerProjectId(id);
+    setDrawerVisible(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerVisible(false);
+    setDrawerProjectId(undefined);
+    // 清掉 URL 上的 new/edit 参数
+    if (searchParams.has('new') || searchParams.has('edit')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      next.delete('edit');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // 通过 URL ?new=1 或 ?edit=<id> 触发抽屉打开
+  useEffect(() => {
+    const newFlag = searchParams.get('new');
+    const editId = searchParams.get('edit');
+    if (newFlag) {
+      setDrawerProjectId(undefined);
+      setDrawerVisible(true);
+    } else if (editId) {
+      setDrawerProjectId(editId);
+      setDrawerVisible(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('new'), searchParams.get('edit')]);
 
   // 归档项目
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
@@ -356,7 +286,7 @@ const ProjectList: React.FC = () => {
       setArchiveModalVisible(false);
       setArchivingProject(null);
       loadProjects();
-    } catch (error) {
+    } catch {
       Message.error('项目归档失败');
     }
   };
@@ -366,7 +296,7 @@ const ProjectList: React.FC = () => {
       await projectsApi.unarchiveProject(project.id);
       Message.success('项目已取消归档');
       loadProjects();
-    } catch (error) {
+    } catch {
       Message.error('取消归档失败');
     }
   };
@@ -449,7 +379,7 @@ const ProjectList: React.FC = () => {
     },
     {
       title: '时间',
-      width: 200,
+      width: 220,
       sorter: (a: Project, b: Project) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
       render: (_: unknown, record: Project) => (
         <span className="text-meta">
@@ -479,6 +409,7 @@ const ProjectList: React.FC = () => {
                       type="text"
                       icon={<IconUndo />}
                       size="small"
+                      aria-label="取消归档"
                       onClick={() => handleUnarchive(record)}
                     />
                   </Tooltip>
@@ -492,7 +423,8 @@ const ProjectList: React.FC = () => {
                       type="text"
                       icon={<IconEdit />}
                       size="small"
-                      onClick={() => handleOpenDrawer(record)}
+                      aria-label="编辑"
+                      onClick={() => openEditDrawer(record.id)}
                     />
                   </Tooltip>
                 )}
@@ -503,6 +435,7 @@ const ProjectList: React.FC = () => {
                       status="danger"
                       icon={<IconDelete />}
                       size="small"
+                      aria-label="删除"
                       onClick={() => handleDelete(record)}
                     />
                   </Tooltip>
@@ -513,6 +446,7 @@ const ProjectList: React.FC = () => {
                       type="text"
                       icon={<IconStorage />}
                       size="small"
+                      aria-label="归档"
                       onClick={() => handleArchive(record)}
                     />
                   </Tooltip>
@@ -541,6 +475,7 @@ const ProjectList: React.FC = () => {
             title="全部项目"
             count={statistics.total}
             color="var(--status-info)"
+            textColor="#3055c9"
             glowStyle={{ right: -30, bottom: -40 }}
             decors={[
               { icon: <IconApps />, style: { right: -20, bottom: -28, fontSize: 120, transform: 'rotate(15deg)', opacity: 0.07 } },
@@ -552,6 +487,7 @@ const ProjectList: React.FC = () => {
             title="进行中"
             count={statistics.inProgress}
             color="var(--status-success)"
+            textColor="#00801d"
             glowStyle={{ right: -20, top: -50 }}
             decors={[
               { icon: <IconThunderbolt />, style: { right: -12, top: -30, fontSize: 130, transform: 'rotate(-22deg)', opacity: 0.08 } },
@@ -563,6 +499,7 @@ const ProjectList: React.FC = () => {
             title="已完成"
             count={statistics.completed}
             color="var(--status-not-started)"
+            textColor="#555e66"
             glowStyle={{ right: -35, bottom: -45 }}
             decors={[
               { icon: <IconCheckCircle />, style: { right: -28, bottom: -34, fontSize: 115, transform: 'rotate(10deg)', opacity: 0.07 } },
@@ -574,6 +511,7 @@ const ProjectList: React.FC = () => {
             title="已暂停"
             count={statistics.onHold}
             color="var(--status-warning)"
+            textColor="#b85c00"
             glowStyle={{ right: -25, top: -45 }}
             decors={[
               { icon: <IconPause />, style: { right: -16, top: -34, fontSize: 125, transform: 'rotate(-12deg)', opacity: 0.07 } },
@@ -637,13 +575,14 @@ const ProjectList: React.FC = () => {
                   <Button
                     type="primary"
                     icon={<IconPlus />}
-                    onClick={() => handleOpenDrawer()}
+                    onClick={openCreateDrawer}
                   >
                     新建项目
                   </Button>
                   <Tooltip content="项目模板管理">
                     <Button
                       icon={<IconFile />}
+                      aria-label="项目模板管理"
                       onClick={() => navigate('/templates')}
                     />
                   </Tooltip>
@@ -670,182 +609,13 @@ const ProjectList: React.FC = () => {
           />
         </Card>
 
-        {/* 新建/编辑抽屉 */}
-        <Drawer
-          width={600}
-          title={editingProject ? '编辑项目' : '新建项目'}
+        {/* 新建/编辑项目抽屉 */}
+        <ProjectFormDrawer
           visible={drawerVisible}
-          onCancel={() => setDrawerVisible(false)}
-          footer={
-            <div style={{ textAlign: 'right' }}>
-              <Space>
-                <Button onClick={() => setDrawerVisible(false)}>取消</Button>
-                <Button type="primary" onClick={handleSubmit}>
-                  {editingProject ? '保存' : '创建'}
-                </Button>
-              </Space>
-            </div>
-          }
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={{
-              status: 'IN_PROGRESS',
-              priority: 'MEDIUM',
-              productLine: 'DANDELION',
-            }}
-          >
-            {/* 项目名称 */}
-            <Form.Item
-              label="项目名称"
-              field="name"
-              rules={[{ required: true, message: '请输入项目名称' }]}
-            >
-              <Input placeholder="请输入项目名称" />
-            </Form.Item>
-
-            {/* 项目描述 */}
-            <Form.Item label="项目描述" field="description">
-              <Input.TextArea
-                placeholder="请输入项目描述"
-                rows={3}
-                showWordLimit
-                maxLength={500}
-              />
-            </Form.Item>
-
-            {/* 项目模板（仅新建时显示） */}
-            {!editingProject && templates.length > 0 && (
-              <Form.Item
-                label="项目模板"
-                field="templateId"
-                extra="选择模板后，创建项目时将自动生成活动计划"
-              >
-                <Select placeholder="选择模板（可选）" allowClear>
-                  {templates.map((t) => (
-                    <Select.Option key={t.id} value={t.id}>
-                      {t.name}
-                      {t._count?.activities ? ` (${t._count.activities} 个活动)` : ''}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            )}
-
-            {/* 产品线 / 状态 / 优先级 — 一行三列 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <Form.Item
-                label="产品线"
-                field="productLine"
-                rules={[{ required: true, message: '请选择产品线' }]}
-              >
-                <Select placeholder="产品线">
-                  {Object.entries(PRODUCT_LINE_MAP).map(([key, value]) => (
-                    <Select.Option key={key} value={key}>
-                      <Tag color={value.color}>{value.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item
-                label="状态"
-                field="status"
-                rules={[{ required: true, message: '请选择状态' }]}
-              >
-                <Select placeholder="状态">
-                  {Object.entries(STATUS_MAP)
-                    .filter(([key]) => key !== 'ARCHIVED')
-                    .map(([key, value]) => (
-                    <Select.Option key={key} value={key}>
-                      <Tag color={value.color}>{value.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item
-                label="优先级"
-                field="priority"
-                rules={[{ required: true, message: '请选择优先级' }]}
-              >
-                <Select placeholder="优先级">
-                  {Object.entries(PRIORITY_MAP).map(([key, value]) => (
-                    <Select.Option key={key} value={key}>
-                      <Tag color={value.color}>{value.label}</Tag>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </div>
-
-            {/* 时间 */}
-            <Form.Item
-              label="时间"
-              field="dateRange"
-              rules={[
-                { required: true, message: '请选择时间' },
-                {
-                  validator: (value, callback) => {
-                    if (value && value[0] && value[1] && dayjs(value[1]).isBefore(dayjs(value[0]))) {
-                      callback('结束日期不能早于开始日期');
-                    } else {
-                      callback();
-                    }
-                  },
-                },
-              ]}
-            >
-              <RangePicker style={{ width: '100%' }} />
-            </Form.Item>
-
-            {/* 项目经理 / 协作者 — 一行两列 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Form.Item
-                label="项目经理"
-                field="managerId"
-                rules={[{ required: true, message: '请选择项目经理' }]}
-              >
-                <Select placeholder="项目经理" showSearch filterOption={(input, option) =>
-                  (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-                } onChange={(v) => {
-                  setSelectedManagerId(v || '');
-                  // 如果新经理在协作者列表中，自动移除
-                  const currentMembers: string[] = form.getFieldValue('memberIds') || [];
-                  if (v && currentMembers.includes(v)) {
-                    form.setFieldValue('memberIds', currentMembers.filter((id) => id !== v));
-                  }
-                }}>
-                  {users.map((u) => (
-                    <Select.Option key={u.id} value={u.id}>
-                      {u.realName || u.username}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              <Form.Item label="协作者" field="memberIds">
-                <Select
-                  mode="multiple"
-                  placeholder="协作者（可选）"
-                  allowClear
-                  showSearch
-                  maxTagCount={2}
-                  filterOption={(input, option) =>
-                    (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-                  }
-                >
-                  {users
-                    .filter((u) => u.id !== selectedManagerId)
-                    .map((u) => (
-                      <Select.Option key={u.id} value={u.id}>
-                        {u.realName || u.username}
-                      </Select.Option>
-                    ))
-                  }
-                </Select>
-              </Form.Item>
-            </div>
-          </Form>
-        </Drawer>
+          projectId={drawerProjectId}
+          onClose={closeDrawer}
+          onSuccess={() => loadProjects()}
+        />
 
         {/* 归档确认弹窗 */}
         <Modal

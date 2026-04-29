@@ -4,9 +4,7 @@ import {
   expectMessage,
   confirmModal,
   waitForTableLoad,
-  clickDrawerSubmit,
-  pickDateRange,
-  selectOption,
+  createProjectViaPage,
   searchProject,
 } from '../helpers/arco';
 
@@ -27,29 +25,7 @@ test.describe.serial('Project Edit & Search', () => {
   // ──────── setup: create project ────────
   test('setup: create project', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
-    await page.getByRole('button', { name: '新建项目' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
-    await page.getByPlaceholder('请输入项目名称').fill(projectName);
-    await page.getByPlaceholder('请输入项目描述').fill(text.projectDesc);
-    await pickDateRange(page);
-
-    const managerSelect = page.locator('.arco-drawer .arco-select').filter({
-      has: page.locator('[placeholder="项目经理"]'),
-    });
-    await managerSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
-    await page.waitForTimeout(200);
-
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/projects') && resp.request().method() === 'POST',
-      { timeout: 15_000 },
-    );
-    await clickDrawerSubmit(page, '创建');
-    const resp = await responsePromise;
-    expect(resp.status()).toBeLessThan(400);
-
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
-    await waitForTableLoad(page);
+    await createProjectViaPage(page, { name: projectName, desc: text.projectDesc });
     await searchProject(page, projectName);
     await expect(page.getByText(projectName)).toBeVisible({ timeout: 10_000 });
   });
@@ -143,15 +119,14 @@ test.describe.serial('Project Edit & Search', () => {
 
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // Click edit button (non-danger button in actions column)
-    const editBtn = row.locator('button').filter({ hasNotText: /删除/ }).filter({ has: page.locator('svg') }).first();
+    // Click edit button - opens drawer
+    const editBtn = row.getByRole('button', { name: '编辑' });
     await editBtn.click();
-
-    // Drawer should open with project data
     await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await page.waitForTimeout(500);
 
     // Modify name
-    const nameInput = page.getByPlaceholder('请输入项目名称');
+    const nameInput = page.locator('.arco-drawer').getByPlaceholder('请输入项目名称');
     await nameInput.clear();
     await nameInput.fill(updatedName);
 
@@ -160,7 +135,7 @@ test.describe.serial('Project Edit & Search', () => {
       (resp) => resp.url().includes('/api/projects') && resp.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await clickDrawerSubmit(page, '保存');
+    await page.locator('.arco-drawer-footer').getByRole('button', { name: '保存修改' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 

@@ -103,8 +103,114 @@ export async function clickSubNav(page: Page, text: string) {
  * Useful when there are many projects and the target is not on page 1.
  */
 export async function searchProject(page: Page, projectName: string) {
-  const searchInput = page.getByPlaceholder('搜索项目名称');
+  const searchInput = page.getByPlaceholder(/搜索项目名称/);
   await searchInput.fill(projectName);
   await page.waitForTimeout(500);
   await waitForTableLoad(page);
+}
+
+/**
+ * Create a project via the Drawer form.
+ * The "新建项目" button opens a Drawer (not a full page).
+ * Returns the project name used.
+ */
+export async function createProjectViaPage(
+  page: Page,
+  options?: { name?: string; desc?: string },
+) {
+  const projectName = options?.name || `E2E-${Date.now()}`;
+  const projectDesc = options?.desc || 'E2E auto test project';
+
+  await page.getByRole('button', { name: '新建项目' }).click();
+  await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(300);
+
+  await page.locator('.arco-drawer').getByPlaceholder('请输入项目名称').fill(projectName);
+  await page.locator('.arco-drawer').getByPlaceholder('请输入项目描述').fill(projectDesc);
+
+  await pickDateRange(page);
+
+  const managerSelect = page.locator('.arco-drawer .arco-select').filter({
+    has: page.locator('[placeholder="选择项目经理"]'),
+  });
+  await managerSelect.click();
+  await page.waitForTimeout(300);
+  await page
+    .locator('.arco-select-popup:visible .arco-select-option')
+    .first()
+    .click();
+  await page.waitForTimeout(200);
+
+  const responsePromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/api/projects') &&
+      resp.request().method() === 'POST',
+    { timeout: 15_000 },
+  );
+  await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建项目' }).click();
+  const resp = await responsePromise;
+  expect(resp.status()).toBeLessThan(400);
+
+  await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+  await waitForTableLoad(page);
+
+  return projectName;
+}
+
+/**
+ * Edit an existing project via the Drawer form.
+ */
+export async function editProjectViaPage(
+  page: Page,
+  projectName: string,
+  updates: { name?: string; desc?: string },
+) {
+  await searchProject(page, projectName);
+  await page.waitForTimeout(300);
+
+  const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+  await row.getByRole('button', { name: '编辑' }).click();
+  await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(500);
+
+  if (updates.name) {
+    const nameInput = page.locator('.arco-drawer').getByPlaceholder('请输入项目名称');
+    await nameInput.clear();
+    await nameInput.fill(updates.name);
+  }
+  if (updates.desc) {
+    const descInput = page.locator('.arco-drawer').getByPlaceholder('请输入项目描述');
+    await descInput.clear();
+    await descInput.fill(updates.desc);
+  }
+
+  const responsePromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/api/projects') &&
+      resp.request().method() === 'PUT',
+    { timeout: 15_000 },
+  );
+  await page.locator('.arco-drawer-footer').getByRole('button', { name: '保存修改' }).click();
+  const resp = await responsePromise;
+  expect(resp.status()).toBeLessThan(400);
+
+  await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+}
+
+/** Pick a date range on a full page (not inside a drawer) */
+export async function pickDateRangeOnPage(page: Page) {
+  const picker = page.locator('.arco-picker-range');
+  await picker.locator('input').first().click();
+
+  const panels = page.locator('.arco-panel-date');
+  await panels.first().waitFor({ state: 'visible', timeout: 5_000 });
+
+  await panels.first().locator('.arco-picker-cell-today').click();
+  await page.waitForTimeout(500);
+
+  const rightCells = panels
+    .nth(1)
+    .locator('.arco-picker-cell.arco-picker-cell-in-view');
+  await rightCells.nth(14).click();
+  await page.waitForTimeout(500);
 }

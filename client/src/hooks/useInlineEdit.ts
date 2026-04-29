@@ -30,7 +30,7 @@ export function useInlineEdit({
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!document.contains(target)) return;
-      if (target.closest('.arco-picker-dropdown, .arco-picker-range-wrapper, .arco-picker-panel, .arco-select-popup, .arco-picker, .arco-select, .arco-input-wrapper, .arco-input-number, .arco-picker-container')) return;
+      if (target.closest('.arco-picker-container, .arco-picker-range-container, .arco-select-popup, .arco-picker, .arco-select, .arco-input-wrapper, .arco-input-number, .arco-trigger')) return;
       if (['name', 'notes', 'planDuration'].includes(inlineEditing.field)) return;
       setInlineEditing(null);
     };

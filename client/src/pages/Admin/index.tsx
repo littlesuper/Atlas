@@ -32,8 +32,63 @@ import { USER_STATUS_MAP, PERMISSION_RESOURCE_MAP, PERMISSION_ACTION_MAP } from 
 import AiManagement from './AiManagement';
 import AuditLogTab from './AuditLog';
 import WecomManagement from './WecomManagement';
+import HolidayManagement from './HolidayManagement';
+import RoleMembersTab from './RoleMembersTab';
 import dayjs from 'dayjs';
 import { pinyin } from 'pinyin-pro';
+
+// 内联角色编辑器：挂载后强制展开下拉，外部点击触发提交
+interface InlineRoleEditorProps {
+  roles: Role[];
+  initialValue: string[];
+  loading: boolean;
+  onChange: (value: string[]) => void;
+  onCommit: () => void;
+}
+const InlineRoleEditor: React.FC<InlineRoleEditorProps> = ({ roles, initialValue, loading, onChange, onCommit }) => {
+  const [popupVisible, setPopupVisible] = React.useState(false);
+  const [value, setValue] = React.useState<string[]>(initialValue);
+
+  // 挂载后下一帧强制展开（避开 React 同步事件循环导致的关闭）
+  React.useEffect(() => {
+    const t = setTimeout(() => setPopupVisible(true), 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <Select
+      size="small"
+      mode="multiple"
+      showSearch
+      allowClear
+      popupVisible={popupVisible}
+      onVisibleChange={(v) => {
+        setPopupVisible(v);
+        if (!v) onCommit();
+      }}
+      filterOption={(input, option) => {
+        const label = String(option?.props?.value ?? '');
+        return label.toLowerCase().includes(input.toLowerCase());
+      }}
+      value={value}
+      onChange={(v) => {
+        const arr = v as string[];
+        setValue(arr);
+        onChange(arr);
+      }}
+      loading={loading}
+      disabled={loading}
+      style={{ width: '100%' }}
+      placeholder="搜索或选择角色"
+    >
+      {roles.map((r) => (
+        <Select.Option key={r.id} value={r.name}>
+          {r.name}
+        </Select.Option>
+      ))}
+    </Select>
+  );
+};
 
 const AdminPage: React.FC = () => {
   const { hasPermission } = useAuthStore();
@@ -52,6 +107,7 @@ const AdminPage: React.FC = () => {
     const tabs: string[] = [];
     if (hasPermission('system', 'ai')) tabs.push('ai');
     if (hasPermission('system', 'account')) tabs.push('account');
+    if (hasPermission('system', 'account')) tabs.push('holidays');
     if (hasPermission('system', 'audit_log')) tabs.push('audit');
     return tabs;
   }, [hasPermission]);
@@ -77,6 +133,11 @@ const AdminPage: React.FC = () => {
   const [formCanLogin, setFormCanLogin] = useState(true);
   const [formStatus, setFormStatus] = useState<string>('ACTIVE');
 
+  // 行内编辑用户角色
+  const [inlineRoleUserId, setInlineRoleUserId] = useState<string | null>(null);
+  const [inlineRoleValue, setInlineRoleValue] = useState<string[]>([]);
+  const [inlineRoleSaving, setInlineRoleSaving] = useState(false);
+
   // 角色数据
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
@@ -93,7 +154,7 @@ const AdminPage: React.FC = () => {
       if (canLoginFilter) params.canLogin = canLoginFilter;
       const response = await usersApi.list(params);
       setUsers(response.data.data || []);
-    } catch (error) {
+    } catch {
       Message.error('加载用户列表失败');
     } finally {
       setUsersLoading(false);
@@ -106,7 +167,7 @@ const AdminPage: React.FC = () => {
     try {
       const response = await rolesApi.list();
       setRoles(response.data);
-    } catch (error) {
+    } catch {
       Message.error('加载角色列表失败');
     } finally {
       setRolesLoading(false);
@@ -281,11 +342,43 @@ const AdminPage: React.FC = () => {
           await rolesApi.delete(role.id);
           Message.success('角色删除成功');
           loadRoles();
-        } catch (error) {
+        } catch {
           Message.error('角色删除失败');
         }
       },
     });
+  };
+
+  // 进入行内编辑
+  const startInlineRoleEdit = (user: User) => {
+    if (!hasPermission('user', 'update')) return;
+    setInlineRoleUserId(user.id);
+    setInlineRoleValue([...(user.roles || [])]);
+  };
+
+  // 提交行内编辑
+  const commitInlineRoleEdit = async (user: User) => {
+    if (inlineRoleSaving) return;
+    const original = [...(user.roles || [])].sort().join(',');
+    const next = [...inlineRoleValue].sort().join(',');
+    if (original === next) {
+      setInlineRoleUserId(null);
+      return;
+    }
+    const roleIds = inlineRoleValue
+      .map((name) => roles.find((r) => r.name === name)?.id)
+      .filter(Boolean) as string[];
+    setInlineRoleSaving(true);
+    try {
+      await usersApi.update(user.id, { roleIds });
+      Message.success('角色已更新');
+      await loadUsers();
+    } catch {
+      Message.error('角色更新失败');
+    } finally {
+      setInlineRoleSaving(false);
+      setInlineRoleUserId(null);
+    }
   };
 
   // 用户表格列配置
@@ -316,17 +409,44 @@ const AdminPage: React.FC = () => {
     {
       title: '角色',
       dataIndex: 'roles',
-      width: 200,
-      render: (roles: string[]) => (
-        <Space wrap>
-          {roles.map((role) => (
-            <Tag key={role} color="blue">
-              {role}
-            </Tag>
-          ))}
-          {roles.length === 0 && '-'}
-        </Space>
-      ),
+      width: 280,
+      render: (userRoles: string[], record: User) => {
+        const canEdit = hasPermission('user', 'update');
+        if (inlineRoleUserId === record.id) {
+          return (
+            <InlineRoleEditor
+              roles={roles}
+              initialValue={inlineRoleValue}
+              loading={inlineRoleSaving}
+              onChange={setInlineRoleValue}
+              onCommit={() => commitInlineRoleEdit(record)}
+            />
+          );
+        }
+        return (
+          <div
+            onClick={() => canEdit && startInlineRoleEdit(record)}
+            style={{
+              cursor: canEdit ? 'pointer' : 'default',
+              minHeight: 22,
+              padding: '2px 4px',
+              borderRadius: 4,
+            }}
+            title={canEdit ? '单击编辑角色' : undefined}
+          >
+            <Space wrap>
+              {userRoles.map((role) => (
+                <Tag key={role} color="blue">
+                  {role}
+                </Tag>
+              ))}
+              {userRoles.length === 0 && (
+                <span style={{ color: 'var(--color-text-4)' }}>-</span>
+              )}
+            </Space>
+          </div>
+        );
+      },
     },
     {
       title: '状态',
@@ -554,8 +674,18 @@ const AdminPage: React.FC = () => {
                   <Tabs.TabPane key="wecom" title="企微配置">
                     <WecomManagement />
                   </Tabs.TabPane>
+                  <Tabs.TabPane key="roleMembers" title="角色成员">
+                    <RoleMembersTab />
+                  </Tabs.TabPane>
                 </Tabs>
           </Tabs.TabPane>
+          )}
+
+          {/* 节假日 */}
+          {hasPermission('system', 'account') && (
+            <Tabs.TabPane key="holidays" title="节假日">
+              <HolidayManagement />
+            </Tabs.TabPane>
           )}
 
           {/* 操作日志 */}

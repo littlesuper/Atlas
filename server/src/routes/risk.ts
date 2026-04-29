@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { assessProjectRisk } from '../utils/riskEngine';
 import { callAi } from '../utils/aiClient';
-import { buildRiskContext, trimContextForAI, RiskContext } from '../utils/riskContext';
+import { buildRiskContext, trimContextForAI } from '../utils/riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from '../utils/riskPrompts';
 import { logger } from '../utils/logger';
 

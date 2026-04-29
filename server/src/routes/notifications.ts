@@ -118,17 +118,16 @@ router.post('/generate', authenticate, async (req: Request, res: Response): Prom
         status: { notIn: ['COMPLETED', 'CANCELLED'] },
       },
       include: {
-        assignees: { select: { id: true } },
+        executors: { select: { userId: true } },
         project: { select: { name: true } },
       },
     });
 
     for (const a of dueSoonActivities) {
-      for (const u of a.assignees) {
-        // 24h 内去重
+      for (const e of a.executors) {
         const existing = await prisma.notification.findFirst({
           where: {
-            userId: u.id,
+            userId: e.userId,
             type: 'ACTIVITY_DUE',
             relatedId: a.id,
             createdAt: { gte: oneDayAgo },
@@ -137,7 +136,7 @@ router.post('/generate', authenticate, async (req: Request, res: Response): Prom
         if (!existing) {
           await prisma.notification.create({
             data: {
-              userId: u.id,
+              userId: e.userId,
               type: 'ACTIVITY_DUE',
               title: '活动即将到期',
               content: `项目「${a.project.name}」中的活动「${a.name}」将在3天内到期`,
@@ -157,13 +156,13 @@ router.post('/generate', authenticate, async (req: Request, res: Response): Prom
         status: { notIn: ['COMPLETED', 'CANCELLED'] },
       },
       include: {
-        assignees: { select: { id: true } },
+        executors: { select: { userId: true } },
         project: { select: { name: true, managerId: true } },
       },
     });
 
     for (const m of milestones) {
-      const targetUserIds = [...m.assignees.map(u => u.id), m.project.managerId];
+      const targetUserIds = [...m.executors.map(e => e.userId), m.project.managerId];
       const uniqueUserIds = [...new Set(targetUserIds)];
       for (const uid of uniqueUserIds) {
         const existing = await prisma.notification.findFirst({

@@ -156,10 +156,12 @@ body {
 
 /* 输入框样式 */
 .arco-input,
+.arco-input-inner-wrapper,
+.arco-input-inner-wrapper-focus,
 .arco-textarea,
 .arco-select-view,
 .arco-picker {
-  border-radius: 8px;
+  border-radius: 8px !important;
 }
 
 /* 按钮样式 */
@@ -171,6 +173,14 @@ body {
 .arco-tag {
   border-radius: 6px;
   font-size: 12px;
+}
+
+/* Fix WCAG AA color-contrast for Arco Tag */
+.arco-tag-checked.arco-tag-blue {
+  color: rgb(17, 75, 163) !important;
+}
+.arco-tag-checked.arco-tag-orange {
+  color: rgb(166, 69, 0) !important;
 }
 
 /* 下拉面板样式 */

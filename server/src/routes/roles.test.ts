@@ -4,7 +4,7 @@ import request from 'supertest';
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
-const { mockPrisma, mockInvalidateAllUserCache } = vi.hoisted(() => {
+const { mockPrisma, mockInvalidateAllUserCache, mockPermissionMiddleware } = vi.hoisted(() => {
   const mockPrisma = {
     role: {
       findMany: vi.fn(),
@@ -27,7 +27,8 @@ const { mockPrisma, mockInvalidateAllUserCache } = vi.hoisted(() => {
     },
   };
   const mockInvalidateAllUserCache = vi.fn();
-  return { mockPrisma, mockInvalidateAllUserCache };
+  const mockPermissionMiddleware = vi.fn().mockImplementation((_req: any, _res: any, next: any) => next());
+  return { mockPrisma, mockInvalidateAllUserCache, mockPermissionMiddleware };
 });
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  requirePermission: () => mockPermissionMiddleware,
   isAdmin: vi.fn().mockReturnValue(true),
 }));
 
@@ -115,6 +116,7 @@ describe('GET /api/roles', () => {
 describe('GET /api/roles - error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPermissionMiddleware.mockImplementation((_req: any, _res: any, next: any) => next());
   });
 
   it('returns 500 on database error', async () => {
@@ -124,6 +126,18 @@ describe('GET /api/roles - error handling', () => {
 
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('服务器内部错误');
+  });
+
+  it('RBAC-012: User without role:read permission gets 403 on GET /api/roles', async () => {
+    mockPermissionMiddleware.mockImplementationOnce((_req: any, res: any, _next: any) => {
+      res.status(403).json({ error: '权限不足' });
+    });
+
+    const res = await request(app).get('/api/roles');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toHaveProperty('error');
+    expect(mockPrisma.role.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -300,6 +314,37 @@ describe('PUT /api/roles/:id', () => {
     });
     expect(mockPrisma.rolePermission.createMany).toHaveBeenCalledWith({
       data: [{ roleId: 'r1', permissionId: 'perm3' }],
+    });
+    expect(mockInvalidateAllUserCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('RBAC-015: Assign 50 permissions at once, verify cache is flushed', async () => {
+    const permissionIds = Array.from({ length: 50 }, (_, i) => `perm-${i + 1}`);
+
+    mockPrisma.role.findUnique
+      .mockResolvedValueOnce({ id: 'r1', name: '大权限角色' })
+      .mockResolvedValueOnce({
+        id: 'r1',
+        name: '大权限角色',
+        rolePermissions: permissionIds.map((pid) => ({
+          permission: { id: pid, resource: `res-${pid}`, action: 'read' },
+        })),
+        _count: { userRoles: 5 },
+      });
+    mockPrisma.role.update.mockResolvedValue({});
+    mockPrisma.rolePermission.deleteMany.mockResolvedValue({ count: 50 });
+    mockPrisma.rolePermission.createMany.mockResolvedValue({ count: 50 });
+
+    const res = await request(app)
+      .put('/api/roles/r1')
+      .send({ permissionIds });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+      where: { roleId: 'r1' },
+    });
+    expect(mockPrisma.rolePermission.createMany).toHaveBeenCalledWith({
+      data: permissionIds.map((pid) => ({ roleId: 'r1', permissionId: pid })),
     });
     expect(mockInvalidateAllUserCache).toHaveBeenCalledTimes(1);
   });

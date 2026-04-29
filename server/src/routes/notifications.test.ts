@@ -304,7 +304,7 @@ describe('POST /api/notifications/generate', () => {
         {
           id: 'a-1',
           name: '测试活动',
-          assignees: [{ id: 'user-2' }],
+          executors: [{ userId: 'user-2' }],
           project: { name: '测试项目' },
         },
       ])
@@ -338,7 +338,7 @@ describe('POST /api/notifications/generate', () => {
         {
           id: 'a-1',
           name: '测试活动',
-          assignees: [{ id: 'user-2' }],
+          executors: [{ userId: 'user-2' }],
           project: { name: '测试项目' },
         },
       ])
@@ -363,7 +363,7 @@ describe('POST /api/notifications/generate', () => {
           id: 'm-1',
           name: '里程碑1',
           type: 'MILESTONE',
-          assignees: [{ id: 'user-2' }],
+          executors: [{ userId: 'user-2' }],
           project: { name: '测试项目', managerId: 'user-3' },
         },
       ]);

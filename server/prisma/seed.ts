@@ -179,7 +179,107 @@ async function main() {
     });
   }
 
-  console.log('已创建 4 个角色');
+  // ========== 新增 11 个职能角色 + 项目协作者（共 12 个） ==========
+  // 各角色权限：以"参与项目"为基础，按职责差异微调
+  const baseReadAll = permissions.filter(
+    (p) =>
+      p.action === 'read' && (p.resource === 'project' || p.resource === 'activity' || p.resource === 'product' || p.resource === 'user' || p.resource === 'role')
+  );
+  const activityRW = permissions.filter(
+    (p) => p.resource === 'activity' && (p.action === 'read' || p.action === 'update' || p.action === 'create')
+  );
+  const productRW = permissions.filter((p) => p.resource === 'product');
+  const weeklyRW = permissions.filter((p) => p.resource === 'weekly_report');
+
+  const functionalRoles: Array<{ name: string; description: string; perms: typeof permissions }> = [
+    {
+      name: '项目协作者',
+      description: '协助管理项目的活动、周报',
+      perms: [...baseReadAll, ...activityRW, ...weeklyRW],
+    },
+    {
+      name: '硬件产品',
+      description: '硬件产品经理，管理硬件产品资料',
+      perms: [...baseReadAll, ...productRW, ...activityRW],
+    },
+    {
+      name: '软件产品',
+      description: '软件产品经理，管理软件产品资料',
+      perms: [...baseReadAll, ...productRW, ...activityRW],
+    },
+    {
+      name: '硬件开发',
+      description: '硬件研发工程师',
+      perms: [...baseReadAll, ...activityRW],
+    },
+    {
+      name: '软件开发',
+      description: '软件研发工程师',
+      perms: [...baseReadAll, ...activityRW],
+    },
+    {
+      name: '硬件测试',
+      description: '硬件测试工程师',
+      perms: [...baseReadAll, ...activityRW],
+    },
+    {
+      name: '软件测试',
+      description: '软件测试工程师',
+      perms: [...baseReadAll, ...activityRW],
+    },
+    {
+      name: '结构工程师',
+      description: '结构/机械工程师',
+      perms: [...baseReadAll, ...activityRW],
+    },
+    {
+      name: '品质工程师',
+      description: 'QA / 品质工程师',
+      perms: [...baseReadAll, ...activityRW, ...weeklyRW.filter((p) => p.action === 'read')],
+    },
+    {
+      name: '设计师',
+      description: 'UI/工业设计师',
+      perms: [...baseReadAll, ...activityRW],
+    },
+    {
+      name: '采购',
+      description: '采购人员',
+      perms: [...baseReadAll],
+    },
+    {
+      name: '法务',
+      description: '法务人员',
+      perms: [...baseReadAll],
+    },
+    {
+      name: '供应链',
+      description: '供应链管理',
+      perms: [...baseReadAll],
+    },
+    {
+      name: '其他',
+      description: '其他参与人员（兜底）',
+      perms: [...baseReadAll],
+    },
+  ];
+
+  for (const def of functionalRoles) {
+    const role = await prisma.role.upsert({
+      where: { name: def.name },
+      update: { description: def.description },
+      create: { name: def.name, description: def.description },
+    });
+    for (const perm of def.perms) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
+        update: {},
+        create: { roleId: role.id, permissionId: perm.id },
+      });
+    }
+  }
+
+  console.log(`已创建 ${4 + functionalRoles.length} 个角色`);
 
   // 3. 创建用户
   console.log('创建用户...');
@@ -217,11 +317,10 @@ async function main() {
     update: {},
     create: {
       username: 'zhangsan',
-      email: 'zhangsan@hwsystem.com',
       password: await bcrypt.hash('123456', 10),
       realName: '张三',
-      phone: '13800138001',
       status: 'ACTIVE',
+      canLogin: true,
     },
   });
 
@@ -245,11 +344,10 @@ async function main() {
     update: {},
     create: {
       username: 'lisi',
-      email: 'lisi@hwsystem.com',
       password: await bcrypt.hash('123456', 10),
       realName: '李四',
-      phone: '13800138002',
       status: 'ACTIVE',
+      canLogin: true,
     },
   });
 

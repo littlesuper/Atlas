@@ -29,7 +29,10 @@ import notificationsRoutes from './routes/notifications';
 import templatesRoutes from './routes/templates';
 import riskItemsRoutes from './routes/riskItems';
 import checkItemsRoutes from './routes/checkItems';
+import holidaysRoutes from './routes/holidays';
+import roleMembersRoutes from './routes/roleMembers';
 import { startScheduledJobs } from './utils/scheduler';
+import { refreshHolidayCache } from './utils/workday';
 import { logger } from './utils/logger';
 import { requestId } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
@@ -173,6 +176,12 @@ app.use('/api/risk-items', riskItemsRoutes);
 // 检查项路由
 app.use('/api/check-items', checkItemsRoutes);
 
+// 节假日路由
+app.use('/api/holidays', holidaysRoutes);
+
+// 角色成员管理路由
+app.use('/api/role-members', roleMembersRoutes);
+
 // ==================== 前端静态文件（生产环境） ====================
 
 if (process.env.NODE_ENV === 'production') {
@@ -196,7 +205,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // 全局错误处理
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   logger.error({ err, requestId: req.id }, '服务器错误');
   res.status(500).json({
     error: '服务器内部错误',
@@ -214,6 +223,11 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   if (process.env.NODE_ENV !== 'test') {
     startScheduledJobs();
   }
+
+  // 加载节假日缓存（用于工作日计算）
+  refreshHolidayCache().catch((err) => {
+    logger.warn({ err }, '节假日缓存加载失败，将使用内置兜底数据');
+  });
 });
 
 // ==================== 优雅关闭 ====================

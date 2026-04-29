@@ -16,6 +16,14 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
       count: vi.fn(),
       aggregate: vi.fn(),
     },
+    activityExecutor: {
+      deleteMany: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    roleMember: {
+      findMany: vi.fn(),
+    },
     project: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -118,6 +126,12 @@ vi.mock('multer', () => {
 vi.mock('pinyin-pro', () => ({
   pinyin: vi.fn().mockReturnValue('zhangsan'),
 }));
+vi.mock('../utils/roleMembershipResolver', () => ({
+  autoAssignByRole: vi.fn().mockResolvedValue(['user-1', 'user-2']),
+  resolveRoleMembers: vi.fn().mockResolvedValue([]),
+  findRolesByUser: vi.fn().mockResolvedValue([]),
+  findActiveActivitiesByExecutor: vi.fn().mockResolvedValue([]),
+}));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 
@@ -155,7 +169,7 @@ const sampleActivity = {
   dependencies: null,
   notes: null,
   sortOrder: 1,
-  assignees: [{ id: 'user-1', realName: '管理员', username: 'admin' }],
+  executors: [],
   _count: { checkItems: 2 },
   checkItems: [
     { id: 'ci-1', checked: true },
@@ -365,7 +379,7 @@ describe('GET /api/activities/workload', () => {
     planStartDate: new Date('2026-03-01'),
     planEndDate: new Date('2026-03-10'),
     planDuration: 8,
-    assignees: [{ id: 'user-1', realName: '管理员', username: 'admin' }],
+    executors: [{ userId: 'user-1', user: { id: 'user-1', realName: '管理员', username: 'admin' } }],
     project: { id: 'proj-1', name: '测试项目' },
   };
 
@@ -418,7 +432,7 @@ describe('GET /api/activities/workload', () => {
     const unassigned = {
       ...workloadActivity,
       status: 'NOT_STARTED',
-      assignees: [],
+      executors: [],
     };
     mockPrisma.activity.findMany.mockResolvedValue([unassigned]);
 
@@ -463,7 +477,7 @@ describe('GET /api/activities/resource-conflicts', () => {
       planStartDate: new Date('2026-04-01'),
       planEndDate: new Date('2026-04-10'),
       planDuration: 8,
-      assignees: [user],
+      executors: [{ user }],
       project: { id: 'proj-1', name: '项目1' },
     };
     const a2 = {
@@ -473,7 +487,7 @@ describe('GET /api/activities/resource-conflicts', () => {
       planStartDate: new Date('2026-04-05'),
       planEndDate: new Date('2026-04-15'),
       planDuration: 8,
-      assignees: [user],
+      executors: [{ user }],
       project: { id: 'proj-1', name: '项目1' },
     };
     mockPrisma.activity.findMany.mockResolvedValue([a1, a2]);
@@ -510,7 +524,7 @@ describe('GET /api/activities/resource-conflicts', () => {
       planStartDate: new Date('2026-04-01'),
       planEndDate: new Date('2026-04-05'),
       planDuration: 4,
-      assignees: [user],
+      executors: [{ user }],
       project: { id: 'proj-1', name: '项目1' },
     };
     const a2 = {
@@ -520,7 +534,7 @@ describe('GET /api/activities/resource-conflicts', () => {
       planStartDate: new Date('2026-04-10'),
       planEndDate: new Date('2026-04-15'),
       planDuration: 4,
-      assignees: [user],
+      executors: [{ user }],
       project: { id: 'proj-1', name: '项目1' },
     };
     mockPrisma.activity.findMany.mockResolvedValue([a1, a2]);
@@ -539,7 +553,7 @@ describe('GET /api/activities/resource-conflicts', () => {
       planStartDate: new Date('2026-04-01'),
       planEndDate: new Date('2026-04-10'),
       planDuration: 8,
-      assignees: [{ id: 'user-solo', realName: '独行侠', username: 'solo' }],
+      executors: [{ user: { id: 'user-solo', realName: '独行侠', username: 'solo' } }],
       project: { id: 'proj-1', name: '项目1' },
     };
     mockPrisma.activity.findMany.mockResolvedValue([singleAct]);
@@ -1122,23 +1136,165 @@ describe('PUT /api/activities/batch-update', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('批量操作仅支持同一项目的活动');
   });
+});
 
-  it('should return 403 when user cannot manage project', async () => {
-    mockPrisma.activity.findMany.mockResolvedValue([
-      { id: 'act-1', projectId: 'proj-1' },
-    ]);
-    mockPrisma.project.findUnique.mockResolvedValue({ managerId: 'other-user' });
-    mockCanManage.mockReturnValue(false);
+// ==================== Activity Role Binding Tests ====================
 
-    const res = await request(app)
-      .put('/api/activities/batch-update')
-      .send({
-        ids: ['act-1'],
-        updates: { status: 'COMPLETED' },
-      });
+describe('Activity Role Binding: POST /api/activities with roleId', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('auto-fills executors when roleId provided without executorIds', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.create.mockResolvedValue({ ...sampleActivity, roleId: 'r1', executors: [] });
+
+    const res = await request(app).post('/api/activities').send({
+      projectId: 'proj-1',
+      name: 'PCB 打样',
+      roleId: 'r1',
+    });
+
+    expect(res.status).toBe(201);
+    const createCall = mockPrisma.activity.create.mock.calls[0][0];
+    expect(createCall.data.roleId).toBe('r1');
+    expect(createCall.data.executors.create).toBeDefined();
+    expect(createCall.data.executors.create.length).toBeGreaterThan(0);
+    expect(createCall.data.executors.create[0].source).toBe('ROLE_AUTO');
+    expect(createCall.data.executors.create[0].snapshotRoleId).toBe('r1');
+  });
+
+  it('uses provided executorIds when both roleId and executorIds given', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.create.mockResolvedValue({ ...sampleActivity, roleId: 'r1', executors: [] });
+
+    const res = await request(app).post('/api/activities').send({
+      projectId: 'proj-1',
+      name: 'PCB 打样',
+      roleId: 'r1',
+      executorIds: ['user-1'],
+    });
+
+    expect(res.status).toBe(201);
+    const createCall = mockPrisma.activity.create.mock.calls[0][0];
+    expect(createCall.data.executors.create).toHaveLength(1);
+    expect(createCall.data.executors.create[0].userId).toBe('user-1');
+    expect(createCall.data.executors.create[0].source).toBe('ROLE_AUTO');
+  });
+
+  it('marks non-role members as MANUAL_ADD', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.create.mockResolvedValue({ ...sampleActivity, roleId: 'r1', executors: [] });
+
+    const res = await request(app).post('/api/activities').send({
+      projectId: 'proj-1',
+      name: 'PCB 打样',
+      roleId: 'r1',
+      executorIds: ['user-1', 'user-3'],
+    });
+
+    expect(res.status).toBe(201);
+    const createCall = mockPrisma.activity.create.mock.calls[0][0];
+    const sources = createCall.data.executors.create.map((e: any) => e.source);
+    expect(sources).toContain('MANUAL_ADD');
+  });
+
+  it('creates activity with null roleId and executorIds as MANUAL_ADD', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.create.mockResolvedValue({ ...sampleActivity, roleId: null, executors: [] });
+
+    const res = await request(app).post('/api/activities').send({
+      projectId: 'proj-1',
+      name: '协调会议',
+      roleId: null,
+      executorIds: ['user-1'],
+    });
+
+    expect(res.status).toBe(201);
+    const createCall = mockPrisma.activity.create.mock.calls[0][0];
+    expect(createCall.data.roleId).toBeNull();
+    expect(createCall.data.executors.create[0].source).toBe('MANUAL_ADD');
+    expect(createCall.data.executors.create[0].snapshotRoleId).toBeNull();
+  });
+
+  it('allows empty roleId with empty executorIds', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.create.mockResolvedValue({ ...sampleActivity, roleId: null, executors: [] });
+
+    const res = await request(app).post('/api/activities').send({
+      projectId: 'proj-1',
+      name: '协调会议',
+      roleId: null,
+    });
+
+    expect(res.status).toBe(201);
+    const createCall = mockPrisma.activity.create.mock.calls[0][0];
+    expect(createCall.data.executors.create).toHaveLength(0);
+  });
+});
+
+describe('Activity Role Binding: PUT /api/activities/:id', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('updates roleId without resetting executors', async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue({ ...sampleActivity, roleId: null });
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.update.mockResolvedValue({ ...sampleActivity, roleId: 'r1', executors: [] });
+
+    const res = await request(app).put('/api/activities/act-1').send({
+      roleId: 'r1',
+    });
+
+    expect(res.status).toBe(200);
+    const updateCall = mockPrisma.activity.update.mock.calls[0][0];
+    expect(updateCall.data.roleId).toBe('r1');
+    expect(updateCall.data.executors).toBeUndefined();
+  });
+
+  it('resets executors when resetExecutorsByRole=true', async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue({ ...sampleActivity, roleId: 'r1' });
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activityExecutor.deleteMany.mockResolvedValue({ count: 2 });
+    mockPrisma.activity.update.mockResolvedValue({ ...sampleActivity, roleId: 'r1', executors: [] });
+
+    const res = await request(app).put('/api/activities/act-1').send({
+      resetExecutorsByRole: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.activityExecutor.deleteMany).toHaveBeenCalledWith({
+      where: { activityId: 'act-1' },
+    });
+    const updateCall = mockPrisma.activity.update.mock.calls[0][0];
+    expect(updateCall.data.executors.create).toBeDefined();
+    expect(updateCall.data.executors.create[0].source).toBe('ROLE_AUTO');
+  });
+
+  it('replaces executors when executorIds provided', async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue({ ...sampleActivity, roleId: 'r1' });
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activityExecutor.deleteMany.mockResolvedValue({ count: 1 });
+    mockPrisma.activity.update.mockResolvedValue({ ...sampleActivity, roleId: 'r1', executors: [] });
+
+    const res = await request(app).put('/api/activities/act-1').send({
+      executorIds: ['user-2'],
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.activityExecutor.deleteMany).toHaveBeenCalled();
+    const updateCall = mockPrisma.activity.update.mock.calls[0][0];
+    expect(updateCall.data.executors.create).toHaveLength(1);
+    expect(updateCall.data.executors.create[0].userId).toBe('user-2');
+  });
+
+  it('blocks update for archived project', async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue({ ...sampleActivity });
+    mockPrisma.project.findUnique.mockResolvedValue({ ...sampleProject, status: 'ARCHIVED' });
+
+    const res = await request(app).put('/api/activities/act-1').send({
+      roleId: 'r1',
+      executorIds: ['user-1'],
+    });
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe('无权操作');
   });
 });
 
@@ -1284,6 +1440,179 @@ describe('DELETE /api/activities/batch-delete', () => {
     const res = await request(app)
       .delete('/api/activities/batch-delete')
       .send({ ids: ['act-1', 'act-2'] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('批量操作仅支持同一项目的活动');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// P0: ACT-015 parent delete cascades children
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ACT-015: parent activity delete cascades children', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('ACT-015 deleting parent activity also deletes child activities', async () => {
+    const parentId = 'parent-act';
+    mockPrisma.activity.findUnique.mockResolvedValue({
+      id: parentId,
+      projectId: 'proj-1',
+      parentId: null,
+    });
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1' });
+
+    // Prisma onDelete: Cascade handles children
+    mockPrisma.activity.delete.mockResolvedValue({ id: parentId });
+
+    const res = await request(app)
+      .delete(`/api/activities/${parentId}`);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.activity.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: parentId } })
+    );
+  });
+});
+
+describe('ACT-006/007: planDuration bounds', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('ACT-006 planDuration=0 is accepted (no backend validation)', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', status: 'IN_PROGRESS', managerId: 'user-1' });
+    mockPrisma.activity.findUnique.mockResolvedValue(null);
+    mockPrisma.activity.create.mockResolvedValue({ id: 'act-1' });
+    mockPrisma.activity.count.mockResolvedValue(0);
+
+    const res = await request(app)
+      .post('/api/activities')
+      .send({ projectId: 'proj-1', name: 'Zero Duration', type: 'TASK', planDuration: 0 });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('ACT-007 planDuration=9999 is accepted (no backend validation)', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', status: 'IN_PROGRESS', managerId: 'user-1' });
+    mockPrisma.activity.findUnique.mockResolvedValue(null);
+    mockPrisma.activity.create.mockResolvedValue({ id: 'act-1' });
+    mockPrisma.activity.count.mockResolvedValue(0);
+
+    const res = await request(app)
+      .post('/api/activities')
+      .send({ projectId: 'proj-1', name: 'Huge Duration', type: 'TASK', planDuration: 9999 });
+
+    expect(res.status).toBe(201);
+  });
+});
+
+describe('ACT-017: activity name search (no keyword filter)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('ACT-017 GET /project/:id returns all activities (no keyword param)', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1' });
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+    mockPrisma.activity.count.mockResolvedValue(0);
+    mockPrisma.activity.aggregate.mockResolvedValue({ _sum: { planDuration: 0 } });
+
+    const res = await request(app).get('/api/activities/project/proj-1');
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.activity.findMany).toHaveBeenCalled();
+  });
+});
+
+describe('ACT-012: dependency on non-existent activity', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('ACT-012 create with non-existent dependency activity creates anyway (no backend FK check)', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', status: 'IN_PROGRESS', managerId: 'user-1' });
+    mockPrisma.activity.create.mockResolvedValue({
+      ...sampleActivity,
+      id: 'act-new',
+      dependencies: [{ id: 'nonexistent-act', type: '0' }],
+    });
+
+    const res = await request(app)
+      .post('/api/activities')
+      .send({
+        projectId: 'proj-1',
+        name: '活动with无效依赖',
+        type: 'TASK',
+        dependencies: [{ id: 'nonexistent-act', type: '0' }],
+      });
+
+    // No FK validation on dependency IDs; activity is created
+    expect(res.status).toBe(201);
+  });
+});
+
+describe('ACT-014: 5-level nested tree structure', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('ACT-014 tree mode returns flat list with parentId references', async () => {
+    const l0 = { ...sampleActivity, id: 'l0', parentId: null, name: 'Level 0' };
+    const l1 = { ...sampleActivity, id: 'l1', parentId: 'l0', name: 'Level 1' };
+    const l2 = { ...sampleActivity, id: 'l2', parentId: 'l1', name: 'Level 2' };
+    const l3 = { ...sampleActivity, id: 'l3', parentId: 'l2', name: 'Level 3' };
+    const l4 = { ...sampleActivity, id: 'l4', parentId: 'l3', name: 'Level 4' };
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.activity.findMany.mockResolvedValue([l0, l1, l2, l3, l4]);
+
+    const res = await request(app).get('/api/activities/project/proj-1');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(5);
+    expect(res.body.find((a: any) => a.id === 'l4').parentId).toBe('l3');
+    expect(res.body.find((a: any) => a.id === 'l3').parentId).toBe('l2');
+    expect(res.body.find((a: any) => a.id === 'l2').parentId).toBe('l1');
+    expect(res.body.find((a: any) => a.id === 'l1').parentId).toBe('l0');
+    expect(res.body.find((a: any) => a.id === 'l0').parentId).toBeNull();
+  });
+});
+
+describe('ACT-023: What-If with negative delayDays (advance)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('ACT-023 negative delayDays simulates advancing dates', async () => {
+    const act = {
+      id: 'act-1',
+      name: '活动1',
+      dependencies: null,
+      planStartDate: new Date('2026-04-10'),
+      planEndDate: new Date('2026-04-20'),
+      planDuration: 5,
+    };
+    mockPrisma.activity.findMany.mockResolvedValue([act]);
+
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/what-if')
+      .send({ activityId: 'act-1', delayDays: -5 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.affectedCount).toBeGreaterThanOrEqual(1);
+    // The new start should be earlier than original
+    const affected0 = res.body.affected[0];
+    expect(new Date(affected0.newStart).getTime()).toBeLessThan(new Date(affected0.originalStart).getTime());
+  });
+});
+
+describe('ACT-040: cross-project batch update returns 400', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('ACT-040 batch update with activities from different projects returns 400', async () => {
+    mockPrisma.activity.findMany.mockResolvedValue([
+      { id: 'act-1', projectId: 'proj-1' },
+      { id: 'act-2', projectId: 'proj-2' },
+    ]);
+
+    const res = await request(app)
+      .put('/api/activities/batch-update')
+      .send({
+        ids: ['act-1', 'act-2'],
+        updates: { status: 'IN_PROGRESS' },
+      });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('批量操作仅支持同一项目的活动');

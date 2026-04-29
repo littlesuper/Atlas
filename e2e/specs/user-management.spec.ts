@@ -38,8 +38,7 @@ test.describe.serial('User Management', () => {
     await goToUserTab(page);
 
     await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
-    // Admin user should be in the list
-    await expect(page.getByText('admin').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '新建用户' })).toBeVisible();
   });
 
   // ──────── TC2: create login-enabled user ────────

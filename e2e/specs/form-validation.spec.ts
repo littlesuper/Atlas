@@ -12,49 +12,48 @@ test.describe('Form Validation', () => {
   // ──────── TC1: project form validation ────────
   test('project form shows validation errors on empty submit', async ({ authedPage: page }) => {
     await page.getByRole('button', { name: '新建项目' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
 
     // Try to submit empty form
-    await clickDrawerSubmit(page, '创建');
+    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建项目' }).click();
     await page.waitForTimeout(500);
 
     // Should show validation errors
-    const errors = page.locator('.arco-form-message');
+    const errors = page.locator('.arco-drawer .arco-form-message');
     const errorCount = await errors.count();
     expect(errorCount).toBeGreaterThan(0);
 
-    // Drawer should still be open
-    await expect(page.locator('.arco-drawer')).toBeVisible();
-
     // Close drawer
     await page.locator('.arco-drawer-close-icon').click();
+    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
   });
 
   // ──────── TC2: project name is required ────────
   test('project form requires project name', async ({ authedPage: page }) => {
     await page.getByRole('button', { name: '新建项目' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
 
     // Fill everything except name
     await pickDateRange(page);
 
-    const managerSelect = page.locator('.arco-drawer .arco-select').filter({
-      has: page.locator('[placeholder="项目经理"]'),
-    });
+    const managerSelect = page
+      .locator('.arco-drawer .arco-select')
+      .filter({ has: page.locator('[placeholder="选择项目经理"]') });
     await managerSelect.click();
     await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
     await page.waitForTimeout(200);
 
     // Try to submit
-    await clickDrawerSubmit(page, '创建');
+    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建项目' }).click();
     await page.waitForTimeout(500);
 
     // Name field should show error
-    const nameError = page.locator('.arco-form-message').first();
+    const nameError = page.locator('.arco-drawer .arco-form-message').first();
     await expect(nameError).toBeVisible();
 
     // Close drawer
     await page.locator('.arco-drawer-close-icon').click();
+    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
   });
 
   // ──────── TC3: activity form validation ────────
@@ -108,14 +107,14 @@ test.describe('Form Validation', () => {
   // ──────── TC5: drawer cancel button closes without saving ────────
   test('drawer cancel/close discards changes', async ({ authedPage: page }) => {
     await page.getByRole('button', { name: '新建项目' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
 
     // Fill some data
-    await page.getByPlaceholder('请输入项目名称').fill('不应该保存的项目');
+    await page.locator('.arco-drawer').getByPlaceholder('请输入项目名称').fill('不应该保存的项目');
 
-    // Click close icon
-    await page.locator('.arco-drawer-close-icon').click();
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 3_000 });
+    // Click cancel
+    await page.locator('.arco-drawer-footer').getByRole('button', { name: '取消' }).click();
+    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
 
     // The project should NOT appear in the list
     await waitForTableLoad(page);

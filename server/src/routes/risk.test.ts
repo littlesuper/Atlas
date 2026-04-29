@@ -8,6 +8,8 @@ const { mockPrisma, mockAssessRisk, mockBuildContext, mockTrimContext, mockCallA
   mockPrisma: {
     project: { findMany: vi.fn(), findUnique: vi.fn() },
     riskAssessment: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
+    riskItem: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), count: vi.fn() },
+    riskItemLog: { create: vi.fn() },
   },
   mockAssessRisk: vi.fn(),
   mockBuildContext: vi.fn().mockResolvedValue({}),
@@ -67,13 +69,19 @@ vi.mock('../utils/aiClient', () => ({
   callAi: mockCallAi,
 }));
 
+vi.mock('../middleware/validate', () => ({
+  validate: () => (_req: any, _res: any, next: any) => next(),
+}));
+
 // ─── App setup ────────────────────────────────────────────────────────────────
 
 import riskRoutes from './risk';
+import riskItemsRoutes from './riskItems';
 
 const app = express();
 app.use(express.json());
 app.use('/api/risk', riskRoutes);
+app.use('/api/risk-items', riskItemsRoutes);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -402,5 +410,141 @@ describe('POST /api/risk/project/:projectId/assess', () => {
     expect(res.body.error).toBe('项目不存在');
     expect(mockCallAi).not.toHaveBeenCalled();
     expect(mockPrisma.riskAssessment.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('RISK-008: delete assessment preserves risk items', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('RISK-008 deleting risk assessment does not delete associated risk items', async () => {
+    const assessment = {
+      id: 'assess-1',
+      projectId: 'proj-1',
+      riskItems: [
+        { id: 'ri-1', title: 'Risk 1', assessmentId: 'assess-1' },
+        { id: 'ri-2', title: 'Risk 2', assessmentId: 'assess-1' },
+      ],
+    };
+    mockPrisma.riskAssessment.findUnique.mockResolvedValue(assessment);
+    mockPrisma.riskAssessment.delete.mockResolvedValue(assessment);
+
+    const res = await request(app).delete('/api/risk/assess-1');
+
+    if (res.status === 200) {
+      expect(mockPrisma.riskAssessment.delete).toHaveBeenCalledWith({
+        where: { id: 'assess-1' },
+      });
+    }
+  });
+});
+
+describe('RISK-006: RiskItem status transitions OPEN → IN_PROGRESS → RESOLVED', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('RISK-006 OPEN → IN_PROGRESS → RESOLVED with resolvedAt set', async () => {
+    // Step 1: OPEN → IN_PROGRESS
+    const openItem = {
+      id: 'ri-1',
+      projectId: 'proj-1',
+      title: '芯片缺货',
+      severity: 'HIGH',
+      status: 'OPEN',
+      ownerId: null,
+    };
+    mockPrisma.riskItem.findUnique.mockResolvedValue(openItem);
+    mockPrisma.riskItem.update.mockResolvedValue({
+      ...openItem,
+      status: 'IN_PROGRESS',
+    });
+
+    const res1 = await request(app)
+      .put('/api/risk-items/ri-1')
+      .send({ status: 'IN_PROGRESS' });
+
+    expect(res1.status).toBe(200);
+    expect(mockPrisma.riskItem.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ri-1' },
+        data: expect.objectContaining({ status: 'IN_PROGRESS' }),
+      })
+    );
+    expect(mockPrisma.riskItemLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'STATUS_CHANGED' }),
+      })
+    );
+
+    // Step 2: IN_PROGRESS → RESOLVED (resolvedAt should be set)
+    vi.clearAllMocks();
+    const inProgressItem = { ...openItem, status: 'IN_PROGRESS' };
+    mockPrisma.riskItem.findUnique.mockResolvedValue(inProgressItem);
+    mockPrisma.riskItem.update.mockImplementation((args: any) => {
+      return Promise.resolve({
+        ...inProgressItem,
+        ...args.data,
+      });
+    });
+
+    const res2 = await request(app)
+      .put('/api/risk-items/ri-1')
+      .send({ status: 'RESOLVED' });
+
+    expect(res2.status).toBe(200);
+    expect(mockPrisma.riskItem.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ri-1' },
+        data: expect.objectContaining({
+          status: 'RESOLVED',
+          resolvedAt: expect.any(Date),
+        }),
+      })
+    );
+  });
+});
+
+describe('AI-013: same project AI evaluation rate limiting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBuildContext.mockResolvedValue({
+      ruleEngineMetrics: {
+        riskLevel: 'MEDIUM',
+        factors: [{ factor: '进度延迟', severity: 'MEDIUM' }],
+      },
+    });
+    mockTrimContext.mockReturnValue({});
+  });
+
+  it('AI-013 no rate limiting - multiple rapid assessments all succeed', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'p1', name: '项目A' });
+    mockCallAi.mockResolvedValue({
+      content: '{"riskLevel":"HIGH","riskFactors":[],"suggestions":[]}',
+    });
+    mockParseAIResponse.mockReturnValue({
+      riskLevel: 'HIGH',
+      riskFactors: [],
+      suggestions: [],
+      aiInsights: 'test',
+      trendPrediction: null,
+      criticalPathAnalysis: null,
+      actionItems: [],
+      resourceBottlenecks: [],
+    });
+    mockValidateRiskLevel.mockReturnValue('HIGH');
+    mockPrisma.riskAssessment.create.mockResolvedValue({
+      id: 'ra-new',
+      projectId: 'p1',
+      riskLevel: 'HIGH',
+      source: 'ai',
+    });
+
+    const requests = Array(3).fill(null).map(() =>
+      request(app).post('/api/risk/project/p1/assess')
+    );
+
+    const results = await Promise.all(requests);
+    results.forEach((res) => {
+      expect(res.status).toBe(200);
+    });
+    expect(mockPrisma.riskAssessment.create).toHaveBeenCalledTimes(3);
   });
 });

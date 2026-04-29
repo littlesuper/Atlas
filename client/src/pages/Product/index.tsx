@@ -469,6 +469,7 @@ const ProductPage: React.FC = () => {
     {
       title: '',
       width: 50,
+      align: 'center' as const,
       render: (_: unknown, record: Product) => (
         <Checkbox
           checked={selectedProductIds.has(record.id)}

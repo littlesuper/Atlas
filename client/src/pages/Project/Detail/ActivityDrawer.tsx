@@ -18,13 +18,13 @@ import {
 } from '@arco-design/web-react/icon';
 import { Activity, User } from '../../../types';
 import {
-  PRIORITY_MAP,
   ACTIVITY_STATUS_MAP,
   ACTIVITY_TYPE_MAP,
   DEPENDENCY_TYPE_MAP,
   PHASE_OPTIONS,
 } from '../../../utils/constants';
 import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/workday';
+import { rolesApi, roleMembersApi } from '../../../api';
 import ActivityComments from './ActivityComments';
 import CheckItems from './CheckItems';
 import dayjs from 'dayjs';
@@ -55,6 +55,7 @@ interface ActivityDrawerProps {
   activities: Activity[];
   users: User[];
   activitySeqMap: Map<string, number>;
+  defaultAssigneeId?: string;
   onSubmit: (values: any, planDuration: number | null, actualDuration: number | null, formDeps: { id: string; type: string; lag: number }[]) => Promise<void>;
   onImportFile: (file: File) => void;
 }
@@ -66,6 +67,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
   activities,
   users,
   activitySeqMap,
+  defaultAssigneeId,
   onSubmit,
   onImportFile,
 }) => {
@@ -74,6 +76,27 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
   const [planDuration, setPlanDuration] = useState<number | null>(null);
   const [actualDuration, setActualDuration] = useState<number | null>(null);
   const [formDeps, setFormDeps] = useState<Array<{ id: string; type: string; lag: number }>>([]);
+  const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
+
+  React.useEffect(() => {
+    rolesApi.list().then((roles: any) => {
+      setRoleOptions(Array.isArray(roles) ? roles : []);
+    }).catch(() => {});
+  }, []);
+
+  const handleRoleChange = async (value: string | undefined) => {
+    if (value) {
+      try {
+        const preview: any = await roleMembersApi.preview(value);
+        const ids = (preview.members || (preview.data?.members) || []).map((m: any) => m.userId);
+        form.setFieldsValue({ executorIds: ids });
+      } catch {
+        form.setFieldsValue({ executorIds: [] });
+      }
+    } else {
+      form.setFieldsValue({ executorIds: [] });
+    }
+  };
 
   // 用活动数据填充表单
   const populateFormFromActivity = useCallback((activity: Activity) => {
@@ -91,12 +114,12 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
       description: activity.description,
       type: activity.type,
       status: activity.status,
-      priority: activity.priority,
       planStart: activity.planStartDate ? dayjs(activity.planStartDate) : undefined,
       planEnd: activity.planEndDate ? dayjs(activity.planEndDate) : undefined,
       actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
       actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
-      assigneeIds: activity.assignees?.map((a) => a.id) ?? [],
+      roleId: activity.roleId ?? undefined,
+      executorIds: activity.executors?.map((e: any) => e.userId) ?? [],
       notes: activity.notes,
     });
     const rawDeps = activity.dependencies;
@@ -116,6 +139,9 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
         setActualDuration(null);
         setFormDeps([]);
         form.resetFields();
+        if (defaultAssigneeId) {
+          form.setFieldsValue({ executorIds: [defaultAssigneeId] });
+        }
       }
     }
   }, [visible, editingActivity]);
@@ -210,7 +236,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
       <Form
         form={form}
         layout="vertical"
-        initialValues={{ type: 'TASK', status: 'NOT_STARTED', priority: 'MEDIUM' }}
+        initialValues={{ type: 'TASK', status: 'NOT_STARTED' }}
       >
         {/* 第一行：阶段 + 活动名称 */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12 }}>
@@ -233,8 +259,8 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
           <Input.TextArea placeholder="请输入描述" rows={3} maxLength={500} showWordLimit />
         </Form.Item>
 
-        {/* 类型 / 状态 / 优先级 / 负责人 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '100px 100px 100px 1fr', gap: 12 }}>
+        {/* 类型 / 状态 / 负责人 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '100px 100px 150px 1fr', gap: 12 }}>
           <Form.Item label="类型" field="type" rules={[{ required: true }]}>
             <Select placeholder="类型">
               {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
@@ -253,22 +279,28 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
               ))}
             </Select>
           </Form.Item>
-          <Form.Item label="优先级" field="priority" rules={[{ required: true }]}>
-            <Select placeholder="优先级">
-              {Object.entries(PRIORITY_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}>
-                  <Tag color={v.color}>{v.label}</Tag>
-                </Select.Option>
+          <Form.Item label="角色" field="roleId">
+            <Select
+              placeholder="选择角色"
+              allowClear
+              showSearch
+              filterOption={(input, option) =>
+                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+              onChange={handleRoleChange}
+            >
+              {roleOptions.map(r => (
+                <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
-          <Form.Item label="负责人" field="assigneeIds">
-            <Select mode="multiple" placeholder="请选择负责人" allowClear showSearch filterOption={(input, option) =>
+          <Form.Item label="执行人" field="executorIds">
+            <Select mode="multiple" placeholder="按角色自动填入，可调整" allowClear showSearch filterOption={(input, option) =>
               (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
             }>
               {users.map((u) => (
                 <Select.Option key={u.id} value={u.id}>
-                  {u.realName}
+                  {u.realName}{!u.canLogin ? ' (仅联系人)' : ''}
                 </Select.Option>
               ))}
             </Select>

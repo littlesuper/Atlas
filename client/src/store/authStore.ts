@@ -94,7 +94,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         loading: false,
       });
-    } catch (error) {
+    } catch {
       // 获取用户信息失败，清除token
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');

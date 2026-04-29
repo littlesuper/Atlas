@@ -224,7 +224,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
         userId: string;
         username: string;
       };
-    } catch (err) {
+    } catch {
       res.status(401).json({ error: '刷新令牌无效' });
       return;
     }

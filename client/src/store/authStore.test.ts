@@ -39,7 +39,7 @@ describe('hasPermission', () => {
     useAuthStore.setState({ user: null, isAuthenticated: false, loading: false });
   });
 
-  const { hasPermission } = useAuthStore.getState();
+  const { hasPermission: _hasPermission } = useAuthStore.getState();
 
   it('未登录时（user=null）返回 false', () => {
     useAuthStore.setState({ user: null });
@@ -157,7 +157,7 @@ describe('initial state', () => {
     // 直接读取 store 默认值（不经过 beforeEach setState）
     // 由于其他 describe 的 beforeEach 会覆盖，这里用 getInitialState 方式验证
     // 通过检查 authStore 模块导出中 loading 的默认值来确认
-    const defaultState = useAuthStore.getState();
+    const _defaultState = useAuthStore.getState();
     // 在整个测试文件中，其他 describe 的 beforeEach 都会先把 loading 置为 false
     // 所以此测试必须放在最前面，或单独验证初始定义
     // 这里通过重置到模块初始状态来验证

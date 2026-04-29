@@ -14,12 +14,14 @@ import {
   IconDragDotVertical,
   IconPlus,
 } from '@arco-design/web-react/icon';
-import { Activity, User } from '../types';
+import { Activity, User, ProjectMember } from '../types';
 import {
   ACTIVITY_STATUS_MAP,
   ACTIVITY_TYPE_MAP,
   DEPENDENCY_TYPE_MAP,
   PHASE_OPTIONS,
+  PROJECT_MEMBER_ROLE_MAP,
+  PROJECT_MEMBER_ROLE_KEYS,
 } from '../utils/constants';
 import { calcWorkdays, addWorkdays } from '../utils/workday';
 import dayjs from 'dayjs';
@@ -63,7 +65,7 @@ const AutoOpenDatePicker: React.FC<React.ComponentProps<typeof DatePicker> & { o
       const target = e.target as HTMLElement;
       if (!document.contains(target)) return;
       if (wrapRef.current?.contains(target)) return;
-      if (target.closest('.arco-picker-dropdown, .arco-picker-panel, .arco-picker-container')) return;
+      if (target.closest('.arco-picker-container, .arco-picker-range-container, .arco-trigger')) return;
       onDismiss();
     };
     document.addEventListener('mousedown', handler, true);
@@ -79,13 +81,19 @@ const AutoOpenDatePicker: React.FC<React.ComponentProps<typeof DatePicker> & { o
 // 自动展开的 RangePicker 包装
 const AutoOpenRangePicker: React.FC<React.ComponentProps<typeof DatePicker.RangePicker> & { onDismiss: () => void }> = ({ onDismiss, ...props }) => {
   const wrapRef = React.useRef<HTMLDivElement>(null);
-  const [popupVisible, setPopupVisible] = React.useState(true);
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      const input = wrapRef.current?.querySelector('input') as HTMLElement;
+      if (input) { input.focus(); input.click(); }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
   React.useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!document.contains(target)) return;
       if (wrapRef.current?.contains(target)) return;
-      if (target.closest('.arco-picker-dropdown, .arco-picker-panel, .arco-picker-container')) return;
+      if (target.closest('.arco-picker-container, .arco-picker-range-container, .arco-trigger')) return;
       onDismiss();
     };
     document.addEventListener('mousedown', handler, true);
@@ -93,8 +101,32 @@ const AutoOpenRangePicker: React.FC<React.ComponentProps<typeof DatePicker.Range
   }, [onDismiss]);
   return (
     <div ref={wrapRef} style={{ display: 'inline-block' }}>
-      <DatePicker.RangePicker {...props} popupVisible={popupVisible} onVisibleChange={(v) => { setPopupVisible(!!v); if (!v) onDismiss(); }} />
+      <DatePicker.RangePicker {...props} />
     </div>
+  );
+};
+
+// 内联文本编辑：使用本地状态承载输入，避免父级 re-render 引起的光标跳动（IME 组词时尤为明显）
+interface InlineTextEditorProps {
+  initialValue: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  placeholder?: string;
+  style?: React.CSSProperties;
+}
+const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ initialValue, onChange, onCommit, placeholder, style }) => {
+  const [value, setValue] = React.useState(initialValue);
+  return (
+    <Input
+      autoFocus
+      size="small"
+      value={value}
+      placeholder={placeholder}
+      style={style}
+      onChange={(v) => { setValue(v); onChange(v); }}
+      onBlur={onCommit}
+      onPressEnter={onCommit}
+    />
   );
 };
 
@@ -113,7 +145,7 @@ export { AutoOpenSelect, AutoOpenDatePicker, AutoOpenRangePicker, PHASE_COLOR, f
 interface UseActivityColumnsOptions {
   activities: Activity[];
   users: User[];
-  project: { managerId: string; id: string } | null;
+  project: { managerId: string; id: string; manager?: { id: string; realName?: string; username?: string }; members?: ProjectMember[] } | null;
   isArchived: boolean;
   canManage: boolean;
   canCreate: boolean;
@@ -177,6 +209,47 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     activities.forEach((a, i) => map.set(a.id, i + 1));
     return map;
   }, [activities]);
+
+  // 项目成员按角色分组：负责人下拉的选项数据来源
+  const assigneeRoleOptions = useMemo(() => {
+    const byRole = new Map<string, { userId: string; name: string }[]>();
+    const pushUser = (role: string, userId: string, name: string) => {
+      if (!byRole.has(role)) byRole.set(role, []);
+      const list = byRole.get(role)!;
+      if (!list.some((u) => u.userId === userId)) list.push({ userId, name });
+    };
+
+    if (project?.manager) {
+      const m = project.manager;
+      pushUser('PROJECT_MANAGER', m.id, m.realName || m.username || m.id.slice(0, 6));
+    } else if (project?.managerId) {
+      const u = users.find((x) => x.id === project.managerId);
+      if (u) pushUser('PROJECT_MANAGER', u.id, u.realName || u.username || u.id.slice(0, 6));
+    }
+
+    project?.members?.forEach((m) => {
+      const role = m.role || 'COLLABORATOR';
+      const userId = m.user.id;
+      const name = m.user.realName || m.user.username || userId.slice(0, 6);
+      pushUser(role, userId, name);
+    });
+
+    const orderedKeys: string[] = ['PROJECT_MANAGER', ...PROJECT_MEMBER_ROLE_KEYS];
+    return orderedKeys
+      .filter((k) => byRole.has(k))
+      .map((k) => {
+        const meta =
+          k === 'PROJECT_MANAGER'
+            ? { label: '项目经理', color: 'red' as const }
+            : PROJECT_MEMBER_ROLE_MAP[k as keyof typeof PROJECT_MEMBER_ROLE_MAP];
+        return {
+          key: k,
+          label: meta.label,
+          color: meta.color as string,
+          users: byRole.get(k)!,
+        };
+      });
+  }, [project?.manager, project?.managerId, project?.members, users]);
 
   const getSeq = useCallback((activity: Activity): string => {
     return formatSeq(activitySeqMap.get(activity.id) || 0);
@@ -322,15 +395,12 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'predecessor') {
           return (
-            <Input
-              autoFocus
-              size="small"
-              value={inlineValue}
+            <InlineTextEditor
+              initialValue={inlineValue}
               placeholder="如: 3FS+2, 5"
               style={{ fontFamily: 'monospace', fontSize: 12 }}
               onChange={setInlineValue}
-              onBlur={() => commitPredecessorEdit(record)}
-              onPressEnter={() => commitPredecessorEdit(record)}
+              onCommit={() => commitPredecessorEdit(record)}
             />
           );
         }
@@ -387,13 +457,10 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       render: (name: string, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
           return (
-            <Input
-              autoFocus
-              size="small"
-              value={inlineValue}
+            <InlineTextEditor
+              initialValue={inlineValue}
               onChange={setInlineValue}
-              onBlur={() => commitInlineEdit(record, 'name')}
-              onPressEnter={() => commitInlineEdit(record, 'name')}
+              onCommit={() => commitInlineEdit(record, 'name')}
             />
           );
         }
@@ -480,40 +547,81 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       onHeaderCell: () => ({ 'data-column-key': 'assignee' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeIds') {
+          const currentAssigneeIds = new Set(record.executors?.map((e) => e.userId) ?? []);
+          const preselectedRoles = assigneeRoleOptions
+            .filter((opt) => opt.users.some((u) => currentAssigneeIds.has(u.userId)))
+            .map((opt) => opt.key);
+
+          if (assigneeRoleOptions.length === 0) {
+            return (
+              <Tooltip content="请先在项目编辑页配置项目成员">
+                <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>无可选角色</span>
+              </Tooltip>
+            );
+          }
+
           return (
             <AutoOpenSelect
               mode="multiple"
               size="small"
               allowClear
               showSearch
-              filterOption={(input, option) =>
-                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
-              style={{ width: 160 }}
-              value={record.assignees?.map((a) => a.id) ?? []}
+              filterOption={(input, option) => {
+                const key = option?.props?.value as string;
+                const opt = assigneeRoleOptions.find((o) => o.key === key);
+                if (!opt) return false;
+                const lower = input.toLowerCase();
+                return (
+                  opt.label.toLowerCase().includes(lower) ||
+                  opt.users.some((u) => u.name.toLowerCase().includes(lower))
+                );
+              }}
+              style={{ width: 200 }}
+              value={preselectedRoles}
+              placeholder="选择角色"
               onDismiss={() => setInlineEditing(null)}
-              onChange={(v: string[]) => {
+              onChange={(roleKeys: string[]) => {
                 setInlineEditing(null);
-                const oldIds = record.assignees?.map((a) => a.id) ?? [];
-                activitiesApi.update(record.id, { assigneeIds: v }).then(() => {
+                const userIdSet = new Set<string>();
+                for (const k of roleKeys) {
+                  const opt = assigneeRoleOptions.find((o) => o.key === k);
+                  if (opt) opt.users.forEach((u) => userIdSet.add(u.userId));
+                }
+                const newIds = Array.from(userIdSet);
+                const oldIds = record.executors?.map((e) => e.userId) ?? [];
+                activitiesApi.update(record.id, { executorIds: newIds }).then(() => {
                   loadActivities();
-                  showUndoMessage(record.id, { assigneeIds: oldIds }, record.name);
+                  showUndoMessage(record.id, { executorIds: oldIds }, record.name);
                 }).catch(() => Message.error('更新失败'));
               }}
             >
-              {users.map((u) => (
-                <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
+              {assigneeRoleOptions.map((opt) => (
+                <Select.Option key={opt.key} value={opt.key}>
+                  <Tag color={opt.color} size="small" style={{ marginRight: 6 }}>{opt.label}</Tag>
+                  <span style={{ color: 'var(--color-text-2)' }}>
+                    {opt.users.map((u) => u.name).join('、')}
+                  </span>
+                </Select.Option>
               ))}
             </AutoOpenSelect>
           );
         }
-        const names = record.assignees?.map((a) => a.realName).join(', ') || '-';
+        const names = record.executors?.map((e) => e.user?.realName).filter(Boolean).join(', ') || '-';
+        const roleName = record.role?.name || null;
+        const isEmpty = !record.executors || record.executors.length === 0;
         return (
           <span
             style={{ cursor: canManage ? 'pointer' : 'default' }}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
           >
-            {names}
+            {isEmpty ? (
+              <span style={{ color: 'rgb(var(--danger-6))' }}>⚠️ 未配置</span>
+            ) : (
+              <>
+                {roleName && <Tag size="small" style={{ marginRight: 4 }}>{roleName}</Tag>}
+                {names}
+              </>
+            )}
           </span>
         );
       },
@@ -692,13 +800,10 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       render: (notes: string | null, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
           return (
-            <Input
-              autoFocus
-              size="small"
-              value={inlineValue}
+            <InlineTextEditor
+              initialValue={inlineValue}
               onChange={setInlineValue}
-              onBlur={() => commitInlineEdit(record, 'notes')}
-              onPressEnter={() => commitInlineEdit(record, 'notes')}
+              onCommit={() => commitInlineEdit(record, 'notes')}
             />
           );
         }
@@ -724,6 +829,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     },
   }), [
     inlineEditing, inlineValue, users, project, activities, activitySeqMap,
+    assigneeRoleOptions,
     canManage, criticalActivityIds, columnWidths, hasDependencies,
     getSeq, getPredecessorSeq, getPredecessorTooltip, commitPredecessorEdit, commitPlanDurationEdit,
     startInlineEdit, setInlineEditing, setInlineValue, commitInlineEdit, commitSelectEdit,

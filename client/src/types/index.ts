@@ -51,7 +51,27 @@ export enum Priority {
   CRITICAL = 'CRITICAL',
 }
 
+export type ProjectMemberRole =
+  | 'PROJECT_MANAGER'
+  | 'COLLABORATOR'
+  | 'HW_PRODUCT'
+  | 'SW_PRODUCT'
+  | 'HW_DEV'
+  | 'SW_DEV'
+  | 'HW_QA'
+  | 'SW_QA'
+  | 'STRUCTURE'
+  | 'QUALITY'
+  | 'DESIGNER'
+  | 'PROCUREMENT'
+  | 'LEGAL'
+  | 'SUPPLY_CHAIN'
+  | 'OTHER';
+
 export interface ProjectMember {
+  projectId?: string;
+  userId?: string;
+  role?: ProjectMemberRole;
   user: Pick<User, 'id' | 'realName' | 'username'>;
 }
 
@@ -103,8 +123,6 @@ export interface Activity {
   description?: string;
   type: ActivityType;
   phase?: string; // EVT | DVT | PVT | MP
-  assigneeIds?: string[];
-  assignees?: Pick<User, 'id' | 'realName'>[];
   status: ActivityStatus;
   priority: Priority;
   planStartDate?: string | null;
@@ -115,12 +133,55 @@ export interface Activity {
   duration?: number | null;
   dependencies?: ActivityDependency[] | null;
   notes?: string | null;
+  roleId?: string | null;
+  role?: Pick<Role, 'id' | 'name'> | null;
+  executors?: ActivityExecutor[];
   sortOrder: number;
   children?: Activity[];
   checkItems?: Array<{ id: string; checked: boolean }>;
   _count?: { checkItems: number };
   createdAt: string;
   updatedAt: string;
+}
+
+export enum ExecutorSource {
+  ROLE_AUTO = 'ROLE_AUTO',
+  MANUAL_KEEP = 'MANUAL_KEEP',
+  MANUAL_ADD = 'MANUAL_ADD',
+}
+
+export interface ActivityExecutor {
+  id: string;
+  activityId: string;
+  userId: string;
+  source: ExecutorSource;
+  snapshotRoleId: string | null;
+  assignedAt: string;
+  user: Pick<User, 'id' | 'realName' | 'canLogin'>;
+}
+
+export interface RoleMember {
+  id: string;
+  roleId: string;
+  userId: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  createdBy?: string;
+  role: Pick<Role, 'id' | 'name'>;
+  user: Pick<User, 'id' | 'realName' | 'canLogin'>;
+}
+
+export interface RoleMemberPreview {
+  roleId: string;
+  role: { name: string };
+  members: Array<{
+    userId: string;
+    realName: string;
+    sortOrder: number;
+    canLogin: boolean;
+  }>;
+  isEmpty: boolean;
 }
 
 export interface ActivityComment {

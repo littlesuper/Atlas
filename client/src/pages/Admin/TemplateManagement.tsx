@@ -595,7 +595,7 @@ const TemplateManagement: React.FC = () => {
           }
           components={{
             body: {
-              row: ({ children, record, index, ...rest }: { children: React.ReactNode; record: TemplateActivity; index: number; [key: string]: unknown }) => {
+              row: ({ children, record: _record, index, ...rest }: { children: React.ReactNode; record: TemplateActivity; index: number; [key: string]: unknown }) => {
                 const isSource = dragFromRef.current === index;
                 const isTarget = dragOverRef.current === index && dragOverRef.current !== dragFromRef.current;
                 const insertAbove = isTarget && dragFromRef.current > index;

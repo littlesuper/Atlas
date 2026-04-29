@@ -43,7 +43,7 @@ setup() {
   fi
 
   # 3. 创建目录
-  mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$LOG_DIR"
+  mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$LOG_DIR" "${LOG_DIR}/tsx-cache" "${APP_DIR}/server/uploads"
 
   # 4. 生成 .env
   if [ ! -f .env ]; then
@@ -87,6 +87,16 @@ ENVEOF
   DATABASE_URL="file:${DATA_DIR}/atlas.db" npx tsx src/prisma/seed.ts 2>/dev/null || log "种子数据已存在，跳过"
   cd ..
 
+  # 8. 生成节假日数据（seed 不含节假日）
+  log "生成节假日数据..."
+  sleep 2
+  for year in 2025 2026; do
+    curl -sf -X POST "http://localhost:${PORT:-3000}/api/holidays/generate" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $(curl -sf -X POST "http://localhost:${PORT:-3000}/api/auth/login" -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}' | python3 -c "import sys,json; print(json.load(sys.stdin).get('accessToken',''))" 2>/dev/null)" \
+      -d "{\"year\":${year}}" > /dev/null 2>&1 && log "  ${year} 年节假日已生成" || warn "  ${year} 年节假日生成失败（可稍后手动生成）"
+  done
+
   # 8. 设置文件权限
   chmod 600 .env
   chmod 700 "$DATA_DIR"
@@ -126,9 +136,12 @@ Type=simple
 User=$(whoami)
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${APP_DIR}/.env
+Environment=TSX_CACHE_DIR=${LOG_DIR}/tsx-cache
 ExecStart=$(which node) ${APP_DIR}/node_modules/tsx/dist/cli.mjs ${APP_DIR}/server/src/index.ts
-Restart=always
-RestartSec=5
+  Restart=always
+  RestartSec=5
+  StartLimitBurst=5
+  StartLimitIntervalSec=300
 
 # 安全加固
 NoNewPrivileges=true

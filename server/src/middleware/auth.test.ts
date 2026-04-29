@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
 
 // ─── Hoisted mocks ──────────────────────────────────────────
 const { mockVerify, mockFindUnique, mockFindMany } = vi.hoisted(() => ({
@@ -280,5 +280,123 @@ describe('authenticate middleware', () => {
     const projectReadCount = req.user!.permissions.filter(p => p === 'project:read').length;
     expect(projectReadCount).toBe(1);
     expect(req.user!.permissions).toContain('user:read');
+  });
+
+  describe('AUTH-022: algorithm=none attack', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      process.env.JWT_SECRET = 'test-secret';
+      invalidateAllUserCache();
+    });
+
+    it('AUTH-022 rejects JWT with alg=none in header', async () => {
+      // Create a token with alg:none header
+      const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+      const payload = Buffer.from(JSON.stringify({ userId: 'u1', username: 'testuser' })).toString('base64url');
+      const noneToken = `${header}.${payload}.`;
+
+      mockVerify.mockImplementation(() => {
+        throw new Error('invalid algorithm');
+      });
+
+      const req = mockReq(`Bearer ${noneToken}`);
+      const res = mockRes();
+      const next = vi.fn();
+
+      await authenticate(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AUTH-021: JWT signature tampering', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      process.env.JWT_SECRET = 'test-secret';
+      invalidateAllUserCache();
+    });
+
+    it('AUTH-021 rejects JWT with modified payload', async () => {
+      mockVerify.mockImplementation(() => {
+        throw new Error('invalid signature');
+      });
+
+      const req = mockReq('Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJoYWNrZXIiLCJ1c2VybmFtZSI6ImFkbWluIn0.tampered');
+      const res = mockRes();
+      const next = vi.fn();
+
+      await authenticate(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CHAOS-006: JWT_SECRET change invalidates old tokens', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      invalidateAllUserCache();
+    });
+
+    it('CHAOS-006 tokens signed with old secret fail verification after secret change', async () => {
+      // First verify with original secret works
+      process.env.JWT_SECRET = 'old-secret';
+      mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+      mockFindUnique.mockResolvedValue(VALID_USER);
+      mockFindMany.mockResolvedValue([]);
+
+      const req1 = mockReq('Bearer old-secret-token');
+      const res1 = mockRes();
+      const next1 = vi.fn();
+      await authenticate(req1, res1, next1);
+      expect(next1).toHaveBeenCalled();
+
+      // Now change secret - old tokens should fail
+      invalidateAllUserCache();
+      process.env.JWT_SECRET = 'new-secret';
+      mockVerify.mockImplementation(() => {
+        throw new Error('invalid signature');
+      });
+
+      const req2 = mockReq('Bearer old-secret-token');
+      const res2 = mockRes();
+      const next2 = vi.fn();
+      await authenticate(req2, res2, next2);
+      expect(res2.status).toHaveBeenCalledWith(401);
+      expect(next2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AUTH-025: disabled user immediately effective via cache', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      process.env.JWT_SECRET = 'test-secret';
+      invalidateAllUserCache();
+    });
+
+    it('AUTH-025 cached user that gets disabled should be rejected on cache invalidation', async () => {
+      mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+      mockFindUnique.mockResolvedValue(VALID_USER);
+      mockFindMany.mockResolvedValue([]);
+
+      // First call - user is active, should succeed
+      const req1 = mockReq('Bearer valid-token');
+      const next1 = vi.fn();
+      await authenticate(req1, mockRes(), next1);
+      expect(next1).toHaveBeenCalled();
+
+      // Invalidate cache (simulating admin disabling user)
+      invalidateUserCache('u1');
+
+      // Re-mock as disabled
+      mockFindUnique.mockResolvedValue({ ...VALID_USER, status: 'DISABLED' });
+
+      const req2 = mockReq('Bearer valid-token');
+      const res2 = mockRes();
+      const next2 = vi.fn();
+      await authenticate(req2, res2, next2);
+      expect(res2.status).toHaveBeenCalledWith(403);
+    });
   });
 });

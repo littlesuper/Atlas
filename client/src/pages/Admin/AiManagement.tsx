@@ -443,7 +443,7 @@ const AiManagement: React.FC = () => {
           loading={configsLoading}
           rowKey="id"
           pagination={false}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1200 }}
           noDataElement={
             <div style={{ padding: 40, color: 'var(--color-text-3)', textAlign: 'center' }}>
               暂无AI配置，点击"新建配置"添加

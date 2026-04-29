@@ -4,8 +4,7 @@ import {
   expectMessage,
   confirmModal,
   waitForTableLoad,
-  clickDrawerSubmit,
-  pickDateRange,
+  createProjectViaPage,
   searchProject,
 } from '../helpers/arco';
 
@@ -21,26 +20,7 @@ test.describe.serial('Project Archive & Restore', () => {
 
   // ──────── setup: create project ────────
   test('setup: create project', async ({ authedPage: page }) => {
-    await page.getByRole('button', { name: '新建项目' }).click();
-    await page.getByPlaceholder('请输入项目名称').fill(projectName);
-    await page.getByPlaceholder('请输入项目描述').fill('归档测试用项目');
-    await pickDateRange(page);
-
-    const managerSelect = page.locator('.arco-drawer .arco-select').filter({
-      has: page.locator('[placeholder="项目经理"]'),
-    });
-    await managerSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
-    await page.waitForTimeout(200);
-
-    const resp = page.waitForResponse(
-      (r) => r.url().includes('/api/projects') && r.request().method() === 'POST',
-      { timeout: 15_000 },
-    );
-    await clickDrawerSubmit(page, '创建');
-    expect((await resp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
-    await waitForTableLoad(page);
+    await createProjectViaPage(page, { name: projectName, desc: '归档测试用项目' });
     await searchProject(page, projectName);
     await expect(page.getByText(projectName)).toBeVisible({ timeout: 10_000 });
   });

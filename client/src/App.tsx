@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 const Login = React.lazy(() => import('./pages/Login'));
 const ProjectList = React.lazy(() => import('./pages/Project/List'));
 const ProjectDetail = React.lazy(() => import('./pages/Project/Detail'));
+const ProjectEdit = React.lazy(() => import('./pages/Project/Edit'));
 const ProductManagement = React.lazy(() => import('./pages/Product'));
 const AdminManagement = React.lazy(() => import('./pages/Admin'));
 const WeeklyReportsSummary = React.lazy(() => import('./pages/WeeklyReports'));
@@ -130,6 +131,26 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <ProjectList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 新建项目（全屏） */}
+          <Route
+            path="/projects/new"
+            element={
+              <ProtectedRoute requirePermission={{ resource: 'project', action: 'create' }}>
+                <ProjectEdit />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 编辑项目（全屏） */}
+          <Route
+            path="/projects/:id/edit"
+            element={
+              <ProtectedRoute requirePermission={{ resource: 'project', action: 'update' }}>
+                <ProjectEdit />
               </ProtectedRoute>
             }
           />

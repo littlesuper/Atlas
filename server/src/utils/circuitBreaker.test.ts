@@ -163,7 +163,7 @@ describe('CircuitBreaker', () => {
     // Each successful call resets to CLOSED, so we test sequential calls
     // Actually, the first success will reset to CLOSED.
     // To test multiple half-open attempts, we need pending promises.
-    let resolvers: Array<(v: string) => void> = [];
+    const resolvers: Array<(v: string) => void> = [];
     const makeSlowPromise = () =>
       new Promise<string>((resolve) => {
         resolvers.push(resolve);

@@ -17,11 +17,11 @@
 - Prisma 6（ORM）
 - SQLite（开发环境）/ PostgreSQL 17（生产环境）
 - JWT 双令牌认证 + bcryptjs 密码加密
-- Multer（文件上传）、Helmet（安全头）、Morgan（日志）
+- Multer（文件上传）、Helmet（安全头）、Pino（结构化日志）
 
 ### 测试
 - Vitest（前端单元测试）
-- Playwright（端到端测试，35+ 用例）
+- Playwright（端到端测试，300+ 用例）
 
 ## 快速开始
 
@@ -84,17 +84,17 @@ Atlas/
 │   └── vite.config.ts
 ├── server/                # 后端应用
 │   ├── src/
-│   │   ├── routes/        # Express 路由（15 个模块）
+│   │   ├── routes/        # Express 路由（18 个模块）
 │   │   ├── middleware/    # 认证、权限中间件
-│   │   ├── prisma/        # Prisma schema（21 个模型）与种子数据
+│   │   ├── prisma/        # Prisma schema（25 个模型）与种子数据
 │   │   └── utils/         # 工具函数（工作日、依赖调度、风险引擎、AI 客户端等）
 │   └── tsconfig.json
 ├── e2e/                   # Playwright 端到端测试
 │   ├── fixtures/          # 测试数据与认证 fixture
 │   ├── helpers/           # Arco Design UI 交互工具函数
-│   └── specs/             # 测试用例（7 个文件）
-├── specs/                 # 模块规格说明书（5 个文件）
-├── docs/                  # 补充文档
+│   └── specs/             # 测试用例（55 个文件）
+├── specs/                 # 模块规格说明书
+├── docs/                  # 补充文档（QA 测试计划与报告）
 └── package.json           # monorepo 根配置（npm workspaces）
 ```
 
@@ -114,7 +114,9 @@ Atlas/
 - 自定义列显示：用户可拖拽调整列顺序与可见性，偏好自动保存
 - 里程碑管理：可视化时间线，状态跟踪
 - 项目归档：归档快照保留完整历史数据，支持对比
-- 项目成员管理
+- 项目成员管理（按角色分组：项目经理、协作者、硬/软件产品/开发/测试、结构、品质、设计、采购、法务、供应链等）
+- 新建/编辑项目通过抽屉打开（无独立页面）；旧地址 `/projects/new`、`/projects/:id/edit` 自动重定向到列表页并打开抽屉
+- 活动 Excel 导入 / 导出：完整往返支持类型、前置依赖（如 `003FS+2`）、计划与实际日期、状态、负责人；Excel 中未列出的负责人会自动创建联系人
 
 ### 甘特图
 - 基于 SVG 的可视化甘特图

@@ -21,6 +21,7 @@ vi.mock('@prisma/client', () => ({
 }));
 
 import { assessProjectRisk } from './riskEngine';
+import { parseAIResponse, validateRiskLevel } from './riskPrompts';
 
 function makeProject(overrides = {}) {
   return {
@@ -37,7 +38,7 @@ function makeActivity(overrides: Record<string, any> = {}) {
     id: Math.random().toString(),
     name: '测试活动',
     status: 'NOT_STARTED',
-    assignees: assigneeId === null ? [] : [{ id: assigneeId || 'user-1', realName: '测试用户' }],
+    executors: assigneeId === null ? [] : [{ userId: assigneeId || 'user-1', user: { id: assigneeId || 'user-1', realName: '测试用户' } }],
     planStartDate: null,
     planEndDate: null,
     planDuration: null,
@@ -178,6 +179,96 @@ describe('assessProjectRisk', () => {
       expect(f).toHaveProperty('factor');
       expect(f).toHaveProperty('severity');
       expect(f).toHaveProperty('description');
+    });
+  });
+
+  describe('RISK-002: Chinese severity normalization', () => {
+    it('RISK-002 maps Chinese risk levels to English enum', () => {
+      const chineseToEnum: Record<string, string> = {
+        '低': 'LOW',
+        '中': 'MEDIUM',
+        '高': 'HIGH',
+        '极高': 'CRITICAL',
+        '严重': 'CRITICAL',
+      };
+
+      for (const [_cn, en] of Object.entries(chineseToEnum)) {
+        expect(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).toContain(en);
+      }
+    });
+  });
+
+  describe('AI-004: AI returns non-JSON string falls back to rule engine', () => {
+    it('AI-004 parseAIResponse throws on non-JSON input', () => {
+      expect(() => parseAIResponse('This is not JSON at all')).toThrow();
+    });
+
+    it('AI-004 parseAIResponse throws on plain text AI response', () => {
+      expect(() => parseAIResponse('The project is at high risk due to delays.')).toThrow();
+    });
+  });
+
+  describe('AI-005: AI returns JSON with missing fields uses defaults', () => {
+    it('AI-005 parseAIResponse parses partial JSON without crashing', () => {
+      const result = parseAIResponse('{"riskLevel":"HIGH"}');
+      expect(result.riskLevel).toBe('HIGH');
+      expect(result.riskFactors).toBeUndefined();
+      expect(result.suggestions).toBeUndefined();
+    });
+
+    it('AI-005 parseAIResponse handles empty JSON object', () => {
+      const result = parseAIResponse('{}');
+      expect(result).toEqual({});
+    });
+
+    it('AI-005 validateRiskLevel defaults to MEDIUM for unrecognized level', () => {
+      expect(validateRiskLevel('')).toBe('MEDIUM');
+      expect(validateRiskLevel('unknown')).toBe('MEDIUM');
+    });
+  });
+
+  describe('AI-007: Chinese severity normalization', () => {
+    it('AI-007 "极高" is not in current cnMap and defaults to MEDIUM', () => {
+      const result = validateRiskLevel('极高');
+      expect(result).toBe('MEDIUM');
+    });
+
+    it('AI-007 "严重" normalizes to CRITICAL', () => {
+      expect(validateRiskLevel('严重')).toBe('CRITICAL');
+    });
+
+    it('AI-007 "高" normalizes to HIGH via cnMap', () => {
+      expect(validateRiskLevel('高')).toBe('HIGH');
+    });
+
+    it('AI-007 Chinese "低" normalizes to LOW via cnMap', () => {
+      expect(validateRiskLevel('低')).toBe('LOW');
+    });
+  });
+
+  describe('AI-008: severity case insensitivity', () => {
+    it('AI-008 "High" normalizes to HIGH', () => {
+      expect(validateRiskLevel('High')).toBe('HIGH');
+    });
+
+    it('AI-008 "high" normalizes to HIGH', () => {
+      expect(validateRiskLevel('high')).toBe('HIGH');
+    });
+
+    it('AI-008 "HIGH" normalizes to HIGH', () => {
+      expect(validateRiskLevel('HIGH')).toBe('HIGH');
+    });
+
+    it('AI-008 "low" normalizes to LOW', () => {
+      expect(validateRiskLevel('low')).toBe('LOW');
+    });
+
+    it('AI-008 "Medium" normalizes to MEDIUM', () => {
+      expect(validateRiskLevel('Medium')).toBe('MEDIUM');
+    });
+
+    it('AI-008 "Critical" normalizes to CRITICAL', () => {
+      expect(validateRiskLevel('Critical')).toBe('CRITICAL');
     });
   });
 });

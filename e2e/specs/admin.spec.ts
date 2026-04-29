@@ -21,7 +21,7 @@ test.describe.serial('System Admin', () => {
 
     await waitForTableLoad(page);
     await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('admin').first()).toBeVisible();
+    await expect(page.getByText('用户管理').first()).toBeVisible();
   });
 
   test('roles tab: view roles list', async ({ authedPage: page }) => {

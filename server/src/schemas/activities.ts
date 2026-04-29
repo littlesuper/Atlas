@@ -14,6 +14,8 @@ export const createActivitySchema = z.object({
   type: z.enum(['TASK', 'MILESTONE', 'PHASE']).default('TASK'),
   phase: z.string().nullable().optional(),
   assigneeIds: z.array(z.string()).optional(),
+  roleId: z.string().nullable().optional(),
+  executorIds: z.array(z.string()).optional(),
   status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).default('NOT_STARTED'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('MEDIUM'),
   planStartDate: z.string().nullable().optional(),
@@ -27,7 +29,27 @@ export const createActivitySchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export const updateActivitySchema = createActivitySchema.partial().omit({ projectId: true });
+export const updateActivitySchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  type: z.enum(['TASK', 'MILESTONE', 'PHASE']).optional(),
+  phase: z.string().nullable().optional(),
+  assigneeIds: z.array(z.string()).optional(),
+  roleId: z.string().nullable().optional(),
+  executorIds: z.array(z.string()).optional(),
+  resetExecutorsByRole: z.boolean().optional(),
+  status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  planStartDate: z.string().nullable().optional(),
+  planEndDate: z.string().nullable().optional(),
+  planDuration: z.number().int().positive().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  duration: z.number().int().positive().nullable().optional(),
+  dependencies: z.array(dependencySchema).nullable().optional(),
+  notes: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
 
 export const batchUpdateSchema = z.object({
   ids: z.array(z.string().min(1)).min(1, '至少选择一个活动'),

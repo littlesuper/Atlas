@@ -103,6 +103,58 @@ function validateFileContent(filePath: string, mimetype: string): boolean {
   return expectedSignatures.some(sig => header.subarray(0, sig.length).equals(sig));
 }
 
+const DANGEROUS_SVG_TAGS = new Set([
+  'script', 'iframe', 'embed', 'object', 'applet', 'form',
+  'input', 'textarea', 'select', 'button', 'link', 'meta',
+  'base', 'style', 'noscript', 'template',
+]);
+
+const DANGEROUS_ATTR_PATTERN = /\bon\w+\s*=/i;
+const DANGEROUS_HREF_PATTERN = /^\s*(javascript|data|vbscript)\s*:/i;
+
+function sanitizeSvg(filePath: string): boolean {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, 'utf-8');
+  } catch {
+    return false;
+  }
+
+  if (!/<svg[\s>]/i.test(content)) {
+    return false;
+  }
+
+  let sanitized = content;
+  let modified = false;
+
+  for (const tag of DANGEROUS_SVG_TAGS) {
+    const regex = new RegExp(`<${tag}[\\s>][\\s\\S]*?<\\/${tag}>|<${tag}[\\s\\/]*>`, 'gi');
+    const before = sanitized;
+    sanitized = sanitized.replace(regex, '');
+    if (sanitized !== before) modified = true;
+  }
+
+  let prev = sanitized;
+  sanitized = sanitized.replace(
+    /\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+    '',
+  );
+  if (sanitized !== prev) modified = true;
+
+  prev = sanitized;
+  sanitized = sanitized.replace(
+    /\s+(?:xlink:)?href\s*=\s*("(?:javascript|data|vbscript)[^"]*"|'(?:javascript|data|vbscript)[^']*'|(?:javascript|data|vbscript)[^\s>]+)/gi,
+    '',
+  );
+  if (sanitized !== prev) modified = true;
+
+  if (modified) {
+    fs.writeFileSync(filePath, sanitized, 'utf-8');
+  }
+
+  return true;
+}
+
 router.post('/', authenticate, upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {
@@ -116,6 +168,15 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
       fs.unlinkSync(req.file.path);
       res.status(400).json({ error: '文件内容与类型不匹配，已拒绝' });
       return;
+    }
+
+    // SVG 文件消毒：移除 script/iframe 等危险标签和事件属性
+    if (req.file.mimetype === 'image/svg+xml') {
+      if (!sanitizeSvg(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+        res.status(400).json({ error: 'SVG 文件内容无效' });
+        return;
+      }
     }
 
     // 返回文件信息（name 使用时间戳文件名）

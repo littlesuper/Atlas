@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
-import { requirePermission, isAdmin } from '../middleware/permission';
+import { isAdmin } from '../middleware/permission';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
-import { offsetWorkdays, calculateWorkdays } from '../utils/workday';
+import { offsetWorkdays } from '../utils/workday';
 import { updateProjectProgress } from '../utils/projectProgress';
 import { logger } from '../utils/logger';
 

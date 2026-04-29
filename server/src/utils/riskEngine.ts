@@ -50,7 +50,10 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   // 获取所有活动（包括子活动）
   const allActivities = await prisma.activity.findMany({
     where: { projectId },
-    include: { assignees: { select: { id: true, realName: true } } },
+    include: {
+      executors: { include: { user: { select: { id: true, realName: true } } } },
+      role: { select: { id: true, name: true } },
+    },
   });
 
   const totalActivities = allActivities.length;
@@ -184,7 +187,8 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   // 4. 评估资源分配
   const unassignedActivities = allActivities.filter(
     (a) =>
-      a.assignees.length === 0 &&
+      (a as any).executors?.length === 0 &&
+      !(a as any).roleId &&
       a.status !== ActivityStatus.COMPLETED &&
       a.status !== ActivityStatus.CANCELLED
   );
@@ -196,7 +200,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       factor: '资源分配不足',
       severity: 'MEDIUM',
       score: 2,
-      description: `${unassignedActivities.length}个任务未分配负责人，占比${unassignedRate.toFixed(0)}%`,
+      description: `${unassignedActivities.length}个任务未分配负责人或执行人，占比${unassignedRate.toFixed(0)}%`,
       triggeredActivities: unassignedActivities.slice(0, 20).map((a) => ({
         id: a.id,
         name: a.name,
@@ -345,36 +349,35 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   }
 
   // 8. 跨项目资源冲突
-  const assigneeIds = new Set<string>();
+  const executorIds = new Set<string>();
   for (const a of allActivities) {
     if (
       a.status !== ActivityStatus.COMPLETED &&
       a.status !== ActivityStatus.CANCELLED
     ) {
-      for (const assignee of a.assignees) {
-        assigneeIds.add(assignee.id);
+      for (const ex of (a as any).executors || []) {
+        executorIds.add(ex.userId);
       }
     }
   }
 
-  // 构建 userId -> realName 映射
   const userNameMap = new Map<string, string>();
   for (const a of allActivities) {
-    for (const assignee of a.assignees) {
-      if (!userNameMap.has(assignee.id)) {
-        userNameMap.set(assignee.id, (assignee as any).realName || assignee.id);
+    for (const ex of (a as any).executors || []) {
+      if (!userNameMap.has(ex.userId)) {
+        userNameMap.set(ex.userId, ex.user?.realName || ex.userId);
       }
     }
   }
 
-  if (assigneeIds.size > 0) {
+  if (executorIds.size > 0) {
     const conflictUserDetails: TriggeredActivity[] = [];
-    for (const userId of assigneeIds) {
+    for (const userId of executorIds) {
       const otherProjectActivities = await prisma.activity.count({
         where: {
           projectId: { not: projectId },
           status: { in: [ActivityStatus.IN_PROGRESS, ActivityStatus.NOT_STARTED] },
-          assignees: { some: { id: userId } },
+          executors: { some: { userId } },
         },
       });
       if (otherProjectActivities > 0) {

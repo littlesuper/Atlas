@@ -13,9 +13,47 @@ import { detectCircularDependency } from '../utils/dependencyValidator';
 import { calculateCriticalPath } from '../utils/criticalPath';
 import { pinyin } from 'pinyin-pro';
 import { logger } from '../utils/logger';
+import { autoAssignByRole } from '../utils/roleMembershipResolver';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+async function buildExecutorsForActivity(
+  roleId: string | null | undefined,
+  executorIds: string[] | undefined,
+  currentUserId: string
+) {
+  if (executorIds && executorIds.length > 0) {
+    const roleMemberIds = roleId ? await autoAssignByRole(roleId) : [];
+    const roleMemberSet = new Set(roleMemberIds);
+    return executorIds.map(uid => ({
+      userId: uid,
+      source: (roleId && roleMemberSet.has(uid)) ? 'ROLE_AUTO' as const : 'MANUAL_ADD' as const,
+      snapshotRoleId: (roleId && roleMemberSet.has(uid)) ? roleId : null,
+      assignedBy: currentUserId,
+    }));
+  }
+  if (roleId && !executorIds) {
+    const autoIds = await autoAssignByRole(roleId);
+    return autoIds.map(uid => ({
+      userId: uid,
+      source: 'ROLE_AUTO' as const,
+      snapshotRoleId: roleId,
+      assignedBy: currentUserId,
+    }));
+  }
+  return [];
+}
+
+const EXECUTOR_INCLUDE = {
+  executors: {
+    include: {
+      user: { select: { id: true, realName: true, canLogin: true } },
+    },
+    orderBy: [{ assignedAt: 'asc' }],
+  },
+  role: { select: { id: true, name: true } },
+};
 
 
 /**
@@ -138,18 +176,15 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
     }
 
     const includeAssignee = {
-      assignees: {
-        select: {
-          id: true,
-          realName: true,
-          username: true,
+      executors: {
+        include: {
+          user: { select: { id: true, realName: true, canLogin: true } },
         },
+        orderBy: [{ assignedAt: 'asc' }],
       },
+      role: { select: { id: true, name: true } },
       _count: {
         select: { checkItems: true },
-      },
-      checkItems: {
-        select: { id: true, checked: true },
       },
     };
 
@@ -210,11 +245,9 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
       where: { projectId },
       orderBy: { sortOrder: 'asc' },
       include: {
-        assignees: {
-          select: {
-            id: true,
-            realName: true,
-            username: true,
+        executors: {
+          include: {
+            user: { select: { id: true, realName: true } },
           },
         },
       },
@@ -240,7 +273,7 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
         duration: activity.duration,
         parent: '0',
         type,
-        assignee: (activity as any).assignees?.map((u: any) => u.realName).join(', ') || '',
+        assignee: (activity as any).executors?.map((e: any) => e.user.realName).join(', ') || '',
         status: activity.status,
         priority: activity.priority,
       };
@@ -288,7 +321,11 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
 
     const created = await prisma.$transaction(
       items.map((item: any) => {
-        const assigneeIds: string[] = Array.isArray(item.assigneeIds) ? item.assigneeIds : [];
+        const effectiveExecutorIds: string[] = Array.isArray(item.executorIds)
+          ? item.executorIds
+          : Array.isArray(item.assigneeIds)
+            ? item.assigneeIds
+            : [];
         let planDuration = item.planDuration;
         if (!planDuration && item.planStartDate && item.planEndDate) {
           planDuration = calculateWorkdays(new Date(item.planStartDate), new Date(item.planEndDate));
@@ -311,9 +348,17 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
             dependencies: item.dependencies || null,
             notes: item.notes || null,
             sortOrder: item.sortOrder || 0,
-            assignees: assigneeIds.length > 0 ? { connect: assigneeIds.map((id: string) => ({ id })) } : undefined,
+            executors: effectiveExecutorIds.length > 0
+              ? {
+                  create: effectiveExecutorIds.map((uid: string) => ({
+                    userId: uid,
+                    source: 'MANUAL_ADD' as const,
+                    assignedBy: (req as any).user?.id,
+                  })),
+                }
+              : undefined,
           },
-          include: { assignees: { select: { id: true, realName: true, username: true } } },
+          include: EXECUTOR_INCLUDE,
         });
       })
     );
@@ -343,7 +388,8 @@ router.post(
         description,
         type,
         phase,
-        assigneeIds,
+        roleId,
+        executorIds,
         status,
         priority,
         planStartDate,
@@ -379,9 +425,6 @@ router.post(
       }
 
       // 解析负责人列表
-      const resolvedAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
-
-      // 循环依赖检测（创建时 activityId 为空字符串，因为活动还不存在）
       if (dependencies && Array.isArray(dependencies) && dependencies.length > 0) {
         const hasCycle = await detectCircularDependency(projectId, '', dependencies, prisma);
         if (hasCycle) {
@@ -415,6 +458,9 @@ router.post(
       }
 
       // 创建活动
+      const currentUserId = (req as any).user?.id;
+      const executorData = await buildExecutorsForActivity(roleId, executorIds, currentUserId);
+
       const activity = await prisma.activity.create({
         data: {
           projectId,
@@ -422,7 +468,10 @@ router.post(
           description,
           type: type || ActivityType.TASK,
           phase,
-          assignees: resolvedAssigneeIds.length > 0 ? { connect: resolvedAssigneeIds.map((uid: string) => ({ id: uid })) } : undefined,
+          roleId: roleId ?? null,
+          executors: {
+            create: executorData,
+          },
           status: status || 'NOT_STARTED',
           priority,
           planStartDate: resolvedPlanStart,
@@ -435,15 +484,7 @@ router.post(
           notes,
           sortOrder: sortOrder || 0,
         },
-        include: {
-          assignees: {
-            select: {
-              id: true,
-              realName: true,
-              username: true,
-            },
-          },
-        },
+        include: EXECUTOR_INCLUDE,
       });
 
       // 自动更新项目进度
@@ -491,7 +532,17 @@ router.put('/batch-update', authenticate, requirePermission('activity', 'update'
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.phase !== undefined) updateData.phase = updates.phase;
       if (updates.assigneeIds !== undefined) {
-        updateData.assignees = { set: updates.assigneeIds.map((uid: string) => ({ id: uid })) };
+        const ids: string[] = Array.isArray(updates.assigneeIds) ? updates.assigneeIds : [];
+        await prisma.activityExecutor.deleteMany({ where: { activityId: actId } });
+        if (ids.length > 0) {
+          updateData.executors = {
+            create: ids.map((uid: string) => ({
+              userId: uid,
+              source: 'MANUAL_ADD' as const,
+              assignedBy: (req as any).user?.id,
+            })),
+          };
+        }
       }
       await prisma.activity.update({ where: { id: actId }, data: updateData });
     }
@@ -521,7 +572,9 @@ router.put(
         description,
         type,
         phase,
-        assigneeIds,
+        roleId,
+        executorIds,
+        resetExecutorsByRole,
         status,
         priority,
         planStartDate,
@@ -566,10 +619,60 @@ router.put(
       if (type !== undefined) updateData.type = type;
       if (phase !== undefined) updateData.phase = phase;
 
-      // 处理负责人多选
-      if (assigneeIds !== undefined) {
-        const ids: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
-        updateData.assignees = { set: ids.map((uid: string) => ({ id: uid })) };
+      // 处理角色绑定
+      if (roleId !== undefined) updateData.roleId = roleId;
+
+      // 处理执行人列表
+      const currentUserId = (req as any).user?.id;
+      const shouldResetExecutors = resetExecutorsByRole === true;
+      const effectiveRoleId = roleId !== undefined ? roleId : existingActivity.roleId;
+      const roleChanged = roleId !== undefined && roleId !== existingActivity.roleId;
+
+      if (shouldResetExecutors && effectiveRoleId) {
+        const autoIds = await autoAssignByRole(effectiveRoleId);
+        await prisma.activityExecutor.deleteMany({ where: { activityId: id } });
+        updateData.executors = {
+          create: autoIds.map(uid => ({
+            userId: uid,
+            source: 'ROLE_AUTO',
+            snapshotRoleId: effectiveRoleId,
+            assignedBy: currentUserId,
+          })),
+        };
+      } else if (executorIds !== undefined) {
+        let existingExecutorUserIds = new Set<string>();
+        if (roleChanged) {
+          const existingExecutors = await prisma.activityExecutor.findMany({
+            where: { activityId: id },
+            select: { userId: true },
+          });
+          existingExecutorUserIds = new Set(existingExecutors.map(e => e.userId));
+        }
+
+        const roleMemberIds = effectiveRoleId ? await autoAssignByRole(effectiveRoleId) : [];
+        const roleMemberSet = new Set(roleMemberIds);
+
+        const executorData = executorIds.map(uid => {
+          if (roleChanged && existingExecutorUserIds.has(uid) && !roleMemberSet.has(uid)) {
+            return {
+              userId: uid,
+              source: 'MANUAL_KEEP' as const,
+              snapshotRoleId: effectiveRoleId || null,
+              assignedBy: currentUserId,
+            };
+          }
+          return {
+            userId: uid,
+            source: (effectiveRoleId && roleMemberSet.has(uid)) ? 'ROLE_AUTO' as const : 'MANUAL_ADD' as const,
+            snapshotRoleId: (effectiveRoleId && roleMemberSet.has(uid)) ? effectiveRoleId : null,
+            assignedBy: currentUserId,
+          };
+        });
+
+        await prisma.activityExecutor.deleteMany({ where: { activityId: id } });
+        updateData.executors = {
+          create: executorData,
+        };
       }
       if (status !== undefined) updateData.status = status;
       if (priority !== undefined) updateData.priority = priority;
@@ -668,15 +771,7 @@ router.put(
       const activity = await prisma.activity.update({
         where: { id },
         data: updateData,
-        include: {
-          assignees: {
-            select: {
-              id: true,
-              realName: true,
-              username: true,
-            },
-          },
-        },
+        include: EXECUTOR_INCLUDE,
       });
 
       // 级联更新下游依赖任务（当计划日期发生变更时）
@@ -872,7 +967,7 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
     const activities = await prisma.activity.findMany({
       where,
       include: {
-        assignees: { select: { id: true, realName: true, username: true } },
+        executors: { include: { user: { select: { id: true, realName: true, username: true } } } },
         project: { select: { id: true, name: true } },
       },
     });
@@ -902,8 +997,11 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
       const isActive = a.status !== 'COMPLETED' && a.status !== 'CANCELLED';
       const isOverdue = isActive && a.planEndDate && a.planEndDate < now;
 
-      // Aggregate per assignee
-      for (const u of a.assignees) {
+      const effectiveUsers = (a as any).executors?.length > 0
+        ? (a as any).executors.map((e: any) => e.user)
+        : [];
+
+      for (const u of effectiveUsers) {
         let entry = userMap.get(u.id);
         if (!entry) {
           entry = { userId: u.id, realName: u.realName, username: u.username, totalActivities: 0, inProgress: 0, notStarted: 0, overdue: 0, totalDuration: 0 };
@@ -927,7 +1025,7 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
           activityName: a.name,
           projectId: a.project.id,
           projectName: a.project.name,
-          assigneeNames: a.assignees.map((u: any) => u.realName),
+          assigneeNames: effectiveUsers.map((u: any) => u.realName),
           planStartDate: a.planStartDate ? a.planStartDate.toISOString() : null,
           planEndDate: a.planEndDate ? a.planEndDate.toISOString() : null,
           overdueDays,
@@ -935,7 +1033,7 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
       }
 
       // Unassigned issues
-      if (isActive && a.assignees.length === 0) {
+      if (isActive && effectiveUsers.length === 0) {
         unassignedIssues.push({
           type: 'unassigned',
           activityId: a.id,
@@ -1131,7 +1229,9 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
       status: { in: ['NOT_STARTED', 'IN_PROGRESS'] },
       planStartDate: { not: null },
       planEndDate: { not: null },
-      assignees: { some: {} },
+      OR: [
+        { executors: { some: {} } },
+      ],
     };
     if (projectId) where.projectId = projectId as string;
 
@@ -1144,7 +1244,7 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
         planStartDate: true,
         planEndDate: true,
         planDuration: true,
-        assignees: { select: { id: true, realName: true, username: true } },
+        executors: { include: { user: { select: { id: true, realName: true, username: true } } } },
         project: { select: { id: true, name: true } },
       },
     });
@@ -1152,7 +1252,10 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
     // 按人员分组，检测时间重叠
     const userActivities = new Map<string, typeof activities>();
     for (const a of activities) {
-      for (const u of a.assignees) {
+      const effectiveUsers = (a as any).executors?.length > 0
+        ? (a as any).executors.map((e: any) => e.user)
+        : [];
+      for (const u of effectiveUsers) {
         if (!userActivities.has(u.id)) userActivities.set(u.id, []);
         userActivities.get(u.id)!.push(a);
       }
@@ -1194,7 +1297,10 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
       }
 
       if (overlapping.length >= 2) {
-        const user = overlapping[0].assignees.find((u) => u.id === userId)!;
+        const allUsers = [
+          ...((overlapping[0] as any).executors?.map((e: any) => e.user) || []),
+        ];
+        const user = allUsers.find((u: any) => u.id === userId)!;
         conflicts.push({
           userId,
           realName: user.realName,
@@ -1369,7 +1475,7 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
 router.post('/project/:projectId/what-if/apply', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const { affected, archiveLabel } = req.body;
+    const { affected, archiveLabel: _archiveLabel } = req.body;
 
     if (!Array.isArray(affected) || affected.length === 0) {
       res.status(400).json({ error: '受影响活动列表不能为空' });
@@ -1446,7 +1552,7 @@ router.post('/project/:projectId/reschedule', authenticate, async (req: Request,
     });
 
     // 分类：已完成的保持不动，未完成的重排
-    const completed = allActivities.filter((a) => a.status === 'COMPLETED' || a.status === 'CANCELLED');
+    const _completed = allActivities.filter((a) => a.status === 'COMPLETED' || a.status === 'CANCELLED');
     const incomplete = allActivities.filter((a) => a.status !== 'COMPLETED' && a.status !== 'CANCELLED');
 
     if (incomplete.length === 0) {
@@ -1543,7 +1649,7 @@ router.get(
 
       const activities = await prisma.activity.findMany({
         where: { projectId },
-        include: { assignees: { select: { id: true, realName: true } } },
+        include: { executors: { include: { user: { select: { id: true, realName: true } } } } },
         orderBy: { sortOrder: 'asc' },
       });
 
@@ -1586,6 +1692,7 @@ router.get(
         { header: '活动名称', key: 'name', width: 30 },
         { header: '类型', key: 'type', width: 8 },
         { header: '状态', key: 'status', width: 8 },
+        { header: '角色', key: 'role', width: 12 },
         { header: '负责人', key: 'assignee', width: 12 },
         { header: '计划工期', key: 'planDuration', width: 10 },
         { header: '计划开始', key: 'planStart', width: 12 },
@@ -1609,7 +1716,8 @@ router.get(
           name: a.name,
           type: typeMap[a.type] || a.type,
           status: statusMap[a.status] || a.status,
-          assignee: (a as any).assignees?.map((u: { realName: string }) => u.realName).join(', ') || '',
+          role: (a as any).role?.name || '',
+          assignee: (a as any).executors?.map((e: { user: { realName: string } }) => e.user.realName).join(', ') || '',
           planDuration: a.planDuration ?? '',
           planStart: fmtDate(a.planStartDate),
           planEnd: fmtDate(a.planEndDate),
@@ -1720,18 +1828,25 @@ router.post(
       const dateStr = (d: Date | null | undefined) => d ? d.toISOString().slice(0, 10) : '';
       const existingActivities = await prisma.activity.findMany({
         where: { projectId },
-        select: { name: true, phase: true, planStartDate: true, planEndDate: true },
+        select: { id: true, name: true, phase: true, planStartDate: true, planEndDate: true },
       });
-      const existingSet = new Set(
-        existingActivities.map((a) =>
-          `${a.name}|${a.phase || ''}|${dateStr(a.planStartDate)}|${dateStr(a.planEndDate)}`
-        )
-      );
-
-      // 过滤掉与现有活动重复的行
-      const toCreate = parsed.filter((a) => {
+      const existingByKey = new Map<string, string>();
+      existingActivities.forEach((a) => {
         const key = `${a.name}|${a.phase || ''}|${dateStr(a.planStartDate)}|${dateStr(a.planEndDate)}`;
-        return !existingSet.has(key);
+        existingByKey.set(key, a.id);
+      });
+
+      // 区分已存在（跳过）和新增的行，但保留所有行的 seq → activityId 映射用于解析前置依赖
+      const seqToActivityId = new Map<number, string>();
+      const toCreate: typeof parsed = [];
+      parsed.forEach((a) => {
+        const key = `${a.name}|${a.phase || ''}|${dateStr(a.planStartDate)}|${dateStr(a.planEndDate)}`;
+        const existingId = existingByKey.get(key);
+        if (existingId) {
+          if (a.seq) seqToActivityId.set(a.seq, existingId);
+        } else {
+          toCreate.push(a);
+        }
       });
       const skipped = parsed.length - toCreate.length;
 
@@ -1747,43 +1862,106 @@ router.post(
       });
       let sortOrder = (maxSort._max.sortOrder ?? 0) + 1;
 
-      // 批量创建活动
-      const activities = await prisma.$transaction(
-        toCreate.map((a) => {
+      const roleNames = new Set<string>();
+      toCreate.forEach((a) => { if (a.roleName) roleNames.add(a.roleName); });
+      const roles = roleNames.size > 0
+        ? await prisma.role.findMany({ where: { name: { in: Array.from(roleNames) } } })
+        : [];
+      const roleMap = new Map<string, string>();
+      roles.forEach((r) => roleMap.set(r.name, r.id));
+
+      const currentUserId = (req as any).user?.id;
+
+      const executorDataList = await Promise.all(
+        toCreate.map(async (a) => {
           const assigneeIds = a.assigneeNames
             .map((n) => userMap.get(n))
             .filter((id): id is string => !!id);
 
+          const roleId = a.roleName ? roleMap.get(a.roleName) : undefined;
+
+          if (roleId) {
+            return buildExecutorsForActivity(roleId, assigneeIds.length > 0 ? assigneeIds : undefined, currentUserId);
+          }
+
+          if (assigneeIds.length > 0) {
+            return assigneeIds.map((uid) => ({
+              userId: uid,
+              source: 'MANUAL_ADD' as const,
+              assignedBy: currentUserId,
+            }));
+          }
+
+          return [];
+        })
+      );
+
+      const activities = await prisma.$transaction(
+        toCreate.map((a, idx) => {
+          const executorData = executorDataList[idx];
+
           const data: any = {
             projectId,
             name: a.name,
-            type: ActivityType.TASK,
+            type: a.type || ActivityType.TASK,
             phase: a.phase || null,
             status: a.status || 'NOT_STARTED',
             planStartDate: a.planStartDate || null,
             planEndDate: a.planEndDate || null,
             planDuration: a.planDuration || null,
+            startDate: a.actualStartDate || null,
+            endDate: a.actualEndDate || null,
             notes: a.notes || null,
             sortOrder: sortOrder++,
+            roleId: a.roleName ? roleMap.get(a.roleName) || null : null,
           };
 
-          // 自动计算工期
           if (!data.planDuration && data.planStartDate && data.planEndDate) {
             data.planDuration = calculateWorkdays(data.planStartDate, data.planEndDate);
           }
 
-          if (assigneeIds.length > 0) {
-            data.assignees = { connect: assigneeIds.map((id) => ({ id })) };
+          if (executorData && executorData.length > 0) {
+            data.executors = { create: executorData };
           }
 
           return prisma.activity.create({
             data,
-            include: {
-              assignees: { select: { id: true, realName: true, username: true } },
-            },
+            include: EXECUTOR_INCLUDE,
           });
         })
       );
+
+      // 记录新建活动的 seq → id 映射
+      activities.forEach((created, idx) => {
+        const seq = toCreate[idx].seq;
+        if (seq) seqToActivityId.set(seq, created.id);
+      });
+
+      // 解析并写回前置依赖（仅引用本次解析中存在 seq 的活动）
+      const depUpdates = toCreate
+        .map((a, idx) => {
+          if (!a.predecessors || a.predecessors.length === 0) return null;
+          const resolved = a.predecessors
+            .map((p) => {
+              const id = seqToActivityId.get(p.seq);
+              return id ? { id, type: p.type, lag: p.lag } : null;
+            })
+            .filter((d): d is { id: string; type: string; lag: number } => d !== null);
+          if (resolved.length === 0) return null;
+          return { activityId: activities[idx].id, dependencies: resolved };
+        })
+        .filter((u): u is { activityId: string; dependencies: { id: string; type: string; lag: number }[] } => u !== null);
+
+      if (depUpdates.length > 0) {
+        await prisma.$transaction(
+          depUpdates.map((u) =>
+            prisma.activity.update({
+              where: { id: u.activityId },
+              data: { dependencies: u.dependencies as any },
+            })
+          )
+        );
+      }
 
       // 更新项目进度
       await updateProjectProgress(projectId);

@@ -242,6 +242,30 @@ export const USER_STATUS_MAP = {
   },
 } as const;
 
+// ============ 项目成员角色 ============
+// 用于"项目成员按角色分组"，独立于全局 RBAC 角色
+// 顺序即页面上分组展示顺序
+export const PROJECT_MEMBER_ROLE_MAP = {
+  COLLABORATOR: { label: '项目协作者', color: 'arcoblue' },
+  HW_PRODUCT: { label: '硬件产品', color: 'blue' },
+  SW_PRODUCT: { label: '软件产品', color: 'cyan' },
+  HW_DEV: { label: '硬件开发', color: 'green' },
+  SW_DEV: { label: '软件开发', color: 'lime' },
+  HW_QA: { label: '硬件测试', color: 'gold' },
+  SW_QA: { label: '软件测试', color: 'orange' },
+  STRUCTURE: { label: '结构工程师', color: 'magenta' },
+  QUALITY: { label: '品质工程师', color: 'red' },
+  DESIGNER: { label: '设计师', color: 'purple' },
+  PROCUREMENT: { label: '采购', color: 'pinkpurple' },
+  LEGAL: { label: '法务', color: 'gray' },
+  SUPPLY_CHAIN: { label: '供应链', color: 'orangered' },
+  OTHER: { label: '其他', color: 'gray' },
+} as const;
+
+export const PROJECT_MEMBER_ROLE_KEYS = Object.keys(PROJECT_MEMBER_ROLE_MAP) as Array<
+  keyof typeof PROJECT_MEMBER_ROLE_MAP
+>;
+
 // ============ 阶段选项 ============
 export const PHASE_OPTIONS = ['EVT', 'DVT', 'PVT', 'MP'] as const;
 

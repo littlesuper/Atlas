@@ -8,7 +8,7 @@ const PROJECT_ID = '5b2826f4-08df-4c61-98dc-53ed26dce6cf';
 
 // ============ 工具函数 ============
 
-function parseChineseDate(dateStr: string): string | null {
+function _parseChineseDate(dateStr: string): string | null {
   if (!dateStr || !dateStr.trim()) return null;
   const s = dateStr.trim();
   const match = s.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
@@ -73,7 +73,7 @@ const USER_ID_MAP: Record<string, string> = {};
 // 团队成员角色 ID
 const TEAM_MEMBER_ROLE_ID = '8cc309be-9410-48dd-872c-8a4a702d2a03'; // 项目经理
 
-function parseAssignees(raw: string): string[] {
+function _parseAssignees(raw: string): string[] {
   if (!raw || !raw.trim()) return [];
   // 格式: "李哲齐(蓝鳍金枪鱼), 田萌(血红龙)"
   return raw.split(',').map((s) => {
@@ -343,7 +343,7 @@ async function addProjectMembers() {
   const memberIds = Object.values(USER_ID_MAP).filter(Boolean);
   console.log(`\n添加 ${memberIds.length} 个项目成员...`);
   for (const userId of memberIds) {
-    const res = await api('POST', `/projects/${PROJECT_ID}/members`, { userId });
+    const _res = await api('POST', `/projects/${PROJECT_ID}/members`, { userId });
     // 忽略已存在的错误
   }
   console.log('✓ 项目成员添加完毕');
