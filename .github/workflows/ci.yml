@@ -95,7 +95,7 @@ jobs:
         run: cd server && npx prisma generate
 
       - name: Setup database and seed
-        run: cd server && npx prisma db push && npx tsx src/prisma/seed.ts
+        run: cd server && npx prisma db push && npx tsx prisma/seed.ts
         env:
           DATABASE_URL: file:./dev.db
 
