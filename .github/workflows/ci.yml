@@ -99,6 +99,16 @@ jobs:
         env:
           DATABASE_URL: file:./dev.db
 
+      - name: Create CI server env file
+        run: |
+          cat > server/.env <<'EOF'
+          DATABASE_URL=file:./dev.db
+          JWT_SECRET=ci-test-jwt-secret
+          JWT_REFRESH_SECRET=ci-test-jwt-refresh-secret
+          PORT=3000
+          CORS_ORIGINS=http://localhost:5173
+          EOF
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
