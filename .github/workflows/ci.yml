@@ -78,6 +78,7 @@ jobs:
   e2e-core:
     runs-on: ubuntu-latest
     needs: test
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -113,7 +114,29 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: npx playwright test --project=setup --project=chromium
+        run: |
+          npx playwright test --project=setup
+          npx playwright test \
+            e2e/specs/accessibility.spec.ts \
+            e2e/specs/auth.spec.ts \
+            e2e/specs/projects.spec.ts \
+            e2e/specs/project-archive.spec.ts \
+            e2e/specs/project-detail-tabs.spec.ts \
+            e2e/specs/activities.spec.ts \
+            e2e/specs/activity-date-edit.spec.ts \
+            e2e/specs/activity-dependencies.spec.ts \
+            e2e/specs/check-items.spec.ts \
+            e2e/specs/activity-role-binding.spec.ts \
+            e2e/specs/weekly-report-crud.spec.ts \
+            e2e/specs/products.spec.ts \
+            e2e/specs/product-filters.spec.ts \
+            e2e/specs/product-upload-security.spec.ts \
+            e2e/specs/risk.spec.ts \
+            e2e/specs/risk-items.spec.ts \
+            e2e/specs/permission-access.spec.ts \
+            e2e/specs/permission-buttons.spec.ts \
+            e2e/specs/idor-permission.spec.ts \
+            --project=chromium
         env:
           JWT_SECRET: ci-test-jwt-secret
           JWT_REFRESH_SECRET: ci-test-jwt-refresh-secret
