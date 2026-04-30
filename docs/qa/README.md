@@ -9,6 +9,8 @@
 | `README.md` | 本文件。环境/命令/执行流程 |
 | `test-plan.md` | **完整测试用例**（380+ 条，16 个模块） |
 | `prod-deploy-validation.md` | 生产部署验证用例（42 条） |
+| `week2-acceptance.md` | Week 2 质量体系落地验收与差距 |
+| `dependabot-triage-20260430.md` | 2026-04-30 首批 Dependabot PR 分流 |
 | `reports/run-20260428.md` | 测试执行报告（最新） |
 | `reports/coverage-P0-20260428.md` | P0 覆盖映射 |
 | `reports/coverage-P1-20260428.md` | P1 覆盖映射 |
