@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { PrismaClient, ActivityType } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
@@ -17,6 +17,16 @@ import { autoAssignByRole } from '../utils/roleMembershipResolver';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+interface ExcelUploadRejectionError extends Error {
+  excelImportRejectReason?: string;
+  excelImportFile?: {
+    originalname?: string;
+    mimetype?: string;
+    size?: number;
+  };
+  code?: string;
+}
 
 async function buildExecutorsForActivity(
   roleId: string | null | undefined,
@@ -50,7 +60,7 @@ const EXECUTOR_INCLUDE = {
     include: {
       user: { select: { id: true, realName: true, canLogin: true } },
     },
-    orderBy: [{ assignedAt: 'asc' }],
+    orderBy: [{ assignedAt: 'asc' as const }],
   },
   role: { select: { id: true, name: true } },
 };
@@ -180,9 +190,13 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
         include: {
           user: { select: { id: true, realName: true, canLogin: true } },
         },
-        orderBy: [{ assignedAt: 'asc' }],
+        orderBy: [{ assignedAt: 'asc' as const }],
       },
       role: { select: { id: true, name: true } },
+      checkItems: {
+        select: { id: true, checked: true },
+        orderBy: { sortOrder: 'asc' as const },
+      },
       _count: {
         select: { checkItems: true },
       },
@@ -632,7 +646,7 @@ router.put(
         const autoIds = await autoAssignByRole(effectiveRoleId);
         await prisma.activityExecutor.deleteMany({ where: { activityId: id } });
         updateData.executors = {
-          create: autoIds.map(uid => ({
+          create: autoIds.map((uid: string) => ({
             userId: uid,
             source: 'ROLE_AUTO',
             snapshotRoleId: effectiveRoleId,
@@ -652,7 +666,7 @@ router.put(
         const roleMemberIds = effectiveRoleId ? await autoAssignByRole(effectiveRoleId) : [];
         const roleMemberSet = new Set(roleMemberIds);
 
-        const executorData = executorIds.map(uid => {
+        const executorData = executorIds.map((uid: string) => {
           if (roleChanged && existingExecutorUserIds.has(uid) && !roleMemberSet.has(uid)) {
             return {
               userId: uid,
@@ -1749,19 +1763,77 @@ const excelUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = (file.originalname || '').toLowerCase();
-    if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+    if (ext.endsWith('.xlsx')) {
       cb(null, true);
     } else {
-      cb(new Error('仅支持 .xlsx / .xls 文件'));
+      const error = new Error('仅支持 .xlsx 文件') as ExcelUploadRejectionError;
+      error.excelImportRejectReason = 'unsupported_extension';
+      error.excelImportFile = {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+      };
+      cb(error);
     }
   },
 });
+
+const XLSX_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+
+function hasMagic(buffer: Buffer, magic: Buffer): boolean {
+  return buffer.length >= magic.length && buffer.subarray(0, magic.length).equals(magic);
+}
+
+function logRejectedExcelImport(
+  req: Request,
+  reason: string,
+  file?: Partial<Express.Multer.File>,
+  error?: unknown
+): void {
+  logger.warn(
+    {
+      reason,
+      err: error,
+      userId: (req as any).user?.id,
+      projectId: req.params.projectId,
+      filename: file?.originalname,
+      mimetype: file?.mimetype,
+      size: file?.size,
+    },
+    '拒绝 Excel 导入文件'
+  );
+}
+
+function uploadExcelFile(req: Request, res: Response, next: NextFunction): void {
+  excelUpload.single('file')(req, res, (error: unknown) => {
+    if (error) {
+      const uploadError = error as ExcelUploadRejectionError;
+      logRejectedExcelImport(
+        req,
+        uploadError.excelImportRejectReason || uploadError.code || 'upload_rejected',
+        uploadError.excelImportFile,
+        error
+      );
+      res.status(uploadError.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+        error: uploadError.message || 'Excel 上传失败',
+      });
+      return;
+    }
+
+    next();
+  });
+}
+
+function isValidExcelUpload(file: Express.Multer.File): boolean {
+  const filename = (file.originalname || '').toLowerCase();
+  if (filename.endsWith('.xlsx')) return hasMagic(file.buffer, XLSX_MAGIC);
+  return false;
+}
 
 router.post(
   '/project/:projectId/import-excel',
   authenticate,
   requirePermission('activity', 'create'),
-  excelUpload.single('file'),
+  uploadExcelFile,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectId } = req.params;
@@ -1784,8 +1856,21 @@ router.post(
         return;
       }
 
+      if (!isValidExcelUpload(req.file)) {
+        logRejectedExcelImport(req, 'invalid_magic', req.file);
+        res.status(400).json({ error: '文件格式与扩展名不匹配，请上传有效的 .xlsx 文件' });
+        return;
+      }
+
       // 解析 Excel
-      const parsed = parseExcelActivities(req.file.buffer);
+      let parsed: Awaited<ReturnType<typeof parseExcelActivities>>;
+      try {
+        parsed = await parseExcelActivities(req.file.buffer);
+      } catch (error) {
+        logRejectedExcelImport(req, 'parse_failed', req.file, error);
+        res.status(400).json({ error: 'Excel 文件解析失败，请检查文件是否损坏、加密或格式不正确' });
+        return;
+      }
       if (parsed.length === 0) {
         res.json({ success: true, count: 0, skipped: 0, createdUsers: [], activities: [] });
         return;
@@ -1938,19 +2023,22 @@ router.post(
       });
 
       // 解析并写回前置依赖（仅引用本次解析中存在 seq 的活动）
-      const depUpdates = toCreate
-        .map((a, idx) => {
+      type ResolvedImportDependency = { id: string; type: string; lag: number };
+      type ActivityDependencyUpdate = { activityId: string; dependencies: ResolvedImportDependency[] };
+
+      const depUpdates: ActivityDependencyUpdate[] = toCreate
+        .map<ActivityDependencyUpdate | null>((a, idx) => {
           if (!a.predecessors || a.predecessors.length === 0) return null;
           const resolved = a.predecessors
-            .map((p) => {
+            .map<ResolvedImportDependency | null>((p) => {
               const id = seqToActivityId.get(p.seq);
               return id ? { id, type: p.type, lag: p.lag } : null;
             })
-            .filter((d): d is { id: string; type: string; lag: number } => d !== null);
+            .filter((d): d is ResolvedImportDependency => d !== null);
           if (resolved.length === 0) return null;
           return { activityId: activities[idx].id, dependencies: resolved };
         })
-        .filter((u): u is { activityId: string; dependencies: { id: string; type: string; lag: number }[] } => u !== null);
+        .filter((u): u is ActivityDependencyUpdate => u !== null);
 
       if (depUpdates.length > 0) {
         await prisma.$transaction(

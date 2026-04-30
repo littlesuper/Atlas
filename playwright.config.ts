@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
+const serverPort = Number(process.env.E2E_SERVER_PORT || process.env.PORT || 3000);
+const clientPort = Number(process.env.E2E_CLIENT_PORT || 5173);
+
 export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
   testDir: './e2e/specs',
@@ -9,7 +12,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: `http://localhost:${clientPort}`,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
@@ -30,16 +33,18 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm run dev',
+      command: 'npm run start',
       cwd: './server',
-      port: 3000,
+      env: { ...process.env, PORT: String(serverPort) },
+      port: serverPort,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
     {
-      command: 'npm run dev',
+      command: `npm run dev -- --port ${clientPort}`,
       cwd: './client',
-      port: 5173,
+      env: { ...process.env, VITE_API_PROXY_TARGET: `http://localhost:${serverPort}` },
+      port: clientPort,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },

@@ -157,16 +157,18 @@ async function runThresholdAlerts(): Promise<void> {
       status: { in: [ActivityStatus.NOT_STARTED, ActivityStatus.IN_PROGRESS] },
     },
     include: {
-      assignees: { select: { id: true, realName: true } },
+      executors: {
+        include: { user: { select: { id: true, realName: true } } },
+      },
       project: { select: { id: true, name: true } },
     },
   });
 
   for (const activity of overdueActivities) {
     const overdueDays = Math.ceil((now.getTime() - activity.planEndDate!.getTime()) / (1000 * 60 * 60 * 24));
-    for (const assignee of activity.assignees) {
+    for (const executor of activity.executors) {
       await createNotificationIfNotDuplicate({
-        userId: assignee.id,
+        userId: executor.user.id,
         type: 'RISK_ALERT',
         title: `活动「${activity.name}」逾期 ${overdueDays} 天`,
         content: `项目「${activity.project.name}」中的活动已逾期超过 7 天，请尽快处理`,
@@ -182,15 +184,17 @@ async function runThresholdAlerts(): Promise<void> {
       status: ActivityStatus.NOT_STARTED,
     },
     include: {
-      assignees: { select: { id: true, realName: true } },
+      executors: {
+        include: { user: { select: { id: true, realName: true } } },
+      },
       project: { select: { id: true, name: true } },
     },
   });
 
   for (const activity of upcomingActivities) {
-    for (const assignee of activity.assignees) {
+    for (const executor of activity.executors) {
       await createNotificationIfNotDuplicate({
-        userId: assignee.id,
+        userId: executor.user.id,
         type: 'RISK_ALERT',
         title: `活动「${activity.name}」即将到期`,
         content: `项目「${activity.project.name}」中的活动将在 3 天内到期，但尚未开始`,

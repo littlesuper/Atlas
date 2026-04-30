@@ -1143,7 +1143,7 @@ const ProjectDetail: React.FC = () => {
               if (importUploading) return;
               const input = document.createElement('input');
               input.type = 'file';
-              input.accept = '.xlsx,.xls';
+              input.accept = '.xlsx';
               input.onchange = () => {
                 const file = input.files?.[0];
                 if (file) doImportFile(file);
@@ -1160,7 +1160,7 @@ const ProjectDetail: React.FC = () => {
                   拖拽 Excel 文件到此处
                 </p>
                 <p style={{ marginTop: 4, fontSize: 13, color: 'var(--color-text-3)' }}>
-                  或点击选择文件（.xlsx / .xls，最大 5MB）
+                  或点击选择文件（.xlsx，最大 5MB）
                 </p>
               </>
             )}

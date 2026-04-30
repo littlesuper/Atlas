@@ -86,7 +86,7 @@ describe('SYS-021: Backend process crash resilience', () => {
 
 describe('IMP-046/047: Import performance', () => {
   const { mockParseExcel } = vi.hoisted(() => ({
-    mockParseExcel: vi.fn().mockReturnValue([]),
+    mockParseExcel: vi.fn().mockResolvedValue([]),
   }));
 
   vi.mock('../excelActivityParser', () => ({
@@ -109,10 +109,10 @@ describe('IMP-046/047: Import performance', () => {
       status: 'NOT_STARTED',
     }));
 
-    mockParseExcel.mockReturnValue(largeDataset);
+    mockParseExcel.mockResolvedValue(largeDataset);
 
     const { parseExcelActivities } = await import('../excelActivityParser');
-    const result = parseExcelActivities(Buffer.from('large-fake-excel'));
+    const result = await parseExcelActivities(Buffer.from('large-fake-excel'));
 
     expect(result).toHaveLength(500);
     expect(result[0].name).toBe('Activity 0');
@@ -121,10 +121,10 @@ describe('IMP-046/047: Import performance', () => {
   });
 
   it('should handle empty parse results efficiently', async () => {
-    mockParseExcel.mockReturnValue([]);
+    mockParseExcel.mockResolvedValue([]);
 
     const { parseExcelActivities } = await import('../excelActivityParser');
-    const result = parseExcelActivities(Buffer.from('empty'));
+    const result = await parseExcelActivities(Buffer.from('empty'));
 
     expect(result).toHaveLength(0);
     expect(mockParseExcel).toHaveBeenCalledTimes(1);
@@ -143,10 +143,10 @@ describe('IMP-046/047: Import performance', () => {
         status: 'NOT_STARTED',
       },
     ];
-    mockParseExcel.mockReturnValue(dataset);
+    mockParseExcel.mockResolvedValue(dataset);
 
     const { parseExcelActivities } = await import('../excelActivityParser');
-    const result = parseExcelActivities(Buffer.from('single-row'));
+    const result = await parseExcelActivities(Buffer.from('single-row'));
 
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveProperty('name');
@@ -157,12 +157,12 @@ describe('IMP-046/047: Import performance', () => {
   });
 
   it('parser is called once per invocation (no double-load)', async () => {
-    mockParseExcel.mockReturnValue([]);
+    mockParseExcel.mockResolvedValue([]);
 
     const { parseExcelActivities } = await import('../excelActivityParser');
 
-    parseExcelActivities(Buffer.from('test-1'));
-    parseExcelActivities(Buffer.from('test-2'));
+    await parseExcelActivities(Buffer.from('test-1'));
+    await parseExcelActivities(Buffer.from('test-2'));
 
     expect(mockParseExcel).toHaveBeenCalledTimes(2);
   });

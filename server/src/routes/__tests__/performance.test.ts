@@ -151,7 +151,7 @@ vi.mock('../../utils/aiClient', () => ({
 }));
 
 vi.mock('../../utils/excelActivityParser', () => ({
-  parseExcelActivities: vi.fn().mockReturnValue([]),
+  parseExcelActivities: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../middleware/validate', () => ({
@@ -169,7 +169,11 @@ vi.mock('../../utils/sanitize', () => ({
 vi.mock('multer', () => {
   const m = () => ({
     single: () => (req: any, _res: any, next: any) => {
-      req.file = req.file || { buffer: Buffer.from('fake-excel'), originalname: 'test.xlsx' };
+      const fakeXlsx = Buffer.concat([
+        Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+        Buffer.from('fake-excel'),
+      ]);
+      req.file = req.file || { buffer: fakeXlsx, originalname: 'test.xlsx' };
       next();
     },
   });
@@ -227,6 +231,11 @@ const sampleActivity = {
   sortOrder: 1,
   assignees: [{ id: 'user-1', realName: '管理员', username: 'admin' }],
 };
+
+const fakeXlsxUpload = Buffer.concat([
+  Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+  Buffer.from('fake-excel'),
+]);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -352,7 +361,7 @@ describe('IMP-041: Import transaction handling', () => {
       planDuration: 5,
       status: 'NOT_STARTED',
     }));
-    (parseExcelActivities as any).mockReturnValue(parsed50);
+    (parseExcelActivities as any).mockResolvedValue(parsed50);
     (pinyin as any).mockReturnValue('fuzeren');
 
     mockPrisma.user.findMany.mockResolvedValue([]);
@@ -368,7 +377,7 @@ describe('IMP-041: Import transaction handling', () => {
 
     const res = await request(app)
       .post('/api/activities/project/proj-1/import-excel')
-      .attach('file', Buffer.from('fake-excel'), 'test.xlsx');
+      .attach('file', fakeXlsxUpload, 'test.xlsx');
 
     expect(res.status).toBe(500);
     expect(res.body).toHaveProperty('error');
@@ -401,7 +410,7 @@ describe('IMP-041: Import transaction handling', () => {
         status: 'NOT_STARTED',
       },
     ];
-    (parseExcelActivities as any).mockReturnValue(validParsed);
+    (parseExcelActivities as any).mockResolvedValue(validParsed);
 
     mockPrisma.user.findMany.mockResolvedValue([]);
     mockPrisma.activity.findMany.mockResolvedValue([]);
@@ -414,7 +423,7 @@ describe('IMP-041: Import transaction handling', () => {
 
     const res = await request(app)
       .post('/api/activities/project/proj-1/import-excel')
-      .attach('file', Buffer.from('fake-excel'), 'test.xlsx');
+      .attach('file', fakeXlsxUpload, 'test.xlsx');
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -598,7 +607,7 @@ describe('CHAOS-010: Pinyin conflict for similar names', () => {
     );
     const { pinyin } = await import('pinyin-pro');
 
-    (parseExcelActivities as any).mockReturnValue([
+    (parseExcelActivities as any).mockResolvedValue([
       {
         name: 'Import Activity',
         type: 'TASK',
@@ -641,7 +650,7 @@ describe('CHAOS-010: Pinyin conflict for similar names', () => {
 
     const res = await request(app)
       .post('/api/activities/project/proj-1/import-excel')
-      .attach('file', Buffer.from('fake'), 'test.xlsx');
+      .attach('file', fakeXlsxUpload, 'test.xlsx');
 
     expect(res.status).toBe(200);
 

@@ -781,7 +781,11 @@ router.post(
       const [activities, products, weeklyReports, riskAssessments, activityComments] = await Promise.all([
         prisma.activity.findMany({
           where: { projectId: id },
-          include: { assignees: { select: { id: true, realName: true } } },
+          include: {
+            executors: {
+              include: { user: { select: { id: true, realName: true } } },
+            },
+          },
           orderBy: { sortOrder: 'asc' },
         }),
         prisma.product.findMany({ where: { projectId: id } }),
@@ -936,7 +940,11 @@ router.post(
       const [activities, products, weeklyReports, riskAssessments, activityComments] = await Promise.all([
         prisma.activity.findMany({
           where: { projectId: id },
-          include: { assignees: { select: { id: true, realName: true } } },
+          include: {
+            executors: {
+              include: { user: { select: { id: true, realName: true } } },
+            },
+          },
           orderBy: { sortOrder: 'asc' },
         }),
         prisma.product.findMany({ where: { projectId: id } }),

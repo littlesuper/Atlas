@@ -4,10 +4,6 @@
 import { PrismaClient } from '@prisma/client';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const prisma = new PrismaClient();
 
@@ -23,6 +19,24 @@ interface MigrationReport {
   totalRoleMembersCreated: number;
   needsManualReview: number;
   reviewItems: Array<{ activityId: string; activityName: string; reason: string }>;
+}
+
+interface LegacyUserRole {
+  role: { id: string; name: string };
+}
+
+interface LegacyAssignee {
+  id: string;
+  realName: string;
+  canLogin: boolean;
+  userRoles: LegacyUserRole[];
+}
+
+interface LegacyActivity {
+  id: string;
+  name: string;
+  createdAt: Date;
+  assignees: LegacyAssignee[];
 }
 
 async function migrate() {
@@ -85,7 +99,7 @@ async function migrate() {
 
   // Step 2: Get all activities with their assignees
   console.log('Step 2: 获取所有活动和当前负责人...');
-  const activities = await prisma.activity.findMany({
+  const activities = (await prisma.activity.findMany({
     select: {
       id: true,
       name: true,
@@ -101,7 +115,7 @@ async function migrate() {
         },
       },
     },
-  });
+  } as any) as unknown) as LegacyActivity[];
 
   report.totalActivities = activities.length;
   console.log(`  总活动数: ${activities.length}\n`);

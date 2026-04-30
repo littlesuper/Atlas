@@ -1,33 +1,34 @@
 import { describe, it, expect } from 'vitest';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { parseExcelActivities } from './excelActivityParser';
 
 // ─── Helper: create an Excel buffer from a 2D array of cell values ────────
-function createExcelBuffer(rows: (string | number | null | undefined)[][]): Buffer {
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+async function createExcelBuffer(rows: (string | number | boolean | Date | null | undefined)[][]): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Sheet1');
+  rows.forEach((row) => worksheet.addRow(row.map((value) => value ?? null)));
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
 }
 
 // ─── Helper: create a workbook buffer with an empty sheet (no data) ───────
-function createEmptySheetBuffer(): Buffer {
-  const ws = XLSX.utils.aoa_to_sheet([]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+async function createEmptySheetBuffer(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.addWorksheet('Sheet1');
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. Column Detection
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Column Detection', () => {
-  it('detects Chinese headers: 任务描述, 阶段, 负责人, 工期', () => {
-    const buf = createExcelBuffer([
+  it('detects Chinese headers: 任务描述, 阶段, 负责人, 工期', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段', '负责人', '工期'],
       ['PCB 设计', 'EVT', '张三', '10'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('PCB 设计');
     expect(result[0].phase).toBe('EVT');
@@ -35,12 +36,12 @@ describe('Column Detection', () => {
     expect(result[0].planDuration).toBe(10);
   });
 
-  it('detects English headers: phase, assignee, duration, status, notes', () => {
-    const buf = createExcelBuffer([
+  it('detects English headers: phase, assignee, duration, status, notes', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', 'phase', 'assignee', 'duration', 'status', 'notes'],
       ['Board layout', 'DVT', 'Alice', '5', '进行中', 'urgent'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result).toHaveLength(1);
     expect(result[0].phase).toBe('DVT');
     expect(result[0].assigneeNames).toEqual(['Alice']);
@@ -49,32 +50,32 @@ describe('Column Detection', () => {
     expect(result[0].notes).toBe('urgent');
   });
 
-  it('finds headers on row 2 when row 1 is a title row', () => {
-    const buf = createExcelBuffer([
+  it('finds headers on row 2 when row 1 is a title row', async () => {
+    const buf = await createExcelBuffer([
       ['项目活动列表'],
       ['任务描述', '阶段', '负责人', '工期'],
       ['结构件开模', '1EVT阶段', '李四', '15'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('结构件开模');
     expect(result[0].planDuration).toBe(15);
   });
 
-  it('throws error when no recognizable name column exists', () => {
-    const buf = createExcelBuffer([
+  it('throws error when no recognizable name column exists', async () => {
+    const buf = await createExcelBuffer([
       ['序号', '类别', '描述'],
       ['1', 'A', 'something'],
     ]);
-    expect(() => parseExcelActivities(buf)).toThrow('无法识别 Excel 表头');
+    await expect(parseExcelActivities(buf)).rejects.toThrow('无法识别 Excel 表头');
   });
 
-  it('detects mixed Chinese/English headers', () => {
-    const buf = createExcelBuffer([
+  it('detects mixed Chinese/English headers', async () => {
+    const buf = await createExcelBuffer([
       ['活动名称', 'phase', '负责人', 'duration', '状态', 'notes'],
       ['固件开发', 'PVT', '王五', '20', '未开始', '需要评审'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('固件开发');
     expect(result[0].phase).toBe('PVT');
@@ -89,39 +90,39 @@ describe('Column Detection', () => {
 // 2. Phase Parsing
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Phase Parsing', () => {
-  it('extracts EVT from "1EVT阶段"', () => {
-    const buf = createExcelBuffer([
+  it('extracts EVT from "1EVT阶段"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段'],
       ['Task A', '1EVT阶段'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].phase).toBe('EVT');
   });
 
-  it('extracts PVT from "3PVT"', () => {
-    const buf = createExcelBuffer([
+  it('extracts PVT from "3PVT"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段'],
       ['Task B', '3PVT'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].phase).toBe('PVT');
   });
 
-  it('extracts DVT without numeric prefix', () => {
-    const buf = createExcelBuffer([
+  it('extracts DVT without numeric prefix', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段'],
       ['Task C', 'DVT'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].phase).toBe('DVT');
   });
 
-  it('returns raw value for non-matching phase like "其他阶段"', () => {
-    const buf = createExcelBuffer([
+  it('returns raw value for non-matching phase like "其他阶段"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段'],
       ['Task D', '其他阶段'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].phase).toBe('其他阶段');
   });
 });
@@ -130,39 +131,39 @@ describe('Phase Parsing', () => {
 // 3. Assignee Parsing
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Assignee Parsing', () => {
-  it('parses "张三(昵称), 李四(Nick)" → ["张三", "李四"]', () => {
-    const buf = createExcelBuffer([
+  it('parses "张三(昵称), 李四(Nick)" → ["张三", "李四"]', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '负责人'],
       ['Task A', '张三(昵称), 李四(Nick)'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].assigneeNames).toEqual(['张三', '李四']);
   });
 
-  it('handles Chinese comma: "张三，李四" → ["张三", "李四"]', () => {
-    const buf = createExcelBuffer([
+  it('handles Chinese comma: "张三，李四" → ["张三", "李四"]', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '负责人'],
       ['Task B', '张三，李四'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].assigneeNames).toEqual(['张三', '李四']);
   });
 
-  it('handles single assignee: "张三" → ["张三"]', () => {
-    const buf = createExcelBuffer([
+  it('handles single assignee: "张三" → ["张三"]', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '负责人'],
       ['Task C', '张三'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].assigneeNames).toEqual(['张三']);
   });
 
-  it('handles empty assignee → []', () => {
-    const buf = createExcelBuffer([
+  it('handles empty assignee → []', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '负责人'],
       ['Task D', ''],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].assigneeNames).toEqual([]);
   });
 });
@@ -171,57 +172,57 @@ describe('Assignee Parsing', () => {
 // 4. Status Mapping
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Status Mapping', () => {
-  it('maps "已完成" → "COMPLETED"', () => {
-    const buf = createExcelBuffer([
+  it('maps "已完成" → "COMPLETED"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task A', '已完成'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('COMPLETED');
   });
 
-  it('maps "进行中" → "IN_PROGRESS"', () => {
-    const buf = createExcelBuffer([
+  it('maps "进行中" → "IN_PROGRESS"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task B', '进行中'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('IN_PROGRESS');
   });
 
-  it('maps "未开始" → "NOT_STARTED"', () => {
-    const buf = createExcelBuffer([
+  it('maps "未开始" → "NOT_STARTED"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task C', '未开始'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('NOT_STARTED');
   });
 
-  it('maps "暂停" → "ON_HOLD"', () => {
-    const buf = createExcelBuffer([
+  it('maps "暂停" → "ON_HOLD"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task D', '暂停'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('ON_HOLD');
   });
 
-  it('returns undefined for unrecognized status "未知状态"', () => {
-    const buf = createExcelBuffer([
+  it('returns undefined for unrecognized status "未知状态"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task E', '未知状态'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBeUndefined();
   });
 
-  it('IMP-033: maps "已取消" → "CANCELLED"', () => {
-    const buf = createExcelBuffer([
+  it('IMP-033: maps "已取消" → "CANCELLED"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task F', '已取消'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('CANCELLED');
   });
 });
@@ -230,20 +231,14 @@ describe('Status Mapping', () => {
 // 5. Date Parsing
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Date Parsing', () => {
-  it('converts Excel serial number to correct date', () => {
+  it('converts Excel serial number to correct date', async () => {
     // Excel serial 46068 = 2026-02-15
-    const ws = XLSX.utils.aoa_to_sheet([
+    const buf = await createExcelBuffer([
       ['任务描述', '计划开始'],
+      ['Task A', 46068],
     ]);
-    // Manually set cell B2 to a numeric value (Excel serial number)
-    ws['B2'] = { t: 'n', v: 46068 };
-    ws['A2'] = { t: 's', v: 'Task A' };
-    ws['!ref'] = 'A1:B2';
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    const buf = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].planStartDate).toBeInstanceOf(Date);
     const d = result[0].planStartDate!;
     expect(d.getUTCFullYear()).toBe(2026);
@@ -251,12 +246,12 @@ describe('Date Parsing', () => {
     expect(d.getUTCDate()).toBe(15);
   });
 
-  it('parses Chinese date format "2026年2月2日"', () => {
-    const buf = createExcelBuffer([
+  it('parses Chinese date format "2026年2月2日"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '计划开始'],
       ['Task B', '2026年2月2日'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].planStartDate).toBeInstanceOf(Date);
     const d = result[0].planStartDate!;
     expect(d.getUTCFullYear()).toBe(2026);
@@ -264,12 +259,12 @@ describe('Date Parsing', () => {
     expect(d.getUTCDate()).toBe(2);
   });
 
-  it('parses ISO date format "2026-02-02"', () => {
-    const buf = createExcelBuffer([
+  it('parses ISO date format "2026-02-02"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '开始日期'],
       ['Task C', '2026-02-02'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].planStartDate).toBeInstanceOf(Date);
     const d = result[0].planStartDate!;
     expect(d.getUTCFullYear()).toBe(2026);
@@ -277,12 +272,12 @@ describe('Date Parsing', () => {
     expect(d.getUTCDate()).toBe(2);
   });
 
-  it('returns undefined for empty/null date values', () => {
-    const buf = createExcelBuffer([
+  it('returns undefined for empty/null date values', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '计划开始'],
       ['Task D', ''],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].planStartDate).toBeUndefined();
   });
 });
@@ -291,15 +286,15 @@ describe('Date Parsing', () => {
 // 6. Integration Tests
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Integration', () => {
-  it('parses a full Excel with all columns into correct ParsedActivity array', () => {
-    const buf = createExcelBuffer([
+  it('parses a full Excel with all columns into correct ParsedActivity array', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段', '负责人', '工期', '计划开始', '完成时间', '任务状态', '备注'],
       ['PCB 设计', '1EVT阶段', '张三(工程师), 李四', '10', '2026-03-01', '2026-03-15', '进行中', '优先级高'],
       ['结构件开模', '2DVT', '王五', '20', '2026年3月10日', '2026年4月5日', '未开始', ''],
       ['固件开发', 'MP', '赵六(FW)', '15', '2026-04-01', '2026-04-20', '已完成', '已交付'],
     ]);
 
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result).toHaveLength(3);
 
     // Row 1
@@ -335,8 +330,8 @@ describe('Integration', () => {
     });
   });
 
-  it('parses Excel with only name column → minimal results', () => {
-    const _buf = createExcelBuffer([
+  it('parses Excel with only name column → minimal results', async () => {
+    const _buf = await createExcelBuffer([
       ['任务名称'],
       ['Task Alpha'],
       ['Task Beta'],
@@ -351,13 +346,13 @@ describe('Integration', () => {
     // So colMap['name'] will be undefined after the reset → throws.
     // We need at least 2 keyword columns for the header to be recognized.
     // Let's test with name + one more keyword to make it minimal:
-    const buf2 = createExcelBuffer([
+    const buf2 = await createExcelBuffer([
       ['任务名称', '阶段'],
       ['Task Alpha', ''],
       ['Task Beta', ''],
     ]);
 
-    const result = parseExcelActivities(buf2);
+    const result = await parseExcelActivities(buf2);
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('Task Alpha');
     expect(result[0].assigneeNames).toEqual([]);
@@ -369,15 +364,15 @@ describe('Integration', () => {
     expect(result[1].name).toBe('Task Beta');
   });
 
-  it('skips rows with empty names', () => {
-    const buf = createExcelBuffer([
+  it('skips rows with empty names', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段'],
       ['Task 1', 'EVT'],
       ['', 'DVT'],
       ['Task 3', 'PVT'],
       [null, 'MP'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('Task 1');
     expect(result[1].name).toBe('Task 3');
@@ -388,69 +383,69 @@ describe('Integration', () => {
 // 7. Edge Cases
 // ═══════════════════════════════════════════════════════════════════════════
 describe('Edge Cases', () => {
-  it('throws for workbook with empty sheet (no recognizable headers)', () => {
-    const buf = createEmptySheetBuffer();
-    expect(() => parseExcelActivities(buf)).toThrow('无法识别 Excel 表头');
+  it('throws for workbook with empty sheet (no recognizable headers)', async () => {
+    const buf = await createEmptySheetBuffer();
+    await expect(parseExcelActivities(buf)).rejects.toThrow('无法识别 Excel 表头');
   });
 
-  it('handles plan start and plan end date columns', () => {
-    const buf = createExcelBuffer([
+  it('handles plan start and plan end date columns', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '计划开始', '完成日期'],
       ['Task A', '2026-05-01', '2026-05-15'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].planStartDate).toBeInstanceOf(Date);
     expect(result[0].planEndDate).toBeInstanceOf(Date);
     expect(result[0].planStartDate!.getUTCFullYear()).toBe(2026);
     expect(result[0].planEndDate!.getUTCMonth()).toBe(4); // May
   });
 
-  it('handles non-numeric duration gracefully', () => {
-    const buf = createExcelBuffer([
+  it('handles non-numeric duration gracefully', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '工期'],
       ['Task A', 'N/A'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].planDuration).toBeUndefined();
   });
 
-  it('handles alternative status keywords "完成" and "进行"', () => {
-    const buf = createExcelBuffer([
+  it('handles alternative status keywords "完成" and "进行"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task A', '完成'],
       ['Task B', '进行'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('COMPLETED');
     expect(result[1].status).toBe('IN_PROGRESS');
   });
 
-  it('handles alternative status keywords "未启动" and "挂起"', () => {
-    const buf = createExcelBuffer([
+  it('handles alternative status keywords "未启动" and "挂起"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '状态'],
       ['Task A', '未启动'],
       ['Task B', '挂起'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('NOT_STARTED');
     expect(result[1].status).toBe('ON_HOLD');
   });
 
-  it('parses assignees with full-width parentheses "张三（昵称）"', () => {
-    const buf = createExcelBuffer([
+  it('parses assignees with full-width parentheses "张三（昵称）"', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '负责人'],
       ['Task A', '张三（昵称）, 李四（Nick）'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].assigneeNames).toEqual(['张三', '李四']);
   });
 
-  it('extracts MP phase correctly', () => {
-    const buf = createExcelBuffer([
+  it('extracts MP phase correctly', async () => {
+    const buf = await createExcelBuffer([
       ['任务描述', '阶段'],
       ['量产准备', '4MP'],
     ]);
-    const result = parseExcelActivities(buf);
+    const result = await parseExcelActivities(buf);
     expect(result[0].phase).toBe('MP');
   });
 
@@ -463,7 +458,7 @@ describe('Edge Cases', () => {
       expect(formulaText).not.toContain('<script>');
     });
 
-    it('IMP-048 CSV injection with leading = + - @ is handled', () => {
+    it('IMP-048 CSV injection with leading = + - @ is handled', async () => {
       const dangerousValues = ['=CMD|/C calc', '+CMD|/C calc', '@SUM(A1:A10)', '-CMD|/C calc'];
       for (const val of dangerousValues) {
         const isDangerous = /^[=+\-@]/.test(val);
@@ -475,14 +470,14 @@ describe('Edge Cases', () => {
   // ─── IMP-049: XXE prevention ────────────────────────
   describe('IMP-049: XXE in xlsx files', () => {
     it('IMP-049 xlsx parser should not resolve external entities', async () => {
-      const xlsx = await import('xlsx');
-      expect(xlsx).toBeDefined();
+      const reader = await import('read-excel-file/node');
+      expect(reader.readSheet).toBeDefined();
     });
   });
 
   // ─── IMP-003: .csv renamed to .xlsx ──────────────────
   describe('IMP-003: file type validation', () => {
-    it('IMP-003 CSV file renamed to .xlsx should be rejected by magic number', () => {
+    it('IMP-003 CSV file renamed to .xlsx should be rejected by magic number', async () => {
       const XLSX_MAGIC = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
       const csvContent = Buffer.from('name,phase,status\nTest,EVT,NOT_STARTED');
       const isXlsx = csvContent.slice(0, 4).equals(XLSX_MAGIC);
@@ -492,13 +487,13 @@ describe('Edge Cases', () => {
 
   // ─── IMP-006: file size limit 5MB ────────────────────
   describe('IMP-006: file size limit', () => {
-    it('IMP-006 file over 5MB should be rejected', () => {
+    it('IMP-006 file over 5MB should be rejected', async () => {
       const MAX_SIZE = 5 * 1024 * 1024; // 5MB
       const oversized = MAX_SIZE + 1;
       expect(oversized).toBeGreaterThan(MAX_SIZE);
     });
 
-    it('IMP-006 file under 5MB should be accepted', () => {
+    it('IMP-006 file under 5MB should be accepted', async () => {
       const MAX_SIZE = 5 * 1024 * 1024;
       const validSize = MAX_SIZE - 1;
       expect(validSize).toBeLessThanOrEqual(MAX_SIZE);
@@ -507,7 +502,7 @@ describe('Edge Cases', () => {
 
   // ─── IMP-020: auto-create contact for unknown assignee ─
   describe('IMP-020: auto-create contact for unknown assignee', () => {
-    it('IMP-020 unknown assignee name should trigger user creation with canLogin=false', () => {
+    it('IMP-020 unknown assignee name should trigger user creation with canLogin=false', async () => {
       const newUserName = '新人';
       const newUserData = {
         realName: newUserName,
@@ -521,7 +516,7 @@ describe('Edge Cases', () => {
 
   // ─── IMP-036: auto-calculate workdays from dates ──────
   describe('IMP-036: auto-calculate workdays from dates', () => {
-    it('IMP-036 when only dates given, duration is auto-calculated', () => {
+    it('IMP-036 when only dates given, duration is auto-calculated', async () => {
       const _startDate = new Date('2026-03-02'); // Monday
       const _endDate = new Date('2026-03-06'); // Friday
       const expectedWorkdays = 5; // Mon-Fri
@@ -531,7 +526,7 @@ describe('Edge Cases', () => {
 
   // ─── IMP-040: sortOrder appended after existing ───────
   describe('IMP-040: sortOrder appended after existing', () => {
-    it('IMP-040 imported activities get sortOrder starting after existing count', () => {
+    it('IMP-040 imported activities get sortOrder starting after existing count', async () => {
       const existingCount = 10;
       const importedItems = 5;
       const expectedSortOrder = Array.from(
@@ -544,13 +539,13 @@ describe('Edge Cases', () => {
 
   // ─── IMP-026: MM/DD/YYYY date format ───────
   describe('IMP-026: US date format', () => {
-    it('IMP-026 01/15/2026 is parsed correctly', () => {
+    it('IMP-026 01/15/2026 is parsed correctly', async () => {
       const rows = [
         ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
         ['Task A', 'EVT', '01/15/2026', '02/28/2026', 44],
       ];
-      const buf = createExcelBuffer(rows);
-      const result = parseExcelActivities(buf);
+      const buf = await createExcelBuffer(rows);
+      const result = await parseExcelActivities(buf);
       expect(result[0].planStartDate).toBeDefined();
       expect(result[0].planEndDate).toBeDefined();
     });
@@ -558,26 +553,26 @@ describe('Edge Cases', () => {
 
   // ─── IMP-029: end date before start date ───────
   describe('IMP-029: end date before start date', () => {
-    it('IMP-029 end date before start date is still parsed (validation at service layer)', () => {
+    it('IMP-029 end date before start date is still parsed (validation at service layer)', async () => {
       const rows = [
         ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
         ['Task A', 'EVT', '2026-06-01', '2026-01-01', 5],
       ];
-      const buf = createExcelBuffer(rows);
-      const result = parseExcelActivities(buf);
+      const buf = await createExcelBuffer(rows);
+      const result = await parseExcelActivities(buf);
       expect(result).toHaveLength(1);
     });
   });
 
   // ─── IMP-030: cross-year date ───────
   describe('IMP-030: cross-year date', () => {
-    it('IMP-030 dates spanning year boundary are parsed correctly', () => {
+    it('IMP-030 dates spanning year boundary are parsed correctly', async () => {
       const rows = [
         ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
         ['Task A', 'EVT', '2025-11-15', '2026-03-15', 120],
       ];
-      const buf = createExcelBuffer(rows);
-      const result = parseExcelActivities(buf);
+      const buf = await createExcelBuffer(rows);
+      const result = await parseExcelActivities(buf);
       expect(result[0].planStartDate).toBeDefined();
       expect(result[0].planEndDate).toBeDefined();
     });
@@ -585,13 +580,13 @@ describe('Edge Cases', () => {
 
   // ─── IMP-035: decimal duration ───────
   describe('IMP-035: decimal duration', () => {
-    it('IMP-035 3.5 days duration is parsed', () => {
+    it('IMP-035 3.5 days duration is parsed', async () => {
       const rows = [
         ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
         ['Task A', 'EVT', '2026-01-01', '2026-01-05', 3.5],
       ];
-      const buf = createExcelBuffer(rows);
-      const result = parseExcelActivities(buf);
+      const buf = await createExcelBuffer(rows);
+      const result = await parseExcelActivities(buf);
       expect(result).toHaveLength(1);
       expect(result[0].planDuration).toBe(3.5);
     });
@@ -599,13 +594,13 @@ describe('Edge Cases', () => {
 
   // ─── IMP-011: extra columns ignored ───────
   describe('IMP-011: extra columns ignored', () => {
-    it('IMP-011 unknown columns are silently skipped', () => {
+    it('IMP-011 unknown columns are silently skipped', async () => {
       const rows = [
         ['活动名称', '自定义列A', '阶段', '自定义列B', '计划开始', '计划结束', '工期'],
         ['Task A', 'foo', 'EVT', 'bar', '2026-01-01', '2026-01-10', 9],
       ];
-      const buf = createExcelBuffer(rows);
-      const result = parseExcelActivities(buf);
+      const buf = await createExcelBuffer(rows);
+      const result = await parseExcelActivities(buf);
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Task A');
       expect(result[0].phase).toBe('EVT');
@@ -614,56 +609,48 @@ describe('Edge Cases', () => {
 
   // ─── IMP-039: trailing empty rows ───────
   describe('IMP-039: trailing empty rows', () => {
-    it('IMP-039 trailing empty rows are skipped', () => {
+    it('IMP-039 trailing empty rows are skipped', async () => {
       const rows = [
         ['活动名称', '阶段', '计划开始', '计划结束', '工期'],
         ['Task A', 'EVT', '2026-01-01', '2026-01-10', 9],
         [null, null, null, null, null],
         [null, null, null, null, null],
       ];
-      const buf = createExcelBuffer(rows);
-      const result = parseExcelActivities(buf);
+      const buf = await createExcelBuffer(rows);
+      const result = await parseExcelActivities(buf);
       expect(result).toHaveLength(1);
     });
   });
 
   // ─── IMP-002: .xls BIFF8 format ───────────
   describe('IMP-002: .xls BIFF8 format (Excel 97-2003)', () => {
-    it('IMP-002 parses .xls BIFF8 format correctly', () => {
-      const ws = XLSX.utils.aoa_to_sheet([
-        ['任务描述', '阶段', '负责人', '工期'],
-        ['PCB 设计', 'EVT', '张三', '10'],
+    it('IMP-002 rejects .xls BIFF8 format after narrowing import support to .xlsx', async () => {
+      const xlsBuf = Buffer.concat([
+        Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+        Buffer.from('legacy workbook'),
       ]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-      const xlsBuf = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'biff8' }));
-      const result = parseExcelActivities(xlsBuf);
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('PCB 设计');
-      expect(result[0].phase).toBe('EVT');
-      expect(result[0].assigneeNames).toEqual(['张三']);
-      expect(result[0].planDuration).toBe(10);
+      await expect(parseExcelActivities(xlsBuf)).rejects.toThrow();
     });
   });
 
   // ─── IMP-004: encrypted xlsx file ───────
   describe('IMP-004: encrypted xlsx file', () => {
-    it('IMP-004 corrupted/encrypted xlsx throws error (not 500)', () => {
+    it('IMP-004 corrupted/encrypted xlsx throws error (not 500)', async () => {
       const corruptedBuf = Buffer.from('PK\x03\x04' + '\x00'.repeat(30) + 'corrupted');
-      expect(() => parseExcelActivities(corruptedBuf)).toThrow();
+      await expect(parseExcelActivities(corruptedBuf)).rejects.toThrow();
     });
 
-    it('IMP-004 completely invalid data throws error', () => {
+    it('IMP-004 completely invalid data throws error', async () => {
       const invalidBuf = Buffer.from('this is not a spreadsheet');
-      expect(() => parseExcelActivities(invalidBuf)).toThrow();
+      await expect(parseExcelActivities(invalidBuf)).rejects.toThrow();
     });
   });
 
   // ─── IMP-007: 0-byte file ────────────────
   describe('IMP-007: 0-byte file', () => {
-    it('IMP-007 0-byte buffer throws error', () => {
+    it('IMP-007 0-byte buffer throws error', async () => {
       const emptyBuf = Buffer.alloc(0);
-      expect(() => parseExcelActivities(emptyBuf)).toThrow();
+      await expect(parseExcelActivities(emptyBuf)).rejects.toThrow();
     });
   });
 
@@ -676,19 +663,19 @@ describe('Edge Cases', () => {
       return `${base}${n}`;
     };
 
-    it('IMP-021 when "zhangsan" exists, new user gets "zhangsan2"', () => {
+    it('IMP-021 when "zhangsan" exists, new user gets "zhangsan2"', async () => {
       expect(resolvePinyinConflict('zhangsan', ['zhangsan'])).toBe('zhangsan2');
     });
 
-    it('IMP-021 when "zhangsan" and "zhangsan2" exist, new user gets "zhangsan3"', () => {
+    it('IMP-021 when "zhangsan" and "zhangsan2" exist, new user gets "zhangsan3"', async () => {
       expect(resolvePinyinConflict('zhangsan', ['zhangsan', 'zhangsan2'])).toBe('zhangsan3');
     });
 
-    it('IMP-021 no conflict returns base pinyin unchanged', () => {
+    it('IMP-021 no conflict returns base pinyin unchanged', async () => {
       expect(resolvePinyinConflict('lisi', ['zhangsan', 'wangwu'])).toBe('lisi');
     });
 
-    it('IMP-021 gap in sequence fills correctly (zhangsan, zhangsan3 → zhangsan2)', () => {
+    it('IMP-021 gap in sequence fills correctly (zhangsan, zhangsan3 → zhangsan2)', async () => {
       expect(resolvePinyinConflict('zhangsan', ['zhangsan', 'zhangsan3'])).toBe('zhangsan2');
     });
   });
