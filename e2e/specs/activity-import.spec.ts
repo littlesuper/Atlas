@@ -11,7 +11,7 @@ import {
 /**
  * 活动批量导入测试
  * - 导入 Modal 显示和交互
- * - 支持 .xlsx/.xls 格式
+ * - 仅支持 .xlsx 格式
  * - 导入成功后显示撤回功能
  */
 test.describe.serial('Activity Batch Import', () => {
@@ -73,7 +73,7 @@ test.describe.serial('Activity Batch Import', () => {
       await expect(uploadArea).toBeVisible({ timeout: 3_000 });
 
       // Should mention supported formats
-      const formatText = modal.getByText(/xlsx|xls|Excel/i);
+      const formatText = modal.getByText(/xlsx|Excel/i);
       await expect(formatText).toBeVisible({ timeout: 3_000 });
 
       // Close the modal
@@ -104,12 +104,12 @@ test.describe.serial('Activity Batch Import', () => {
 
     const modal = page.locator('.arco-modal:visible');
     if (await modal.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      // The upload input should accept .xlsx and .xls
+      // The upload input should accept .xlsx only.
       const fileInput = modal.locator('input[type="file"]');
       if (await fileInput.count() > 0) {
         const acceptAttr = await fileInput.getAttribute('accept');
         if (acceptAttr) {
-          expect(acceptAttr).toContain('xls');
+          expect(acceptAttr).toBe('.xlsx');
         }
       }
 

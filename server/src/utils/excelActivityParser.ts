@@ -1,4 +1,7 @@
-import * as XLSX from 'xlsx';
+import { readSheet } from 'read-excel-file/node';
+
+type ExcelCellValue = string | number | boolean | Date | null;
+type ExcelRow = ExcelCellValue[];
 
 export interface ParsedDependency {
   seq: number;
@@ -110,26 +113,20 @@ function parsePredecessors(raw: string): ParsedDependency[] {
 function excelDateToJS(value: unknown): Date | undefined {
   if (value == null || value === '') return undefined;
 
-  // 已经是 Date
   if (value instanceof Date) return value;
 
-  // 数字 (Excel serial number)
   if (typeof value === 'number') {
-    const d = XLSX.SSF.parse_date_code(value);
-    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d));
-    return undefined;
+    const utcDays = Math.floor(value - 25569);
+    return new Date(utcDays * 86400 * 1000);
   }
 
-  // 字符串日期
   if (typeof value === 'string') {
     const s = value.trim();
     if (!s) return undefined;
-    // "2026年2月2日" → Date (UTC)
     const zhMatch = s.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
     if (zhMatch) {
       return new Date(Date.UTC(parseInt(zhMatch[1]), parseInt(zhMatch[2]) - 1, parseInt(zhMatch[3])));
     }
-    // "YYYY-MM-DD" → UTC
     const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (isoMatch) {
       return new Date(Date.UTC(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3])));
@@ -141,49 +138,47 @@ function excelDateToJS(value: unknown): Date | undefined {
   return undefined;
 }
 
+function cellToText(value: unknown): string {
+  if (value == null) return '';
+  if (value instanceof Date) return value.toISOString();
+  return String(value).trim();
+}
+
 /**
  * 自动识别表头行并映射列索引
  */
-function detectColumns(sheet: XLSX.WorkSheet): { headerRow: number; colMap: Record<string, number> } {
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
-  const colMap: Record<string, number> = {};
+function detectColumns(rows: ExcelRow[]): { headerRow: number; colMap: Record<string, number> } {
+  let fallback: { headerRow: number; colMap: Record<string, number> } | null = null;
 
-  // 扫描前 10 行找表头
-  for (let r = range.s.r; r <= Math.min(range.s.r + 9, range.e.r); r++) {
+  for (let r = 0; r < Math.min(rows.length, 10); r++) {
+    const row = rows[r] || [];
+    const colMap: Record<string, number> = {};
     let matchCount = 0;
 
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-      if (!cell || !cell.v) continue;
-      const text = String(cell.v).trim();
+    for (let c = 0; c < row.length; c++) {
+      const text = cellToText(row[c]);
+      if (!text) continue;
+      const lowerText = text.toLowerCase();
 
       for (const [field, keywords] of COLUMN_KEYWORDS) {
-        if (colMap[field] !== undefined) continue; // already found
-        for (const kw of keywords) {
-          if (text.includes(kw)) {
-            colMap[field] = c;
-            matchCount++;
-            break;
-          }
+        if (colMap[field] !== undefined) continue;
+        if (keywords.some((kw) => lowerText.includes(kw.toLowerCase()))) {
+          colMap[field] = c;
+          matchCount++;
+          break;
         }
       }
     }
 
-    // 至少匹配到 name 列就认为是表头行
-    if (colMap['name'] !== undefined && matchCount >= 2) {
-      return { headerRow: r, colMap };
-    }
-
-    // 如果匹配不够，重置再试下一行
-    if (matchCount < 2) {
-      Object.keys(colMap).forEach((k) => delete colMap[k]);
+    if (colMap['name'] !== undefined) {
+      if (matchCount >= 2) {
+        return { headerRow: r, colMap };
+      }
+      fallback = fallback ?? { headerRow: r, colMap };
     }
   }
 
-  // Fallback: 如果只匹配到 name，也返回
-  if (colMap['name'] !== undefined) {
-    return { headerRow: 0, colMap };
-  }
+  if (fallback) return fallback;
 
   throw new Error('无法识别 Excel 表头，请确保包含"任务描述"或"活动名称"列');
 }
@@ -191,55 +186,44 @@ function detectColumns(sheet: XLSX.WorkSheet): { headerRow: number; colMap: Reco
 /**
  * 解析 Excel 文件 buffer，返回活动列表
  */
-export function parseExcelActivities(buffer: Buffer): ParsedActivity[] {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-  const sheetName = wb.SheetNames[0];
-  if (!sheetName) throw new Error('Excel 文件中没有工作表');
-
-  const sheet = wb.Sheets[sheetName];
-  const { headerRow, colMap } = detectColumns(sheet);
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+export async function parseExcelActivities(buffer: Buffer): Promise<ParsedActivity[]> {
+  const rows = (await readSheet(buffer, 1)) as ExcelRow[];
+  const { headerRow, colMap } = detectColumns(rows);
   const activities: ParsedActivity[] = [];
 
   const getCell = (r: number, c: number | undefined): unknown => {
     if (c === undefined) return undefined;
-    const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-    return cell ? cell.v : undefined;
+    return rows[r]?.[c];
   };
 
   let fallbackSeq = 1;
-  for (let r = headerRow + 1; r <= range.e.r; r++) {
+  for (let r = headerRow + 1; r < rows.length; r++) {
     const name = getCell(r, colMap['name']);
-    if (!name || String(name).trim() === '') continue; // 跳过空行
+    if (!name || cellToText(name) === '') continue; // 跳过空行
 
     const seqRaw = getCell(r, colMap['seq']);
-    const seqNum = seqRaw != null && seqRaw !== ''
-      ? parseInt(String(seqRaw).trim(), 10)
-      : NaN;
+    const seqNum = seqRaw != null && seqRaw !== '' ? parseInt(String(seqRaw).trim(), 10) : NaN;
+
+    const roleValue = getCell(r, colMap['role']);
+    const durationValue = getCell(r, colMap['duration']);
+    const notesValue = getCell(r, colMap['notes']);
+    const durationNumber = Number(durationValue);
 
     const activity: ParsedActivity = {
       seq: !isNaN(seqNum) && seqNum > 0 ? seqNum : fallbackSeq,
-      name: String(name).trim(),
-      type: parseType(String(getCell(r, colMap['type']) ?? '')),
-      phase: parsePhase(String(getCell(r, colMap['phase']) ?? '')),
-      assigneeNames: parseAssignees(String(getCell(r, colMap['assignee']) ?? '')),
-      roleName: (() => { const v = getCell(r, colMap['role']); return v != null && String(v).trim() !== '' ? String(v).trim() : undefined; })(),
-      planDuration: (() => {
-        const v = getCell(r, colMap['duration']);
-        if (v == null || v === '') return undefined;
-        const n = Number(v);
-        return isNaN(n) ? undefined : n;
-      })(),
+      name: cellToText(name),
+      type: parseType(cellToText(getCell(r, colMap['type']))),
+      phase: parsePhase(cellToText(getCell(r, colMap['phase']))),
+      assigneeNames: parseAssignees(cellToText(getCell(r, colMap['assignee']))),
+      roleName: roleValue != null && cellToText(roleValue) !== '' ? cellToText(roleValue) : undefined,
+      planDuration: durationValue == null || durationValue === '' || isNaN(durationNumber) ? undefined : durationNumber,
       planStartDate: excelDateToJS(getCell(r, colMap['planStart'])),
       planEndDate: excelDateToJS(getCell(r, colMap['planEnd'])),
       actualStartDate: excelDateToJS(getCell(r, colMap['actualStart'])),
       actualEndDate: excelDateToJS(getCell(r, colMap['actualEnd'])),
-      status: parseStatus(String(getCell(r, colMap['status']) ?? '')),
-      notes: (() => {
-        const v = getCell(r, colMap['notes']);
-        return v != null && String(v).trim() !== '' ? String(v).trim() : undefined;
-      })(),
-      predecessors: parsePredecessors(String(getCell(r, colMap['predecessor']) ?? '')),
+      status: parseStatus(cellToText(getCell(r, colMap['status']))),
+      notes: notesValue != null && cellToText(notesValue) !== '' ? cellToText(notesValue) : undefined,
+      predecessors: parsePredecessors(cellToText(getCell(r, colMap['predecessor']))),
     };
 
     fallbackSeq++;

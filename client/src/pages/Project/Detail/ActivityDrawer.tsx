@@ -217,7 +217,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx"
                   style={{ display: 'none' }}
                   onChange={handleImportExcel}
                 />
