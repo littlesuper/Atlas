@@ -77,7 +77,11 @@ export async function buildRiskContext(projectId: string): Promise<RiskContext> 
     }),
     prisma.activity.findMany({
       where: { projectId },
-      include: { assignees: { select: { id: true, realName: true } } },
+      include: {
+        executors: {
+          include: { user: { select: { id: true, realName: true } } },
+        },
+      },
     }),
     prisma.projectMember.count({ where: { projectId } }),
     prisma.riskAssessment.findMany({
@@ -117,7 +121,7 @@ export async function buildRiskContext(projectId: string): Promise<RiskContext> 
   );
 
   const unassignedCount = allActivities.filter(
-    a => a.assignees.length === 0 && a.status !== ActivityStatus.COMPLETED && a.status !== ActivityStatus.CANCELLED
+    a => a.executors.length === 0 && a.status !== ActivityStatus.COMPLETED && a.status !== ActivityStatus.CANCELLED
   ).length;
 
   // Average duration deviation
@@ -152,7 +156,7 @@ export async function buildRiskContext(projectId: string): Promise<RiskContext> 
       phase: a.phase,
       status: a.status,
       priority: a.priority,
-      assignees: a.assignees.map(u => u.realName),
+      assignees: a.executors.map(executor => executor.user.realName),
       planStartDate: a.planStartDate?.toISOString().slice(0, 10) || null,
       planEndDate: a.planEndDate?.toISOString().slice(0, 10) || null,
       planDuration: a.planDuration,

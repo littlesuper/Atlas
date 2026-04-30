@@ -9,7 +9,18 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const DB_PATH = path.resolve(__dirname, '../server/prisma/dev.db');
+function resolveSqlitePath(): string {
+  const databaseUrl = process.env.DATABASE_URL || 'file:./dev.db';
+  if (!databaseUrl.startsWith('file:')) {
+    return path.resolve(__dirname, '../server/prisma/dev.db');
+  }
+
+  const filePath = databaseUrl.slice('file:'.length);
+  if (path.isAbsolute(filePath)) return filePath;
+  return path.resolve(__dirname, '../server/prisma', filePath);
+}
+
+const DB_PATH = resolveSqlitePath();
 
 /** 在 SQLite 中执行 SQL 并返回输出 */
 function sql(query: string): string {

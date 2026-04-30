@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { validate } from './validate';
 
@@ -22,10 +22,10 @@ function mockRes() {
 }
 
 describe('validate middleware', () => {
-  let next: ReturnType<typeof vi.fn>;
+  let next: ReturnType<typeof vi.fn> & NextFunction;
 
   beforeEach(() => {
-    next = vi.fn();
+    next = vi.fn() as ReturnType<typeof vi.fn> & NextFunction;
   });
 
   // ─── 1. Valid body passes through and calls next() ───────

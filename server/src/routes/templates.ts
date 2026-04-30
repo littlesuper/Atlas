@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { isAdmin } from '../middleware/permission';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
@@ -263,8 +263,10 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
         const predecessors: PredecessorData[] = deps.map((d) => {
           const resolved = resolvedDates.get(d.id)!;
           return {
+            id: d.id,
             planStartDate: resolved.planStartDate,
             planEndDate: resolved.planEndDate,
+            planDuration: resolved.planDuration,
           };
         });
 
@@ -315,7 +317,7 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
             planStartDate: dates?.planStartDate || null,
             planEndDate: dates?.planEndDate || null,
             planDuration: dates?.planDuration || ta.planDuration || null,
-            dependencies: mappedDeps.length > 0 ? mappedDeps : null,
+            dependencies: mappedDeps.length > 0 ? mappedDeps : Prisma.JsonNull,
             notes: ta.notes,
             sortOrder: ta.sortOrder,
           },

@@ -11,6 +11,10 @@ function maskApiKey(key: string): string {
   return key ? '****' + key.slice(-4) : '';
 }
 
+interface ModelListResponse {
+  data?: Array<{ id?: string }>;
+}
+
 /**
  * 从其他配置中移除指定功能的绑定（确保一个功能只绑定一个配置）
  */
@@ -159,10 +163,10 @@ router.post(
         return;
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as ModelListResponse;
       // 标准 OpenAI 格式: { data: [{ id: "model-name", ... }] }
       const models: string[] = Array.isArray(result.data)
-        ? result.data.map((m: { id: string }) => m.id).filter(Boolean).sort()
+        ? result.data.map((m) => m.id).filter((id): id is string => Boolean(id)).sort()
         : [];
 
       res.json({ success: true, models, message: `获取到 ${models.length} 个模型` });

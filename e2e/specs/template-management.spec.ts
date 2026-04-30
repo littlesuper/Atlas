@@ -33,9 +33,11 @@ test.describe.serial('Template Management', () => {
     await goToTemplates(page);
 
     // Should show template list or empty state
-    await expect(
-      page.locator('.arco-table').or(page.locator('.arco-empty')).or(page.getByText('模板管理')),
-    ).toBeVisible({ timeout: 10_000 });
+    const pageReady = page
+      .getByText('模板管理')
+      .or(page.locator('.arco-table').first())
+      .or(page.locator('.arco-empty').first());
+    await expect(pageReady.first()).toBeVisible({ timeout: 10_000 });
   });
 
   // ──────── TC2: create template ────────

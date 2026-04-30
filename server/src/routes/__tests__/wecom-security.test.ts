@@ -18,6 +18,9 @@ const { mockPrisma, mockWecom, mockJwt } = vi.hoisted(() => {
       findUnique: vi.fn(),
       delete: vi.fn(),
     },
+    wecomConfig: {
+      findFirst: vi.fn(),
+    },
     projectMember: { findMany: vi.fn() },
     $transaction: vi.fn((fn: any) => fn(mockPrisma)),
   };

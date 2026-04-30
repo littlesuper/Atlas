@@ -60,7 +60,7 @@ const EXECUTOR_INCLUDE = {
     include: {
       user: { select: { id: true, realName: true, canLogin: true } },
     },
-    orderBy: [{ assignedAt: 'asc' }],
+    orderBy: [{ assignedAt: 'asc' as const }],
   },
   role: { select: { id: true, name: true } },
 };
@@ -190,9 +190,13 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
         include: {
           user: { select: { id: true, realName: true, canLogin: true } },
         },
-        orderBy: [{ assignedAt: 'asc' }],
+        orderBy: [{ assignedAt: 'asc' as const }],
       },
       role: { select: { id: true, name: true } },
+      checkItems: {
+        select: { id: true, checked: true },
+        orderBy: { sortOrder: 'asc' as const },
+      },
       _count: {
         select: { checkItems: true },
       },
@@ -642,7 +646,7 @@ router.put(
         const autoIds = await autoAssignByRole(effectiveRoleId);
         await prisma.activityExecutor.deleteMany({ where: { activityId: id } });
         updateData.executors = {
-          create: autoIds.map(uid => ({
+          create: autoIds.map((uid: string) => ({
             userId: uid,
             source: 'ROLE_AUTO',
             snapshotRoleId: effectiveRoleId,
@@ -662,7 +666,7 @@ router.put(
         const roleMemberIds = effectiveRoleId ? await autoAssignByRole(effectiveRoleId) : [];
         const roleMemberSet = new Set(roleMemberIds);
 
-        const executorData = executorIds.map(uid => {
+        const executorData = executorIds.map((uid: string) => {
           if (roleChanged && existingExecutorUserIds.has(uid) && !roleMemberSet.has(uid)) {
             return {
               userId: uid,
@@ -2019,19 +2023,22 @@ router.post(
       });
 
       // 解析并写回前置依赖（仅引用本次解析中存在 seq 的活动）
-      const depUpdates = toCreate
-        .map((a, idx) => {
+      type ResolvedImportDependency = { id: string; type: string; lag: number };
+      type ActivityDependencyUpdate = { activityId: string; dependencies: ResolvedImportDependency[] };
+
+      const depUpdates: ActivityDependencyUpdate[] = toCreate
+        .map<ActivityDependencyUpdate | null>((a, idx) => {
           if (!a.predecessors || a.predecessors.length === 0) return null;
           const resolved = a.predecessors
-            .map((p) => {
+            .map<ResolvedImportDependency | null>((p) => {
               const id = seqToActivityId.get(p.seq);
               return id ? { id, type: p.type, lag: p.lag } : null;
             })
-            .filter((d): d is { id: string; type: string; lag: number } => d !== null);
+            .filter((d): d is ResolvedImportDependency => d !== null);
           if (resolved.length === 0) return null;
           return { activityId: activities[idx].id, dependencies: resolved };
         })
-        .filter((u): u is { activityId: string; dependencies: { id: string; type: string; lag: number }[] } => u !== null);
+        .filter((u): u is ActivityDependencyUpdate => u !== null);
 
       if (depUpdates.length > 0) {
         await prisma.$transaction(

@@ -15,6 +15,15 @@ interface AiCallResult {
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
 
+interface AiApiResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
 /**
  * 按功能匹配 AI 配置：
  * 1. 查找 features 字段包含该 feature 的配置
@@ -88,7 +97,7 @@ export async function callAi(options: AiCallOptions): Promise<AiCallResult | nul
     throw new Error(`AI API 调用失败: ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = (await response.json()) as AiApiResponse;
   const content = result.choices?.[0]?.message?.content;
   const usage = result.usage;
 

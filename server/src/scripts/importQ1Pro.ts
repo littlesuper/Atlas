@@ -43,8 +43,8 @@ async function login() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: 'admin123' }),
   });
-  const data = await res.json();
-  TOKEN = data.accessToken;
+  const data = (await res.json()) as { accessToken?: string };
+  TOKEN = data.accessToken || '';
   console.log('✓ 登录成功');
 }
 
@@ -189,7 +189,7 @@ const ACTIVITIES: RawActivity[] = [
   { phase: 'DVT', name: '【测试】DVT整机测试-软件', assignees: '田萌', planDuration: 15, planStartDate: '2026-05-08', planEndDate: '2026-05-29', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【测试】DVT整机测试-工厂', assignees: '刘前程', planDuration: 10, planStartDate: '2026-05-08', planEndDate: '2026-05-22', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【结构】T0 模具评审', assignees: '叶鹏飞', planDuration: 2, planStartDate: '2026-05-15', planEndDate: '2026-05-18', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
-  { phase: 'DVT', name: '【商务流程】试产、量产下单', assignees: '刘前程', planDuration: 7, planStartDate: '2026-05-06', planEndDate: '2026-05-14', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '提前下整机生产订单' },
+  { phase: 'DVT', name: '【商务流程】试产、量产下单', assignees: '刘前程', planDuration: 7, planStartDate: '2026-05-06', planEndDate: '2026-05-14', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '提前下整机生产订单', notes: '' },
   { phase: 'DVT', name: '【结构】T0 样品生产', assignees: '刘前程', planDuration: 3, planStartDate: '2026-05-19', planEndDate: '2026-05-21', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【包材】样品确认(二次)', assignees: '成颖欣, 莫学舞', planDuration: 2, planStartDate: '2026-05-22', planEndDate: '2026-05-25', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【结构】T0 样品试装', assignees: '叶鹏飞', planDuration: 2, planStartDate: '2026-05-22', planEndDate: '2026-05-25', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
