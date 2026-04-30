@@ -461,7 +461,7 @@ describe('AUTH-033: password change invalidates old token', () => {
     const res = await request(app)
       .post('/api/auth/change-password')
       .send({ currentPassword: 'old123', newPassword: 'new123456' });
-    
+
     expect(res.status).toBe(200);
     // After password change, cache should be invalidated so old tokens get re-validated
     // The invalidateUserCache mock is already imported
