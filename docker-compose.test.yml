@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  atlas-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: atlas-test:local
+    container_name: atlas-test-app
+    init: true
+    environment:
+      NODE_ENV: development
+      PORT: '3000'
+      CLIENT_PORT: '5173'
+      CLIENT_ORIGIN: http://localhost:5174
+      CORS_ORIGINS: http://localhost:5174,http://127.0.0.1:5174,http://localhost:3001,http://127.0.0.1:3001
+      JWT_SECRET: atlas-test-jwt-secret # pragma: allowlist secret
+      JWT_REFRESH_SECRET: atlas-test-refresh-secret # pragma: allowlist secret
+      ATLAS_TEST_DB_FILE: docker-test.db
+      AI_API_KEY: ''
+      AI_API_URL: ''
+      WECOM_CORP_ID: ''
+      WECOM_AGENT_ID: ''
+      WECOM_SECRET: ''
+      WECOM_REDIRECT_URI: http://localhost:5174/login
+    ports:
+      - '3001:3000'
+      - '5174:5173'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://localhost:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: 'no'
+
+networks:
+  default:
+    name: atlas-test-network
