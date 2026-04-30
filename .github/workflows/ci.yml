@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: 20.19.0
 
 jobs:
   lint:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Use Node.js 20
+      - name: Use Node.js 20.19.0
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Use Node.js 20
+      - name: Use Node.js 20.19.0
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Use Node.js 20
+      - name: Use Node.js 20.19.0
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -96,7 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Use Node.js 20
+      - name: Use Node.js 20.19.0
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
