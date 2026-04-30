@@ -82,9 +82,9 @@ test.describe.serial('Activity Drag Sort', () => {
     await goToProject(page);
 
     // Look for 001, 002, 003 in the ID column
-    await expect(page.getByText('001')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('002')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('003')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('001', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('002', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('003', { exact: true })).toBeVisible({ timeout: 5_000 });
   });
 
   // ──────── TC3: drag activity to new position ────────
