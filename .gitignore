@@ -2,28 +2,54 @@
 node_modules/
 .pnp
 .pnp.js
+.venv/
+venv/
 
 # Testing
 coverage/
 test-results/
+playwright-report/
+playwright/.cache/
 e2e/.auth/
 
 # Production
 build/
 dist/
+.vercel/
+.netlify/
 
 # Misc
 .DS_Store
+.DS_Store?
+._*
+Thumbs.db
 .env
 .env.local
+.env.development
+.env.test
+.env.staging
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*.local
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+.aws/
+.gcloud/
+secrets/
+credentials/
+!.env.example
+!.env.*.example
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 *.log
 
 # IDE
@@ -33,18 +59,31 @@ yarn-error.log*
 *.swo
 *~
 
+# Caches / temporary files
+.cache/
+.eslintcache
+.parcel-cache/
+*.tmp
+*.bak
+
 # Prisma
 server/src/prisma/migrations/
 
 # Uploads
 server/uploads/
+uploads/
 
 # Database backups
 server/prisma/backups/
 
 # Local SQLite DB (never commit)
+*.sqlite
+*.sqlite3
+*.db
 server/prisma/*.db
 server/prisma/*.db-journal
+server/prisma/*.db-shm
+server/prisma/*.db-wal
 server/prisma/dev.db.backup_*
 
 # Runtime / deploy artifacts
@@ -53,3 +92,9 @@ server/prisma/dev.db.backup_*
 data/
 backups/
 review.md
+
+# Security-sensitive config
+**/secrets.json
+**/credentials.json
+**/private*.json
+**/*.private.*
