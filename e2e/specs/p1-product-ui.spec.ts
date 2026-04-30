@@ -33,35 +33,73 @@ test.describe.serial('P1 Product UI Tests', () => {
 
   // ──────── PROD-028: Compare button not visible with < 2 selected ────────
   test('PROD-028: compare button not visible with < 2 selected', async ({ authedPage: page }) => {
-    await clickNavItem(page, '产品管理');
-    await waitForTableLoad(page);
+    const token = await getToken(page);
+    const productPrefix = uniqueName('对比按钮测试');
+    const productNames = [`${productPrefix}-A`, `${productPrefix}-B`];
+    const createdProductIds: string[] = [];
 
-    const compareBtn = page.getByRole('button', { name: /对比/ });
-    let isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(isVisible).toBeFalsy();
+    const listResp = await page.request.get('/api/projects?pageSize=1', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const listData = await listResp.json();
+    const projectId = listData.data?.[0]?.id;
+    expect(projectId).toBeTruthy();
 
-    const dataRows = page.locator('main table').last().locator('tbody tr, [role="rowgroup"]:not(:first-child) [role="row"]');
-    const rowCount = await dataRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(2);
+    for (const [index, name] of productNames.entries()) {
+      const createResp = await page.request.post('/api/products', {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          name,
+          model: `CMP-${Date.now()}-${index}`,
+          revision: 'V1.0',
+          category: 'ROUTER',
+          status: 'DEVELOPING',
+          projectId,
+        },
+      });
+      expect(createResp.status()).toBeLessThan(400);
+      const product = await createResp.json();
+      createdProductIds.push(product.id);
+    }
 
-    await dataRows.nth(0).locator('td, [role="cell"]').first().click();
-    await page.waitForTimeout(300);
+    try {
+      await clickNavItem(page, '产品管理');
+      await waitForTableLoad(page);
 
-    isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(isVisible).toBeFalsy();
+      const compareBtn = page.getByRole('button', { name: /对比/ });
+      let isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+      expect(isVisible).toBeFalsy();
 
-    await dataRows.nth(1).locator('td, [role="cell"]').first().click();
-    await page.waitForTimeout(300);
+      const firstProductRow = page.getByRole('row').filter({ hasText: productNames[0] });
+      const secondProductRow = page.getByRole('row').filter({ hasText: productNames[1] });
+      await expect(firstProductRow).toBeVisible({ timeout: 10_000 });
+      await expect(secondProductRow).toBeVisible({ timeout: 10_000 });
 
-    await expect(compareBtn).toBeVisible({ timeout: 3_000 });
-    await expect(compareBtn).toHaveText(/对比.*2/);
+      await firstProductRow.locator('td, [role="cell"]').first().click();
+      await page.waitForTimeout(300);
 
-    await compareBtn.click();
-    const drawer = page.locator('.arco-drawer:visible');
-    await expect(drawer).toBeVisible({ timeout: 5_000 });
-    await expect(drawer.getByText(/产品对比/)).toBeVisible();
+      isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+      expect(isVisible).toBeFalsy();
 
-    await page.keyboard.press('Escape');
+      await secondProductRow.locator('td, [role="cell"]').first().click();
+      await page.waitForTimeout(300);
+
+      await expect(compareBtn).toBeVisible({ timeout: 3_000 });
+      await expect(compareBtn).toHaveText(/对比.*2/);
+
+      await compareBtn.click();
+      const drawer = page.locator('.arco-drawer:visible');
+      await expect(drawer).toBeVisible({ timeout: 5_000 });
+      await expect(drawer.getByText(/产品对比/)).toBeVisible();
+
+      await page.keyboard.press('Escape');
+    } finally {
+      for (const id of createdProductIds) {
+        await page.request.delete(`/api/products/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    }
   });
 
   // ──────── PROD-038: Status dropdown shows only allowed transitions ────────
