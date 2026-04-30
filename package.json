@@ -15,6 +15,11 @@
     "start": "npm run start --workspace=server",
     "lint": "eslint .",
     "lint:strict": "eslint . --max-warnings=0",
+    "test:env": "docker compose -f docker-compose.test.yml up --build",
+    "test:env:up": "docker compose -f docker-compose.test.yml up --build -d",
+    "test:env:down": "docker compose -f docker-compose.test.yml down --remove-orphans",
+    "test:env:logs": "docker compose -f docker-compose.test.yml logs -f atlas-test",
+    "test:env:start": "sh scripts/test-env-start.sh",
     "prepare": "husky"
   },
   "devDependencies": {
