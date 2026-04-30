@@ -173,4 +173,3 @@ CREATE UNIQUE INDEX "users_wecomUserId_key" ON "users"("wecomUserId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "weekly_reports_projectId_year_weekNumber_key" ON "weekly_reports"("projectId", "year", "weekNumber");
-

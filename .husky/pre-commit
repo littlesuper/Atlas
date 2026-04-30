@@ -1,1 +1,20 @@
 npx lint-staged
+
+python_user_bin="$(python3 -m site --user-base 2>/dev/null)/bin"
+if [ -d "$python_user_bin" ]; then
+  export PATH="$python_user_bin:$PATH"
+fi
+
+if ! command -v pre-commit >/dev/null 2>&1; then
+  echo "pre-commit is not installed."
+  echo "Install it with: python3 -m pip install --user pre-commit"
+  echo "Then run: pre-commit install-hooks"
+  exit 1
+fi
+
+if git diff --cached --quiet --diff-filter=ACMR --; then
+  pre-commit run --hook-stage pre-commit
+else
+  git diff --cached --name-only -z --diff-filter=ACMR -- \
+    | xargs -0 pre-commit run --hook-stage pre-commit --files
+fi
