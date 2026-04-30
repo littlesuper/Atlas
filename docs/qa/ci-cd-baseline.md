@@ -17,7 +17,7 @@ Atlas 目前使用 `.github/workflows/ci.yml` 作为主分支和 PR 的质量门
 
 - 增加 `concurrency`，同一分支或同一 PR 的旧运行会被取消，减少排队和重复消耗。
 - 增加 workflow 级 `permissions: contents: read`，按最小权限运行。
-- 增加 `NODE_VERSION` 统一配置，避免各 job 分散维护 Node 版本。
+- 增加 `NODE_VERSION` 统一配置，避免各 job 分散维护 Node 版本；当前固定为 `20.19.0`，与根 `package.json` 的 `engines.node` 基线一致。
 - 将 CI 依赖安装从 `npm install` 改为 `npm ci`，让 CI 使用锁文件做可复现安装。
 - 为每个 job 增加 `timeout-minutes`，避免异常挂起：
   - `lint`: 10 分钟

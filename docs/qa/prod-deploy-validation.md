@@ -65,7 +65,7 @@
 
 | ID | 检查项 | 排查 |
 |---|---|---|
-| A-301 | Node 版本 ≥ 20（deploy.sh 默认安装 20，部分依赖如 vitest@4 要求 ≥18） | `node -v` |
+| A-301 | Node 版本 ≥ 20.19.0（与根 `package.json` 的 `engines.node` 和 CI 基线一致） | `node -v` |
 | A-302 | `npm ci --production=false` 已执行成功 | `ls node_modules/tsx`、`ls server/node_modules/@prisma/client` |
 | A-303 | `npx prisma generate` 已执行 | `ls server/node_modules/.prisma/client` |
 | A-304 | `client/dist/index.html` 存在 | `ls client/dist/index.html` | 否则生产模式 SPA fallback 会 sendFile 一个不存在的文件，所有非 API 请求 500 |
