@@ -11,6 +11,7 @@
 | `week3-day3-4-template-prompt-trial.md` | Week 3 Day 3-4 需求模板与提示词试用记录 |
 | `week3-day5-retrospective.md` | Week 3 Day 5 第一次流程回顾执行表 |
 | `process-change-log.md` | AI 协作开发流程变更台账 |
+| `week3-acceptance.md` | Week 3 仓库侧验收与待业务确认事项 |
 
 ## 使用原则
 
