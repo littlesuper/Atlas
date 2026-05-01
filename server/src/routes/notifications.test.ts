@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
@@ -59,6 +59,10 @@ const app = express();
 app.use(express.json());
 app.use('/api/notifications', notificationsRoutes);
 
+afterEach(() => {
+  vi.useRealTimers();
+  mockUser.permissions = ['*:*'];
+});
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +123,26 @@ describe('GET /api/notifications', () => {
     expect(res.body.pageSize).toBe(20);
   });
 
+  it('sanitizes invalid pagination and caps pageSize', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.notification.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const res = await request(app).get('/api/notifications?page=-7&pageSize=5000');
+
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(1);
+    expect(res.body.pageSize).toBe(100);
+    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-1' },
+        skip: 0,
+        take: 100,
+      }),
+    );
+  });
+
   it('returns 500 on database error', async () => {
     mockPrisma.notification.findMany.mockRejectedValue(new Error('DB fail'));
     mockPrisma.notification.count.mockRejectedValue(new Error('DB fail'));
@@ -140,6 +164,28 @@ describe('PUT /api/notifications/:id/read', () => {
       id: 'n-1',
       userId: 'user-1',
       isRead: false,
+    });
+    mockPrisma.notification.update.mockResolvedValue({
+      id: 'n-1',
+      userId: 'user-1',
+      isRead: true,
+    });
+
+    const res = await request(app).put('/api/notifications/n-1/read');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(mockPrisma.notification.update).toHaveBeenCalledWith({
+      where: { id: 'n-1' },
+      data: { isRead: true },
+    });
+  });
+
+  it('treats an already-read notification as an idempotent success for its owner', async () => {
+    mockPrisma.notification.findUnique.mockResolvedValue({
+      id: 'n-1',
+      userId: 'user-1',
+      isRead: true,
     });
     mockPrisma.notification.update.mockResolvedValue({
       id: 'n-1',
@@ -378,6 +424,73 @@ describe('POST /api/notifications/generate', () => {
     expect(res.body.success).toBe(true);
     // Should generate for both assignee (user-2) and project manager (user-3)
     expect(res.body.generatedCount).toBe(2);
+  });
+
+  it('deduplicates milestone recipients when executor is also project manager', async () => {
+    mockPrisma.activity.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'm-1',
+          name: 'EVT样机冻结',
+          type: 'MILESTONE',
+          executors: [{ userId: 'user-2' }],
+          project: { name: '测试项目', managerId: 'user-2' },
+        },
+      ]);
+    mockPrisma.notification.findFirst.mockResolvedValue(null);
+    mockPrisma.notification.create.mockResolvedValue({});
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).post('/api/notifications/generate');
+
+    expect(res.status).toBe(200);
+    expect(res.body.generatedCount).toBe(1);
+    expect(mockPrisma.notification.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'user-2',
+          type: 'MILESTONE_APPROACHING',
+          relatedId: 'm-1',
+        }),
+      }),
+    );
+  });
+
+  it('generates weekly report reminders on Friday when report is missing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T10:00:00.000Z'));
+    mockPrisma.activity.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    mockPrisma.project.findMany.mockResolvedValue([
+      { id: 'proj-1', name: '关键项目', managerId: 'manager-1' },
+    ]);
+    mockPrisma.weeklyReport.findFirst.mockResolvedValue(null);
+    mockPrisma.notification.findFirst.mockResolvedValue(null);
+    mockPrisma.notification.create.mockResolvedValue({});
+
+    const res = await request(app).post('/api/notifications/generate');
+
+    expect(res.status).toBe(200);
+    expect(res.body.generatedCount).toBe(1);
+    expect(mockPrisma.weeklyReport.findFirst).toHaveBeenCalledWith({
+      where: {
+        projectId: 'proj-1',
+        weekStart: { gte: expect.any(Date) },
+      },
+    });
+    expect(mockPrisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'manager-1',
+          type: 'REPORT_REMINDER',
+          title: '周报提醒',
+          relatedId: 'proj-1',
+        }),
+      }),
+    );
   });
 
   it('returns 500 on database error', async () => {
