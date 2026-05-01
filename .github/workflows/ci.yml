@@ -144,7 +144,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: npx playwright test --project=setup --project=chromium
+        run: npm run test:e2e:core
         env:
           JWT_SECRET: ci-test-jwt-secret
           JWT_REFRESH_SECRET: ci-test-jwt-refresh-secret
