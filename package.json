@@ -18,6 +18,7 @@
     "audit": "npm audit --audit-level=high",
     "outdated": "npm outdated",
     "test": "npm run test --workspace=server && npm run test --workspace=client",
+    "test:integration": "npm run test:integration --workspace=server",
     "test:coverage": "npm run test:coverage --workspace=server && npm run test:coverage --workspace=client",
     "coverage:core": "node scripts/core-coverage-report.mjs",
     "test:env": "docker compose -f docker-compose.test.yml up --build",
