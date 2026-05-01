@@ -94,6 +94,29 @@ describe('GET /api/role-members', () => {
 describe('POST /api/role-members', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('returns 400 when role does not exist', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/role-members').send({ roleId: 'missing-role', userId: 'u1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('角色不存在');
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.roleMember.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when user does not exist', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'r1', name: '硬件工程师' });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/role-members').send({ roleId: 'r1', userId: 'missing-user' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('用户不存在');
+    expect(mockPrisma.roleMember.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.roleMember.create).not.toHaveBeenCalled();
+  });
+
   it('creates a new member', async () => {
     mockPrisma.role.findUnique.mockResolvedValue({ id: 'r1', name: '硬件工程师' });
     mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', realName: '张三' });
@@ -127,6 +150,16 @@ describe('POST /api/role-members', () => {
 
 describe('PATCH /api/role-members/:id', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('returns 404 when role member does not exist', async () => {
+    mockPrisma.roleMember.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).patch('/api/role-members/missing-member').send({ sortOrder: 1 });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('角色成员不存在');
+    expect(mockPrisma.roleMember.update).not.toHaveBeenCalled();
+  });
 
   it('updates sortOrder', async () => {
     mockPrisma.roleMember.findUnique.mockResolvedValue({ id: 'rm1', sortOrder: 0 });
@@ -164,10 +197,48 @@ describe('DELETE /api/role-members/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.cascadedActivityCount).toBe(1);
   });
+
+  it('cascades only selected activities in selective mode', async () => {
+    mockPrisma.roleMember.findUnique.mockResolvedValue({ id: 'rm1', roleId: 'r1', userId: 'u1', role: { name: '硬件工程师' }, user: { realName: '张三' } });
+    mockPrisma.roleMember.update.mockResolvedValue({ id: 'rm1', isActive: false });
+    mockFindActiveActivitiesByExecutor.mockResolvedValue([
+      { activityId: 'act-1', activityName: '结构评审', projectId: 'proj-1', projectName: '项目A' },
+      { activityId: 'act-2', activityName: 'PCB打样', projectId: 'proj-1', projectName: '项目A' },
+    ]);
+    mockPrisma.activityExecutor.deleteMany.mockResolvedValue({ count: 1 });
+    mockPrisma.activityExecutor.count.mockResolvedValue(0);
+    mockPrisma.activity.findUnique.mockResolvedValue({ id: 'act-2', name: 'PCB打样' });
+
+    const res = await request(app).delete('/api/role-members/rm1?cascadeMode=selective&cascadeActivityIds=act-2');
+
+    expect(res.status).toBe(200);
+    expect(res.body.cascadedActivityCount).toBe(1);
+    expect(res.body.remainingEmptyActivities).toEqual([{ id: 'act-2', name: 'PCB打样' }]);
+    expect(mockPrisma.activityExecutor.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'u1',
+        activityId: { in: ['act-2'] },
+      },
+    });
+  });
 });
 
 describe('POST /api/role-members/batch-set', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('returns 400 when batch target role does not exist', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/role-members/batch-set').send({
+      roleId: 'missing-role',
+      members: [{ userId: 'u1', sortOrder: 0 }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('角色不存在');
+    expect(mockPrisma.roleMember.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
 
   it('performs batch set (add, update, soft-delete)', async () => {
     mockPrisma.role.findUnique.mockResolvedValue({ id: 'r1', name: '硬件工程师' });
@@ -198,6 +269,16 @@ describe('POST /api/role-members/batch-set', () => {
 
 describe('GET /api/role-members/preview/:roleId', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('returns 404 when preview role does not exist', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/role-members/preview/missing-role');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('角色不存在');
+    expect(mockPrisma.roleMember.findMany).not.toHaveBeenCalled();
+  });
 
   it('returns preview with members', async () => {
     mockPrisma.role.findUnique.mockResolvedValue({ id: 'r1', name: '硬件工程师' });

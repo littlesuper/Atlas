@@ -121,6 +121,28 @@ describe('POST /api/check-items', () => {
     expect(res.body.sortOrder).toBe(3);
   });
 
+  it('trims title before storing a new check item', async () => {
+    mockPrisma.checkItem.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
+    mockPrisma.checkItem.create.mockResolvedValue({
+      id: 'ci-new',
+      activityId: 'a1',
+      title: '需要确认夹具图纸',
+      checked: false,
+      sortOrder: 0,
+    });
+
+    const res = await request(app)
+      .post('/api/check-items')
+      .send({ activityId: 'a1', title: '  需要确认夹具图纸  ' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.checkItem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ title: '需要确认夹具图纸' }),
+      }),
+    );
+  });
+
   it('sets sortOrder to 0 when no existing items', async () => {
     mockPrisma.checkItem.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     mockPrisma.checkItem.create.mockResolvedValue({
@@ -239,6 +261,25 @@ describe('PUT /api/check-items/:id', () => {
     expect(res.body.title).toBe('Updated Title');
   });
 
+  it('trims title before updating a check item', async () => {
+    mockPrisma.checkItem.update.mockResolvedValue({
+      id: 'ci-1',
+      title: '更新检查项',
+      checked: false,
+      sortOrder: 0,
+    });
+
+    const res = await request(app)
+      .put('/api/check-items/ci-1')
+      .send({ title: '  更新检查项  ' });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.checkItem.update).toHaveBeenCalledWith({
+      where: { id: 'ci-1' },
+      data: { title: '更新检查项' },
+    });
+  });
+
   it('updates checked status successfully', async () => {
     mockPrisma.checkItem.update.mockResolvedValue({
       id: 'ci-1',
@@ -303,6 +344,15 @@ describe('PUT /api/check-items/activity/:activityId/reorder', () => {
       .put('/api/check-items/activity/a1/reorder')
       .send({ items: 'bad' });
     expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when reorder items is empty', async () => {
+    const res = await request(app)
+      .put('/api/check-items/activity/a1/reorder')
+      .send({ items: [] });
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('reorders items successfully', async () => {
