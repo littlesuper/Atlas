@@ -75,11 +75,11 @@ jobs:
         run: cd server && npx prisma generate
 
       - name: Run server tests with coverage
-        run: cd server && npx vitest run --coverage.enabled --coverage.reporter=text --coverage.reporter=json-summary
+        run: npm run test:coverage --workspace=server
         continue-on-error: false
 
       - name: Run client tests with coverage
-        run: cd client && npx vitest run --coverage.enabled --coverage.reporter=text --coverage.reporter=json-summary
+        run: npm run test:coverage --workspace=client
         continue-on-error: false
 
       - name: Build client

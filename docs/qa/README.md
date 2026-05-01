@@ -10,6 +10,7 @@
 | `test-plan.md` | **完整测试用例**（380+ 条，16 个模块） |
 | `prod-deploy-validation.md` | 生产部署验证用例（42 条） |
 | `week2-acceptance.md` | Week 2 质量体系落地验收与差距 |
+| `unit-test-infrastructure.md` | Week 4 Day 1-2 单元测试基础设施与测试约定 |
 | `dependabot-triage-20260430.md` | 2026-04-30 首批 Dependabot PR 分流 |
 | `node-runtime-baseline.md` | Node.js 运行时与工具链版本基线 |
 | `reports/run-20260428.md` | 测试执行报告（最新） |
@@ -73,6 +74,12 @@ cd server && npm test
 
 # 前端单元测试（Vitest + jsdom）
 cd client && npm test
+
+# 前后端单元测试（仓库根目录统一入口）
+npm test
+
+# 前后端覆盖率报告（仓库根目录统一入口）
+npm run test:coverage
 
 # E2E（Playwright，含无障碍审计）
 npx playwright test                        # 全量
