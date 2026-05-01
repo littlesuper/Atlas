@@ -102,6 +102,9 @@ jobs:
         run: npm run test:coverage --workspace=server
         continue-on-error: false
 
+      - name: Report core module coverage
+        run: npm run coverage:core
+
       - name: Run client tests with coverage
         run: npm run test:coverage --workspace=client
         continue-on-error: false
