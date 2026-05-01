@@ -51,6 +51,12 @@
 7. `server/src/routes/products.ts`: 状态机非法逆向和 CSV 转义。
 8. `server/src/routes/auditLogs.ts`: 非授权用户查询审计日志被拒绝、筛选参数边界。
 
+## Day 3-4 补测批次记录
+
+| 日期 | 批次 | 覆盖模块 | 新增测试文件 | 场景数量 | 验证命令 | 结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-05-01 | Batch 1 | 活动评论、审计日志 | `server/src/routes/activityComments.test.ts`, `server/src/routes/auditLogs.test.ts` | 15 | `npx vitest run src/routes/activityComments.test.ts src/routes/auditLogs.test.ts` | 通过 |
+
 ## 需要业务确认的问题
 
 1. 上述 Top 10 是否就是 Atlas 上线前的核心功能？是否需要把"假期管理"提升到 Top 10？
