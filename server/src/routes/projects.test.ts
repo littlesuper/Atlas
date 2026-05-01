@@ -863,3 +863,131 @@ describe('PROJ-012: keyword search fuzzy match', () => {
     );
   });
 });
+
+describe('Week 4 Batch 4: project archive and snapshot boundaries', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('returns 404 for archive on a missing project without reading snapshot data', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/projects/missing-project/archive')
+      .send({ remark: 'missing' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('项目不存在');
+    expect(mockPrisma.activity.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.projectArchive.create).not.toHaveBeenCalled();
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not update project status when archive creation fails inside the transaction', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({
+      ...sampleProject,
+      status: 'IN_PROGRESS',
+      manager: { id: 'user-1', realName: 'Admin', username: 'admin' },
+      members: [],
+    });
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.riskAssessment.findMany.mockResolvedValue([]);
+    mockPrisma.activityComment.findMany.mockResolvedValue([]);
+    mockPrisma.projectArchive.create.mockRejectedValue(new Error('archive write failed'));
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/archive')
+      .send({ remark: 'will fail' });
+
+    expect(res.status).toBe(500);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.projectArchive.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+  });
+
+  it('creates a snapshot without changing the project status', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({
+      ...sampleProject,
+      status: 'IN_PROGRESS',
+      manager: { id: 'user-1', realName: 'Admin', username: 'admin' },
+      members: [],
+    });
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.riskAssessment.findMany.mockResolvedValue([]);
+    mockPrisma.activityComment.findMany.mockResolvedValue([]);
+    mockPrisma.projectArchive.create.mockResolvedValue({ id: 'snapshot-1', projectId: 'proj-1' });
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/snapshot')
+      .send({ remark: 'before release' });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.projectArchive.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        projectId: 'proj-1',
+        archivedBy: 'user-1',
+        remark: 'before release',
+        snapshot: expect.objectContaining({
+          project: expect.objectContaining({ status: 'IN_PROGRESS' }),
+        }),
+      }),
+    });
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('enriches archive history creators and leaves missing users as null', async () => {
+    const archivedAt = new Date('2026-05-01T08:00:00.000Z');
+    mockPrisma.projectArchive.findMany.mockResolvedValue([
+      { id: 'archive-1', archivedBy: 'user-2', archivedAt, remark: 'release' },
+      { id: 'archive-2', archivedBy: 'missing-user', archivedAt, remark: null },
+    ]);
+    mockPrisma.user.findMany.mockResolvedValue([
+      { id: 'user-2', realName: '张三', username: 'zhangsan' },
+    ]);
+
+    const res = await request(app).get('/api/projects/proj-1/archives');
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.projectArchive.findMany).toHaveBeenCalledWith({
+      where: { projectId: 'proj-1' },
+      select: {
+        id: true,
+        archivedBy: true,
+        archivedAt: true,
+        remark: true,
+      },
+      orderBy: { archivedAt: 'desc' },
+    });
+    expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['user-2', 'missing-user'] } },
+      select: { id: true, realName: true, username: true },
+    });
+    expect(res.body[0].creator).toEqual({ id: 'user-2', realName: '张三', username: 'zhangsan' });
+    expect(res.body[1].creator).toBeNull();
+  });
+
+  it('falls back to COMPLETED when unarchive snapshot has an invalid previous status', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ ...sampleProject, status: 'ARCHIVED' });
+    mockPrisma.projectArchive.findFirst.mockResolvedValue({
+      id: 'archive-1',
+      snapshot: { project: { status: 'ARCHIVED' } },
+    });
+    mockPrisma.project.update.mockResolvedValue({ ...sampleProject, status: 'COMPLETED' });
+
+    const res = await request(app).post('/api/projects/proj-1/unarchive');
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.project.update).toHaveBeenCalledWith({
+      where: { id: 'proj-1' },
+      data: { status: 'COMPLETED' },
+      include: {
+        manager: { select: { id: true, realName: true, username: true } },
+        _count: { select: { activities: true, products: true } },
+      },
+    });
+  });
+});

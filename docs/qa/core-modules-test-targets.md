@@ -58,6 +58,7 @@
 | 2026-05-01 | Batch 1 | 活动评论、审计日志 | `server/src/routes/activityComments.test.ts`, `server/src/routes/auditLogs.test.ts` | 15 | `npx vitest run src/routes/activityComments.test.ts src/routes/auditLogs.test.ts` | 通过 |
 | 2026-05-01 | Batch 2 | 角色成员、通知、检查项 | `server/src/routes/roleMembers.test.ts`, `server/src/routes/notifications.test.ts`, `server/src/routes/checkItems.test.ts` | 13 | `npx vitest run src/routes/roleMembers.test.ts src/routes/notifications.test.ts src/routes/checkItems.test.ts` | 通过 |
 | 2026-05-01 | Batch 3 | 风险项、上传 | `server/src/routes/riskItems.test.ts`, `server/src/routes/uploads.test.ts` | 16 | `npx vitest run src/routes/riskItems.test.ts src/routes/uploads.test.ts` | 通过 |
+| 2026-05-01 | Batch 4 | 项目归档/快照、活动批量操作 | `server/src/routes/projects.test.ts`, `server/src/routes/activities.test.ts` | 9 | `npx vitest run src/routes/projects.test.ts src/routes/activities.test.ts` | 通过 |
 
 ## 需要业务确认的问题
 

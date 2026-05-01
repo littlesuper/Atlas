@@ -1618,3 +1618,104 @@ describe('ACT-040: cross-project batch update returns 400', () => {
     expect(res.body.error).toBe('批量操作仅支持同一项目的活动');
   });
 });
+
+describe('Week 4 Batch 4: activity batch operation side-effect guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCanManage.mockReturnValue(true);
+  });
+
+  it('does not update anything when batch update ids match no activities', async () => {
+    const { updateProjectProgress } = await import('../utils/projectProgress');
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .put('/api/activities/batch-update')
+      .send({
+        ids: ['missing-1', 'missing-2'],
+        updates: { status: 'IN_PROGRESS' },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('批量操作仅支持同一项目的活动');
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.activity.update).not.toHaveBeenCalled();
+    expect(updateProjectProgress).not.toHaveBeenCalled();
+  });
+
+  it('clears and recreates executors for every activity in a batch assignee update', async () => {
+    mockPrisma.activity.findMany.mockResolvedValue([
+      { id: 'act-1', projectId: 'proj-1' },
+      { id: 'act-2', projectId: 'proj-1' },
+    ]);
+    mockPrisma.project.findUnique.mockResolvedValue({ managerId: 'user-1' });
+    mockPrisma.activityExecutor.deleteMany.mockResolvedValue({ count: 1 });
+    mockPrisma.activity.update.mockResolvedValue({});
+
+    const res = await request(app)
+      .put('/api/activities/batch-update')
+      .send({
+        ids: ['act-1', 'act-2'],
+        updates: { assigneeIds: ['user-2', 'user-3'] },
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.activityExecutor.deleteMany).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.activityExecutor.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: { activityId: 'act-1' },
+    });
+    expect(mockPrisma.activity.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'act-1' },
+      data: {
+        executors: {
+          create: [
+            { userId: 'user-2', source: 'MANUAL_ADD', assignedBy: 'user-1' },
+            { userId: 'user-3', source: 'MANUAL_ADD', assignedBy: 'user-1' },
+          ],
+        },
+      },
+    });
+    expect(mockPrisma.activity.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'act-2' },
+      data: {
+        executors: {
+          create: [
+            { userId: 'user-2', source: 'MANUAL_ADD', assignedBy: 'user-1' },
+            { userId: 'user-3', source: 'MANUAL_ADD', assignedBy: 'user-1' },
+          ],
+        },
+      },
+    });
+  });
+
+  it('does not delete activities or update progress when batch delete permission is denied', async () => {
+    const { updateProjectProgress } = await import('../utils/projectProgress');
+    mockPrisma.activity.findMany.mockResolvedValue([
+      { id: 'act-1', projectId: 'proj-1' },
+      { id: 'act-2', projectId: 'proj-1' },
+    ]);
+    mockPrisma.project.findUnique.mockResolvedValue({ managerId: 'manager-1' });
+    mockCanManage.mockReturnValue(false);
+
+    const res = await request(app)
+      .delete('/api/activities/batch-delete')
+      .send({ ids: ['act-1', 'act-2'] });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('无权操作');
+    expect(mockPrisma.activity.deleteMany).not.toHaveBeenCalled();
+    expect(updateProjectProgress).not.toHaveBeenCalled();
+  });
+
+  it('does not reorder activities when reorder payload is invalid', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+
+    const res = await request(app)
+      .put('/api/activities/project/proj-1/reorder')
+      .send({ items: null });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('无效的排序数据');
+    expect(mockPrisma.activity.update).not.toHaveBeenCalled();
+  });
+});
