@@ -94,7 +94,7 @@ Atlas/
 │   ├── helpers/           # Arco Design UI 交互工具函数
 │   └── specs/             # 测试用例（55 个文件）
 ├── specs/                 # 模块规格说明书
-├── docs/                  # 补充文档（QA 测试计划与报告）
+├── docs/                  # 补充文档（QA 测试计划、报告、AI 协作流程）
 └── package.json           # monorepo 根配置（npm workspaces）
 ```
 
