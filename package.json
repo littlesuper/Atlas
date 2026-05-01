@@ -19,6 +19,7 @@
     "outdated": "npm outdated",
     "test": "npm run test --workspace=server && npm run test --workspace=client",
     "test:coverage": "npm run test:coverage --workspace=server && npm run test:coverage --workspace=client",
+    "coverage:core": "node scripts/core-coverage-report.mjs",
     "test:env": "docker compose -f docker-compose.test.yml up --build",
     "test:env:up": "docker compose -f docker-compose.test.yml up --build -d",
     "test:env:down": "docker compose -f docker-compose.test.yml down --remove-orphans",
