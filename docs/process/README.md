@@ -8,6 +8,7 @@
 | --- | --- |
 | `atlas-ai-development-workflow.md` | Atlas 版 14 步 AI 协作开发流程 |
 | `week3-day1-2-training.md` | Week 3 Day 1-2 流程培训执行包与实战记录模板 |
+| `week3-day3-4-template-prompt-trial.md` | Week 3 Day 3-4 需求模板与提示词试用记录 |
 
 ## 使用原则
 
@@ -16,3 +17,9 @@
 3. 每个阶段都要留下可追溯产物：需求文档、验收场景、测试、PR、CI 结果、上线验证。
 4. 小修复可以走简化流程，但不能跳过测试和 PR 门禁。
 5. 遇到密钥、生产配置、数据库迁移、已部署服务影响时，必须暂停并让 AI 代码守护人确认。
+
+## 相关入口
+
+- 需求模板：`docs/requirements/REQUIREMENT_TEMPLATE.md`
+- 需求文档目录：`docs/requirements/`
+- 提示词库：`docs/prompts/`
