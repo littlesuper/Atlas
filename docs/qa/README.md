@@ -11,6 +11,7 @@
 | `prod-deploy-validation.md` | 生产部署验证用例（42 条） |
 | `week2-acceptance.md` | Week 2 质量体系落地验收与差距 |
 | `unit-test-infrastructure.md` | Week 4 Day 1-2 单元测试基础设施与测试约定 |
+| `core-modules-test-targets.md` | Week 4 Day 3-4 核心模块候选清单与补测目标 |
 | `dependabot-triage-20260430.md` | 2026-04-30 首批 Dependabot PR 分流 |
 | `node-runtime-baseline.md` | Node.js 运行时与工具链版本基线 |
 | `reports/run-20260428.md` | 测试执行报告（最新） |
