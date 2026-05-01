@@ -14,13 +14,13 @@
 
 | 步骤 | 动作 | Atlas 产物 | 通过标准 |
 | --- | --- | --- | --- |
-| 1 | 需求结构化 | `docs/requirements/REQ-XXX-*.md` | 需求模板字段完整，无"待定" |
-| 2 | 需求审查 | AI 需求审查记录 | 无阻断级问题，重要问题已有明确回答 |
+| 1 | 需求结构化 | `docs/requirements/REQ-XXX-*.md` | 使用 `docs/requirements/REQUIREMENT_TEMPLATE.md`，字段完整，无"待定" |
+| 2 | 需求审查 | `docs/prompts/01-需求澄清提示词.md` 的审查记录 | 无阻断级问题，重要问题已有明确回答 |
 | 3 | 定义验收标准 | Gherkin 场景写入需求文档 | 每条验收标准都能转成自动化测试 |
 | 4 | 建分支和任务边界 | `codex/<topic>` 或团队约定分支 | 只包含本需求范围 |
-| 5 | 生成或修改代码 | 前端、后端、Prisma、测试相关文件 | 遵守 Atlas 架构约束 |
-| 6 | 生成测试 | Vitest / Playwright / Supertest 测试 | 覆盖正常、异常、权限、边界场景 |
-| 7 | AI 自审 | AI 代码审查记录 | 无安全、权限、数据破坏类阻断问题 |
+| 5 | 生成或修改代码 | 使用 `docs/prompts/02-代码生成提示词.md`，产出前端、后端、Prisma、测试相关文件 | 遵守 Atlas 架构约束 |
+| 6 | 生成测试 | 使用 `docs/prompts/04-测试生成提示词.md`，产出 Vitest / Playwright / Supertest 测试 | 覆盖正常、异常、权限、边界场景 |
+| 7 | AI 自审 | 使用 `docs/prompts/03-代码审查提示词.md` 的审查记录 | 无安全、权限、数据破坏类阻断问题 |
 | 8 | 本地验证 | 命令输出或截图 | 相关 lint、test、build 通过 |
 | 9 | 提交 PR | GitHub PR | 描述包含需求、测试、风险 |
 | 10 | 处理 CI 反馈 | PR checks | `lint`、`security`、`test`、`e2e-core` 通过 |
