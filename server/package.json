@@ -12,6 +12,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "test": "vitest run",
+    "test:integration": "vitest run src/__tests__/integration",
     "test:coverage": "vitest run --coverage.enabled",
     "test:watch": "vitest"
   },
