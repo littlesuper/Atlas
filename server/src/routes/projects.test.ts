@@ -22,6 +22,7 @@ const { mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
       updateMany: vi.fn(),
@@ -37,7 +38,10 @@ const { mockPrisma } = vi.hoisted(() => {
     weeklyReport: { findMany: vi.fn() },
     riskAssessment: { findMany: vi.fn() },
     activityComment: { findMany: vi.fn() },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn((arg: any) => {
+      if (Array.isArray(arg)) return Promise.all(arg);
+      return arg(mockPrisma);
+    }),
   };
   return { mockPrisma };
 });
@@ -91,7 +95,8 @@ vi.mock('../utils/validation', () => ({
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 
-import projectRoutes from './projects';
+import { invalidateUserCache } from '../middleware/auth';
+import projectRoutes, { rejectIfArchived } from './projects';
 
 const app = express();
 app.use(express.json());
@@ -989,5 +994,453 @@ describe('Week 4 Batch 4: project archive and snapshot boundaries', () => {
         _count: { select: { activities: true, products: true } },
       },
     });
+  });
+});
+
+describe('Week 4 coverage closure: project route branch behavior', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('applies keyword and multi-product-line filters to both stats and list queries', async () => {
+    mockPrisma.project.count.mockResolvedValue(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/projects?page=2&pageSize=5&status=COMPLETED&keyword=Alpha&productLine=Router,%20Switch');
+
+    expect(res.status).toBe(200);
+    const expectedSearch = [
+      { name: { contains: 'Alpha' } },
+      { description: { contains: 'Alpha' } },
+    ];
+    const expectedProductLine = [
+      { OR: [{ productLine: { in: ['Router', 'Switch'] } }, { productLine: null }] },
+    ];
+
+    expect(mockPrisma.project.count.mock.calls[0][0].where).toEqual({
+      OR: expectedSearch,
+      AND: expectedProductLine,
+    });
+    expect(mockPrisma.project.count.mock.calls[1][0].where).toEqual({
+      OR: expectedSearch,
+      AND: expectedProductLine,
+      status: 'IN_PROGRESS',
+    });
+    expect(mockPrisma.project.count.mock.calls[5][0].where).toEqual({
+      status: 'COMPLETED',
+      OR: expectedSearch,
+      AND: expectedProductLine,
+    });
+    expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: 'COMPLETED',
+          OR: expectedSearch,
+          AND: expectedProductLine,
+        },
+        skip: 5,
+        take: 5,
+      })
+    );
+  });
+
+  it('returns a single archive snapshot before the generic project detail route can match it', async () => {
+    mockPrisma.projectArchive.findUnique.mockResolvedValue({
+      id: 'archive-1',
+      projectId: 'proj-1',
+      snapshot: { project: { name: 'Archived Project' } },
+    });
+
+    const res = await request(app).get('/api/projects/archives/archive-1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe('archive-1');
+    expect(mockPrisma.projectArchive.findUnique).toHaveBeenCalledWith({
+      where: { id: 'archive-1' },
+    });
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when a requested archive snapshot does not exist', async () => {
+    mockPrisma.projectArchive.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/projects/archives/missing-archive');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('归档记录不存在');
+  });
+
+  it('rejects invalid update priority before writing project changes', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+
+    const res = await request(app)
+      .put('/api/projects/proj-1')
+      .send({ priority: 'URGENT' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/优先级/);
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid update date ranges before writing project changes', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+
+    const res = await request(app)
+      .put('/api/projects/proj-1')
+      .send({ startDate: '2026-12-01', endDate: '2026-01-01' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/结束日期/);
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+  });
+
+  it('normalizes blank update dates to null values', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.project.update.mockResolvedValue({
+      ...sampleProject,
+      startDate: null,
+      endDate: null,
+    });
+
+    const res = await request(app)
+      .put('/api/projects/proj-1')
+      .send({ startDate: '', endDate: '' });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'proj-1' },
+        data: { startDate: null, endDate: null },
+      })
+    );
+  });
+
+  it('returns project members with user display fields', async () => {
+    mockPrisma.projectMember.findMany.mockResolvedValue([
+      {
+        id: 'member-1',
+        projectId: 'proj-1',
+        userId: 'user-2',
+        role: 'HW_DEV',
+        user: { id: 'user-2', realName: 'Member', username: 'member' },
+      },
+    ]);
+
+    const res = await request(app).get('/api/projects/proj-1/members');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(mockPrisma.projectMember.findMany).toHaveBeenCalledWith({
+      where: { projectId: 'proj-1' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            realName: true,
+            username: true,
+          },
+        },
+      },
+    });
+  });
+
+  it('rejects member creation when userId is missing or the role is invalid', async () => {
+    const missingUserId = await request(app)
+      .post('/api/projects/proj-1/members')
+      .send({ role: 'COLLABORATOR' });
+    expect(missingUserId.status).toBe(400);
+    expect(missingUserId.body.error).toBe('用户ID不能为空');
+
+    const invalidRole = await request(app)
+      .post('/api/projects/proj-1/members')
+      .send({ userId: 'user-2', role: 'MANAGER' });
+    expect(invalidRole.status).toBe(400);
+    expect(invalidRole.body.error).toBe('角色值非法');
+
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.projectMember.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects adding the project manager as a PROJECT_MANAGER member', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/members')
+      .send({ userId: 'user-1', role: 'PROJECT_MANAGER' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('项目经理已是该项目负责人');
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.projectMember.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the member user does not exist', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/members')
+      .send({ userId: 'ghost-user', role: 'COLLABORATOR' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('用户不存在');
+    expect(mockPrisma.projectMember.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.projectMember.create).not.toHaveBeenCalled();
+  });
+
+  it('adds a member and invalidates that user cache', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-2', realName: 'Member' });
+    mockPrisma.projectMember.findUnique.mockResolvedValue(null);
+    mockPrisma.projectMember.create.mockResolvedValue({
+      id: 'member-1',
+      projectId: 'proj-1',
+      userId: 'user-2',
+      role: 'HW_DEV',
+      user: { id: 'user-2', realName: 'Member', username: 'member' },
+    });
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/members')
+      .send({ userId: 'user-2', role: 'HW_DEV' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.projectMember.create).toHaveBeenCalledWith({
+      data: { projectId: 'proj-1', userId: 'user-2', role: 'HW_DEV' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            realName: true,
+            username: true,
+          },
+        },
+      },
+    });
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-2');
+  });
+
+  it('bulk-replaces members after deduplicating entries and invalidates old plus new users', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.projectMember.findMany
+      .mockResolvedValueOnce([
+        { id: 'old-1', projectId: 'proj-1', userId: 'old-user', role: 'COLLABORATOR' },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'new-1',
+          projectId: 'proj-1',
+          userId: 'user-2',
+          role: 'HW_DEV',
+          user: { id: 'user-2', realName: 'Member 2', username: 'member2' },
+        },
+        {
+          id: 'new-2',
+          projectId: 'proj-1',
+          userId: 'user-3',
+          role: 'SW_DEV',
+          user: { id: 'user-3', realName: 'Member 3', username: 'member3' },
+        },
+      ]);
+    mockPrisma.projectMember.deleteMany.mockResolvedValue({ count: 1 });
+    mockPrisma.projectMember.createMany.mockResolvedValue({ count: 2 });
+
+    const res = await request(app)
+      .put('/api/projects/proj-1/members')
+      .send({
+        members: [
+          { userId: 'user-2', role: 'HW_DEV' },
+          { userId: 'user-2', role: 'HW_DEV' },
+          { userId: 'user-3', role: 'SW_DEV' },
+        ],
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.projectMember.deleteMany).toHaveBeenCalledWith({
+      where: { projectId: 'proj-1' },
+    });
+    expect(mockPrisma.projectMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { projectId: 'proj-1', userId: 'user-2', role: 'HW_DEV' },
+        { projectId: 'proj-1', userId: 'user-3', role: 'SW_DEV' },
+      ],
+    });
+    expect(invalidateUserCache).toHaveBeenCalledWith('old-user');
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-2');
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-3');
+    expect(res.body).toHaveLength(2);
+  });
+
+  it('rejects invalid bulk member payloads before loading the project', async () => {
+    const notArray = await request(app)
+      .put('/api/projects/proj-1/members')
+      .send({ members: 'user-2' });
+    expect(notArray.status).toBe(400);
+    expect(notArray.body.error).toBe('members 必须是数组');
+
+    const invalidMember = await request(app)
+      .put('/api/projects/proj-1/members')
+      .send({ members: [{ userId: '', role: 'HW_DEV' }] });
+    expect(invalidMember.status).toBe(400);
+    expect(invalidMember.body.error).toBe('成员或角色值非法');
+
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('removes one member role and invalidates that user cache', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.projectMember.findUnique.mockResolvedValue({
+      id: 'member-1',
+      projectId: 'proj-1',
+      userId: 'user-2',
+      role: 'HW_DEV',
+    });
+    mockPrisma.projectMember.delete.mockResolvedValue({});
+
+    const res = await request(app)
+      .delete('/api/projects/proj-1/members/user-2?role=HW_DEV');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(mockPrisma.projectMember.delete).toHaveBeenCalledWith({
+      where: { projectId_userId_role: { projectId: 'proj-1', userId: 'user-2', role: 'HW_DEV' } },
+    });
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-2');
+  });
+
+  it('returns 404 when removing a user with no project member rows', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.projectMember.deleteMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app)
+      .delete('/api/projects/proj-1/members/user-2');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('该用户不是协作者');
+    expect(invalidateUserCache).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when removing an invalid member role', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+
+    const res = await request(app)
+      .delete('/api/projects/proj-1/members/user-2?role=MANAGER');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('角色值非法');
+    expect(mockPrisma.projectMember.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.projectMember.delete).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when unarchiving a project that is not archived', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+
+    const res = await request(app).post('/api/projects/proj-1/unarchive');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('项目未处于归档状态');
+    expect(mockPrisma.projectArchive.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+  });
+
+  it('falls back to COMPLETED when unarchiving has no archive snapshot', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ ...sampleProject, status: 'ARCHIVED' });
+    mockPrisma.projectArchive.findFirst.mockResolvedValue(null);
+    mockPrisma.project.update.mockResolvedValue({ ...sampleProject, status: 'COMPLETED' });
+
+    const res = await request(app).post('/api/projects/proj-1/unarchive');
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: 'COMPLETED' },
+      })
+    );
+  });
+
+  it('returns 404 without querying snapshot data when snapshot project is missing', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/projects/missing-project/snapshot')
+      .send({ remark: 'missing' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('项目不存在');
+    expect(mockPrisma.activity.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.projectArchive.create).not.toHaveBeenCalled();
+  });
+
+  it('passes through when rejectIfArchived cannot resolve a project id', async () => {
+    const next = vi.fn();
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    await rejectIfArchived(() => undefined)({} as any, res as any, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('blocks writes when rejectIfArchived sees an archived project', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ status: 'ARCHIVED' });
+    const next = vi.fn();
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    await rejectIfArchived((req) => req.params.projectId)(
+      { params: { projectId: 'proj-1' } } as any,
+      res as any,
+      next
+    );
+
+    expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
+      where: { id: 'proj-1' },
+      select: { status: true },
+    });
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: '归档项目不可修改' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('passes through when rejectIfArchived sees an active or missing project', async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({ status: 'IN_PROGRESS' }).mockResolvedValueOnce(null);
+    const next = vi.fn();
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    const middleware = rejectIfArchived((req) => req.params.projectId);
+
+    await middleware({ params: { projectId: 'active-project' } } as any, res as any, next);
+    await middleware({ params: { projectId: 'missing-project' } } as any, res as any, next);
+
+    expect(next).toHaveBeenCalledTimes(2);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('forwards database errors from rejectIfArchived to next', async () => {
+    const dbError = new Error('project lookup failed');
+    mockPrisma.project.findUnique.mockRejectedValue(dbError);
+    const next = vi.fn();
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    await rejectIfArchived((req) => req.params.projectId)(
+      { params: { projectId: 'proj-1' } } as any,
+      res as any,
+      next
+    );
+
+    expect(next).toHaveBeenCalledWith(dbError);
+    expect(res.status).not.toHaveBeenCalled();
   });
 });
