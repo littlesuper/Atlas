@@ -9,6 +9,8 @@
 | `atlas-ai-development-workflow.md` | Atlas 版 14 步 AI 协作开发流程 |
 | `week3-day1-2-training.md` | Week 3 Day 1-2 流程培训执行包与实战记录模板 |
 | `week3-day3-4-template-prompt-trial.md` | Week 3 Day 3-4 需求模板与提示词试用记录 |
+| `week3-day5-retrospective.md` | Week 3 Day 5 第一次流程回顾执行表 |
+| `process-change-log.md` | AI 协作开发流程变更台账 |
 
 ## 使用原则
 
@@ -23,3 +25,4 @@
 - 需求模板：`docs/requirements/REQUIREMENT_TEMPLATE.md`
 - 需求文档目录：`docs/requirements/`
 - 提示词库：`docs/prompts/`
+- 流程变更台账：`docs/process/process-change-log.md`
