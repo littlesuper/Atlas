@@ -18,7 +18,7 @@ Atlas 在 CI 中新增 `ai-code-review` job，用 `prompts/03-代码审查提示
 
 ## 配置
 
-需要在 GitHub repository secret 中配置：
+如果要启用真实 Claude 审查，需要在 GitHub repository secret 中配置：
 
 - `ANTHROPIC_API_KEY`：Claude API key。
 
@@ -27,6 +27,15 @@ Atlas 在 CI 中新增 `ai-code-review` job，用 `prompts/03-代码审查提示
 - `AI_REVIEW_MODEL`：Claude model，默认 `claude-sonnet-4-6`。
 
 不要把 API key 写入仓库、workflow 文件、日志或 PR 描述。
+
+## 当前项目决策
+
+2026-05-01 决定暂不配置 `ANTHROPIC_API_KEY`。因此当前状态为：
+
+- `ai-code-review` job 保留在 CI 中，作为后续启用 AI 审查的框架。
+- PR 触发时，如果没有 `ANTHROPIC_API_KEY`，job 会记录跳过原因并成功退出。
+- 不调用 Claude API，不产生 API 费用，不生成 PR 审查评论。
+- 不加入 GitHub required checks，不影响 `lint`、`security`、`test`、`e2e-core` 门禁。
 
 ## 非阻断策略
 
