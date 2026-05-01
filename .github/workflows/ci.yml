@@ -55,6 +55,30 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high
 
+  ai-code-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Node.js 20.19.0
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run AI Code Review (advisory)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL || 'claude-sonnet-4-6' }}
+        run: node .github/scripts/ai-code-review.mjs
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
