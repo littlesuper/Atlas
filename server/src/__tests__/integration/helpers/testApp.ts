@@ -11,23 +11,30 @@ export interface IntegrationTestContext {
   app: Express;
   prisma: PrismaClient;
   dbDir: string;
+  databaseUrl: string;
   seed: {
     adminUser: { id: string; username: string | null; realName: string };
     project: { id: string; name: string };
   };
 }
 
-export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
-  const dbDir = mkdtempSync(join(tmpdir(), 'atlas-integration-'));
-  const databaseUrl = `file:${join(dbDir, 'test.db')}`;
+export interface IntegrationDatabaseContext {
+  prisma: PrismaClient;
+  dbDir: string;
+  databaseUrl: string;
+}
 
+interface SetupIntegrationDatabaseOptions {
+  updateProcessEnv?: boolean;
+}
+
+export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
   process.env.NODE_ENV = 'test';
-  process.env.DATABASE_URL = databaseUrl;
   process.env.JWT_SECRET = 'atlas-integration-jwt-secret'; // pragma: allowlist secret
   process.env.JWT_REFRESH_SECRET = 'atlas-integration-refresh-secret'; // pragma: allowlist secret
 
-  const prisma = new PrismaClient();
-  await applySchema(prisma, databaseUrl);
+  const database = await setupIntegrationDatabase({ updateProcessEnv: true });
+  const { prisma } = database;
   const seed = await seedAuthProjectFlow(prisma);
 
   vi.resetModules();
@@ -36,12 +43,34 @@ export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
   return {
     app: createApp(),
     prisma,
-    dbDir,
+    dbDir: database.dbDir,
+    databaseUrl: database.databaseUrl,
     seed,
   };
 }
 
 export async function cleanupIntegrationTest(context?: IntegrationTestContext): Promise<void> {
+  await cleanupIntegrationDatabase(context);
+}
+
+export async function setupIntegrationDatabase(
+  options: SetupIntegrationDatabaseOptions = {}
+): Promise<IntegrationDatabaseContext> {
+  const dbDir = mkdtempSync(join(tmpdir(), 'atlas-integration-'));
+  const databaseUrl = `file:${join(dbDir, 'test.db')}`;
+
+  process.env.NODE_ENV = 'test';
+  if (options.updateProcessEnv) {
+    process.env.DATABASE_URL = databaseUrl;
+  }
+
+  const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
+  await applySchema(prisma, databaseUrl);
+
+  return { prisma, dbDir, databaseUrl };
+}
+
+export async function cleanupIntegrationDatabase(context?: IntegrationDatabaseContext): Promise<void> {
   if (!context) {
     return;
   }
