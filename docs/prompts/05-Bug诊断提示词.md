@@ -16,6 +16,8 @@
 - 防止Bug再次出现(写测试用例)
 - 沉淀经验(更新CLAUDE.md规范)
 
+Atlas 项目事实:前端 React/Vite/Arco/Zustand,后端 Express/Prisma/Zod/Pino,测试为 Vitest/Supertest/Playwright。诊断时优先要求提供 requestId、浏览器控制台、Network 响应、server Pino 日志、Sentry issue(如已配置)、相关 PR/commit、复现账号角色和 Feature Flag 状态。
+
 【诊断方法论:5 Why分析】
 
 不要满足于"找到一个看起来对的修改",而要追问:
@@ -58,6 +60,7 @@
 - 如何验证?(查看哪些代码、日志、数据)
 - 验证的预期结果?
 - 如果假设成立会有什么征兆?
+- 对 Atlas,请明确要运行哪些命令,例如 `npm run lint`、`npm test`、`npm run test:e2e:core`、`cd server && npx prisma generate && npm test`
 
 如果需要用户提供更多信息(如具体日志、相关代码),**列出请求清单**。
 
@@ -86,11 +89,13 @@
 - 最快能让用户恢复服务的方法
 - 可能是临时workaround(如关Feature Flag、回滚)
 - 评估副作用
+- 如果涉及生产环境、密钥、数据库迁移或真实用户数据,必须先请求人工确认
 
 ### 6.2 根本修复方案
 - 解决根本问题
 - 可能需要重构、改架构、改流程
 - 评估实施成本
+- 指出需要新增/修改的 Vitest、Supertest 或 Playwright 防回归测试
 
 ### 6.3 长期预防方案
 - 如何防止类似Bug再次出现?
@@ -222,10 +227,10 @@
 [贴入相关代码,所有可能涉及的文件]
 
 【错误日志】
-[贴入Sentry报错、控制台错误、服务器日志等]
+[贴入Sentry报错(如有)、浏览器控制台错误、Network响应、server Pino日志、requestId等]
 
 【环境信息】
-[浏览器、操作系统、用户数据特征等]
+[浏览器、操作系统、用户角色/权限、Feature Flag状态、数据库环境(dev/staging/prod)等]
 
 【已尝试的方案】(如果有)
 [列出已经试过但没成功的方案,避免重复]
