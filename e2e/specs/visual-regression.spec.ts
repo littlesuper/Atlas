@@ -31,7 +31,7 @@ test.describe('Visual regression @visual', () => {
 
     test('admin page matches baseline', async ({ page }) => {
       await page.goto('/admin');
-      await expect(page.getByText('用户管理')).toBeVisible();
+      await expect(page.getByRole('tab', { name: 'AI管理' })).toBeVisible();
 
       await expect(page).toHaveScreenshot('admin-page.png', screenshotOptions);
     });
