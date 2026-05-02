@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { authApi } from '../api';
 import { User } from '../types';
 import { Message } from '@arco-design/web-react';
+import { addErrorTrackingBreadcrumb, setErrorTrackingUser } from '../utils/errorTracking';
 
 interface AuthState {
   user: User | null;
@@ -38,6 +39,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         loading: false,
       });
+      setErrorTrackingUser(user);
+      addErrorTrackingBreadcrumb({
+        category: 'auth',
+        message: 'User signed in',
+        level: 'info',
+      });
 
       Message.success('登录成功');
     } catch (error) {
@@ -55,6 +62,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: true,
       loading: false,
     });
+    setErrorTrackingUser(data.user);
+    addErrorTrackingBreadcrumb({
+      category: 'auth',
+      message: 'User signed in with WeCom',
+      level: 'info',
+    });
     Message.success('登录成功');
   },
 
@@ -69,6 +82,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       isAuthenticated: false,
     });
+    setErrorTrackingUser(null);
+    addErrorTrackingBreadcrumb({
+      category: 'auth',
+      message: 'User signed out',
+      level: 'info',
+    });
 
     Message.success('已退出登录');
 
@@ -81,6 +100,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const accessToken = localStorage.getItem('accessToken');
     if (!accessToken) {
       set({ isAuthenticated: false, user: null, loading: false });
+      setErrorTrackingUser(null);
       return;
     }
 
@@ -94,6 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         loading: false,
       });
+      setErrorTrackingUser(user);
     } catch {
       // 获取用户信息失败，清除token
       localStorage.removeItem('accessToken');
@@ -103,6 +124,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: false,
         loading: false,
       });
+      setErrorTrackingUser(null);
     }
   },
 

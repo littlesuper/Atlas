@@ -4,6 +4,9 @@ import { Modal } from '@arco-design/web-react';
 import '@arco-design/web-react/dist/css/arco.css';
 import './styles/global.css';
 import App from './App';
+import { initErrorTracking } from './utils/errorTracking';
+
+initErrorTracking();
 
 // 全局覆盖 Modal.confirm：默认显示右上角关闭按钮
 const _originalConfirm = Modal.confirm;

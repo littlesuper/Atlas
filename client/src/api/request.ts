@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Message } from '@arco-design/web-react';
+import { addErrorTrackingBreadcrumb, sanitizeTrackingUrl } from '../utils/errorTracking';
 
 // 创建axios实例
 const request = axios.create({
@@ -17,6 +18,15 @@ request.interceptors.request.use(
     if (accessToken && config.headers) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
+    addErrorTrackingBreadcrumb({
+      category: 'http',
+      type: 'http',
+      level: 'info',
+      data: {
+        method: config.method?.toUpperCase(),
+        url: sanitizeTrackingUrl(config.url),
+      },
+    });
     return config;
   },
   (error: AxiosError) => {
@@ -51,6 +61,16 @@ request.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
+    addErrorTrackingBreadcrumb({
+      category: 'http',
+      type: 'http',
+      level: 'error',
+      data: {
+        method: originalRequest?.method?.toUpperCase(),
+        url: sanitizeTrackingUrl(originalRequest?.url),
+        status: error.response?.status,
+      },
+    });
 
     // 处理401错误：token过期
     if (error.response?.status === 401 && !originalRequest._retry) {

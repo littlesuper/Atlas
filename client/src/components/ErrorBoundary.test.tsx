@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ErrorBoundary from './ErrorBoundary';
+import { captureFrontendException } from '../utils/errorTracking';
+
+vi.mock('../utils/errorTracking', () => ({
+  captureFrontendException: vi.fn(),
+}));
 
 // Component that throws
 const ThrowError = ({ shouldThrow }: { shouldThrow: boolean }) => {
@@ -13,6 +18,7 @@ describe('ErrorBoundary', () => {
   const originalError = console.error;
   beforeEach(() => {
     console.error = vi.fn();
+    vi.mocked(captureFrontendException).mockClear();
   });
   afterEach(() => {
     console.error = originalError;
@@ -34,6 +40,12 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
     expect(screen.getByText('页面出错了')).toBeInTheDocument();
+    expect(captureFrontendException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'react_error_boundary' },
+      })
+    );
   });
 
   it('shows error message in development', () => {
