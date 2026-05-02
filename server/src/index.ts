@@ -205,7 +205,19 @@ export function createApp() {
 
   // 全局错误处理
   app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-    logger.error({ err, requestId: req.id }, '服务器错误');
+    logger.error(
+      {
+        err,
+        trace_id: req.id,
+        requestId: req.id,
+        user_id: req.user?.id,
+        context: {
+          method: req.method,
+          url: req.originalUrl,
+        },
+      },
+      '服务器错误'
+    );
     res.status(500).json({
       error: '服务器内部错误',
       message: process.env.NODE_ENV === 'development' ? err.message : undefined,
