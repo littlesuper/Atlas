@@ -4,40 +4,41 @@
 
 ## 文档清单
 
-| 文件 | 用途 |
-|------|------|
-| `README.md` | 本文件。环境/命令/执行流程 |
-| `test-plan.md` | **完整测试用例**（380+ 条，16 个模块） |
-| `prod-deploy-validation.md` | 生产部署验证用例（42 条） |
-| `week2-acceptance.md` | Week 2 质量体系落地验收与差距 |
-| `unit-test-infrastructure.md` | Week 4 Day 1-2 单元测试基础设施与测试约定 |
-| `core-modules-test-targets.md` | Week 4 Day 3-4 核心模块候选清单与补测目标 |
-| `dependabot-triage-20260430.md` | 2026-04-30 首批 Dependabot PR 分流 |
-| `node-runtime-baseline.md` | Node.js 运行时与工具链版本基线 |
-| `reports/run-20260428.md` | 测试执行报告（最新） |
-| `reports/coverage-P0-20260428.md` | P0 覆盖映射 |
-| `reports/coverage-P1-20260428.md` | P1 覆盖映射 |
-| `reports/prod-deploy-20260428.md` | 生产部署验证报告 |
+| 文件                              | 用途                                      |
+| --------------------------------- | ----------------------------------------- |
+| `README.md`                       | 本文件。环境/命令/执行流程                |
+| `test-plan.md`                    | **完整测试用例**（380+ 条，16 个模块）    |
+| `prod-deploy-validation.md`       | 生产部署验证用例（42 条）                 |
+| `week2-acceptance.md`             | Week 2 质量体系落地验收与差距             |
+| `unit-test-infrastructure.md`     | Week 4 Day 1-2 单元测试基础设施与测试约定 |
+| `core-modules-test-targets.md`    | Week 4 Day 3-4 核心模块候选清单与补测目标 |
+| `week5-closure.md`                | Week 5 集成测试与 E2E 体系收口报告        |
+| `dependabot-triage-20260430.md`   | 2026-04-30 首批 Dependabot PR 分流        |
+| `node-runtime-baseline.md`        | Node.js 运行时与工具链版本基线            |
+| `reports/run-20260428.md`         | 测试执行报告（最新）                      |
+| `reports/coverage-P0-20260428.md` | P0 覆盖映射                               |
+| `reports/coverage-P1-20260428.md` | P1 覆盖映射                               |
+| `reports/prod-deploy-20260428.md` | 生产部署验证报告                          |
 
 ## 0. 测试框架现状（**无需安装**）
 
-| 维度 | 框架 | 版本 | 是否就绪 |
-|------|------|------|---------|
-| 后端单元 | Vitest | server/devDeps | ✅ |
-| 前端单元 | Vitest + jsdom | client/devDeps | ✅ |
-| E2E | Playwright | 1.58.2 | ✅ |
-| 视觉回归 | Playwright screenshot assertions | 1.58.2 | ✅ |
-| 无障碍 | @axe-core/playwright | 4.11.1 | ✅ |
-| API 集成 | supertest（已用于路由测试） | server/devDeps | ✅ |
+| 维度     | 框架                             | 版本           | 是否就绪 |
+| -------- | -------------------------------- | -------------- | -------- |
+| 后端单元 | Vitest                           | server/devDeps | ✅       |
+| 前端单元 | Vitest + jsdom                   | client/devDeps | ✅       |
+| E2E      | Playwright                       | 1.58.2         | ✅       |
+| 视觉回归 | Playwright screenshot assertions | 1.58.2         | ✅       |
+| 无障碍   | @axe-core/playwright             | 4.11.1         | ✅       |
+| API 集成 | supertest（已用于路由测试）      | server/devDeps | ✅       |
 
 ## 当前测试统计
 
-| 套件 | 数量 | 状态 |
-|------|------|------|
-| 后端单元 | 843 passed, 1 todo | ✅ |
-| 前端单元 | 236 passed | ✅ |
-| E2E | 362 passed, 5 skipped | ✅ |
-| **总计** | **1441 passed** | ✅ |
+| 套件     | 数量                  | 状态 |
+| -------- | --------------------- | ---- |
+| 后端单元 | 843 passed, 1 todo    | ✅   |
+| 前端单元 | 236 passed            | ✅   |
+| E2E      | 362 passed, 5 skipped | ✅   |
+| **总计** | **1441 passed**       | ✅   |
 
 ### E2E 覆盖要点
 
@@ -116,33 +117,33 @@ npx playwright show-report
 <模块前缀>-<编号>
 ```
 
-| 前缀 | 模块 |
-|------|------|
-| AUTH | 认证 |
-| RBAC | 权限/RBAC |
-| PROJ | 项目 |
-| ACT | 活动 |
-| CHK | 检查项 |
-| WR | 周报 |
-| RISK | 风险评估 |
-| PROD | 产品 |
-| SYS | 系统级 |
-| IMP | Excel 导入 |
-| WRX | 周报富文本/XSS |
-| AI | AI 评估 |
-| WC | 企微 OAuth |
-| ARC | 归档/快照 |
-| I18N | 国际化 |
-| THEME | 主题/偏好 |
-| CHAOS | 破坏性场景 |
+| 前缀  | 模块           |
+| ----- | -------------- |
+| AUTH  | 认证           |
+| RBAC  | 权限/RBAC      |
+| PROJ  | 项目           |
+| ACT   | 活动           |
+| CHK   | 检查项         |
+| WR    | 周报           |
+| RISK  | 风险评估       |
+| PROD  | 产品           |
+| SYS   | 系统级         |
+| IMP   | Excel 导入     |
+| WRX   | 周报富文本/XSS |
+| AI    | AI 评估        |
+| WC    | 企微 OAuth     |
+| ARC   | 归档/快照      |
+| I18N  | 国际化         |
+| THEME | 主题/偏好      |
+| CHAOS | 破坏性场景     |
 
 ## 5. 测试账号
 
-| 账号 | 密码 | 角色 |
-|------|------|------|
-| admin | admin123 | 系统管理员（`*:*`） |
-| zhangsan | 123456 | 项目经理 |
-| lisi | 123456 | 普通成员 |
+| 账号     | 密码     | 角色                |
+| -------- | -------- | ------------------- |
+| admin    | admin123 | 系统管理员（`*:*`） |
+| zhangsan | 123456   | 项目经理            |
+| lisi     | 123456   | 普通成员            |
 
 ## 6. 关键约束（来自 CLAUDE.md / MEMORY）
 
