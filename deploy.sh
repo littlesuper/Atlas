@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==================== Atlas 部署脚本（裸机版） ====================
 # 直接在 Ubuntu Server 上运行，无需 Docker
-# 用法: ./deploy.sh [setup|update|start|stop|restart|status|logs|backup|restore]
+# 用法: ./deploy.sh [setup|update|rollback-code|start|stop|restart|status|logs|backup|restore]
 
 set -e
 
@@ -196,6 +196,72 @@ update() {
   fi
 }
 
+# ─── 代码版本回滚 ────────────────────────────────────
+rollback_code() {
+  TARGET_REF="${2:-}"
+
+  if [ -z "$TARGET_REF" ]; then
+    err "用法: ./deploy.sh rollback-code <git-ref-or-sha>"
+  fi
+
+  log "准备代码回滚到: ${TARGET_REF}"
+  git fetch origin --tags
+
+  TARGET_SHA=$(git rev-parse --verify "${TARGET_REF}^{commit}" 2>/dev/null || true)
+  [ -z "$TARGET_SHA" ] && err "找不到目标版本: ${TARGET_REF}"
+  TARGET_SHORT=$(git rev-parse --short "$TARGET_SHA")
+  CURRENT_SHA=$(git rev-parse HEAD)
+  CURRENT_SHORT=$(git rev-parse --short "$CURRENT_SHA")
+  CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
+
+  echo ""
+  warn "⚠️  代码回滚会切换当前工作区版本并重启服务。"
+  warn "当前版本: ${CURRENT_SHORT}"
+  warn "目标版本: ${TARGET_SHORT}"
+  warn "数据库不会自动回滚；如涉及 schema/数据变更，请先确认数据库回滚方案。"
+  echo ""
+
+  if [ "${ATLAS_ROLLBACK_CONFIRM:-}" != "$TARGET_SHORT" ]; then
+    warn "未执行。请先确认目标版本，然后这样运行："
+    echo "  ATLAS_ROLLBACK_CONFIRM=${TARGET_SHORT} ./deploy.sh rollback-code ${TARGET_REF}"
+    return 2
+  fi
+
+  if [ "$CURRENT_BRANCH" != "main" ]; then
+    err "当前不在 main 分支（当前: ${CURRENT_BRANCH:-detached}），为避免破坏部署状态，已停止"
+  fi
+
+  if [ -n "$(git status --porcelain)" ] && [ "${ATLAS_ROLLBACK_ALLOW_DIRTY:-}" != "true" ]; then
+    err "工作区有未提交改动。请先处理，或设置 ATLAS_ROLLBACK_ALLOW_DIRTY=true 后重试"
+  fi
+
+  # 回滚前自动备份 SQLite 数据库，便于需要时配合 restore 恢复数据。
+  backup
+
+  log "切换代码版本..."
+  git reset --hard "$TARGET_SHA"
+
+  log "安装依赖..."
+  npm ci --production=false
+
+  log "生成 Prisma Client..."
+  cd server && npx prisma generate && cd ..
+
+  log "构建前端..."
+  npm run build --workspace=client
+
+  log "重启服务..."
+  sudo systemctl restart $SERVICE_NAME
+
+  sleep 3
+  if curl -sf http://localhost:${PORT:-3000}/api/health > /dev/null; then
+    VERSION=$(curl -sf http://localhost:${PORT:-3000}/api/health | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "?")
+    log "✅ 代码回滚完成！当前版本: v${VERSION} (${TARGET_SHORT})"
+  else
+    err "回滚后服务未响应，请立即查看日志: ./deploy.sh logs"
+  fi
+}
+
 # ─── 启动/停止/重启 ────────────────────────────────────
 start()   { sudo systemctl start $SERVICE_NAME   && log "✅ 已启动"; }
 stop()    { sudo systemctl stop $SERVICE_NAME    && log "✅ 已停止"; }
@@ -299,6 +365,7 @@ restore() {
 case "${1:-}" in
   setup)   setup ;;
   update)  update ;;
+  rollback-code) rollback_code "$@" ;;
   start)   start ;;
   stop)    stop ;;
   restart) restart ;;
@@ -313,6 +380,7 @@ case "${1:-}" in
     echo ""
     echo "  setup    首次部署（安装依赖 + 构建 + 初始化）"
     echo "  update   更新（自动备份 + 拉代码 + 重建 + 重启）"
+    echo "  rollback-code <git-ref>  回滚到指定代码版本（需 ATLAS_ROLLBACK_CONFIRM）"
     echo "  start    启动服务"
     echo "  stop     停止服务"
     echo "  restart  重启服务"
