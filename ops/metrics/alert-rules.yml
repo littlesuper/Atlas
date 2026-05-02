@@ -1,0 +1,119 @@
+groups:
+  - name: atlas-business-alerts
+    interval: 30s
+    rules:
+      - alert: AtlasHighLoginFailureRate
+        expr: |
+          (
+            sum(rate(atlas_business_events_total{event="auth_login",result!="success"}[5m]))
+            /
+            clamp_min(sum(rate(atlas_business_events_total{event="auth_login"}[5m])), 0.001)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: Atlas login failure rate is above 5%
+          description: More than 5% of login attempts have failed for 10 minutes. Check auth logs in Loki before treating this as an incident.
+          runbook_url: docs/qa/alerts.md#atlas-high-login-failure-rate
+
+      - alert: AtlasCoreBusinessActionFailureRate
+        expr: |
+          (
+            sum(rate(atlas_business_events_total{event=~"project_create|activity_create|weekly_report_create|weekly_report_submit",result!="success"}[5m]))
+            /
+            clamp_min(sum(rate(atlas_business_events_total{event=~"project_create|activity_create|weekly_report_create|weekly_report_submit"}[5m])), 0.001)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: Atlas core business action failure rate is above 5%
+          description: Project, activity, or weekly report write failures are elevated. Correlate this with HTTP 4xx/5xx and request logs.
+          runbook_url: docs/qa/alerts.md#atlas-core-business-action-failure-rate
+
+      - alert: AtlasNoCoreBusinessActions
+        expr: |
+          sum(rate(atlas_business_events_total{event=~"project_create|activity_create|weekly_report_create|weekly_report_submit"}[5m])) == 0
+        for: 30m
+        labels:
+          severity: info
+          category: business
+        annotations:
+          summary: Atlas has no core business actions for 30 minutes
+          description: No project/activity/weekly-report write actions were observed. Enable only after confirming expected business hours and traffic volume.
+          runbook_url: docs/qa/alerts.md#atlas-no-core-business-actions
+
+  - name: atlas-technical-alerts
+    interval: 30s
+    rules:
+      - alert: AtlasApiScrapeDown
+        expr: up{job="atlas-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: technical
+        annotations:
+          summary: Atlas API metrics target is down
+          description: Prometheus cannot scrape /api/metrics from the Atlas API target.
+          runbook_url: docs/qa/alerts.md#atlas-api-scrape-down
+
+      - alert: AtlasHighHttp5xxRate
+        expr: |
+          (
+            sum(rate(atlas_http_requests_total{status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(atlas_http_requests_total[5m])), 0.001)
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: critical
+          category: technical
+        annotations:
+          summary: Atlas HTTP 5xx rate is above 1%
+          description: More than 1% of HTTP requests have returned 5xx for 10 minutes.
+          runbook_url: docs/qa/alerts.md#atlas-high-http-5xx-rate
+
+      - alert: AtlasHighHttpP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(atlas_http_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          category: technical
+        annotations:
+          summary: Atlas HTTP P95 latency is above 1 second
+          description: Overall HTTP P95 latency has stayed above 1 second for 10 minutes.
+          runbook_url: docs/qa/alerts.md#atlas-high-http-p95-latency
+
+      - alert: AtlasApiHighProcessCpu
+        expr: |
+          (
+            rate(atlas_process_cpu_user_seconds_total{job="atlas-api"}[5m])
+            +
+            rate(atlas_process_cpu_system_seconds_total{job="atlas-api"}[5m])
+          ) > 0.8
+        for: 15m
+        labels:
+          severity: warning
+          category: technical
+        annotations:
+          summary: Atlas API process CPU is above 80%
+          description: The Atlas API Node.js process has used more than 0.8 CPU cores for 15 minutes.
+          runbook_url: docs/qa/alerts.md#atlas-api-high-process-cpu
+
+      - alert: AtlasApiHighMemory
+        expr: atlas_process_resident_memory_bytes{job="atlas-api"} > 536870912
+        for: 15m
+        labels:
+          severity: warning
+          category: technical
+        annotations:
+          summary: Atlas API process memory is above 512 MiB
+          description: The Atlas API resident memory is above 512 MiB for 15 minutes. Tune this threshold after observing production baseline.
+          runbook_url: docs/qa/alerts.md#atlas-api-high-memory

@@ -149,6 +149,6 @@ Prometheus 本地抓取 `host.docker.internal:3000/api/metrics`。Grafana 会自
 
 如果在 Linux 上运行且 Docker 不支持 `host.docker.internal`，需要把 Prometheus target 改成宿主机可访问的 IP 或把 Atlas 服务加入同一个 Compose 网络。
 
-## 后续任务
+## 告警规则
 
-- 为 dashboard 阈值配置告警规则。
+Week 6 Day 4 已新增 Prometheus 告警规则模板，详见 `docs/qa/alerts.md`。
