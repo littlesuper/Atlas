@@ -33,6 +33,7 @@ import checkItemsRoutes from './routes/checkItems';
 import holidaysRoutes from './routes/holidays';
 import roleMembersRoutes from './routes/roleMembers';
 import metricsRoutes from './routes/metrics';
+import featureFlagsRoutes from './routes/featureFlags';
 import { startScheduledJobs } from './utils/scheduler';
 import { refreshHolidayCache } from './utils/workday';
 import { logger } from './utils/logger';
@@ -41,6 +42,9 @@ import { httpLogger } from './middleware/httpLogger';
 import { metricsMiddleware } from './middleware/metrics';
 import { setupSwagger } from './swagger';
 import { captureServerException } from './utils/errorTracking';
+import { initializeFeatureFlags } from './utils/featureFlags';
+
+initializeFeatureFlags();
 
 // ==================== 安全校验 ====================
 
@@ -129,6 +133,9 @@ export function createApp() {
 
   // Prometheus 指标（生产环境需显式设置 METRICS_ENABLED=true）
   app.use('/api/metrics', metricsRoutes);
+
+  // Feature Flag 状态查询与非生产本地覆盖
+  app.use('/api/feature-flags', featureFlagsRoutes);
 
   // 认证路由（登录接口限流）
   app.use('/api/auth/login', loginLimiter);
