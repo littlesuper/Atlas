@@ -26,4 +26,5 @@
 - 需求模板：`docs/requirements/REQUIREMENT_TEMPLATE.md`
 - 需求文档目录：`docs/requirements/`
 - 提示词库：`docs/prompts/`
+- 质量检查清单：`docs/checklists/`
 - 流程变更台账：`docs/process/process-change-log.md`
