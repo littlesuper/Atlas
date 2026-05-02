@@ -31,11 +31,13 @@ import riskItemsRoutes from './routes/riskItems';
 import checkItemsRoutes from './routes/checkItems';
 import holidaysRoutes from './routes/holidays';
 import roleMembersRoutes from './routes/roleMembers';
+import metricsRoutes from './routes/metrics';
 import { startScheduledJobs } from './utils/scheduler';
 import { refreshHolidayCache } from './utils/workday';
 import { logger } from './utils/logger';
 import { requestId } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
+import { metricsMiddleware } from './middleware/metrics';
 import { setupSwagger } from './swagger';
 
 // ==================== 安全校验 ====================
@@ -82,6 +84,7 @@ export function createApp() {
 
   // 请求 ID + 结构化日志
   app.use(requestId);
+  app.use(metricsMiddleware);
   if (process.env.NODE_ENV !== 'test') {
     app.use(httpLogger);
   }
@@ -121,6 +124,9 @@ export function createApp() {
       uptime: process.uptime(),
     });
   });
+
+  // Prometheus 指标（生产环境需显式设置 METRICS_ENABLED=true）
+  app.use('/api/metrics', metricsRoutes);
 
   // 认证路由（登录接口限流）
   app.use('/api/auth/login', loginLimiter);

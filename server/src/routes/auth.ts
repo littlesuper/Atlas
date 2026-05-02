@@ -8,6 +8,7 @@ import { auditLog } from '../utils/auditLog';
 import { isWecomEnabled, getWecomConfig, getUserInfoByCode, getUserDetail } from '../utils/wecom';
 import { logger } from '../utils/logger';
 import { blacklistToken } from '../utils/tokenBlacklist';
+import { recordBusinessEvent } from '../utils/metrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -58,6 +59,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // 1. 验证必填字段
     if (!username || !password) {
+      recordBusinessEvent('auth_login', 'validation_failed');
       res.status(400).json({ error: '用户名和密码不能为空' });
       return;
     }
@@ -83,30 +85,35 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!user) {
+      recordBusinessEvent('auth_login', 'invalid_user');
       res.status(401).json({ error: '用户名或密码错误' });
       return;
     }
 
     // 3. 检查是否允许登录
     if (!user.canLogin) {
+      recordBusinessEvent('auth_login', 'forbidden');
       res.status(403).json({ error: '该账号未开启登录权限' });
       return;
     }
 
     // 3.5 验证密码
     if (!user.password) {
+      recordBusinessEvent('auth_login', 'forbidden');
       res.status(403).json({ error: '该账号不支持密码登录' });
       return;
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      recordBusinessEvent('auth_login', 'invalid_password');
       res.status(401).json({ error: '用户名或密码错误' });
       return;
     }
 
     // 4. 检查账号状态
     if (user.status === 'DISABLED') {
+      recordBusinessEvent('auth_login', 'disabled');
       res.status(403).json({ error: '账号已被禁用' });
       return;
     }
@@ -153,6 +160,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       userId: user.id,
       userName: user.realName,
     });
+    recordBusinessEvent('auth_login', 'success');
 
     // 8. 返回响应
     res.json({
@@ -169,6 +177,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
+    recordBusinessEvent('auth_login', 'error');
     logger.error({ err: error }, '登录错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
