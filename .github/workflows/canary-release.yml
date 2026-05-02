@@ -1,0 +1,79 @@
+name: Canary Release Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Canary stage percentage
+        required: true
+        type: choice
+        options:
+          - '5'
+          - '25'
+          - '50'
+          - '100'
+      target_url:
+        description: Staging or production base URL to observe
+        required: true
+        type: string
+      release_ref:
+        description: Git ref being released
+        required: true
+        default: main
+        type: string
+      metrics_json:
+        description: Optional metrics JSON, for example {"errorRate":0.001,"p95Ms":320,"successRate":0.999}
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-release-${{ inputs.target_url }}
+  cancel-in-progress: false
+
+jobs:
+  canary-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_ref }}
+
+      - name: Use Node.js 20.19.0
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write supplied metrics
+        if: inputs.metrics_json != ''
+        env:
+          METRICS_JSON: ${{ inputs.metrics_json }}
+        run: printf '%s' "$METRICS_JSON" > canary-metrics.json
+
+      - name: Run canary gate
+        env:
+          CANARY_STAGE: ${{ inputs.stage }}
+          TARGET_URL: ${{ inputs.target_url }}
+        run: |
+          args=(
+            --stage "$CANARY_STAGE"
+            --base-url "$TARGET_URL"
+          )
+          if [ -f canary-metrics.json ]; then
+            args+=(--metrics-file canary-metrics.json)
+          fi
+          npm run release:canary-gate -- "${args[@]}"
+
+      - name: Next action
+        if: success()
+        run: |
+          echo "Canary gate passed for ${{ inputs.stage }}%."
+          echo "Observe this stage for 30 minutes before advancing."
