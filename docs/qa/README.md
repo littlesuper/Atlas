@@ -26,6 +26,7 @@
 | 后端单元 | Vitest | server/devDeps | ✅ |
 | 前端单元 | Vitest + jsdom | client/devDeps | ✅ |
 | E2E | Playwright | 1.58.2 | ✅ |
+| 视觉回归 | Playwright screenshot assertions | 1.58.2 | ✅ |
 | 无障碍 | @axe-core/playwright | 4.11.1 | ✅ |
 | API 集成 | supertest（已用于路由测试） | server/devDeps | ✅ |
 
@@ -86,6 +87,7 @@ npm run test:coverage
 npx playwright test                        # 全量
 npx playwright test e2e/specs/auth.spec.ts # 指定文件
 npx playwright test --project=chromium     # 指定项目
+npm run test:e2e:visual                    # 视觉回归（Chromium 基线）
 npx playwright test --grep @P0             # 仅跑 P0（需在 spec 中加 tag）
 
 # 查看 HTML 报告
