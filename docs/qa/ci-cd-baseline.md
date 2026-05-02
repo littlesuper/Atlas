@@ -34,7 +34,6 @@ Atlas 目前使用 `.github/workflows/ci.yml` 作为主分支和 PR 的质量门
 - `npm run lint:style`
 - `npm run test:unit`
 - `npm run test:integration`
-- `npm run test:a11y`
 - Storybook / Chromatic
 - Lighthouse CI
 - k6 性能测试
@@ -43,6 +42,9 @@ Atlas 目前使用 `.github/workflows/ci.yml` 作为主分支和 PR 的质量门
 - Snyk / Codecov / Chromatic / LHCI / Anthropic 相关 GitHub Secrets
 
 如果直接复制模板，CI 会因为缺少脚本、配置或密钥而必然失败。因此当前采用"适配现有 CI、保留 required checks、逐步补强"的方式落地。
+
+Week 5 Day 5 已补齐 `npm run test:a11y` / `npm run test:e2e:a11y`，并通过
+`e2e-core` required check 在每次 PR 中运行 axe-core 的 critical/serious 扫描。
 
 ## 10 分钟目标状态
 

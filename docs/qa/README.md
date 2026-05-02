@@ -87,6 +87,7 @@ npm run test:coverage
 npx playwright test                        # 全量
 npx playwright test e2e/specs/auth.spec.ts # 指定文件
 npx playwright test --project=chromium     # 指定项目
+npm run test:e2e:a11y                      # 无障碍扫描（axe-core）
 npm run test:e2e:visual                    # 视觉回归（Chromium 基线）
 npx playwright test --grep @P0             # 仅跑 P0（需在 spec 中加 tag）
 
