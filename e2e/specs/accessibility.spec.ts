@@ -1,87 +1,69 @@
-import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { expect, test, type Page } from '@playwright/test';
 
-const authedPage = async (page: any) => {
-  // Load auth state
-  const storageState = 'e2e/.auth/state.json';
-  return page;
-};
+const wcagTags = ['wcag2a', 'wcag2aa'];
+const arcoKnownIssueExclusions = {
+  table: '.arco-table',
+  tabs: '.arco-tabs',
+} as const;
 
-test.describe('无障碍 (Accessibility) 审计', () => {
-  test.use({ storageState: 'e2e/.auth/state.json' });
+async function expectNoCriticalA11yViolations(page: Page, pageName: string, excludedSelectors: string[] = []) {
+  let builder = new AxeBuilder({ page }).withTags(wcagTags);
 
-  test('项目列表页无严重无障碍问题', async ({ page }) => {
-    await page.goto('/projects');
-    await page.waitForLoadState('networkidle');
+  for (const selector of excludedSelectors) {
+    builder = builder.exclude(selector);
+  }
 
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude('.arco-table')   // Arco Table has known issues
-      .exclude('.arco-tabs')    // Arco Tabs missing role="tablist" on wrapper (v2.66)
-      .analyze();
+  const results = await builder.analyze();
+  const critical = results.violations.filter(
+    (violation) => violation.impact === 'critical' || violation.impact === 'serious'
+  );
 
-    const critical = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious'
-    );
+  const details = critical
+    .flatMap((violation) =>
+      violation.nodes.map(
+        (node) => `[${violation.impact}] ${violation.id}: ${violation.help} (${node.target.join(', ')})`
+      )
+    )
+    .join('\n');
 
-    if (critical.length > 0) {
-      console.log('Critical/Serious a11y violations:');
-      critical.forEach((v) => {
-        console.log(`  [${v.impact}] ${v.id}: ${v.description}`);
-        console.log(`    Help: ${v.helpUrl}`);
-        v.nodes.forEach((n) => console.log(`    Target: ${n.target}`));
-      });
-    }
+  expect(critical, `${pageName} critical/serious a11y violations:\n${details}`).toHaveLength(0);
+}
 
-    expect(critical.length).toBe(0);
-  });
-
-  test('登录页无严重无障碍问题', async ({ page }) => {
+test.describe('Accessibility audit @a11y', () => {
+  test('login page has no critical or serious accessibility violations', async ({ page }) => {
     await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('button', { name: '登录' })).toBeVisible();
 
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude('.arco-tabs')    // Arco Tabs missing role="tablist" on wrapper (v2.66)
-      .analyze();
-
-    const critical = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious'
-    );
-
-    if (critical.length > 0) {
-      console.log('Login page Critical/Serious a11y violations:');
-      critical.forEach((v) => {
-        console.log(`  [${v.impact}] ${v.id}: ${v.description}`);
-        v.nodes.forEach((n) => console.log(`    Target: ${n.target}`));
-      });
-    }
-
-    expect(critical.length).toBe(0);
+    await expectNoCriticalA11yViolations(page, 'Login page', [
+      // Arco Tabs missing role="tablist" on wrapper (v2.66).
+      arcoKnownIssueExclusions.tabs,
+    ]);
   });
 
-  test('管理员页面无严重无障碍问题', async ({ page }) => {
-    await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+  test.describe('authenticated pages', () => {
+    test.use({ storageState: 'e2e/.auth/state.json' });
 
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude('.arco-table')
-      .exclude('.arco-tabs')    // Arco Tabs missing role="tablist" on wrapper (v2.66)
-      .analyze();
+    test('projects page has no critical or serious accessibility violations', async ({ page }) => {
+      await page.goto('/projects');
+      await expect(page.getByRole('button', { name: '新建项目' })).toBeVisible();
 
-    const critical = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious'
-    );
+      await expectNoCriticalA11yViolations(page, 'Projects page', [
+        // Known Arco component issues; keep exclusions explicit and narrow.
+        arcoKnownIssueExclusions.table,
+        arcoKnownIssueExclusions.tabs,
+      ]);
+    });
 
-    if (critical.length > 0) {
-      console.log('Admin page Critical/Serious a11y violations:');
-      critical.forEach((v) => {
-        console.log(`  [${v.impact}] ${v.id}: ${v.description}`);
-        v.nodes.forEach((n) => console.log(`    Target: ${n.target}`));
-      });
-    }
+    test('admin page has no critical or serious accessibility violations', async ({ page }) => {
+      await page.goto('/admin');
+      await expect(page.getByRole('tab', { name: 'AI管理' })).toBeVisible();
 
-    expect(critical.length).toBe(0);
+      await expectNoCriticalA11yViolations(page, 'Admin page', [
+        // Known Arco component issues; keep exclusions explicit and narrow.
+        arcoKnownIssueExclusions.table,
+        arcoKnownIssueExclusions.tabs,
+      ]);
+    });
   });
 });
