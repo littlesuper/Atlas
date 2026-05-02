@@ -4,6 +4,8 @@ import { Form, Input, Button, Tabs } from '@arco-design/web-react';
 import { IconUser, IconLock } from '@arco-design/web-react/icon';
 import { useAuthStore } from '../../store/authStore';
 import WecomQrLogin from '../../components/WecomQrLogin';
+import { FEATURE_FLAGS } from '../../featureFlags/flags';
+import { useFeatureFlag } from '../../featureFlags/FeatureFlagProvider';
 import '../../styles/global.css';
 
 const FormItem = Form.Item;
@@ -19,12 +21,13 @@ const Login: React.FC = () => {
   const [form] = Form.useForm<LoginFormData>();
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
+  const wecomLoginEnabled = useFeatureFlag(FEATURE_FLAGS.WECOM_LOGIN);
 
   // URL 含 code 参数时默认选中企微 Tab
   const defaultTab = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('code') ? 'wecom' : 'password';
-  }, []);
+    return wecomLoginEnabled && params.get('code') ? 'wecom' : 'password';
+  }, [wecomLoginEnabled]);
 
   const handleSubmit = async (values: LoginFormData) => {
     setLoading(true);
@@ -103,11 +106,13 @@ const Login: React.FC = () => {
             </Form>
           </TabPane>
 
-          <TabPane key="wecom" title="企业微信">
-            <div style={{ marginTop: 16 }}>
-              <WecomQrLogin onSuccess={handleWecomSuccess} />
-            </div>
-          </TabPane>
+          {wecomLoginEnabled && (
+            <TabPane key="wecom" title="企业微信">
+              <div style={{ marginTop: 16 }}>
+                <WecomQrLogin onSuccess={handleWecomSuccess} />
+              </div>
+            </TabPane>
+          )}
         </Tabs>
 
         <div style={{ textAlign: 'center', marginTop: '24px' }}>

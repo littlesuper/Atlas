@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requireFeatureFlag } from '../middleware/featureFlag';
 import { isAdmin } from '../middleware/permission';
 import { validate } from '../middleware/validate';
 import { logger } from '../utils/logger';
@@ -11,9 +12,12 @@ import {
   updateHolidaySchema,
   generateHolidaySchema,
 } from '../schemas/holidays';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+router.use(requireFeatureFlag(FEATURE_FLAGS.HOLIDAY_MANAGEMENT));
 
 function parseISODate(s: string): Date {
   // 强制 UTC 归零，避免时区导致跨日

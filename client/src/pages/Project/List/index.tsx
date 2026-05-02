@@ -32,6 +32,8 @@ import MainLayout from '../../../layouts/MainLayout';
 import ProjectFormDrawer from '../Edit/ProjectFormDrawer';
 import { projectsApi, weeklyReportsApi } from '../../../api';
 import { useAuthStore } from '../../../store/authStore';
+import { FEATURE_FLAGS } from '../../../featureFlags/flags';
+import { useFeatureFlag } from '../../../featureFlags/FeatureFlagProvider';
 import { Project } from '../../../types';
 import {
   STATUS_MAP,
@@ -104,6 +106,7 @@ const ProjectList: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission, isProjectManager } = useAuthStore();
+  const projectTemplatesEnabled = useFeatureFlag(FEATURE_FLAGS.PROJECT_TEMPLATES);
 
   // 数据状态
   const [projects, setProjects] = useState<Project[]>([]);
@@ -579,13 +582,15 @@ const ProjectList: React.FC = () => {
                   >
                     新建项目
                   </Button>
-                  <Tooltip content="项目模板管理">
-                    <Button
-                      icon={<IconFile />}
-                      aria-label="项目模板管理"
-                      onClick={() => navigate('/templates')}
-                    />
-                  </Tooltip>
+                  {projectTemplatesEnabled && (
+                    <Tooltip content="项目模板管理">
+                      <Button
+                        icon={<IconFile />}
+                        aria-label="项目模板管理"
+                        onClick={() => navigate('/templates')}
+                      />
+                    </Tooltip>
+                  )}
                 </>
               )}
             </Space>

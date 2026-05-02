@@ -30,6 +30,8 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { riskApi } from '../../../api';
+import { FEATURE_FLAGS } from '../../../featureFlags/flags';
+import { useFeatureFlag } from '../../../featureFlags/FeatureFlagProvider';
 import { RiskAssessment, RiskComparison } from '../../../types';
 import { RISK_LEVEL_MAP } from '../../../utils/constants';
 import RiskItemsPanel from './RiskItemsPanel';
@@ -80,6 +82,7 @@ const SOURCE_LABEL: Record<string, { text: string; color: string }> = {
 };
 
 const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotData }) => {
+  const aiAssistanceEnabled = useFeatureFlag(FEATURE_FLAGS.AI_ASSISTANCE);
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -209,14 +212,19 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
       {/* 最新评估结果 */}
       {latest ? (
         <div>
-          <RiskCard assessment={latest} isLatest projectId={projectId} />
+          <RiskCard assessment={latest} isLatest projectId={projectId} aiAssistanceEnabled={aiAssistanceEnabled} />
           {/* 历史记录 */}
           {history.length > 0 && (
             <div style={{ marginTop: 24 }}>
               <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: 'var(--color-text-2)' }}>历史记录</div>
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 {history.map((a) => (
-                  <RiskCard key={a.id} assessment={a} onDelete={isArchived ? undefined : () => handleDelete(a.id)} />
+                  <RiskCard
+                    key={a.id}
+                    assessment={a}
+                    aiAssistanceEnabled={aiAssistanceEnabled}
+                    onDelete={isArchived ? undefined : () => handleDelete(a.id)}
+                  />
                 ))}
               </Space>
               {total > pageSize && (
@@ -399,10 +407,12 @@ const RiskCard: React.FC<{
   isLatest?: boolean;
   onDelete?: () => void;
   projectId?: string;
+  aiAssistanceEnabled: boolean;
 }> = ({
   assessment,
   isLatest,
   onDelete,
+  aiAssistanceEnabled,
 }) => {
   const [expandedFactors, setExpandedFactors] = useState<Record<number, boolean>>({});
   const [showAIDetail, setShowAIDetail] = useState(false);
@@ -414,7 +424,7 @@ const RiskCard: React.FC<{
   const normalizedLevel = normalizeRiskLevel(assessment.riskLevel);
   const cfg = RISK_LEVEL_CONFIG[normalizedLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
   const sourceInfo = SOURCE_LABEL[assessment.source || 'rule_engine'] || SOURCE_LABEL.rule_engine;
-  const hasAIEnhanced = (assessment.source === 'ai' || assessment.source === 'scheduled_ai') && assessment.aiEnhancedData;
+  const hasAIEnhanced = aiAssistanceEnabled && (assessment.source === 'ai' || assessment.source === 'scheduled_ai') && assessment.aiEnhancedData;
 
   return (
     <Card
@@ -457,7 +467,7 @@ const RiskCard: React.FC<{
       </div>
 
       {/* AI 洞察总结 */}
-      {isLatest && assessment.aiInsights && (
+      {aiAssistanceEnabled && isLatest && assessment.aiInsights && (
         <div style={{
           padding: '12px 16px',
           marginBottom: 16,

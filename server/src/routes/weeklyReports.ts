@@ -1,12 +1,14 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient, ActivityStatus } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requireFeatureFlag } from '../middleware/featureFlag';
 import { requirePermission, isAdmin, canManageProject, sanitizePagination } from '../middleware/permission';
 import { getWeekNumber } from '../utils/weekNumber';
 import { callAi } from '../utils/aiClient';
 import { sanitizeRichText } from '../utils/sanitize';
 import { logger } from '../utils/logger';
 import { recordBusinessEvent } from '../utils/metrics';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -901,7 +903,7 @@ router.get('/project/:projectId/risk-prefill', authenticate, async (req: Request
  * POST /api/weekly-reports/project/:projectId/ai-suggestions
  * AI智能建议
  */
-router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.post('/project/:projectId/ai-suggestions', authenticate, requireFeatureFlag(FEATURE_FLAGS.AI_ASSISTANCE), async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
     const { weekStart, weekEnd } = req.body;

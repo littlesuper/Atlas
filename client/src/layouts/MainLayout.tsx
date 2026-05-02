@@ -5,6 +5,8 @@ import { IconUser, IconPoweroff, IconSun, IconMoon } from '@arco-design/web-reac
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import NotificationBell from '../components/NotificationBell';
+import { FEATURE_FLAGS } from '../featureFlags/flags';
+import { useFeatureFlag } from '../featureFlags/FeatureFlagProvider';
 import '../styles/global.css';
 
 const { Header, Content } = Layout;
@@ -18,6 +20,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const location = useLocation();
   const { user, hasPermission, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
+  const riskDashboardEnabled = useFeatureFlag(FEATURE_FLAGS.RISK_DASHBOARD);
+  const workloadDashboardEnabled = useFeatureFlag(FEATURE_FLAGS.WORKLOAD_DASHBOARD);
 
   // 动态获取版本号
   const [appVersion, setAppVersion] = React.useState('');
@@ -36,6 +40,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       key: '/risk-dashboard',
       label: '风险总览',
       path: '/risk-dashboard',
+      enabled: riskDashboardEnabled,
     },
     {
       key: '/weekly-reports',
@@ -46,6 +51,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       key: '/workload',
       label: '项目资源',
       path: '/workload',
+      enabled: workloadDashboardEnabled,
     },
     {
       key: '/products',
@@ -63,6 +69,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // 过滤掉没有权限的菜单项
   const visibleMenuItems = menuItems.filter((item) => {
+    if (item.enabled === false) {
+      return false;
+    }
     if (item.permission) {
       return hasPermission(item.permission.resource, item.permission.action);
     }

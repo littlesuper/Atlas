@@ -22,6 +22,8 @@ import {
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi, projectsApi, uploadApi } from '../../api';
+import { FEATURE_FLAGS } from '../../featureFlags/flags';
+import { useFeatureFlag } from '../../featureFlags/FeatureFlagProvider';
 import { Project, ReportAttachment, WeeklyReport } from '../../types';
 import RichTextEditor, { RichTextEditorRef } from '../../components/RichTextEditor';
 import AttachmentList from '../../components/AttachmentList';
@@ -98,6 +100,7 @@ const WeeklyReportForm: React.FC = () => {
   const projectIdParam = searchParams.get('projectId');
 
   const isEdit = !!id;
+  const aiAssistanceEnabled = useFeatureFlag(FEATURE_FLAGS.AI_ASSISTANCE);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -268,6 +271,7 @@ const WeeklyReportForm: React.FC = () => {
   };
 
   const handleAiSuggestions = async () => {
+    if (!aiAssistanceEnabled) return;
     if (!projectId) { Message.error('请先选择项目'); return; }
     setAiLoading(true);
     const hideLoading = Message.loading({ content: '正在进行 AI 分析...', duration: 0 });
@@ -390,15 +394,17 @@ const WeeklyReportForm: React.FC = () => {
               <span style={{ color: 'var(--color-text-3)', fontSize: 14 }}>— {project.name}</span>
             )}
           </div>
-          <Button
-            type="outline"
-            icon={<IconBulb />}
-            loading={aiLoading}
-            onClick={handleAiSuggestions}
-            style={{ borderStyle: 'dashed' }}
-          >
-            AI 智能分析
-          </Button>
+          {aiAssistanceEnabled && (
+            <Button
+              type="outline"
+              icon={<IconBulb />}
+              loading={aiLoading}
+              onClick={handleAiSuggestions}
+              style={{ borderStyle: 'dashed' }}
+            >
+              AI 智能分析
+            </Button>
+          )}
         </div>
 
         {/* 周次 + 进展状态 */}

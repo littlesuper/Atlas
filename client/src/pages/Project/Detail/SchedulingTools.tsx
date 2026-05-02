@@ -15,6 +15,8 @@ import {
   Radio,
 } from '@arco-design/web-react';
 import { activitiesApi } from '../../../api';
+import { FEATURE_FLAGS } from '../../../featureFlags/flags';
+import { useFeatureFlag } from '../../../featureFlags/FeatureFlagProvider';
 import { Activity, ResourceConflict, WhatIfResult, AiScheduleSuggestion } from '../../../types';
 import dayjs from 'dayjs';
 
@@ -26,6 +28,8 @@ interface SchedulingToolsProps {
 }
 
 const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities, onRefresh, isArchived }) => {
+  const aiAssistanceEnabled = useFeatureFlag(FEATURE_FLAGS.AI_ASSISTANCE);
+
   // Resource conflicts
   const [conflicts, setConflicts] = useState<ResourceConflict[]>([]);
   const [conflictsLoading, setConflictsLoading] = useState(false);
@@ -334,77 +338,79 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
       </Card>
 
       {/* AI scheduling suggestions */}
-      <Card title="AI 排期建议" size="small">
-        <Typography.Paragraph style={{ color: 'var(--color-text-3)', marginBottom: 12 }}>
-          基于历史项目数据和 AI 分析，为活动推荐合理工期并识别潜在风险。
-        </Typography.Paragraph>
-        <Button type="primary" loading={aiLoading} onClick={runAiSchedule}>
-          获取 AI 建议
-        </Button>
+      {aiAssistanceEnabled && (
+        <Card title="AI 排期建议" size="small">
+          <Typography.Paragraph style={{ color: 'var(--color-text-3)', marginBottom: 12 }}>
+            基于历史项目数据和 AI 分析，为活动推荐合理工期并识别潜在风险。
+          </Typography.Paragraph>
+          <Button type="primary" loading={aiLoading} onClick={runAiSchedule}>
+            获取 AI 建议
+          </Button>
 
-        {aiResult && (
-          <div style={{ marginTop: 16 }}>
-            {/* Summary */}
-            {aiResult.summary && (
-              <Alert
-                type="info"
-                content={aiResult.summary}
-                style={{ marginBottom: 12 }}
-              />
-            )}
-
-            {/* Duration suggestions */}
-            {aiResult.suggestions.length > 0 && (
-              <Card title="工期建议" size="small" style={{ marginBottom: 12 }}>
-                <Table
-                  columns={[
-                    { title: '活动名称', dataIndex: 'name', width: 200 },
-                    {
-                      title: '建议工期(天)',
-                      dataIndex: 'suggestedDuration',
-                      width: 120,
-                      render: (d: number) => (
-                        <Tag color="blue">{d} 天</Tag>
-                      ),
-                    },
-                    { title: '理由', dataIndex: 'reason' },
-                  ]}
-                  data={aiResult.suggestions}
-                  rowKey="name"
-                  pagination={false}
-                  size="small"
+          {aiResult && (
+            <div style={{ marginTop: 16 }}>
+              {/* Summary */}
+              {aiResult.summary && (
+                <Alert
+                  type="info"
+                  content={aiResult.summary}
+                  style={{ marginBottom: 12 }}
                 />
-              </Card>
-            )}
+              )}
 
-            {/* Risk warnings */}
-            {aiResult.risks.length > 0 && (
-              <Card title="风险提示" size="small">
-                <Table
-                  columns={[
-                    { title: '活动', dataIndex: 'activity', width: 200 },
-                    { title: '风险', dataIndex: 'risk' },
-                    {
-                      title: '严重程度',
-                      dataIndex: 'severity',
-                      width: 100,
-                      render: (s: string) => {
-                        const color = s === 'high' ? 'red' : s === 'medium' ? 'orange' : 'blue';
-                        const label = s === 'high' ? '高' : s === 'medium' ? '中' : '低';
-                        return <Tag color={color}>{label}</Tag>;
+              {/* Duration suggestions */}
+              {aiResult.suggestions.length > 0 && (
+                <Card title="工期建议" size="small" style={{ marginBottom: 12 }}>
+                  <Table
+                    columns={[
+                      { title: '活动名称', dataIndex: 'name', width: 200 },
+                      {
+                        title: '建议工期(天)',
+                        dataIndex: 'suggestedDuration',
+                        width: 120,
+                        render: (d: number) => (
+                          <Tag color="blue">{d} 天</Tag>
+                        ),
                       },
-                    },
-                  ]}
-                  data={aiResult.risks}
-                  rowKey="activity"
-                  pagination={false}
-                  size="small"
-                />
-              </Card>
-            )}
-          </div>
-        )}
-      </Card>
+                      { title: '理由', dataIndex: 'reason' },
+                    ]}
+                    data={aiResult.suggestions}
+                    rowKey="name"
+                    pagination={false}
+                    size="small"
+                  />
+                </Card>
+              )}
+
+              {/* Risk warnings */}
+              {aiResult.risks.length > 0 && (
+                <Card title="风险提示" size="small">
+                  <Table
+                    columns={[
+                      { title: '活动', dataIndex: 'activity', width: 200 },
+                      { title: '风险', dataIndex: 'risk' },
+                      {
+                        title: '严重程度',
+                        dataIndex: 'severity',
+                        width: 100,
+                        render: (s: string) => {
+                          const color = s === 'high' ? 'red' : s === 'medium' ? 'orange' : 'blue';
+                          const label = s === 'high' ? '高' : s === 'medium' ? '中' : '低';
+                          return <Tag color={color}>{label}</Tag>;
+                        },
+                      },
+                    ]}
+                    data={aiResult.risks}
+                    rowKey="activity"
+                    pagination={false}
+                    size="small"
+                  />
+                </Card>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 };

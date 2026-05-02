@@ -4,7 +4,29 @@ import { DEFAULT_FEATURE_FLAGS, FEATURE_FLAGS, FeatureFlagName } from './flags';
 
 type FeatureFlagMap = Record<FeatureFlagName, boolean>;
 
-const FeatureFlagContext = createContext<FeatureFlagMap>(DEFAULT_FEATURE_FLAGS);
+const parseLocalOverrides = (): Partial<FeatureFlagMap> => {
+  const raw = import.meta.env.VITE_FEATURE_FLAG_OVERRIDES;
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.values(FEATURE_FLAGS).reduce<Partial<FeatureFlagMap>>((acc, name) => {
+      if (typeof parsed[name] === 'boolean') {
+        acc[name] = parsed[name];
+      }
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+};
+
+const getLocalDefaults = (): FeatureFlagMap => ({
+  ...DEFAULT_FEATURE_FLAGS,
+  ...parseLocalOverrides(),
+});
+
+const FeatureFlagContext = createContext<FeatureFlagMap>(getLocalDefaults());
 
 interface AtlasFeatureFlagProviderProps {
   children: React.ReactNode;
@@ -27,11 +49,23 @@ const getUnleashConfig = () => {
 
 const UnleashBridge: React.FC<AtlasFeatureFlagProviderProps> = ({ children }) => {
   const week7DemoEnabled = useFlag(FEATURE_FLAGS.WEEK7_DEMO);
+  const aiAssistanceEnabled = useFlag(FEATURE_FLAGS.AI_ASSISTANCE);
+  const wecomLoginEnabled = useFlag(FEATURE_FLAGS.WECOM_LOGIN);
+  const projectTemplatesEnabled = useFlag(FEATURE_FLAGS.PROJECT_TEMPLATES);
+  const riskDashboardEnabled = useFlag(FEATURE_FLAGS.RISK_DASHBOARD);
+  const workloadDashboardEnabled = useFlag(FEATURE_FLAGS.WORKLOAD_DASHBOARD);
+  const holidayManagementEnabled = useFlag(FEATURE_FLAGS.HOLIDAY_MANAGEMENT);
 
   return (
     <FeatureFlagContext.Provider
       value={{
         [FEATURE_FLAGS.WEEK7_DEMO]: week7DemoEnabled,
+        [FEATURE_FLAGS.AI_ASSISTANCE]: aiAssistanceEnabled,
+        [FEATURE_FLAGS.WECOM_LOGIN]: wecomLoginEnabled,
+        [FEATURE_FLAGS.PROJECT_TEMPLATES]: projectTemplatesEnabled,
+        [FEATURE_FLAGS.RISK_DASHBOARD]: riskDashboardEnabled,
+        [FEATURE_FLAGS.WORKLOAD_DASHBOARD]: workloadDashboardEnabled,
+        [FEATURE_FLAGS.HOLIDAY_MANAGEMENT]: holidayManagementEnabled,
       }}
     >
       {children}
@@ -43,7 +77,7 @@ export const AtlasFeatureFlagProvider: React.FC<AtlasFeatureFlagProviderProps> =
   const config = getUnleashConfig();
 
   if (!config) {
-    return <FeatureFlagContext.Provider value={DEFAULT_FEATURE_FLAGS}>{children}</FeatureFlagContext.Provider>;
+    return <FeatureFlagContext.Provider value={getLocalDefaults()}>{children}</FeatureFlagContext.Provider>;
   }
 
   return (

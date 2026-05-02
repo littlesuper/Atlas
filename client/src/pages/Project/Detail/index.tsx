@@ -40,6 +40,8 @@ import SchedulingTools from './SchedulingTools';
 import SnapshotsTab from './SnapshotsTab';
 import ActivityDrawer from './ActivityDrawer';
 import MembersModal from './MembersModal';
+import { FEATURE_FLAGS } from '../../../featureFlags/flags';
+import { useFeatureFlag } from '../../../featureFlags/FeatureFlagProvider';
 import { Activity } from '../../../types';
 import {
   STATUS_MAP,
@@ -83,6 +85,7 @@ const ProjectDetail: React.FC = () => {
   const { id, snapshotId } = useParams<{ id: string; snapshotId?: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const aiAssistanceEnabled = useFeatureFlag(FEATURE_FLAGS.AI_ASSISTANCE);
   const { hasPermission, isProjectManager } = useAuthStore();
 
   // UI 状态
@@ -1050,8 +1053,8 @@ const ProjectDetail: React.FC = () => {
               <GanttChart activities={activities} criticalActivityIds={criticalActivityIds} />
             </Tabs.TabPane>
 
-            {/* AI 风险评估 */}
-            <Tabs.TabPane key="risk" title="AI风险评估">
+            {/* 风险评估 */}
+            <Tabs.TabPane key="risk" title={aiAssistanceEnabled ? 'AI风险评估' : '风险评估'}>
               {id && <RiskAssessmentTab projectId={id} isArchived={!!isArchived} snapshotData={snapshotRiskAssessments} />}
             </Tabs.TabPane>
 

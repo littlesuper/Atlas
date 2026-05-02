@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_UNLEASH_APP_NAME?: string;
   readonly VITE_UNLEASH_ENVIRONMENT?: string;
   readonly VITE_UNLEASH_REFRESH_INTERVAL?: string;
+  readonly VITE_FEATURE_FLAG_OVERRIDES?: string;
 }
 
 interface ImportMeta {

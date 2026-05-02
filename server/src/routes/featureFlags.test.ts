@@ -17,6 +17,7 @@ describe('featureFlags route', () => {
   beforeEach(() => {
     clearLocalFeatureFlagOverrides();
     process.env = { ...originalEnv, NODE_ENV: 'test' };
+    delete process.env.FEATURE_FLAG_OVERRIDES;
     delete process.env.FEATURE_FLAGS_ALLOW_LOCAL_OVERRIDE;
   });
 
@@ -31,7 +32,7 @@ describe('featureFlags route', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       provider: 'local',
-      flags: [{ name: FEATURE_FLAGS.WEEK7_DEMO, enabled: false }],
+      flags: Object.values(FEATURE_FLAGS).map((name) => ({ name, enabled: false })),
     });
   });
 
@@ -45,7 +46,12 @@ describe('featureFlags route', () => {
 
     expect(enableRes.status).toBe(200);
     expect(enableRes.body).toEqual({ name: FEATURE_FLAGS.WEEK7_DEMO, enabled: true });
-    expect(listRes.body.flags).toEqual([{ name: FEATURE_FLAGS.WEEK7_DEMO, enabled: true }]);
+    expect(listRes.body.flags).toEqual(
+      Object.values(FEATURE_FLAGS).map((name) => ({
+        name,
+        enabled: name === FEATURE_FLAGS.WEEK7_DEMO,
+      }))
+    );
   });
 
   it('does not expose local override endpoint unless explicitly enabled', async () => {

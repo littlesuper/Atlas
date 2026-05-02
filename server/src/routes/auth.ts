@@ -9,6 +9,7 @@ import { isWecomEnabled, getWecomConfig, getUserInfoByCode, getUserDetail } from
 import { logger } from '../utils/logger';
 import { blacklistToken } from '../utils/tokenBlacklist';
 import { recordBusinessEvent } from '../utils/metrics';
+import { FEATURE_FLAGS, isFeatureEnabled } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -554,6 +555,11 @@ router.put('/preferences', authenticate, async (req: Request, res: Response): Pr
  * 返回前端初始化企微二维码所需的配置
  */
 router.get('/wecom/config', async (req: Request, res: Response): Promise<void> => {
+  if (!isFeatureEnabled(FEATURE_FLAGS.WECOM_LOGIN, { remoteAddress: req.ip })) {
+    res.json({ enabled: false });
+    return;
+  }
+
   const enabled = await isWecomEnabled();
   if (!enabled) {
     res.json({ enabled: false });
@@ -578,6 +584,11 @@ router.get('/wecom/config', async (req: Request, res: Response): Promise<void> =
  */
 router.post('/wecom/login', async (req: Request, res: Response): Promise<void> => {
   try {
+    if (!isFeatureEnabled(FEATURE_FLAGS.WECOM_LOGIN, { remoteAddress: req.ip })) {
+      res.status(404).json({ error: '接口不存在' });
+      return;
+    }
+
     const { code } = req.body;
 
     if (!code) {

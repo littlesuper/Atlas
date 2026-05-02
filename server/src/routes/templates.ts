@@ -1,14 +1,18 @@
 import express, { Request, Response } from 'express';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requireFeatureFlag } from '../middleware/featureFlag';
 import { isAdmin } from '../middleware/permission';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
 import { offsetWorkdays } from '../utils/workday';
 import { updateProjectProgress } from '../utils/projectProgress';
 import { logger } from '../utils/logger';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+router.use(requireFeatureFlag(FEATURE_FLAGS.PROJECT_TEMPLATES));
 
 // ======================== 模板 CRUD ========================
 

@@ -2,6 +2,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { PrismaClient, ActivityType } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requireFeatureFlag } from '../middleware/featureFlag';
 import { requirePermission, canManageProject, sanitizePagination } from '../middleware/permission';
 import { calculateWorkdays } from '../utils/workday';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
@@ -15,6 +16,7 @@ import { pinyin } from 'pinyin-pro';
 import { logger } from '../utils/logger';
 import { autoAssignByRole } from '../utils/roleMembershipResolver';
 import { recordBusinessEvent } from '../utils/metrics';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -973,7 +975,7 @@ router.get('/project/:projectId/critical-path', authenticate, async (req: Reques
  * GET /api/activities/workload
  * 资源负载看板：summary + members + issues
  */
-router.get('/workload', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.get('/workload', authenticate, requireFeatureFlag(FEATURE_FLAGS.WORKLOAD_DASHBOARD), async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.query;
 
