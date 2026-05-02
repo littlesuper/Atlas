@@ -26,6 +26,7 @@
 | `public-announcement-templates.md` | Week 7 Day 4 对外公告模板                 |
 | `emergency-drill-plan.md`         | Week 7 Day 5 第一次应急演练方案           |
 | `reports/emergency-drill-template.md` | Week 7 Day 5 应急演练记录模板         |
+| `reports/monthly-quality-audit-202605.md` | Week 8 Day 1-2 第一次月度质量审计报告 |
 | `dependabot-triage-20260430.md`   | 2026-04-30 首批 Dependabot PR 分流        |
 | `node-runtime-baseline.md`        | Node.js 运行时与工具链版本基线            |
 | `reports/run-20260428.md`         | 测试执行报告（最新）                      |
