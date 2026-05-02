@@ -4,7 +4,7 @@ import express from 'express';
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
-const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
+const { mockPrisma, mockCanManage, mockRecordBusinessEvent } = vi.hoisted(() => ({
   mockPrisma: {
     activity: {
       findMany: vi.fn(),
@@ -38,6 +38,7 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
     ),
   },
   mockCanManage: vi.fn().mockReturnValue(true),
+  mockRecordBusinessEvent: vi.fn(),
 }));
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
@@ -131,6 +132,10 @@ vi.mock('../utils/roleMembershipResolver', () => ({
   resolveRoleMembers: vi.fn().mockResolvedValue([]),
   findRolesByUser: vi.fn().mockResolvedValue([]),
   findActiveActivitiesByExecutor: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../utils/metrics', () => ({
+  recordBusinessEvent: mockRecordBusinessEvent,
 }));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -583,6 +588,7 @@ describe('POST /api/activities', () => {
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('测试活动');
     expect(mockPrisma.activity.create).toHaveBeenCalled();
+    expect(mockRecordBusinessEvent).toHaveBeenCalledWith('activity_create', 'success');
   });
 
   it('should return 403 when project is archived', async () => {

@@ -4,7 +4,7 @@ import request from 'supertest';
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
-const { mockPrisma } = vi.hoisted(() => {
+const { mockPrisma, mockRecordBusinessEvent } = vi.hoisted(() => {
   const mockPrisma = {
     project: {
       findUnique: vi.fn(),
@@ -43,7 +43,7 @@ const { mockPrisma } = vi.hoisted(() => {
       return arg(mockPrisma);
     }),
   };
-  return { mockPrisma };
+  return { mockPrisma, mockRecordBusinessEvent: vi.fn() };
 });
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
@@ -91,6 +91,10 @@ vi.mock('../utils/validation', () => ({
   isValidPriority: (p: string) => ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(p),
   isValidDateRange: (start: string, end: string) => new Date(start) <= new Date(end),
   isValidProgress: (n: number) => n >= 0 && n <= 100,
+}));
+
+vi.mock('../utils/metrics', () => ({
+  recordBusinessEvent: mockRecordBusinessEvent,
 }));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -269,6 +273,7 @@ describe('POST /api/projects', () => {
 
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('id');
+    expect(mockRecordBusinessEvent).toHaveBeenCalledWith('project_create', 'success');
   });
 
   it('returns 500 on unexpected error', async () => {
@@ -285,6 +290,7 @@ describe('POST /api/projects', () => {
         managerId: 'user-1',
       });
     expect(res.status).toBe(500);
+    expect(mockRecordBusinessEvent).toHaveBeenCalledWith('project_create', 'error');
   });
 });
 

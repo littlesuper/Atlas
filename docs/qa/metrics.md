@@ -41,11 +41,15 @@ atlas_business_events_total{event,result}
 
 当前已埋点：
 
-| event        | result                                                    |
-| ------------ | --------------------------------------------------------- |
-| `auth_login` | `success`                                                 |
-| `auth_login` | `validation_failed` / `invalid_user` / `invalid_password` |
-| `auth_login` | `forbidden` / `disabled` / `error`                        |
+| event                  | result                                                    |
+| ---------------------- | --------------------------------------------------------- |
+| `auth_login`           | `success`                                                 |
+| `auth_login`           | `validation_failed` / `invalid_user` / `invalid_password` |
+| `auth_login`           | `forbidden` / `disabled` / `error`                        |
+| `project_create`       | `success` / `error`                                       |
+| `activity_create`      | `success`                                                 |
+| `weekly_report_create` | `success` / `forbidden`                                   |
+| `weekly_report_submit` | `success`                                                 |
 
 ## 标签约束
 
@@ -90,6 +94,22 @@ sum(rate(atlas_business_events_total{event="auth_login",result!="success"}[5m]))
 sum(rate(atlas_business_events_total{event="auth_login"}[5m]))
 ```
 
+核心业务动作吞吐：
+
+```promql
+sum by (event, result) (
+  rate(atlas_business_events_total{event=~"project_create|activity_create|weekly_report_create|weekly_report_submit"}[5m])
+)
+```
+
+核心业务动作失败率：
+
+```promql
+sum(rate(atlas_business_events_total{event=~"project_create|activity_create|weekly_report_create|weekly_report_submit",result!="success"}[5m]))
+/
+sum(rate(atlas_business_events_total{event=~"project_create|activity_create|weekly_report_create|weekly_report_submit"}[5m]))
+```
+
 ## 本地验证
 
 启动后端时显式打开本地指标端点：
@@ -131,5 +151,4 @@ Prometheus 本地抓取 `host.docker.internal:3000/api/metrics`。Grafana 会自
 
 ## 后续任务
 
-- 扩展关键业务动作埋点，例如项目创建、活动创建、周报提交。
 - 为 dashboard 阈值配置告警规则。

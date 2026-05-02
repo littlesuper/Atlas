@@ -4,6 +4,7 @@ import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, canDeleteProject, sanitizePagination } from '../middleware/permission';
 import { VALID_PROJECT_STATUSES, VALID_PRIORITIES, isValidProjectStatus, isValidPriority, isValidDateRange, isValidProgress } from '../utils/validation';
 import { logger } from '../utils/logger';
+import { recordBusinessEvent } from '../utils/metrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -289,8 +290,10 @@ router.post(
         },
       });
 
+      recordBusinessEvent('project_create', 'success');
       res.status(201).json(project);
     } catch (error) {
+      recordBusinessEvent('project_create', 'error');
       logger.error({ err: error }, '创建项目错误');
       res.status(500).json({ error: '服务器内部错误' });
     }
