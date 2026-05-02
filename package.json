@@ -19,6 +19,7 @@
     "outdated": "npm outdated",
     "test": "npm run test --workspace=server && npm run test --workspace=client",
     "test:e2e:core": "playwright test --project=setup --project=chromium",
+    "test:e2e:visual": "playwright test --project=setup --project=chromium --grep @visual",
     "test:e2e:all-browsers": "playwright test --project=setup --project=chromium --project=firefox --project=webkit",
     "test:integration": "npm run test:integration --workspace=server",
     "test:coverage": "npm run test:coverage --workspace=server && npm run test:coverage --workspace=client",
