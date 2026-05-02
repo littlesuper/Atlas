@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: atlas-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - '3100:3100'
+    volumes:
+      - ./ops/logging/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - atlas-loki-data:/loki
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: atlas-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./ops/logging/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./.logs:/var/log/atlas:ro
+      - atlas-promtail-positions:/tmp
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: atlas-grafana
+    ports:
+      - '3002:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD before starting Grafana}
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ./ops/logging/grafana/provisioning:/etc/grafana/provisioning:ro
+      - atlas-grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+volumes:
+  atlas-loki-data:
+  atlas-promtail-positions:
+  atlas-grafana-data:
