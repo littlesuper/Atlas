@@ -17,6 +17,7 @@
 | `metrics.md`                      | Week 6 Day 3 指标端点、指标名与 PromQL    |
 | `alerts.md`                       | Week 6 Day 4 告警规则、阈值与通道建议     |
 | `error-tracking.md`               | Week 6 Day 5 Sentry 错误追踪与 source map |
+| `feature-flags.md`                | Week 7 Day 1-2 Feature Flag 接入方案      |
 | `dependabot-triage-20260430.md`   | 2026-04-30 首批 Dependabot PR 分流        |
 | `node-runtime-baseline.md`        | Node.js 运行时与工具链版本基线            |
 | `reports/run-20260428.md`         | 测试执行报告（最新）                      |

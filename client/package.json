@@ -13,6 +13,7 @@
   "dependencies": {
     "@arco-design/web-react": "^2.66.2",
     "@sentry/react": "^10.51.0",
+    "@unleash/proxy-client-react": "^5.0.1",
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-react": "^1.0.6",
     "axios": "^1.7.9",
@@ -26,6 +27,7 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^16.6.2",
     "react-router-dom": "^7.1.3",
+    "unleash-proxy-client": "^3.8.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
