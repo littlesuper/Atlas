@@ -6,12 +6,12 @@
 
 ## 当前选择
 
-本仓库先落地自托管 Loki + Promtail + Grafana 模板，原因：
+本仓库先落地自托管 Loki + Promtail + Prometheus + Grafana 模板，原因：
 
 - 不需要写入第三方 token 或生产密钥。
 - 适配现有裸机部署：`deploy.sh` 已把服务日志写到 `.logs/app.log` 和 `.logs/error.log`。
 - Loki 配置了 30 天保留期，符合 Week 6 验收里的“至少能查询 30 天历史日志”。
-- Grafana 通过 provisioning 自动配置 Loki 数据源。
+- Grafana 通过 provisioning 自动配置 Loki / Prometheus 数据源和 Atlas dashboard。
 
 这套模板不会自动影响线上服务；只有显式执行 Docker Compose 命令才会启动日志聚合栈。
 

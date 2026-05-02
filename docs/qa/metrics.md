@@ -92,7 +92,13 @@ sum(rate(atlas_business_events_total{event="auth_login"}[5m]))
 
 ## 本地验证
 
-启动后端后访问：
+启动后端时显式打开本地指标端点：
+
+```bash
+METRICS_ENABLED=true npm run dev:server
+```
+
+访问指标端点：
 
 ```bash
 curl http://localhost:3000/api/metrics
@@ -102,8 +108,28 @@ curl http://localhost:3000/api/metrics
 
 生产环境如未设置 `METRICS_ENABLED=true`，该端点返回 404。
 
+## 本地 Prometheus + Grafana
+
+启动可观测性栈：
+
+```bash
+mkdir -p .logs
+export GRAFANA_ADMIN_PASSWORD='replace-with-local-password' # pragma: allowlist secret
+docker compose -f docker-compose.logging.yml up -d
+```
+
+本地地址：
+
+| 工具       | 地址                    |
+| ---------- | ----------------------- |
+| Prometheus | `http://localhost:9090` |
+| Grafana    | `http://localhost:3002` |
+
+Prometheus 本地抓取 `host.docker.internal:3000/api/metrics`。Grafana 会自动加载 `Atlas Prometheus` 数据源和 `Atlas Observability` dashboard。
+
+如果在 Linux 上运行且 Docker 不支持 `host.docker.internal`，需要把 Prometheus target 改成宿主机可访问的 IP 或把 Atlas 服务加入同一个 Compose 网络。
+
 ## 后续任务
 
-- 接入 Prometheus 抓取配置。
-- 创建 Grafana 业务大盘和技术大盘。
 - 扩展关键业务动作埋点，例如项目创建、活动创建、周报提交。
+- 为 dashboard 阈值配置告警规则。

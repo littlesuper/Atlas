@@ -24,6 +24,22 @@ services:
       - loki
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: atlas-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./ops/metrics/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - atlas-prometheus-data:/prometheus
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.4.0
     container_name: atlas-grafana
@@ -38,9 +54,11 @@ services:
       - atlas-grafana-data:/var/lib/grafana
     depends_on:
       - loki
+      - prometheus
     restart: unless-stopped
 
 volumes:
   atlas-loki-data:
   atlas-promtail-positions:
+  atlas-prometheus-data:
   atlas-grafana-data:
