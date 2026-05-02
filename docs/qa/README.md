@@ -14,6 +14,7 @@
 | `core-modules-test-targets.md`    | Week 4 Day 3-4 核心模块候选清单与补测目标 |
 | `week5-closure.md`                | Week 5 集成测试与 E2E 体系收口报告        |
 | `log-aggregation.md`              | Week 6 Day 1-2 日志聚合方案与常用查询     |
+| `metrics.md`                      | Week 6 Day 3 指标端点、指标名与 PromQL    |
 | `dependabot-triage-20260430.md`   | 2026-04-30 首批 Dependabot PR 分流        |
 | `node-runtime-baseline.md`        | Node.js 运行时与工具链版本基线            |
 | `reports/run-20260428.md`         | 测试执行报告（最新）                      |
