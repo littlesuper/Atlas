@@ -1,13 +1,17 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requireFeatureFlag } from '../middleware/featureFlag';
 import { requirePermission } from '../middleware/permission';
 import { auditLog, diffFields } from '../utils/auditLog';
 import { invalidateWecomConfigCache } from '../utils/wecom';
 import { logger } from '../utils/logger';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+router.use(requireFeatureFlag(FEATURE_FLAGS.WECOM_LOGIN));
 
 function maskSecret(secret: string): string {
   if (!secret) return '';

@@ -1,12 +1,14 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
+import { requireFeatureFlag } from '../middleware/featureFlag';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { assessProjectRisk } from '../utils/riskEngine';
 import { callAi } from '../utils/aiClient';
 import { buildRiskContext, trimContextForAI } from '../utils/riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from '../utils/riskPrompts';
 import { logger } from '../utils/logger';
+import { FEATURE_FLAGS, isFeatureEnabled } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -51,7 +53,7 @@ router.get('/summary', authenticate, async (req: Request, res: Response): Promis
  * GET /api/risk/dashboard
  * 风险仪表盘：跨项目风险全景
  */
-router.get('/dashboard', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.get('/dashboard', authenticate, requireFeatureFlag(FEATURE_FLAGS.RISK_DASHBOARD), async (req: Request, res: Response): Promise<void> => {
   try {
     const projects = await prisma.project.findMany({
       where: { status: 'IN_PROGRESS' },
@@ -140,7 +142,7 @@ router.get('/dashboard', authenticate, async (req: Request, res: Response): Prom
  * GET /api/risk/dashboard/insights
  * 跨项目 AI 洞察
  */
-router.get('/dashboard/insights', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.get('/dashboard/insights', authenticate, requireFeatureFlag(FEATURE_FLAGS.RISK_DASHBOARD), async (req: Request, res: Response): Promise<void> => {
   try {
     const projects = await prisma.project.findMany({
       where: { status: 'IN_PROGRESS' },
@@ -353,6 +355,10 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
     let aiEnhancedData: any = null;
 
     try {
+      if (!isFeatureEnabled(FEATURE_FLAGS.AI_ASSISTANCE, { userId: req.user?.id, remoteAddress: req.ip })) {
+        throw new Error('AI assistance feature is disabled');
+      }
+
       const aiResult = await callAi({
         feature: 'risk',
         projectId,

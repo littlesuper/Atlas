@@ -23,14 +23,16 @@ describe('featureFlags', () => {
     process.env = originalEnv;
   });
 
-  it('defaults the first Atlas release flag to disabled', () => {
+  it('defaults Atlas release flags to disabled', () => {
     expect(isFeatureEnabled(FEATURE_FLAGS.WEEK7_DEMO)).toBe(false);
-    expect(getFeatureFlagSnapshot()).toEqual([{ name: FEATURE_FLAGS.WEEK7_DEMO, enabled: false }]);
+    expect(isFeatureEnabled(FEATURE_FLAGS.AI_ASSISTANCE)).toBe(false);
+    expect(getFeatureFlagSnapshot()).toEqual(Object.values(FEATURE_FLAGS).map((name) => ({ name, enabled: false })));
   });
 
   it('supports JSON environment overrides for known flags', () => {
-    process.env.FEATURE_FLAG_OVERRIDES = JSON.stringify({ [FEATURE_FLAGS.WEEK7_DEMO]: true });
-    expect(isFeatureEnabled(FEATURE_FLAGS.WEEK7_DEMO)).toBe(true);
+    process.env.FEATURE_FLAG_OVERRIDES = JSON.stringify({ [FEATURE_FLAGS.AI_ASSISTANCE]: true });
+    expect(isFeatureEnabled(FEATURE_FLAGS.AI_ASSISTANCE)).toBe(true);
+    expect(isFeatureEnabled(FEATURE_FLAGS.WEEK7_DEMO)).toBe(false);
   });
 
   it('supports local dynamic overrides for non-production verification', () => {

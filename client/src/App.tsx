@@ -4,6 +4,8 @@ import { Spin } from '@arco-design/web-react';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
 import ErrorBoundary from './components/ErrorBoundary';
+import { FEATURE_FLAGS, FeatureFlagName } from './featureFlags/flags';
+import { useFeatureFlag } from './featureFlags/FeatureFlagProvider';
 
 // 页面组件（需要实际创建）
 const Login = React.lazy(() => import('./pages/Login'));
@@ -74,6 +76,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   return <>{children}</>;
+};
+
+const FeatureFlaggedRoute: React.FC<{ children: React.ReactNode; flag: FeatureFlagName }> = ({
+  children,
+  flag,
+}) => {
+  const enabled = useFeatureFlag(flag);
+  return enabled ? <>{children}</> : <Navigate to="/projects" replace />;
 };
 
 const App: React.FC = () => {
@@ -230,7 +240,9 @@ const App: React.FC = () => {
             path="/templates"
             element={
               <ProtectedRoute requirePermission={{ resource: 'project', action: 'create' }}>
-                <TemplateManagement />
+                <FeatureFlaggedRoute flag={FEATURE_FLAGS.PROJECT_TEMPLATES}>
+                  <TemplateManagement />
+                </FeatureFlaggedRoute>
               </ProtectedRoute>
             }
           />
@@ -240,7 +252,9 @@ const App: React.FC = () => {
             path="/risk-dashboard"
             element={
               <ProtectedRoute>
-                <RiskDashboard />
+                <FeatureFlaggedRoute flag={FEATURE_FLAGS.RISK_DASHBOARD}>
+                  <RiskDashboard />
+                </FeatureFlaggedRoute>
               </ProtectedRoute>
             }
           />
@@ -250,7 +264,9 @@ const App: React.FC = () => {
             path="/workload"
             element={
               <ProtectedRoute>
-                <WorkloadPage />
+                <FeatureFlaggedRoute flag={FEATURE_FLAGS.WORKLOAD_DASHBOARD}>
+                  <WorkloadPage />
+                </FeatureFlaggedRoute>
               </ProtectedRoute>
             }
           />

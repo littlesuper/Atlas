@@ -34,6 +34,8 @@ import AuditLogTab from './AuditLog';
 import WecomManagement from './WecomManagement';
 import HolidayManagement from './HolidayManagement';
 import RoleMembersTab from './RoleMembersTab';
+import { FEATURE_FLAGS } from '../../featureFlags/flags';
+import { useFeatureFlag } from '../../featureFlags/FeatureFlagProvider';
 import dayjs from 'dayjs';
 import { pinyin } from 'pinyin-pro';
 
@@ -92,6 +94,9 @@ const InlineRoleEditor: React.FC<InlineRoleEditorProps> = ({ roles, initialValue
 
 const AdminPage: React.FC = () => {
   const { hasPermission } = useAuthStore();
+  const aiAssistanceEnabled = useFeatureFlag(FEATURE_FLAGS.AI_ASSISTANCE);
+  const wecomLoginEnabled = useFeatureFlag(FEATURE_FLAGS.WECOM_LOGIN);
+  const holidayManagementEnabled = useFeatureFlag(FEATURE_FLAGS.HOLIDAY_MANAGEMENT);
   const [userForm] = Form.useForm();
   const [roleForm] = Form.useForm();
 
@@ -105,12 +110,12 @@ const AdminPage: React.FC = () => {
   // 计算可见 Tab 列表，自动回退到第一个有权限的 Tab
   const visibleTabs = useMemo(() => {
     const tabs: string[] = [];
-    if (hasPermission('system', 'ai')) tabs.push('ai');
+    if (aiAssistanceEnabled && hasPermission('system', 'ai')) tabs.push('ai');
     if (hasPermission('system', 'account')) tabs.push('account');
-    if (hasPermission('system', 'account')) tabs.push('holidays');
+    if (holidayManagementEnabled && hasPermission('system', 'account')) tabs.push('holidays');
     if (hasPermission('system', 'audit_log')) tabs.push('audit');
     return tabs;
-  }, [hasPermission]);
+  }, [aiAssistanceEnabled, hasPermission, holidayManagementEnabled]);
 
   const urlTab = searchParams.get('tab') || '';
   const mainTab = visibleTabs.includes(urlTab) ? urlTab : (visibleTabs[0] || 'ai');
@@ -120,7 +125,13 @@ const AdminPage: React.FC = () => {
     if (visibleTabs.length > 0 && urlTab !== mainTab) {
       setSearchParams({ tab: mainTab }, { replace: true });
     }
-  }, [mainTab, urlTab, visibleTabs]);
+  }, [mainTab, setSearchParams, urlTab, visibleTabs]);
+
+  useEffect(() => {
+    if (!wecomLoginEnabled && accountTab === 'wecom') {
+      setAccountTab('users');
+    }
+  }, [accountTab, wecomLoginEnabled]);
 
   // 用户数据
   const [users, setUsers] = useState<User[]>([]);
@@ -588,7 +599,7 @@ const AdminPage: React.FC = () => {
       <Card>
         <Tabs activeTab={mainTab} onChange={setMainTab}>
           {/* AI管理 */}
-          {hasPermission('system', 'ai') && (
+          {aiAssistanceEnabled && hasPermission('system', 'ai') && (
             <Tabs.TabPane key="ai" title="AI管理">
               <AiManagement />
             </Tabs.TabPane>
@@ -671,9 +682,11 @@ const AdminPage: React.FC = () => {
                   </Tabs.TabPane>
 
                   {/* 企微配置 */}
-                  <Tabs.TabPane key="wecom" title="企微配置">
-                    <WecomManagement />
-                  </Tabs.TabPane>
+                  {wecomLoginEnabled && (
+                    <Tabs.TabPane key="wecom" title="企微配置">
+                      <WecomManagement />
+                    </Tabs.TabPane>
+                  )}
                   <Tabs.TabPane key="roleMembers" title="角色成员">
                     <RoleMembersTab />
                   </Tabs.TabPane>
@@ -682,7 +695,7 @@ const AdminPage: React.FC = () => {
           )}
 
           {/* 节假日 */}
-          {hasPermission('system', 'account') && (
+          {holidayManagementEnabled && hasPermission('system', 'account') && (
             <Tabs.TabPane key="holidays" title="节假日">
               <HolidayManagement />
             </Tabs.TabPane>

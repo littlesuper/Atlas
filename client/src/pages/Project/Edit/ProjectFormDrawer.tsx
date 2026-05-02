@@ -16,6 +16,8 @@ import {
 import { IconSave, IconUser } from '@arco-design/web-react/icon';
 import dayjs from 'dayjs';
 import { projectsApi, usersApi, templatesApi } from '../../../api';
+import { FEATURE_FLAGS } from '../../../featureFlags/flags';
+import { useFeatureFlag } from '../../../featureFlags/FeatureFlagProvider';
 import { Project, User, ProjectTemplate } from '../../../types';
 import {
   STATUS_MAP,
@@ -45,6 +47,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
 }) => {
   const isCreate = !projectId;
   const [form] = Form.useForm();
+  const projectTemplatesEnabled = useFeatureFlag(FEATURE_FLAGS.PROJECT_TEMPLATES);
 
   const [users, setUsers] = useState<User[]>([]);
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
@@ -84,7 +87,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
   };
 
   const loadTemplates = async () => {
-    if (!isCreate) return;
+    if (!isCreate || !projectTemplatesEnabled) return;
     try {
       const res = await templatesApi.list();
       setTemplates(res.data || []);
@@ -183,7 +186,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
         const res = await projectsApi.create(data);
         savedId = res.data.id;
 
-        if (values.templateId) {
+        if (projectTemplatesEnabled && values.templateId) {
           try {
             const inst = await templatesApi.instantiate(values.templateId, {
               projectId: savedId,
@@ -289,7 +292,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
               />
             </Form.Item>
 
-            {isCreate && templates.length > 0 && (
+            {isCreate && projectTemplatesEnabled && templates.length > 0 && (
               <Form.Item
                 label="项目模板"
                 field="templateId"
