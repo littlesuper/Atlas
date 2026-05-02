@@ -11,6 +11,8 @@
 | 灰度发布 Runbook | `docs/qa/canary-release-runbook.md` | 已准备 |
 | 降级开关清单 | `docs/qa/degradation-switches.md` | 已准备 |
 | 对外公告模板 | `docs/qa/public-announcement-templates.md` | 已准备 |
+| 第一次应急演练方案 | `docs/qa/emergency-drill-plan.md` | 已准备 |
+| 应急演练记录模板 | `docs/qa/reports/emergency-drill-template.md` | 已准备 |
 | 生产部署验证 | `docs/qa/prod-deploy-validation.md` | 已准备 |
 | 生产验证脚本 | `scripts/prod-check.sh` | 已准备 |
 
@@ -42,6 +44,7 @@ npm run release:canary-gate -- --stage 5 --base-url http://localhost:3000
 ## 演练要求
 
 - 发布前至少走查一次 `docs/qa/incident-response.md`。
-- staging 回滚演练使用 `docs/qa/reports/rollback-drill-template.md` 记录。
+- 第一次故障演练使用 `docs/qa/emergency-drill-plan.md` 规划。
+- staging 故障演练使用 `docs/qa/reports/emergency-drill-template.md` 记录。
 - 故障演练后把缺口补回工具包。
 - 任何真实生产操作都必须在统一发布/事故频道记录。
