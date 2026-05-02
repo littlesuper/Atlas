@@ -4,7 +4,7 @@ import express from 'express';
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
-const { mockPrisma, mockCanManage, mockIsAdmin, mockCallAi } = vi.hoisted(() => ({
+const { mockPrisma, mockCanManage, mockIsAdmin, mockCallAi, mockRecordBusinessEvent } = vi.hoisted(() => ({
   mockPrisma: {
     weeklyReport: {
       findMany: vi.fn(),
@@ -34,6 +34,7 @@ const { mockPrisma, mockCanManage, mockIsAdmin, mockCallAi } = vi.hoisted(() => 
   mockCanManage: vi.fn().mockReturnValue(true),
   mockIsAdmin: vi.fn().mockReturnValue(false),
   mockCallAi: vi.fn(),
+  mockRecordBusinessEvent: vi.fn(),
 }));
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
@@ -90,6 +91,10 @@ vi.mock('../utils/aiClient', () => ({
 
 vi.mock('../middleware/validate', () => ({
   validate: () => (_req: any, _res: any, next: any) => next(),
+}));
+
+vi.mock('../utils/metrics', () => ({
+  recordBusinessEvent: mockRecordBusinessEvent,
 }));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -437,6 +442,7 @@ describe('Weekly Reports Routes', () => {
           }),
         })
       );
+      expect(mockRecordBusinessEvent).toHaveBeenCalledWith('weekly_report_create', 'success');
     });
 
     it('returns 400 when required fields are missing', async () => {
@@ -469,6 +475,7 @@ describe('Weekly Reports Routes', () => {
 
       expect(res.status).toBe(403);
       expect(res.body).toHaveProperty('error', '只能为自己负责的项目创建周报');
+      expect(mockRecordBusinessEvent).toHaveBeenCalledWith('weekly_report_create', 'forbidden');
     });
   });
 
@@ -538,6 +545,7 @@ describe('Weekly Reports Routes', () => {
           data: expect.objectContaining({ status: 'SUBMITTED' }),
         })
       );
+      expect(mockRecordBusinessEvent).toHaveBeenCalledWith('weekly_report_submit', 'success');
     });
 
     it('returns 404 when report does not exist', async () => {

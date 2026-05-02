@@ -6,6 +6,7 @@ import { getWeekNumber } from '../utils/weekNumber';
 import { callAi } from '../utils/aiClient';
 import { sanitizeRichText } from '../utils/sanitize';
 import { logger } from '../utils/logger';
+import { recordBusinessEvent } from '../utils/metrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -442,6 +443,7 @@ router.post(
 
       // 归属检查：管理员、项目经理或协作者可以创建该项目的周报
       if (!canManageProject(req, project.managerId, projectId)) {
+        recordBusinessEvent('weekly_report_create', 'forbidden');
         res.status(403).json({ error: '只能为自己负责的项目创建周报' });
         return;
       }
@@ -487,6 +489,7 @@ router.post(
         },
       });
 
+      recordBusinessEvent('weekly_report_create', 'success');
       res.status(201).json(report);
     } catch (error) {
       logger.error({ err: error }, '创建周报错误');
@@ -680,6 +683,8 @@ router.post(
         },
       },
     });
+
+    recordBusinessEvent('weekly_report_submit', 'success');
 
     // Auto-create RiskItems from weekly report risks array
     try {

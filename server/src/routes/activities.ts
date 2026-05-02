@@ -14,6 +14,7 @@ import { calculateCriticalPath } from '../utils/criticalPath';
 import { pinyin } from 'pinyin-pro';
 import { logger } from '../utils/logger';
 import { autoAssignByRole } from '../utils/roleMembershipResolver';
+import { recordBusinessEvent } from '../utils/metrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -506,6 +507,7 @@ router.post(
 
       auditLog({ req, action: 'CREATE', resourceType: 'activity', resourceId: activity.id, resourceName: activity.name });
 
+      recordBusinessEvent('activity_create', 'success');
       res.status(201).json(activity);
     } catch (error) {
       logger.error({ err: error }, '创建活动错误');
