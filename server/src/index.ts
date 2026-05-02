@@ -1,3 +1,4 @@
+import './instrument';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -39,6 +40,7 @@ import { requestId } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
 import { metricsMiddleware } from './middleware/metrics';
 import { setupSwagger } from './swagger';
+import { captureServerException } from './utils/errorTracking';
 
 // ==================== 安全校验 ====================
 
@@ -211,6 +213,7 @@ export function createApp() {
 
   // 全局错误处理
   app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+    captureServerException(err, req);
     logger.error(
       {
         err,

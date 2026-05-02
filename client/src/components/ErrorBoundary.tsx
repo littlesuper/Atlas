@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo } from 'react';
 import { Button, Result } from '@arco-design/web-react';
+import { captureFrontendException } from '../utils/errorTracking';
 
 interface Props {
   children: React.ReactNode;
@@ -22,6 +23,10 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo);
+    captureFrontendException(error, {
+      tags: { source: 'react_error_boundary' },
+      extra: { componentStack: errorInfo.componentStack },
+    });
   }
 
   handleReset = () => {
