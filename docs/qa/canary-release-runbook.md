@@ -85,6 +85,6 @@ npm run release:canary-gate -- --stage 5 --skip-health --metrics-file /tmp/canar
 
 ## 下一步
 
-- 给 `deploy.sh` 补齐代码版本回滚命令。
-- 在 staging 做一次真实回滚演练，并记录耗时。
-- 将演练结果归档到 `docs/qa/reports/`。
+- 使用 `docs/qa/rollback-runbook.md` 进行 staging 回滚演练。
+- 将演练结果按 `docs/qa/reports/rollback-drill-template.md` 归档。
+- 根据演练结果修复脚本、文档或监控缺口。
