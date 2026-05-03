@@ -12,6 +12,7 @@
 | `week3-day5-retrospective.md` | Week 3 Day 5 第一次流程回顾执行表 |
 | `process-change-log.md` | AI 协作开发流程变更台账 |
 | `week3-acceptance.md` | Week 3 仓库侧验收与待业务确认事项 |
+| `../knowledge-base/` | Week 8 知识库入口、小白手册和关键流程视频脚本 |
 
 ## 使用原则
 
@@ -27,4 +28,5 @@
 - 需求文档目录：`docs/requirements/`
 - 提示词库：`docs/prompts/`
 - 质量检查清单：`docs/checklists/`
+- 质量保障知识库：`docs/knowledge-base/`
 - 流程变更台账：`docs/process/process-change-log.md`
