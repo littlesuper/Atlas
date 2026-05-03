@@ -28,6 +28,7 @@
 | `reports/emergency-drill-template.md` | Week 7 Day 5 应急演练记录模板         |
 | `reports/monthly-quality-audit-202605.md` | Week 8 Day 1-2 第一次月度质量审计报告 |
 | `../checklists/`                  | Week 8 Day 3 Atlas 质量检查清单        |
+| `../knowledge-base/`              | Week 8 Day 3 质量保障知识库、小白手册和视频脚本 |
 | `dependabot-triage-20260430.md`   | 2026-04-30 首批 Dependabot PR 分流        |
 | `node-runtime-baseline.md`        | Node.js 运行时与工具链版本基线            |
 | `reports/run-20260428.md`         | 测试执行报告（最新）                      |
