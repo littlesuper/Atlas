@@ -13,6 +13,7 @@
 | `process-change-log.md` | AI 协作开发流程变更台账 |
 | `week3-acceptance.md` | Week 3 仓库侧验收与待业务确认事项 |
 | `../knowledge-base/` | Week 8 知识库入口、小白手册和关键流程视频脚本 |
+| `week8-day4-quality-review.md` | Week 8 Day 4 团队质量回顾会执行包 |
 
 ## 使用原则
 
@@ -29,4 +30,5 @@
 - 提示词库：`docs/prompts/`
 - 质量检查清单：`docs/checklists/`
 - 质量保障知识库：`docs/knowledge-base/`
+- Week 8 团队对齐会议：`docs/process/week8-day4-quality-review.md`
 - 流程变更台账：`docs/process/process-change-log.md`
