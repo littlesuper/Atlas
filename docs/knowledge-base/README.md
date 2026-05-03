@@ -27,6 +27,7 @@
 | 回滚 | `../qa/rollback-runbook.md` |
 | 事故响应 | `../qa/incident-response.md` |
 | 第一次月度审计 | `../qa/reports/monthly-quality-audit-202605.md` |
+| Week 8 团队质量回顾会 | `../process/week8-day4-quality-review.md` |
 
 ## 知识库维护规则
 
@@ -35,4 +36,3 @@
 3. 月度审计后的长期问题,进入 `../qa/reports/` 对应报告,不要只留在聊天记录里。
 4. 外部 Wiki 可以引用本目录,但仓库文档仍作为质量体系的单一事实来源。
 5. 涉及密钥、生产配置、数据库迁移、真实用户数据或已部署服务影响的内容,只记录流程和负责人,不记录密钥值或生产敏感细节。
-
