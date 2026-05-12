@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -35,7 +35,7 @@ interface Props {
   managerId?: string;
   collaboratingProjectIds?: string[];
   isArchived?: boolean;
-  snapshotData?: any[] | null;
+  snapshotData?: WeeklyReport[] | null;
 }
 
 const PROGRESS_ICON: Record<string, React.ReactNode> = {
@@ -57,7 +57,7 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived, s
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await weeklyReportsApi.getByProject(projectId);
@@ -67,15 +67,15 @@ const ProjectWeeklyTab: React.FC<Props> = ({ projectId, managerId, isArchived, s
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (snapshotData) {
-      setReports(snapshotData as WeeklyReport[]);
+      setReports(snapshotData);
     } else {
       load();
     }
-  }, [projectId, snapshotData]);
+  }, [snapshotData, load]);
 
   const handleCreate = () => {
     navigate(`/weekly-reports/new?projectId=${projectId}`);

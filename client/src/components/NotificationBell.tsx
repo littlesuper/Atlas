@@ -7,6 +7,16 @@ import { Notification } from '../types';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
+export function getNotificationRoute(notification: { type: string; relatedId?: string | null }): string | null {
+  if (!notification.relatedId) return null;
+  if (notification.type === 'REPORT_REMINDER') {
+    return `/projects/${notification.relatedId}?tab=weekly`;
+  } else if (notification.type === 'RISK_ESCALATION' || notification.type === 'RISK_ALERT') {
+    return `/projects/${notification.relatedId}?tab=risk`;
+  }
+  return `/projects/${notification.relatedId}`;
+}
+
 const NotificationBell: React.FC = () => {
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
@@ -74,17 +84,8 @@ const NotificationBell: React.FC = () => {
 
     setVisible(false);
 
-    // Navigate based on type
-    if (notification.relatedId) {
-      if (notification.type === 'REPORT_REMINDER') {
-        navigate(`/projects/${notification.relatedId}?tab=weekly`);
-      } else if (notification.type === 'RISK_ESCALATION' || notification.type === 'RISK_ALERT') {
-        navigate(`/projects/${notification.relatedId}?tab=risk`);
-      } else {
-        // ACTIVITY_DUE and MILESTONE_APPROACHING - navigate to project detail
-        navigate(`/projects/${notification.relatedId}`);
-      }
-    }
+    const route = getNotificationRoute(notification);
+    if (route) navigate(route);
   };
 
   const handleDelete = async (e: React.MouseEvent | Event, id: string) => {

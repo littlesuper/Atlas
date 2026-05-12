@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -27,18 +30,18 @@ const { mockPrisma, mockInvalidateAllUserCache, mockPermissionMiddleware } = vi.
     },
   };
   const mockInvalidateAllUserCache = vi.fn();
-  const mockPermissionMiddleware = vi.fn().mockImplementation((_req: any, _res: any, next: any) => next());
+  const mockPermissionMiddleware = vi.fn().mockImplementation((_req: Request, _res: Response, next: NextFunction) => next());
   return { mockPrisma, mockInvalidateAllUserCache, mockPermissionMiddleware };
 });
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -116,7 +119,7 @@ describe('GET /api/roles', () => {
 describe('GET /api/roles - error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPermissionMiddleware.mockImplementation((_req: any, _res: any, next: any) => next());
+    mockPermissionMiddleware.mockImplementation((_req: Request, _res: Response, next: NextFunction) => next());
   });
 
   it('returns 500 on database error', async () => {
@@ -129,7 +132,7 @@ describe('GET /api/roles - error handling', () => {
   });
 
   it('RBAC-012: User without role:read permission gets 403 on GET /api/roles', async () => {
-    mockPermissionMiddleware.mockImplementationOnce((_req: any, res: any, _next: any) => {
+    mockPermissionMiddleware.mockImplementationOnce((_req: Request, res: Response, _next: NextFunction) => {
       res.status(403).json({ error: '权限不足' });
     });
 
@@ -398,4 +401,276 @@ describe('DELETE /api/roles/:id', () => {
     expect(res.body.error).toMatch(/已分配给 3 个用户/);
     expect(mockPrisma.role.delete).not.toHaveBeenCalled();
   });
+});
+
+describe('GET /api/roles/permissions - error', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPrisma.permission.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/roles/permissions');
+
+    expect(res.status).toBe(500);
+  });
+});
+
+describe('POST /api/roles - without permissions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('creates role without permissionIds', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue(null);
+    mockPrisma.role.create.mockResolvedValue({ id: 'r-new', name: '无权限角色' });
+    mockPrisma.role.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'r-new',
+        name: '无权限角色',
+        rolePermissions: [],
+        _count: { userRoles: 0 },
+      });
+
+    const res = await request(app)
+      .post('/api/roles')
+      .send({ name: '无权限角色' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.rolePermission.createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /api/roles/:id - edge cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates description only without changing name', async () => {
+    mockPrisma.role.findUnique
+      .mockResolvedValueOnce({ id: 'r1', name: '角色A' })
+      .mockResolvedValueOnce({
+        id: 'r1',
+        name: '角色A',
+        description: '新描述',
+        rolePermissions: [],
+        _count: { userRoles: 0 },
+      });
+    mockPrisma.role.update.mockResolvedValue({});
+
+    const res = await request(app)
+      .put('/api/roles/r1')
+      .send({ description: '新描述' });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.role.update).toHaveBeenCalledWith({
+      where: { id: 'r1' },
+      data: { description: '新描述' },
+    });
+    expect(mockPrisma.role.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('sets description to null when empty string provided', async () => {
+    mockPrisma.role.findUnique
+      .mockResolvedValueOnce({ id: 'r1', name: '角色A' })
+      .mockResolvedValueOnce({
+        id: 'r1',
+        name: '角色A',
+        description: null,
+        rolePermissions: [],
+        _count: { userRoles: 0 },
+      });
+    mockPrisma.role.update.mockResolvedValue({});
+
+    const res = await request(app)
+      .put('/api/roles/r1')
+      .send({ description: '' });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.role.update).toHaveBeenCalledWith({
+      where: { id: 'r1' },
+      data: { description: null },
+    });
+  });
+
+  it('clears permissions when empty array provided', async () => {
+    mockPrisma.role.findUnique
+      .mockResolvedValueOnce({ id: 'r1', name: '角色A' })
+      .mockResolvedValueOnce({
+        id: 'r1',
+        name: '角色A',
+        rolePermissions: [],
+        _count: { userRoles: 0 },
+      });
+    mockPrisma.role.update.mockResolvedValue({});
+    mockPrisma.rolePermission.deleteMany.mockResolvedValue({ count: 2 });
+
+    const res = await request(app)
+      .put('/api/roles/r1')
+      .send({ permissionIds: [] });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+      where: { roleId: 'r1' },
+    });
+    expect(mockPrisma.rolePermission.createMany).not.toHaveBeenCalled();
+    expect(mockInvalidateAllUserCache).toHaveBeenCalled();
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPrisma.role.findUnique.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app)
+      .put('/api/roles/r1')
+      .send({ name: 'test' });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('stores empty string description as null when creating role', async () => {
+    mockPrisma.role.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'r-new',
+        name: '空描述角色',
+        description: null,
+        rolePermissions: [],
+        _count: { userRoles: 0 },
+      });
+    mockPrisma.role.create.mockResolvedValue({ id: 'r-new', name: '空描述角色' });
+
+    const res = await request(app)
+      .post('/api/roles')
+      .send({ name: '空描述角色', description: '' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.role.create).toHaveBeenCalledWith({
+      data: { name: '空描述角色', description: null },
+    });
+  });
+
+  it('GET roles returns empty array when no roles exist', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/roles');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('GET roles returns 500 on database error', async () => {
+    mockPrisma.role.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/roles');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('POST create role returns 400 when name is missing', async () => {
+    const res = await request(app)
+      .post('/api/roles')
+      .send({ description: 'No name' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('GET roles returns empty array when no roles exist', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/roles');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('POST create role returns 400 when name is empty string', async () => {
+    const res = await request(app)
+      .post('/api/roles')
+      .send({ name: '' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('GET roles returns empty array when no roles exist', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/roles');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('GET permissions returns empty array when no permissions exist', async () => {
+    mockPrisma.permission.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/roles/permissions');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+});
+
+describe('GET /api/roles batch 125 matrices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `role-${index}`,
+    `角色-${index}`,
+    index % 5,
+  ] as const))(
+    'transforms generated role permissions for %s',
+    async (id, name, userCount) => {
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id,
+          name,
+          description: `desc-${id}`,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          rolePermissions: [
+            { permission: { id: `${id}-p1`, resource: 'project', action: 'read' } },
+            { permission: { id: `${id}-p2`, resource: 'activity', action: 'update' } },
+          ],
+          _count: { userRoles: userCount },
+        },
+      ]);
+
+      const res = await request(app).get('/api/roles');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].id).toBe(id);
+      expect(res.body[0].name).toBe(name);
+      expect(res.body[0].permissions).toEqual([
+        { id: `${id}-p1`, resource: 'project', action: 'read' },
+        { id: `${id}-p2`, resource: 'activity', action: 'update' },
+      ]);
+      expect(res.body[0].rolePermissions).toBeUndefined();
+      expect(res.body[0]._count.userRoles).toBe(userCount);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `resource-${index}`,
+    ['create', 'read', 'update', 'delete'][index % 4],
+  ] as const))(
+    'returns generated permission %s:%s',
+    async (resource, action) => {
+      mockPrisma.permission.findMany.mockResolvedValue([
+        { id: `${resource}-${action}`, resource, action },
+      ]);
+
+      const res = await request(app).get('/api/roles/permissions');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([{ id: `${resource}-${action}`, resource, action }]);
+      expect(mockPrisma.permission.findMany).toHaveBeenCalledWith({
+        orderBy: [{ resource: 'asc' }, { action: 'asc' }],
+        select: { id: true, resource: true, action: true },
+      });
+    },
+  );
 });

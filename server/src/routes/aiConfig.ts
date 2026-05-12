@@ -159,10 +159,10 @@ router.post(
         return;
       }
 
-      const result = await response.json();
+      const result = await response.json() as { data?: Array<{ id?: string }> };
       // 标准 OpenAI 格式: { data: [{ id: "model-name", ... }] }
       const models: string[] = Array.isArray(result.data)
-        ? result.data.map((m: { id: string }) => m.id).filter(Boolean).sort()
+        ? result.data.map((m) => m.id).filter((id): id is string => Boolean(id)).sort()
         : [];
 
       res.json({ success: true, models, message: `获取到 ${models.length} 个模型` });

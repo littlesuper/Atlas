@@ -6,7 +6,7 @@ import { waitForTableLoad } from '../helpers/arco';
  * - 产品线筛选按钮显示与交互
  * - 产品线筛选按钮尺寸
  */
-test.describe('Project List Filters', () => {
+test.describe('Project List Filters @p1', () => {
   test('product line filter tags are visible and properly sized', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 

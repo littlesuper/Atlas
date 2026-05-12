@@ -72,13 +72,24 @@ cd server && npm test
 cd client && npm test
 
 # E2E（Playwright，含无障碍审计）
-npx playwright test                        # 全量
+npm run test:e2e:p0       # PR 阻断集：@smoke + @p0
+npm run test:e2e:smoke    # smoke 子集
+npm run test:e2e:a11y     # axe 无障碍扫描
+npm run test:e2e:visual   # 视觉回归基线（@visual）
+npm run test:e2e:p1       # 夜间 P1 主流程回归
+npm run test:e2e:p2       # 夜间 P2 长尾回归
 npx playwright test e2e/specs/auth.spec.ts # 指定文件
 npx playwright test --project=chromium     # 指定项目
-npx playwright test --grep @P0             # 仅跑 P0（需在 spec 中加 tag）
 
 # 查看 HTML 报告
 npx playwright show-report
+```
+
+Playwright 默认会自己启动 fresh server（server=3000, client=5173），避免复用旧进程导致测试结果被污染。只有在明确需要调试提速时，才显式复用已有服务：
+
+```bash
+npm run dev
+npm run test:e2e:reuse -- --grep @smoke
 ```
 
 ## 3. 给 opencode 的执行流程

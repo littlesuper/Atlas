@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName, text } from '../fixtures/test-data';
 import { expectMessage, confirmModal, waitForTableLoad, createProjectViaPage, searchProject } from '../helpers/arco';
 
-test.describe.serial('Project Management', () => {
+test.describe.serial('Project Management @smoke', () => {
   const projectName = uniqueName(text.projectName);
 
   test('view project list with table', async ({ authedPage: page }) => {

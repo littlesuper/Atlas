@@ -2,6 +2,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+type CountRow = { count: number | string | bigint };
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 async function verify() {
   console.log('=== Activity Role Binding 迁移完整性自检 ===\n');
   let allPassed = true;
@@ -9,7 +14,7 @@ async function verify() {
   // Check 1: Backup count === ActivityExecutor count
   console.log('检查 1: 备份表行数 === ActivityExecutor 行数');
   try {
-    const backupCount = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM _activity_executor_backup`) as any[];
+    const backupCount = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM _activity_executor_backup`) as CountRow[];
     const executorCount = await prisma.activityExecutor.count();
     const bc = Number(backupCount[0].count);
     if (bc === executorCount) {
@@ -18,8 +23,8 @@ async function verify() {
       console.log(`  ✗ 失败: 备份 ${bc} !== ActivityExecutor ${executorCount}`);
       allPassed = false;
     }
-  } catch (e: any) {
-    console.log(`  ⚠ 跳过: 备份表不存在或查询失败 (${e.message})`);
+  } catch (e) {
+    console.log(`  ⚠ 跳过: 备份表不存在或查询失败 (${errorMessage(e)})`);
   }
 
   // Check 2: All ActivityExecutor.userId reference valid Users
@@ -28,7 +33,7 @@ async function verify() {
     SELECT COUNT(*) as count FROM activity_executors AE
     LEFT JOIN users U ON AE.userId = U.id
     WHERE U.id IS NULL
-  `) as any[];
+  `) as CountRow[];
   const invalidUserCount = Number(invalidUserExecutors[0].count);
   if (invalidUserCount === 0) {
     console.log(`  ✓ 通过: 所有 userId 有效`);
@@ -76,7 +81,7 @@ async function verify() {
   console.log('检查 5: 每个 RoleMember 的 (roleId, userId) 唯一');
   const duplicates = await prisma.$queryRawUnsafe(`
     SELECT roleId, userId, COUNT(*) as count FROM role_members GROUP BY roleId, userId HAVING count > 1
-  `) as any[];
+  `) as CountRow[];
   if (duplicates.length === 0) {
     console.log(`  ✓ 通过`);
   } else {

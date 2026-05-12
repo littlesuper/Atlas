@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -43,6 +43,14 @@ import {
   STATUS_MAP,
 } from '../../utils/constants';
 
+export function paramsToObject(params: Array<{ key: string; value: string }>): Record<string, string> {
+  const obj: Record<string, string> = {};
+  params.forEach((p) => {
+    if (p.key) obj[p.key] = p.value;
+  });
+  return obj;
+}
+
 // 规格/性能参数编辑器组件
 interface ParamsEditorProps {
   value?: Record<string, unknown>;
@@ -65,22 +73,14 @@ const ParamsEditor: React.FC<ParamsEditorProps> = ({ value = {}, onChange, categ
     newParams[index][field] = val;
     setParams(newParams);
 
-    const obj: Record<string, string> = {};
-    newParams.forEach((p) => {
-      if (p.key) obj[p.key] = p.value;
-    });
-    onChange?.(obj);
+    onChange?.(paramsToObject(newParams));
   };
 
   const handleRemove = (index: number) => {
     const newParams = params.filter((_, i) => i !== index);
     setParams(newParams);
 
-    const obj: Record<string, string> = {};
-    newParams.forEach((p) => {
-      if (p.key) obj[p.key] = p.value;
-    });
-    onChange?.(obj);
+    onChange?.(paramsToObject(newParams));
   };
 
   const handleLoadTemplate = () => {
@@ -98,11 +98,7 @@ const ParamsEditor: React.FC<ParamsEditorProps> = ({ value = {}, onChange, categ
     }
     const newParams = [...params, ...newKeys.map((k) => ({ key: k, value: '' }))];
     setParams(newParams);
-    const obj: Record<string, string> = {};
-    newParams.forEach((p) => {
-      if (p.key) obj[p.key] = p.value;
-    });
-    onChange?.(obj);
+    onChange?.(paramsToObject(newParams));
     Message.success(`已加载 ${newKeys.length} 个模板参数`);
   };
 
@@ -144,6 +140,12 @@ const ParamsEditor: React.FC<ParamsEditorProps> = ({ value = {}, onChange, categ
   );
 };
 
+export function getApiErrorMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) return undefined;
+  const response = (error as { response?: { data?: { error?: unknown } } }).response;
+  return typeof response?.data?.error === 'string' ? response.data.error : undefined;
+}
+
 const ProductPage: React.FC = () => {
   const { hasPermission } = useAuthStore();
   const [form] = Form.useForm();
@@ -173,6 +175,7 @@ const ProductPage: React.FC = () => {
     pageSize: 20,
     total: 0,
   });
+  const { current: currentPage, pageSize } = pagination;
 
   // 复制版本
   const [copyModalVisible, setCopyModalVisible] = useState(false);
@@ -182,6 +185,19 @@ const ProductPage: React.FC = () => {
   // 对比功能
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [compareDrawerVisible, setCompareDrawerVisible] = useState(false);
+
+  useEffect(() => {
+    if (!detailDrawerVisible && !compareDrawerVisible) return;
+
+    window.requestAnimationFrame(() => {
+      document.querySelectorAll<HTMLElement>('.arco-drawer-content').forEach((content) => {
+        if (content.scrollHeight > content.clientHeight || content.scrollWidth > content.clientWidth) {
+          content.tabIndex = 0;
+          content.setAttribute('aria-label', compareDrawerVisible ? '产品对比内容' : '产品详情内容');
+        }
+      });
+    });
+  }, [compareDrawerVisible, detailDrawerVisible]);
 
   // 文档管理
   const [documents, setDocuments] = useState<ProductDocument[]>([]);
@@ -194,12 +210,12 @@ const ProductPage: React.FC = () => {
   const [editingProjectId, setEditingProjectId] = useState<string>('');
 
   // 加载产品列表
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string | number> = {
-        page: pagination.current,
-        pageSize: pagination.pageSize,
+        page: currentPage,
+        pageSize,
       };
       if (selectedStatus) params.status = selectedStatus;
       if (selectedCategory) params.category = selectedCategory;
@@ -207,7 +223,7 @@ const ProductPage: React.FC = () => {
       if (selectedProjectStatus) params.projectStatus = selectedProjectStatus;
       if (specKeyword) params.specKeyword = specKeyword;
 
-      const response = await productsApi.list(params as any);
+      const response = await productsApi.list(params);
       setProducts(response.data.data || []);
       setPagination((prev) => ({ ...prev, total: response.data.total }));
       if (response.data.stats) {
@@ -218,22 +234,30 @@ const ProductPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    currentPage,
+    pageSize,
+    searchKeyword,
+    selectedCategory,
+    selectedProjectStatus,
+    selectedStatus,
+    specKeyword,
+  ]);
 
   // 加载项目列表
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       const response = await projectsApi.list();
       setProjects(response.data.data || []);
     } catch (error) {
       console.error('加载项目列表失败', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadProducts();
     loadProjects();
-  }, [selectedStatus, selectedCategory, searchKeyword, selectedProjectStatus, specKeyword, pagination.current, pagination.pageSize]);
+  }, [loadProducts, loadProjects]);
 
   // 处理搜索（debounce 300ms）
   const handleSearch = useMemo(() => {
@@ -316,7 +340,7 @@ const ProductPage: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validate();
-      const data: any = {
+      const data: Parameters<typeof productsApi.create>[0] = {
         name: values.name,
         model: values.model,
         revision: values.revision,
@@ -339,9 +363,10 @@ const ProductPage: React.FC = () => {
 
       setDrawerVisible(false);
       loadProducts();
-    } catch (error: any) {
-      if (error?.response?.data?.error) {
-        Message.error(error.response.data.error);
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error);
+      if (message) {
+        Message.error(message);
       }
     }
   };
@@ -372,22 +397,22 @@ const ProductPage: React.FC = () => {
       setCopyModalVisible(false);
       setCopyRevision('');
       loadProducts();
-    } catch (error: any) {
-      Message.error(error?.response?.data?.error || '复制失败');
+    } catch (error: unknown) {
+      Message.error(getApiErrorMessage(error) || '复制失败');
     }
   };
 
   // 导出 CSV
   const handleExport = async () => {
     try {
-      const params: any = {};
+      const params: Parameters<typeof productsApi.exportCsv>[0] = {};
       if (selectedStatus) params.status = selectedStatus;
       if (selectedCategory) params.category = selectedCategory;
       if (searchKeyword) params.keyword = searchKeyword;
       if (selectedProjectStatus) params.projectStatus = selectedProjectStatus;
 
       const response = await productsApi.exportCsv(params);
-      const blob = new Blob([response.data as any], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -592,7 +617,7 @@ const ProductPage: React.FC = () => {
       rows.push({
         field: label,
         values: selectedProducts.map((p) => {
-          const val = (p as any)[key];
+          const val = p[key as keyof Pick<Product, 'name' | 'model' | 'revision' | 'category' | 'status'>];
           if (key === 'category') {
             const cfg = PRODUCT_CATEGORY_MAP[val as keyof typeof PRODUCT_CATEGORY_MAP];
             return cfg?.label || String(val || '-');
@@ -619,7 +644,7 @@ const ProductPage: React.FC = () => {
       allSpecKeys.forEach((key) => {
         rows.push({
           field: key,
-          values: selectedProducts.map((p) => String((p.specifications as any)?.[key] || '-')),
+          values: selectedProducts.map((p) => String(p.specifications?.[key] || '-')),
         });
       });
     }
@@ -629,7 +654,7 @@ const ProductPage: React.FC = () => {
       allPerfKeys.forEach((key) => {
         rows.push({
           field: key,
-          values: selectedProducts.map((p) => String((p.performance as any)?.[key] || '-')),
+          values: selectedProducts.map((p) => String(p.performance?.[key] || '-')),
         });
       });
     }
@@ -661,7 +686,7 @@ const ProductPage: React.FC = () => {
               bodyStyle={{ padding: '12px 16px' }}
               onClick={() => handleStatClick(card.status)}
             >
-              <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 4 }}>{card.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 4 }}>{card.label}</div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>{card.value}</div>
             </Card>
           ))}

@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { assessProjectRisk } from '../utils/riskEngine';
@@ -7,9 +7,38 @@ import { callAi } from '../utils/aiClient';
 import { buildRiskContext, trimContextForAI } from '../utils/riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from '../utils/riskPrompts';
 import { logger } from '../utils/logger';
+import { businessMetrics, recordBusinessEvent } from '../utils/businessMetrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+type RiskActionItem = {
+  action: string;
+  priority?: string;
+};
+
+type RiskFactorSummary = {
+  factor?: string;
+};
+
+type RiskEnhancedData = {
+  actionItems?: unknown[];
+};
+
+const isRiskEnhancedData = (value: unknown): value is RiskEnhancedData =>
+  typeof value === 'object' && value !== null;
+
+const isRiskActionItem = (value: unknown): value is RiskActionItem =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { action?: unknown }).action === 'string';
+
+const riskFactorNames = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+      .map((factor: RiskFactorSummary) => factor.factor)
+      .filter((factor): factor is string => typeof factor === 'string')
+    : [];
 
 /**
  * GET /api/risk/summary
@@ -106,10 +135,9 @@ router.get('/dashboard', authenticate, async (req: Request, res: Response): Prom
       });
 
       // Collect action items from AI enhanced data
-      if (latest.aiEnhancedData) {
-        const enhanced = latest.aiEnhancedData as any;
-        if (Array.isArray(enhanced.actionItems)) {
-          for (const item of enhanced.actionItems.slice(0, 3)) {
+      if (isRiskEnhancedData(latest.aiEnhancedData)) {
+        if (Array.isArray(latest.aiEnhancedData.actionItems)) {
+          for (const item of latest.aiEnhancedData.actionItems.filter(isRiskActionItem).slice(0, 3)) {
             topActionItems.push({
               projectId: p.id,
               projectName: p.name,
@@ -212,8 +240,8 @@ router.get('/project/:projectId/comparison', authenticate, async (req: Request, 
     const current = assessments[0];
     const previous = assessments.length >= 2 ? assessments[1] : null;
 
-    const currentFactors = (current.riskFactors as any[]).map(f => f.factor);
-    const previousFactors = previous ? (previous.riskFactors as any[]).map(f => f.factor) : [];
+    const currentFactors = riskFactorNames(current.riskFactors);
+    const previousFactors = previous ? riskFactorNames(previous.riskFactors) : [];
 
     const newRisks = currentFactors.filter(f => !previousFactors.includes(f));
     const resolvedRisks = previousFactors.filter(f => !currentFactors.includes(f));
@@ -346,11 +374,11 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
     const trimmedContext = trimContextForAI(context);
 
     let riskLevel: string;
-    let riskFactors: any[];
+    let riskFactors: Prisma.InputJsonValue[];
     let suggestions: string[];
     let source: string = 'rule_engine';
     let aiInsights: string | null = null;
-    let aiEnhancedData: any = null;
+    let aiEnhancedData: Prisma.InputJsonValue | undefined;
 
     try {
       const aiResult = await callAi({
@@ -364,7 +392,9 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
       if (aiResult?.content) {
         const parsed = parseAIResponse(aiResult.content);
         riskLevel = validateRiskLevel(parsed.riskLevel);
-        riskFactors = Array.isArray(parsed.riskFactors) ? parsed.riskFactors : context.ruleEngineMetrics.factors;
+        riskFactors = Array.isArray(parsed.riskFactors)
+          ? parsed.riskFactors as unknown as Prisma.InputJsonValue[]
+          : context.ruleEngineMetrics.factors as unknown as Prisma.InputJsonValue[];
         suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
         source = 'ai';
         aiInsights = parsed.aiInsights || null;
@@ -373,7 +403,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
           criticalPathAnalysis: parsed.criticalPathAnalysis || null,
           actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
           resourceBottlenecks: Array.isArray(parsed.resourceBottlenecks) ? parsed.resourceBottlenecks : [],
-        };
+        } as unknown as Prisma.InputJsonValue;
       } else {
         throw new Error('AI 未配置或返回为空');
       }
@@ -381,7 +411,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
       logger.error({ err: aiError }, 'AI评估失败，回退到规则引擎');
       // Use rule engine results from context (already computed)
       riskLevel = context.ruleEngineMetrics.riskLevel;
-      riskFactors = context.ruleEngineMetrics.factors;
+      riskFactors = context.ruleEngineMetrics.factors as unknown as Prisma.InputJsonValue[];
       suggestions = [];
       // Generate basic suggestions from rule engine
       const ruleResult = await assessProjectRisk(projectId);
@@ -393,6 +423,7 @@ router.post('/project/:projectId/assess', authenticate, async (req: Request, res
       data: { projectId, riskLevel, riskFactors, suggestions, source, aiInsights, aiEnhancedData },
     });
 
+    recordBusinessEvent(businessMetrics, 'risk.assessment.created');
     res.json(assessment);
   } catch (error) {
     logger.error({ err: error }, '风险评估错误');

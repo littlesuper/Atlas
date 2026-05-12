@@ -7,7 +7,7 @@ import { waitForTableLoad, clickTab } from '../helpers/arco';
  * - What-If 模拟延期 / 提前方向切换
  * - 一键重排功能已移除
  */
-test.describe('Scheduling Tools', () => {
+test.describe('Scheduling Tools @p1', () => {
   async function goToSchedulingTab(page: import('@playwright/test').Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);

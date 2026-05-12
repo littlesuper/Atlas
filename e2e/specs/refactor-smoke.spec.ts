@@ -18,7 +18,7 @@ async function navigateToFirstProject(page: any) {
   await page.waitForURL('**/projects/**', { timeout: 10000 });
 }
 
-test.describe('Detail page refactor smoke test', () => {
+test.describe('Detail page refactor smoke test @p2', () => {
   test('should load project list and navigate to detail', async ({ page }) => {
     await navigateToFirstProject(page);
 

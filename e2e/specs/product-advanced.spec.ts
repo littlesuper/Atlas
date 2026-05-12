@@ -14,7 +14,7 @@ import {
  * - 产品变更记录
  * - 产品状态转换
  */
-test.describe.serial('Product Advanced Features', () => {
+test.describe.serial('Product Advanced Features @p1', () => {
   const productName = uniqueName('高级产品');
   const updatedProductName = uniqueName('已编辑产品');
 

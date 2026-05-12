@@ -7,7 +7,7 @@ import {
   createProjectViaPage,
 } from '../helpers/arco';
 
-test.describe.serial('XSS Rendering Verification', () => {
+test.describe.serial('XSS Rendering Verification @smoke', () => {
   const projectName = uniqueName('XSS');
   let projectId: string;
   let activityId: string;

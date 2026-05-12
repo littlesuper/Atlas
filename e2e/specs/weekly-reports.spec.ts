@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { clickNavItem, waitForTableLoad } from '../helpers/arco';
 
-test.describe.serial('Weekly Reports', () => {
+test.describe.serial('Weekly Reports @p1', () => {
   test('view weekly reports summary page', async ({ authedPage: page }) => {
     await clickNavItem(page, '项目周报');
     await expect(page).toHaveURL(/\/weekly-reports/);

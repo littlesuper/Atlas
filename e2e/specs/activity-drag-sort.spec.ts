@@ -16,7 +16,7 @@ import {
  * - 拖拽活动到新位置
  * - 拖拽后序号更新
  */
-test.describe.serial('Activity Drag Sort', () => {
+test.describe.serial('Activity Drag Sort @p1', () => {
   const projectName = uniqueName('拖拽排序项目');
   const activity1 = uniqueName('拖拽活动A');
   const activity2 = uniqueName('拖拽活动B');

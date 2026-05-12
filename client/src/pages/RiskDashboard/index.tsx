@@ -24,10 +24,10 @@ import { RISK_LEVEL_MAP } from '../../utils/constants';
 import dayjs from 'dayjs';
 
 const RISK_COLORS: Record<string, string> = {
-  LOW: '#00B42A',
-  MEDIUM: '#FF7D00',
-  HIGH: '#F53F3F',
-  CRITICAL: '#8B0000',
+  LOW: 'var(--risk-low-color)',
+  MEDIUM: 'var(--risk-medium-color)',
+  HIGH: 'var(--risk-high-color)',
+  CRITICAL: 'var(--risk-critical-color)',
 };
 
 const RISK_BG: Record<string, string> = {
@@ -36,6 +36,20 @@ const RISK_BG: Record<string, string> = {
   HIGH: '#FFECE8',
   CRITICAL: '#FFECE8',
 };
+
+export const truncateText = (v: string, maxLen: number): string =>
+  v.slice(0, maxLen) + (v.length > maxLen ? '...' : '');
+
+export function buildStatCards(riskDistribution: Record<string, number>) {
+  return [
+    { label: '低风险', count: riskDistribution.LOW, color: RISK_COLORS.LOW, bg: RISK_BG.LOW },
+    { label: '中风险', count: riskDistribution.MEDIUM, color: RISK_COLORS.MEDIUM, bg: RISK_BG.MEDIUM },
+    { label: '高风险', count: riskDistribution.HIGH, color: RISK_COLORS.HIGH, bg: RISK_BG.HIGH },
+    { label: '严重风险', count: riskDistribution.CRITICAL, color: RISK_COLORS.CRITICAL, bg: RISK_BG.CRITICAL },
+  ];
+}
+
+type RiskProjectRow = RiskDashboardData['projects'][number];
 
 const RiskDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -81,18 +95,13 @@ const RiskDashboard: React.FC = () => {
 
   const { riskDistribution, projects, topActionItems } = dashboard;
 
-  const statCards = [
-    { label: '低风险', count: riskDistribution.LOW, color: RISK_COLORS.LOW, bg: RISK_BG.LOW },
-    { label: '中风险', count: riskDistribution.MEDIUM, color: RISK_COLORS.MEDIUM, bg: RISK_BG.MEDIUM },
-    { label: '高风险', count: riskDistribution.HIGH, color: RISK_COLORS.HIGH, bg: RISK_BG.HIGH },
-    { label: '严重风险', count: riskDistribution.CRITICAL, color: RISK_COLORS.CRITICAL, bg: RISK_BG.CRITICAL },
-  ];
+  const statCards = buildStatCards(riskDistribution);
 
   const columns = [
     {
       title: '项目',
       dataIndex: 'projectName',
-      render: (name: string, record: any) => (
+      render: (name: string, record: RiskProjectRow) => (
         <a
           style={{ cursor: 'pointer', color: 'var(--color-primary-6)' }}
           onClick={() => navigate(`/projects/${record.projectId}?tab=risk`)}
@@ -148,7 +157,7 @@ const RiskDashboard: React.FC = () => {
       dataIndex: 'aiInsights',
       ellipsis: true,
       render: (v: string | null) => v ? (
-        <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{v.slice(0, 60)}{v.length > 60 ? '...' : ''}</span>
+        <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{truncateText(v, 60)}</span>
       ) : '-',
     },
   ];
@@ -158,7 +167,7 @@ const RiskDashboard: React.FC = () => {
       <div style={{ padding: '24px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>风险总览</h2>
-          <div style={{ fontSize: 13, color: 'var(--color-text-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--color-text-2)', marginTop: 4 }}>
             跨项目风险全景视图
           </div>
         </div>
@@ -186,7 +195,7 @@ const RiskDashboard: React.FC = () => {
               <div style={{ marginTop: 12, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                 {insights.improvements.length > 0 && (
                   <div>
-                    <span style={{ fontSize: 12, color: '#00B42A', fontWeight: 500 }}>改善 ↓</span>
+                    <span style={{ fontSize: 12, color: 'var(--risk-low-color)', fontWeight: 500 }}>改善 ↓</span>
                     {insights.improvements.map((item, i) => (
                       <div key={i} style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>{item}</div>
                     ))}
@@ -194,7 +203,7 @@ const RiskDashboard: React.FC = () => {
                 )}
                 {insights.deteriorations.length > 0 && (
                   <div>
-                    <span style={{ fontSize: 12, color: '#F53F3F', fontWeight: 500 }}>恶化 ↑</span>
+                    <span style={{ fontSize: 12, color: 'var(--risk-high-color)', fontWeight: 500 }}>恶化 ↑</span>
                     {insights.deteriorations.map((item, i) => (
                       <div key={i} style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>{item}</div>
                     ))}
@@ -218,7 +227,7 @@ const RiskDashboard: React.FC = () => {
               }}
             >
               <div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-3)' }}>{card.label}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-2)' }}>{card.label}</div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: card.color, marginTop: 4 }}>{card.count}</div>
               </div>
               <div style={{

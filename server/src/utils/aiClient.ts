@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { isFeatureEnabled, parseFeatureFlags } from './featureFlags';
 
 const prisma = new PrismaClient();
 
@@ -62,6 +63,10 @@ export async function getAiConfig(feature?: string) {
  * 返回 null 表示 AI 未配置
  */
 export async function callAi(options: AiCallOptions): Promise<AiCallResult | null> {
+  if (!isFeatureEnabled(parseFeatureFlags(process.env.FEATURE_FLAGS), 'ai.external-calls', true)) {
+    return null;
+  }
+
   const config = await getAiConfig(options.feature);
 
   if (!config.apiKey || !config.apiUrl) {
@@ -88,7 +93,10 @@ export async function callAi(options: AiCallOptions): Promise<AiCallResult | nul
     throw new Error(`AI API 调用失败: ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  };
   const content = result.choices?.[0]?.message?.content;
   const usage = result.usage;
 

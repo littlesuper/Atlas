@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks (available inside vi.mock factories) ───────────────────────
 
@@ -17,7 +20,7 @@ const { mockPrisma, mockBcrypt, mockJwt } = vi.hoisted(() => {
       update: vi.fn(),
     },
     projectMember: { findMany: vi.fn() },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
   };
 
   const mockBcrypt = { compare: vi.fn(), hash: vi.fn(() => 'hashed-pw') };
@@ -33,11 +36,11 @@ const { mockPrisma, mockBcrypt, mockJwt } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -52,10 +55,10 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
-  sanitizePagination: (page: any, pageSize: any) => ({
-    pageNum: parseInt(page) || 1,
-    pageSizeNum: parseInt(pageSize) || 20,
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  sanitizePagination: (page: unknown, pageSize: unknown) => ({
+    pageNum: parseInt(String(page), 10) || 1,
+    pageSizeNum: parseInt(String(pageSize), 10) || 20,
   }),
 }));
 
@@ -834,5 +837,31 @@ describe('AUTH-032: mustChangePassword forces password change', () => {
         data: expect.objectContaining({ mustChangePassword: false }),
       })
     );
+  });
+
+  it('POST login returns 401 for non-existent user', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'nonexistent', password: 'whatever' });
+
+    expect(res.status).toBe(401);
+  });
+
+  it('POST login returns 400 when username is missing', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ password: 'whatever' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('POST login returns 400 when both fields are missing', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({});
+
+    expect(res.status).toBe(400);
   });
 });

@@ -18,7 +18,7 @@ import {
  * - 统计卡片验证
  * - 组合筛选
  */
-test.describe.serial('Project Edit & Search', () => {
+test.describe.serial('Project Edit & Search @p1', () => {
   const projectName = uniqueName('编辑搜索项目');
   const updatedName = uniqueName('已编辑项目');
 

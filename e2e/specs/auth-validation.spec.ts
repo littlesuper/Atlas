@@ -7,7 +7,7 @@ import { credentials } from '../fixtures/test-data';
  * - 最小长度验证
  * - 禁用账号登录
  */
-base.describe('Login Form Validation', () => {
+base.describe('Login Form Validation @p0', () => {
 
   // ──────── TC1: empty username cannot submit ────────
   base('empty username shows validation error', async ({ page }) => {

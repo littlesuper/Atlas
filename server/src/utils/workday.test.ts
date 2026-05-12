@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateWorkdays } from './workday';
+import { calculateWorkdays, isWorkday, offsetWorkdays } from './workday';
 
 // 日期辅助：使用正午时间避免夏令时干扰
 const d = (iso: string) => new Date(`${iso}T12:00:00`);
@@ -123,4 +123,100 @@ describe('calculateWorkdays', () => {
     // 合计: 0 + 2 + 0 + 5 + 5 + 5 + 1(26) + 1(27) + 0(28-31春节) = 19
     expect(calculateWorkdays(d('2025-01-01'), d('2025-01-31'))).toBe(19);
   });
+});
+
+describe('isWorkday', () => {
+  it('returns true for a regular Monday', () => {
+    expect(isWorkday(d('2025-03-03'))).toBe(true);
+  });
+
+  it('returns false for Saturday', () => {
+    expect(isWorkday(d('2025-03-08'))).toBe(false);
+  });
+
+  it('returns false for Sunday', () => {
+    expect(isWorkday(d('2025-03-09'))).toBe(false);
+  });
+
+  it('returns false for holiday (2025-01-01 元旦)', () => {
+    expect(isWorkday(d('2025-01-01'))).toBe(false);
+  });
+
+  it('returns true for makeup workday on weekend (2025-01-26 周日补班)', () => {
+    expect(isWorkday(d('2025-01-26'))).toBe(true);
+  });
+
+  it('returns true for makeup workday (2025-02-08 周六补班)', () => {
+    expect(isWorkday(d('2025-02-08'))).toBe(true);
+  });
+
+  it('returns false for spring festival holiday (2025-01-28)', () => {
+    expect(isWorkday(d('2025-01-28'))).toBe(false);
+  });
+
+  it('returns false for national day (2025-10-01)', () => {
+    expect(isWorkday(d('2025-10-01'))).toBe(false);
+  });
+});
+
+describe('offsetWorkdays', () => {
+  it('offset 0 from Monday returns same Monday', () => {
+    const result = offsetWorkdays(d('2025-03-03'), 0);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-03-03');
+  });
+
+  it('offset 0 from Saturday returns next Monday', () => {
+    const result = offsetWorkdays(d('2025-03-08'), 0);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-03-10');
+  });
+
+  it('offset 1 from Monday returns Tuesday', () => {
+    const result = offsetWorkdays(d('2025-03-03'), 1);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-03-04');
+  });
+
+  it('offset 5 from Monday returns next Monday', () => {
+    const result = offsetWorkdays(d('2025-03-03'), 5);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-03-10');
+  });
+
+  it('offset -1 from Tuesday returns Monday', () => {
+    const result = offsetWorkdays(d('2025-03-04'), -1);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-03-03');
+  });
+
+  it('offset -1 from Monday returns previous Friday', () => {
+    const result = offsetWorkdays(d('2025-03-03'), -1);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-02-28');
+  });
+
+  it('skips holiday when offsetting', () => {
+    const result = offsetWorkdays(d('2024-12-31'), 1);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-01-02');
+  });
+
+  it('includes makeup day when offsetting', () => {
+    const result = offsetWorkdays(d('2025-01-25'), 1);
+    expect(result.toISOString().slice(0, 10)).toBe('2025-01-26');
+  });
+
+  it('isWorkday returns false for Saturday', () => {
+    expect(isWorkday(new Date('2026-03-14'))).toBe(false);
+  });
+
+  it('isWorkday returns true for Monday', () => { expect(isWorkday(new Date('2026-03-09'))).toBe(true); });
+
+  it('isWorkday returns false for Sunday', () => { expect(isWorkday(new Date('2026-03-08'))).toBe(false); });
+
+  it('isWorkday returns true for Friday', () => { expect(isWorkday(new Date('2026-03-13'))).toBe(true); });
+
+  it('isWorkday returns true for Thursday', () => { expect(isWorkday(new Date('2026-03-12'))).toBe(true); });
+
+  it('isWorkday returns false for Saturday', () => { expect(isWorkday(new Date('2026-03-14'))).toBe(false); });
+
+  it('isWorkday returns false for Sunday', () => { expect(isWorkday(new Date('2026-03-15'))).toBe(false); });
+
+  it('isWorkday returns true for Monday', () => { expect(isWorkday(new Date('2026-03-16'))).toBe(true); });
+
+  it('isWorkday returns false for Saturday', () => { expect(isWorkday(new Date('2026-03-14'))).toBe(false); });
 });

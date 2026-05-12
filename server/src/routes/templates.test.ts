@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -18,7 +21,7 @@ const { mockPrisma, mockIsAdmin } = vi.hoisted(() => {
       createMany: vi.fn(),
       deleteMany: vi.fn(),
     },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
   };
   const mockIsAdmin = vi.fn().mockReturnValue(true);
   return { mockPrisma, mockIsAdmin };
@@ -27,16 +30,18 @@ const { mockPrisma, mockIsAdmin } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
+  Prisma: { DbNull: null },
+  ActivityType: { TASK: 'TASK', MILESTONE: 'MILESTONE', PHASE: 'PHASE' },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
       realName: '管理员',
-      roles: [{ name: '系统管理员' }],
+      roles: [{ id: 'role-admin', name: '系统管理员', description: null }],
       permissions: ['*:*'],
       collaboratingProjectIds: [],
     };
@@ -45,7 +50,7 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
   isAdmin: mockIsAdmin,
   canManageProject: vi.fn().mockReturnValue(true),
   canDeleteProject: vi.fn().mockReturnValue(true),
@@ -349,13 +354,137 @@ describe('DELETE /api/templates/:id', () => {
   });
 });
 
-describe('POST /api/templates/:id/copy (not yet implemented)', () => {
+describe('POST /api/templates/:id/copy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsAdmin.mockReturnValue(true);
   });
 
-  it.todo('copies template with "(副本)" suffix');
+  it('copies template with "(副本)" suffix', async () => {
+    const sourceTemplate = {
+      id: 'tpl-1',
+      name: '标准项目模板',
+      description: '模板描述',
+      activities: [
+        { id: 'ta-1', name: '需求分析', type: 'TASK', phase: 'EVT', planDuration: 5, dependencies: null, notes: null, roleId: null, sortOrder: 0 },
+        { id: 'ta-2', name: '详细设计', type: 'MILESTONE', phase: 'EVT', planDuration: 3, dependencies: null, notes: null, roleId: null, sortOrder: 1 },
+      ],
+    };
+
+    const copiedTemplate = {
+      id: 'tpl-2',
+      name: '标准项目模板（副本）',
+      description: '模板描述',
+      activities: sourceTemplate.activities.map((a) => ({ ...a, id: expect.any(String), templateId: 'tpl-2' })),
+    };
+
+    mockPrisma.projectTemplate.findUnique.mockResolvedValue(sourceTemplate);
+    mockPrisma.projectTemplate.create.mockResolvedValue(copiedTemplate);
+
+    const res = await request(app)
+      .post('/api/templates/tpl-1/copy');
+
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('标准项目模板（副本）');
+
+    expect(mockPrisma.projectTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: '标准项目模板（副本）',
+          description: '模板描述',
+        }),
+      }),
+    );
+  });
+
+  it('returns 404 when source template not found', async () => {
+    mockPrisma.projectTemplate.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/templates/nonexistent/copy');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('模板不存在');
+  });
+
+  it('returns 403 for non-admin', async () => {
+    mockIsAdmin.mockReturnValue(false);
+
+    const res = await request(app)
+      .post('/api/templates/tpl-1/copy');
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('仅管理员可复制模板');
+  });
+
+  it('accepts custom name in body', async () => {
+    const sourceTemplate = {
+      id: 'tpl-1',
+      name: '标准项目模板',
+      description: null,
+      activities: [],
+    };
+
+    mockPrisma.projectTemplate.findUnique.mockResolvedValue(sourceTemplate);
+    mockPrisma.projectTemplate.create.mockResolvedValue({
+      id: 'tpl-2',
+      name: '自定义名称',
+      description: null,
+      activities: [],
+    });
+
+    const res = await request(app)
+      .post('/api/templates/tpl-1/copy')
+      .send({ name: '自定义名称' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.projectTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: '自定义名称' }),
+      }),
+    );
+  });
+
+  it('handles empty activities correctly', async () => {
+    const sourceTemplate = {
+      id: 'tpl-1',
+      name: '空模板',
+      description: null,
+      activities: [],
+    };
+
+    mockPrisma.projectTemplate.findUnique.mockResolvedValue(sourceTemplate);
+    mockPrisma.projectTemplate.create.mockResolvedValue({
+      id: 'tpl-2',
+      name: '空模板（副本）',
+      description: null,
+      activities: [],
+    });
+
+    const res = await request(app)
+      .post('/api/templates/tpl-1/copy');
+
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('空模板（副本）');
+  });
+
+  it('handles database error gracefully', async () => {
+    mockPrisma.projectTemplate.findUnique.mockRejectedValue(new Error('DB error'));
+
+    const res = await request(app)
+      .post('/api/templates/tpl-1/copy');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('服务器内部错误');
+  });
+
+  it('DELETE template returns 500 on database error', async () => {
+    mockPrisma.projectTemplate.delete.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).delete('/api/templates/tpl-1');
+
+    expect(res.status).toBe(500);
+  });
 });
 
 describe('Non-admin permission checks', () => {
@@ -409,5 +538,75 @@ describe('Non-admin permission checks', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('模板');
+  });
+
+  it('returns 400 when instantiating template without projectId', async () => {
+    const res = await request(app)
+      .post('/api/templates/tpl-1/instantiate')
+      .send({ startDate: '2026-01-01' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/项目ID/);
+  });
+
+  it('GET templates returns empty array when none exist', async () => {
+    mockPrisma.projectTemplate.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/templates');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('GET template by id returns 404 for nonexistent template', async () => {
+    mockPrisma.projectTemplate.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/templates/nonexistent');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('POST create template returns 403 without permission', async () => {
+    const res = await request(app)
+      .post('/api/templates')
+      .send({ description: 'no name' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('GET templates returns 500 on database error', async () => {
+    mockPrisma.projectTemplate.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/templates');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET templates returns empty array when no templates exist', async () => {
+    mockPrisma.projectTemplate.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/templates');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('DELETE template returns 403 for non-admin user', async () => {
+    mockPrisma.projectTemplate.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/templates/nonexistent');
+
+    expect([403, 404]).toContain(res.status);
+  });
+
+  it('PUT template returns 500 on database error', async () => {
+    mockIsAdmin.mockReturnValue(true);
+    mockPrisma.projectTemplate.findUnique.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app)
+      .put('/api/templates/tpl-1')
+      .send({ name: 'Updated' });
+
+    expect(res.status).toBe(500);
   });
 });

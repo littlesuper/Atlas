@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName } from '../fixtures/test-data';
 import { waitForTableLoad } from '../helpers/arco';
 
-test.describe.serial('Product Upload Security', () => {
+test.describe.serial('Product Upload Security @p0', () => {
   const productName = uniqueName('上传安全');
   let productId: string;
 

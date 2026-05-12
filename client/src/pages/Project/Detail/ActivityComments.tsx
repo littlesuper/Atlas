@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Tabs,
   Input,
@@ -21,6 +21,21 @@ interface Props {
   activityId: string;
 }
 
+export const renderActionLabel = (action: string): string => {
+  switch (action) {
+    case 'CREATE': return '创建';
+    case 'UPDATE': return '更新';
+    case 'DELETE': return '删除';
+    default: return action;
+  }
+};
+
+export function formatChangeEntries(changes: Record<string, { from: unknown; to: unknown }>): string[] {
+  return Object.entries(changes).map(([field, change]) =>
+    `${field}: ${String(change.from ?? '-')} → ${String(change.to ?? '-')}`
+  );
+}
+
 const ActivityComments: React.FC<Props> = ({ activityId }) => {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('comments');
@@ -39,7 +54,7 @@ const ActivityComments: React.FC<Props> = ({ activityId }) => {
   const [logsPage, setLogsPage] = useState(1);
   const [logsLoading, setLogsLoading] = useState(false);
 
-  const loadComments = async (page = 1) => {
+  const loadComments = useCallback(async (page = 1) => {
     setCommentsLoading(true);
     try {
       const res = await activityCommentsApi.list(activityId, { page, pageSize: 10 });
@@ -51,9 +66,9 @@ const ActivityComments: React.FC<Props> = ({ activityId }) => {
     } finally {
       setCommentsLoading(false);
     }
-  };
+  }, [activityId]);
 
-  const loadLogs = async (page = 1) => {
+  const loadLogs = useCallback(async (page = 1) => {
     setLogsLoading(true);
     try {
       const res = await auditLogsApi.list({
@@ -70,7 +85,7 @@ const ActivityComments: React.FC<Props> = ({ activityId }) => {
     } finally {
       setLogsLoading(false);
     }
-  };
+  }, [activityId]);
 
   useEffect(() => {
     if (activeTab === 'comments') {
@@ -78,7 +93,7 @@ const ActivityComments: React.FC<Props> = ({ activityId }) => {
     } else {
       loadLogs(1);
     }
-  }, [activityId, activeTab]);
+  }, [activeTab, loadComments, loadLogs]);
 
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
@@ -109,15 +124,6 @@ const ActivityComments: React.FC<Props> = ({ activityId }) => {
         }
       },
     });
-  };
-
-  const renderActionLabel = (action: string) => {
-    switch (action) {
-      case 'CREATE': return '创建';
-      case 'UPDATE': return '更新';
-      case 'DELETE': return '删除';
-      default: return action;
-    }
   };
 
   return (

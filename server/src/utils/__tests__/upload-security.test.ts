@@ -1,7 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import path from 'path';
-import fs from 'fs';
-import os from 'os';
 import { sanitizeRichText } from '../sanitize';
 
 describe('SYS-001: path traversal in file uploads', () => {
@@ -245,5 +243,45 @@ describe('PROD-025: SVG upload sanitization', () => {
     const result = sanitizeSvgContent(malicious);
     expect(result).not.toContain('<iframe');
     expect(result).toContain('<foreignObject');
+  });
+
+  it('sanitizeSvgContent handles empty SVG', () => {
+    const result = sanitizeSvgContent('<svg></svg>');
+    expect(result).toContain('<svg>');
+  });
+
+  it('sanitizeSvgContent preserves valid style element', () => {
+    const result = sanitizeSvgContent('<svg><style>.cls{fill:red}</style></svg>');
+    expect(result).toContain('<svg>');
+  });
+
+  it('sanitizeSvgContent handles empty string input', () => {
+    const result = sanitizeSvgContent('');
+    expect(result).toBe('');
+  });
+
+  it('sanitizeSvgContent removes onclick attribute', () => {
+    const result = sanitizeSvgContent('<svg><rect onclick="alert(1)"/></svg>');
+    expect(result).not.toContain('onclick');
+  });
+
+  it('sanitizeSvgContent removes onerror attribute', () => {
+    const result = sanitizeSvgContent('<svg><image onerror="alert(1)"/></svg>');
+    expect(result).not.toContain('onerror');
+  });
+
+  it('sanitizeSvgContent removes onclick attribute', () => {
+    const result = sanitizeSvgContent('<svg><rect onclick="alert(1)"/></svg>');
+    expect(result).not.toContain('onclick');
+  });
+
+  it('sanitizeSvgContent removes onload attribute', () => {
+    const result = sanitizeSvgContent('<svg onload="alert(1)"></svg>');
+    expect(result).not.toContain('onload');
+  });
+
+  it('sanitizeSvgContent handles empty string input', () => {
+    const result = sanitizeSvgContent('');
+    expect(result).toBe('');
   });
 });

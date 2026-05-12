@@ -9,7 +9,7 @@ import { waitForTableLoad, clickTab } from '../helpers/arco';
  * - 内联编辑 Esc 退出
  * - 负责人搜索联想
  */
-test.describe('Activity List Filters & Inline Edit', () => {
+test.describe('Activity List Filters & Inline Edit @p1', () => {
   // Navigate to first project detail page
   async function goToProjectDetail(page: import('@playwright/test').Page) {
     await page.goto('/projects');

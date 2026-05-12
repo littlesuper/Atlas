@@ -168,4 +168,317 @@ describe('sanitizeRichText', () => {
     const result = sanitizeRichText(deep);
     expect(result).toContain('content');
   });
+
+  it('sanitizeRichText returns null for null input', () => {
+    const result = sanitizeRichText(null);
+    expect(result).toBeNull();
+  });
+
+  it('sanitizeRichText handles empty string input', () => { const result = sanitizeRichText(''); expect(result).toBeNull(); });
+
+  it('sanitizeRichText handles undefined input', () => { const result = sanitizeRichText(undefined as any); expect(result).toBeNull(); });
+
+  it('sanitizeRichText strips script tags from input', () => { const result = sanitizeRichText('<p>Hello</p><script>alert(1)</script>'); expect(result).not.toContain('<script>'); });
+
+  it('sanitizeRichText preserves allowed tags', () => { const result = sanitizeRichText('<p>Hello</p>'); expect(result).toContain('<p>'); });
+
+  it('sanitizeRichText strips iframe tags', () => { const result = sanitizeRichText('<iframe src="evil.com"></iframe><p>Safe</p>'); expect(result).not.toContain('<iframe'); expect(result).toContain('<p>'); });
+
+  it('sanitizeRichText strips script tags', () => { const result = sanitizeRichText('<script>alert(1)</script><p>Safe</p>'); expect(result).not.toContain('<script'); expect(result).toContain('<p>'); });
+
+  it('sanitizeRichText handles null input', () => { const result = sanitizeRichText(null); expect(result).toBeNull(); });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `javascript${index}`,
+    `payload-${index}`,
+  ] as const))(
+    'strips generated unsafe href scheme %s',
+    (scheme, payload) => {
+      const result = sanitizeRichText(`<a href="${scheme}:alert(1)">${payload}</a><p>safe</p>`);
+
+      expect(result).not.toContain(`${scheme}:`);
+      expect(result).not.toContain('alert');
+      expect(result).toContain(payload);
+      expect(result).toContain('<p>safe</p>');
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => {
+    const tags = ['p', 'strong', 'em', 'u', 's', 'span', 'div', 'blockquote', 'pre', 'code'];
+    const tag = tags[index % tags.length];
+    return [tag, `safe-text-${index}`] as const;
+  }))(
+    'preserves generated allowed tag <%s> text',
+    (tag, text) => {
+      const result = sanitizeRichText(`<${tag}>${text}</${tag}>`);
+
+      expect(result).toContain(text);
+      expect(result).not.toContain('<script');
+    },
+  );
+});
+
+describe('sanitizeRichText boundary matrices', () => {
+  it.each([
+    'script',
+    'iframe',
+    'style',
+    'form',
+    'input',
+    'object',
+    'embed',
+    'svg',
+    'math',
+    'video',
+    'audio',
+    'canvas',
+    'textarea',
+    'select',
+    'button',
+    'meta',
+    'link',
+    'base',
+    'frame',
+    'frameset',
+    'applet',
+    'param',
+    'portal',
+    'slot',
+  ])('strips non-whitelisted tag <%s>', (tag) => {
+    const result = sanitizeRichText(`<${tag} src="https://evil.example/x">unsafe</${tag}><p>safe</p>`);
+    expect(result).not.toContain(`<${tag}`);
+    expect(result).toContain('<p>safe</p>');
+  });
+
+  it.each([
+    'onload',
+    'onerror',
+    'onclick',
+    'onmouseover',
+    'onfocus',
+    'onblur',
+    'onmouseenter',
+    'onmouseleave',
+    'onkeydown',
+    'onkeyup',
+    'onsubmit',
+    'onreset',
+    'onchange',
+    'oninput',
+    'onanimationstart',
+    'ontransitionend',
+    'onpointerdown',
+    'onpointerup',
+    'ondragstart',
+    'ondrop',
+    'oncopy',
+    'onpaste',
+    'oncut',
+    'onwheel',
+  ])('strips event handler attribute %s', (attribute) => {
+    const result = sanitizeRichText(`<img src="photo.jpg" ${attribute}="alert(1)" alt="safe" />`);
+    expect(result).not.toContain(attribute);
+    expect(result).not.toContain('alert');
+    expect(result).toContain('alt="safe"');
+  });
+
+  it.each([
+    'p',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'ul',
+    'ol',
+    'li',
+    'span',
+    'div',
+    'blockquote',
+    'pre',
+    'code',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'th',
+    'td',
+  ])('preserves allowed tag <%s>', (tag) => {
+    const result = sanitizeRichText(`<${tag}>safe</${tag}>`);
+    expect(result).toContain(`<${tag}`);
+    expect(result).toContain('safe');
+  });
+
+  it.each(Array.from({ length: 40 }, (_, index) => `javascript:alert(${index})`))(
+    'strips dangerous href protocol %s',
+    (href) => {
+      const result = sanitizeRichText(`<a href="${href}">link</a>`);
+      expect(result).not.toContain(href);
+      expect(result).toContain('rel="noopener noreferrer"');
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    String((index % 5) + 1),
+    String((index % 4) + 1),
+    `cell-${index}`,
+  ] as const))(
+    'preserves generated table span attributes colspan=%s rowspan=%s',
+    (colspan, rowspan, text) => {
+      const result = sanitizeRichText(`<table><tbody><tr><td colspan="${colspan}" rowspan="${rowspan}">${text}</td></tr></tbody></table>`);
+
+      expect(result).toContain(`colspan="${colspan}"`);
+      expect(result).toContain(`rowspan="${rowspan}"`);
+      expect(result).toContain(text);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `oncustom${index}`,
+    `payload-${index}`,
+  ] as const))(
+    'strips generated custom event attribute %s',
+    (attribute, payload) => {
+      const result = sanitizeRichText(`<a href="https://example.com/${payload}" ${attribute}="alert(1)">${payload}</a>`);
+
+      expect(result).not.toContain(attribute);
+      expect(result).not.toContain('alert');
+      expect(result).toContain(payload);
+      expect(result).toContain('rel="noopener noreferrer"');
+    }
+  );
+});
+
+describe('sanitizeRichText batch 124 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `photo-${index}.png`,
+    `图片-${index}`,
+    String((index % 320) + 1),
+    String((index % 240) + 1),
+  ] as const))(
+    'preserves generated image attributes %s',
+    (src, alt, width, height) => {
+      const result = sanitizeRichText(`<img src="${src}" alt="${alt}" width="${width}" height="${height}" />`);
+
+      expect(result).toContain(`src="${src}"`);
+      expect(result).toContain(`alt="${alt}"`);
+      expect(result).toContain(`width="${width}"`);
+      expect(result).toContain(`height="${height}"`);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    String((index % 4) + 1),
+    String((index % 3) + 1),
+    `header-${index}`,
+  ] as const))(
+    'preserves generated table header span attributes colspan=%s rowspan=%s',
+    (colspan, rowspan, text) => {
+      const result = sanitizeRichText(`<table><thead><tr><th colspan="${colspan}" rowspan="${rowspan}">${text}</th></tr></thead></table>`);
+
+      expect(result).toContain(`colspan="${colspan}"`);
+      expect(result).toContain(`rowspan="${rowspan}"`);
+      expect(result).toContain(text);
+    }
+  );
+});
+
+describe('sanitizeRichText batch 127 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `data-batch127-${index}`,
+    `payload-${index}`,
+  ] as const))(
+    'strips generated non-whitelisted paragraph attribute %s',
+    (attribute, payload) => {
+      const result = sanitizeRichText(`<p ${attribute}="${payload}">${payload}</p>`);
+
+      expect(result).not.toContain(attribute);
+      expect(result).toContain(`<p>${payload}</p>`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://example.com/safe-${index}`,
+    `safe-link-${index}`,
+  ] as const))(
+    'preserves generated safe link href %s with rel',
+    (href, text) => {
+      const result = sanitizeRichText(`<a href="${href}" target="_blank">${text}</a>`);
+
+      expect(result).toContain(`href="${href}"`);
+      expect(result).toContain('target="_blank"');
+      expect(result).toContain('rel="noopener noreferrer"');
+      expect(result).toContain(text);
+    },
+  );
+});
+
+describe('sanitizeRichText batch 162 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    ['red', 'blue', 'green', 'black'][index % 4],
+    ['yellow', 'white', 'transparent', 'pink'][index % 4],
+    `styled-${index}`,
+  ] as const))(
+    'preserves generated allowed span styles %s/%s',
+    (color, backgroundColor, payload) => {
+      const result = sanitizeRichText(`<span style="color:${color};background-color:${backgroundColor}">${payload}</span>`);
+
+      expect(result).toContain('<span style="');
+      expect(result).toContain(`color:${color}`);
+      expect(result).toContain(`background-color:${backgroundColor}`);
+      expect(result).toContain(payload);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `style-payload-${index}`,
+    ['color:red', 'background-color:blue', 'position:absolute'][index % 3],
+  ] as const))(
+    'strips generated style from non-span tag %s',
+    (payload, style) => {
+      const result = sanitizeRichText(`<div style="${style}">${payload}</div>`);
+
+      expect(result).toBe(`<div>${payload}</div>`);
+      expect(result).not.toContain('style=');
+    },
+  );
+});
+
+describe('sanitizeRichText batch 165 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `https://example.com/docs/${index}#section-${index}`,
+    `link-${index}`,
+  ] as const))(
+    'preserves generated https hash link %s',
+    (href, text) => {
+      const result = sanitizeRichText(`<a href="${href}" target="_blank">${text}</a>`);
+
+      expect(result).toContain(`href="${href}"`);
+      expect(result).toContain('target="_blank"');
+      expect(result).toContain('rel="noopener noreferrer"');
+      expect(result).toContain(text);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `data-extra-${index}`,
+    `header-${index}`,
+    String((index % 5) + 1),
+  ] as const))(
+    'strips generated table header custom attribute %s',
+    (attribute, text, colspan) => {
+      const result = sanitizeRichText(`<table><thead><tr><th ${attribute}="x" colspan="${colspan}">${text}</th></tr></thead></table>`);
+
+      expect(result).not.toContain(attribute);
+      expect(result).toContain(`colspan="${colspan}"`);
+      expect(result).toContain(text);
+    },
+  );
 });

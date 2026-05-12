@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { expectMessage, waitForPageLoad } from '../helpers/arco';
 
-test.describe.serial('Notification Management', () => {
+test.describe.serial('Notification Management @p1', () => {
   test('notification bell is visible in header', async ({ authedPage: page }) => {
     await waitForPageLoad(page);
     // The bell icon should be rendered in the header area

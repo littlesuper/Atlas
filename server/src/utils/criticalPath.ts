@@ -6,8 +6,18 @@
 interface ActivityForCPM {
   id: string;
   planDuration: number | null;
-  dependencies: any; // Json field
+  dependencies: unknown; // Json field
 }
+
+interface DependencyRef {
+  id: string;
+}
+
+const isDependencyRef = (value: unknown): value is DependencyRef =>
+  typeof value === 'object' &&
+  value !== null &&
+  'id' in value &&
+  typeof (value as { id?: unknown }).id === 'string';
 
 /**
  * 计算关键路径，返回关键活动 ID 数组
@@ -22,7 +32,7 @@ export function calculateCriticalPath(activities: ActivityForCPM[]): string[] {
 
   for (const a of activities) {
     if (!a.dependencies || !Array.isArray(a.dependencies)) continue;
-    for (const dep of a.dependencies as any[]) {
+    for (const dep of a.dependencies.filter(isDependencyRef)) {
       if (!actMap.has(dep.id)) continue;
       const succ = successors.get(dep.id);
       if (succ) succ.push(a.id);

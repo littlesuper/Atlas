@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createCheckItemSchema, batchCreateCheckItemSchema, updateCheckItemSchema, reorderCheckItemSchema } from '../schemas/checkItems';
@@ -7,6 +7,12 @@ import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const isPrismaErrorCode = (error: unknown, code: string): error is { code: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: unknown }).code === code;
 
 /**
  * GET /api/check-items/activity/:activityId
@@ -98,7 +104,7 @@ router.put('/:id', authenticate, validate({ body: updateCheckItemSchema }), asyn
     const id = req.params.id as string;
     const { title, checked } = req.body;
 
-    const data: any = {};
+    const data: Prisma.CheckItemUpdateInput = {};
     if (title !== undefined) data.title = title.trim();
     if (checked !== undefined) data.checked = checked;
 
@@ -107,8 +113,8 @@ router.put('/:id', authenticate, validate({ body: updateCheckItemSchema }), asyn
       data,
     });
     res.json(item);
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (isPrismaErrorCode(error, 'P2025')) {
       res.status(404).json({ error: '检查项不存在' });
       return;
     }
@@ -126,8 +132,8 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
     const id = req.params.id as string;
     await prisma.checkItem.delete({ where: { id } });
     res.json({ success: true });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (isPrismaErrorCode(error, 'P2025')) {
       res.status(404).json({ error: '检查项不存在' });
       return;
     }

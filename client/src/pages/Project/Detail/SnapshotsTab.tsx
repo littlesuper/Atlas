@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Button,
   Tag,
@@ -37,7 +37,7 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({ projectId, managerId }) => 
   const [remark, setRemark] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await projectsApi.listProjectArchives(projectId);
@@ -47,11 +47,11 @@ const SnapshotsTab: React.FC<SnapshotsTabProps> = ({ projectId, managerId }) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     load();
-  }, [projectId]);
+  }, [load]);
 
   const handleCreate = async () => {
     setCreating(true);

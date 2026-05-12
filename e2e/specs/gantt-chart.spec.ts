@@ -19,7 +19,7 @@ import {
  * - 甘特图依赖箭头
  * - 甘特图今日线
  */
-test.describe.serial('Gantt Chart', () => {
+test.describe.serial('Gantt Chart @p1', () => {
   const projectName = uniqueName('甘特图项目');
 
   // ──────── setup ────────

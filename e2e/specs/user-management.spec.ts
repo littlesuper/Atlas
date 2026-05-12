@@ -19,7 +19,7 @@ import {
  * - 禁用/启用用户
  * - 删除用户
  */
-test.describe.serial('User Management', () => {
+test.describe.serial('User Management @p1', () => {
   const loginUserName = '测试登录用户_' + Date.now();
   const contactUserName = '测试联系人_' + Date.now();
 

@@ -7,6 +7,26 @@ import { Project, WorkloadResponse, WorkloadMember, WorkloadIssue } from '../../
 
 const OVERLOAD_THRESHOLD = 5;
 
+export const computeMaxBar = (members: WorkloadMember[]): number =>
+  Math.max(1, ...members.map(m => m.inProgress + m.notStarted + m.overdue));
+
+export const isMemberOverloaded = (m: WorkloadMember): boolean =>
+  m.inProgress >= OVERLOAD_THRESHOLD;
+
+export const computeBarWidth = (member: WorkloadMember, maxBar: number): number => {
+  const total = member.inProgress + member.notStarted + member.overdue;
+  return total > 0 ? (total / maxBar) * 100 : 0;
+};
+
+export function formatIssueDetail(record: WorkloadIssue): { text: string; color: string; fontWeight?: number } {
+  if (record.type === 'overdue') {
+    return { text: `逾期 ${record.overdueDays} 天`, color: 'var(--status-danger)', fontWeight: 500 };
+  }
+  const start = record.planStartDate ? new Date(record.planStartDate).toLocaleDateString('zh-CN') : '-';
+  const end = record.planEndDate ? new Date(record.planEndDate).toLocaleDateString('zh-CN') : '-';
+  return { text: `${start} ~ ${end}`, color: 'var(--color-text-2)' };
+}
+
 const WorkloadPage: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<WorkloadResponse | null>(null);
@@ -89,7 +109,7 @@ const WorkloadPage: React.FC = () => {
       title: '负责人',
       dataIndex: 'assigneeNames',
       width: 120,
-      render: (names: string[]) => names.length > 0 ? names.join('、') : <span style={{ color: 'var(--color-text-4)' }}>-</span>,
+      render: (names: string[]) => names.length > 0 ? names.join('、') : <span style={{ color: 'var(--color-text-2)' }}>-</span>,
     },
     {
       title: '详情',
@@ -101,7 +121,7 @@ const WorkloadPage: React.FC = () => {
         }
         const start = record.planStartDate ? new Date(record.planStartDate).toLocaleDateString('zh-CN') : '-';
         const end = record.planEndDate ? new Date(record.planEndDate).toLocaleDateString('zh-CN') : '-';
-        return <span style={{ color: 'var(--color-text-3)' }}>{start} ~ {end}</span>;
+        return <span style={{ color: 'var(--color-text-2)' }}>{start} ~ {end}</span>;
       },
     },
   ];
@@ -113,19 +133,19 @@ const WorkloadPage: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           <Card style={{ height: 88 }}>
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>逾期任务</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8 }}>逾期任务</div>
               <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--status-danger)' }}>{summary?.totalOverdue ?? '-'}</div>
             </div>
           </Card>
           <Card style={{ height: 88 }}>
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>无人负责</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--status-warning)' }}>{summary?.totalUnassigned ?? '-'}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8 }}>无人负责</div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--risk-medium-color)' }}>{summary?.totalUnassigned ?? '-'}</div>
             </div>
           </Card>
           <Card style={{ height: 88 }}>
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 8 }}>超载人员</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8 }}>超载人员</div>
               <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--status-danger-dark)' }}>{summary?.overloadedCount ?? '-'}</div>
             </div>
           </Card>
@@ -219,9 +239,9 @@ const WorkloadPage: React.FC = () => {
                       </div>
 
                       {/* Labels */}
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-3)', whiteSpace: 'nowrap' }}>
+                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-2)', whiteSpace: 'nowrap' }}>
                         <span>{m.inProgress}进行中</span>
-                        {m.overdue > 0 && <span style={{ color: 'var(--status-danger)' }}>{m.overdue}逾期</span>}
+                        {m.overdue > 0 && <span style={{ color: 'var(--risk-high-color)' }}>{m.overdue}逾期</span>}
                         {isOverloaded && <Tag size="small" color="red">超载</Tag>}
                       </div>
                     </div>
@@ -236,8 +256,8 @@ const WorkloadPage: React.FC = () => {
         <Card>
           <h3 style={{ margin: '0 0 16px 0' }}>需关注</h3>
           {issues.length === 0 && !loading ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-3)' }}>
-              <span style={{ color: 'rgb(var(--success-6))', fontSize: 16, marginRight: 6 }}>&#10003;</span>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-2)' }}>
+              <span style={{ color: 'var(--risk-low-color)', fontSize: 16, marginRight: 6 }}>&#10003;</span>
               暂无需关注事项
             </div>
           ) : (

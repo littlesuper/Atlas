@@ -7,7 +7,7 @@ import {
   clickTab,
 } from '../helpers/arco';
 
-test.describe.serial('Frontend Interaction Details', () => {
+test.describe.serial('Frontend Interaction Details @p1', () => {
   async function getToken(page: import('@playwright/test').Page): Promise<string> {
     return (await page.evaluate(() => localStorage.getItem('accessToken'))) || '';
   }

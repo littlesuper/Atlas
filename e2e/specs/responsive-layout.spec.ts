@@ -10,7 +10,7 @@ import { waitForTableLoad, waitForPageLoad } from '../helpers/arco';
  * - 通知铃铛
  * - 页面布局完整性
  */
-test.describe('Layout & Navigation', () => {
+test.describe('Layout & Navigation @p1', () => {
   // ──────── TC1: header elements visible ────────
   test('header shows logo, navigation and user avatar', async ({ authedPage: page }) => {
     await waitForPageLoad(page);

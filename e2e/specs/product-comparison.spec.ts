@@ -14,7 +14,7 @@ import {
  * - 对比抽屉并排显示产品属性
  * - 差异高亮
  */
-test.describe.serial('Product Comparison', () => {
+test.describe.serial('Product Comparison @p1', () => {
   const product1 = uniqueName('对比产品A');
   const product2 = uniqueName('对比产品B');
   const product3 = uniqueName('对比产品C');

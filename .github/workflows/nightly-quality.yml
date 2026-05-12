@@ -1,0 +1,102 @@
+name: Nightly Quality
+
+on:
+  schedule:
+    # Runs at 02:00 Asia/Shanghai.
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-regression:
+    name: Full Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: cd server && npx prisma validate && npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Server typecheck
+        run: npm run typecheck --workspace=server
+
+      - name: Server unit tests
+        run: npm test --workspace=server
+
+      - name: Client unit tests
+        run: npm test --workspace=client
+
+      - name: Client build
+        run: npm run build --workspace=client
+
+      - name: High severity dependency audit
+        run: npm audit --audit-level=high
+
+  e2e-regression:
+    name: E2E ${{ matrix.tier }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tier: P1
+            command: npm run test:e2e:p1
+          - tier: P2
+            command: npm run test:e2e:p2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare database
+        run: cd server && npx prisma validate && npx prisma generate && npx prisma db push && npx tsx src/prisma/seed.ts
+        env:
+          DATABASE_URL: file:./dev.db
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run ${{ matrix.tier }} E2E tests
+        run: ${{ matrix.command }}
+        env:
+          DATABASE_URL: file:./dev.db
+          JWT_SECRET: ci-test-jwt-secret
+          JWT_REFRESH_SECRET: ci-test-jwt-refresh-secret
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.tier }}-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7

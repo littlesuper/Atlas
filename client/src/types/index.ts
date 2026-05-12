@@ -235,6 +235,7 @@ export interface TemplateActivity {
   planDuration?: number | null;
   dependencies?: ActivityDependency[] | null;
   notes?: string | null;
+  roleId?: string | null;
   sortOrder: number;
 }
 
@@ -572,6 +573,24 @@ export interface WorkloadResponse {
 }
 
 // ============ 通用类型 ============
+
+export interface FeatureFlagsSnapshot {
+  status: 'ok';
+  source: string;
+  flags: Record<string, boolean>;
+  definitions: FeatureFlagDefinition[];
+  unknownFlags: string[];
+  total: number;
+}
+
+export interface FeatureFlagDefinition {
+  name: string;
+  defaultEnabled: boolean;
+  owner: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  description: string;
+  mitigation: string;
+}
 
 export interface ApiResponse<T = unknown> {
   data: T;

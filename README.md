@@ -210,7 +210,10 @@ npx tsx src/prisma/seed.ts  # 初始化种子数据
 # 测试
 cd client && npm test                # 前端单元测试 (Vitest)
 npx playwright install chromium      # 安装浏览器（首次）
-npx playwright test                  # 运行全部 E2E 测试
+npm run test:e2e:p0                  # 运行 PR 阻断 E2E（默认 fresh server）
+npm run test:e2e:visual              # 运行视觉回归基线（@visual，默认 fresh server）
+npm run test:e2e:reuse -- --grep @smoke # 显式复用已有 dev server 调试
+npx playwright test                  # 运行全部 E2E 测试（默认 fresh server）
 npx playwright test --headed         # 带界面运行（调试用）
 ```
 
@@ -225,8 +228,102 @@ JWT_REFRESH_SECRET="hw-system-refresh-secret"
 PORT=3000
 AI_API_KEY=""                          # 可选，AI 功能所需
 AI_API_URL=""                          # 可选，AI 功能所需
+SENTRY_DSN=""                          # 可选，服务端错误追踪
+SENTRY_TRACES_SAMPLE_RATE="0"           # 可选，服务端性能采样率
+SENTRY_RELEASE=""                      # 可选，服务端发布版本标识
+METRICS_TOKEN=""                       # 生产环境访问 /api/metrics 所需 token
+SLOW_REQUEST_THRESHOLD_MS="1000"        # 慢请求阈值，单位 ms
+ALERT_WEBHOOK_URL=""                    # 可选，alerts:check 告警通知 webhook
+ALERT_SERVICE="atlas-api"               # 可选，告警 payload 中的服务名
+METRICS_URL=""                          # 可选，alerts:check 指标端点覆盖
+INCIDENT_BASE_URL=""                    # 可选，incident:collect 默认采集地址
+INCIDENT_REQUEST_ID=""                  # 可选，incident:collect 默认 requestId
+RELEASE_BASE_URL=""                     # 可选，release:precheck 检查地址覆盖
+FEATURE_FLAGS=""                        # 可选，如 risk.ai,!weekly-report
 CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
 NODE_ENV="development"
+```
+
+`/api/metrics` 在开发环境可直接访问；生产环境需使用 `Authorization: Bearer <METRICS_TOKEN>` 或 `X-Metrics-Token` 访问。当前指标包含请求状态族、慢请求、p95/p99、top routes、进程内存、业务事件计数和 `alerts` 告警候选。`/api/metrics?format=prometheus` 可返回 Prometheus 0.0.4 文本格式，便于 Prometheus/Grafana 或云监控采集。可用 `npm run alerts:check --workspace=server` 拉取指标并向 `ALERT_WEBHOOK_URL` 发送当前 active alerts。
+
+`FEATURE_FLAGS` 当前支持 `ai.external-calls`、`activity.import`、`activity.bulk-mutation`。`/api/feature-flags` 会返回当前 flags、definitions 和 unknownFlags，definitions 包含 owner、风险等级、默认值和止血说明；unknownFlags 非空时 `release:precheck` / `release:observe` 会返回 `NO_GO`，需要先修正拼写或补登记再发布。项目详情页会读取该快照，显式关闭活动导入或批量变更时，对应前端入口会禁用并提示，后端接口仍作为最终兜底。
+
+按 requestId 检索本地/服务器日志：
+
+```bash
+npm run logs:request --workspace=server -- <requestId> .logs
+npm run logs:request --workspace=server -- <requestId> .logs --json
+```
+
+采集事故上下文：
+
+```bash
+npm run incident:collect --workspace=server -- --base-url http://localhost:3000
+npm run incident:collect --workspace=server -- --base-url http://localhost:3000 --request-id <requestId> --logs .logs
+```
+
+生成故障演练场景包：
+
+```bash
+npm run incident:drill --workspace=server -- --scenario api_5xx --current-version 1.4.8 --target-version 1.4.7 --base-url http://localhost:3000
+npm run incident:drill --workspace=server -- --scenario database_degraded --current-version 1.4.8 --target-version 1.4.7 --base-url http://localhost:3000
+npm run incident:drill-report --workspace=server -- --scenario api_5xx --started-at 2026-05-05T16:00:00.000Z --ended-at 2026-05-05T16:25:00.000Z --achieved "Incident commander can identify first failing check and affected route or feature|Mitigation command is selected without touching unrelated features|Rollback dry-run reaches READY_FOR_REHEARSAL or records a blocker"
+```
+
+发布前健康门禁：
+
+```bash
+npm run release:precheck --workspace=server -- --base-url http://localhost:3000
+```
+
+发布后观察窗口：
+
+```bash
+npm run release:observe --workspace=server -- --base-url http://localhost:3000 --checks 6 --interval-ms 300000
+```
+
+灰度发布 dry-run：
+
+```bash
+npm run release:canary-plan --workspace=server -- --version 1.4.8 --target-version 1.4.7 --base-url http://localhost:3000
+npm run release:canary-report --workspace=server -- --version 1.4.8 --target-version 1.4.7 --base-url http://localhost:3000 --started-at 2026-05-05T17:00:00.000Z --ended-at 2026-05-05T18:30:00.000Z --stage preflight:PASS --stage canary_5:PASS --stage canary_25:PASS --stage canary_50:PASS --stage full_rollout:PASS
+npm run release:failure-report --workspace=server -- --version 1.4.8 --target-version 1.4.7 --failed-at canary_25 --triggered-gate "release:observe returned ATTENTION_REQUIRED" --mitigation "FEATURE_FLAGS=\"!activity.import\"|npm run incident:collect --workspace=server -- --base-url http://localhost:3000" --owner "release owner|backend on-call" --follow-up "Audit activity import logs" --base-url http://localhost:3000
+```
+
+回滚演练 dry-run：
+
+```bash
+npm run rollback:plan --workspace=server -- --current-version 1.4.8 --target-version 1.4.7 --reason release-5xx --disable-flag activity.import --database-strategy forward-fix --base-url http://localhost:3000
+npm run rollback:report --workspace=server -- --current-version 1.4.8 --target-version 1.4.7 --reason canary_failed --started-at 2026-05-05T18:00:00.000Z --ended-at 2026-05-05T18:20:00.000Z --target-confirmed --database-strategy-confirmed --post-rollback-precheck GO
+```
+
+该命令会读取 `/api/health` 与 `/api/metrics`，输出 `GO/NO_GO` JSON 报告；如果健康检查失败、数据库 degraded 或存在 active metric alerts，命令以非 0 状态退出。
+
+Feature Flags 可通过 `FEATURE_FLAGS` 配置，支持 JSON 对象或逗号简写：
+
+```env
+FEATURE_FLAGS='{"risk.ai":true,"weekly-report":false}'
+FEATURE_FLAGS="risk.ai,!weekly-report"
+```
+
+只读快照接口为 `GET /api/feature-flags`，默认无配置时所有未知 flag 视为关闭。当前已接入的高风险开关：
+
+| Flag | 默认 | 作用 |
+| --- | --- | --- |
+| `ai.external-calls` | 开启 | 关闭后跳过后端所有外部 AI API 调用，相关功能回退到规则引擎或空结果 |
+| `activity.import` | 开启 | 关闭后阻断活动 Excel 导入入口，避免批量写入继续扩大影响 |
+| `activity.bulk-mutation` | 开启 | 关闭后阻断活动批量更新和批量删除，保留单条活动操作 |
+
+前端可在 `client/.env` 中配置可观测性参数；未配置 DSN 时监控逻辑为 no-op：
+
+```env
+VITE_SENTRY_DSN=""                      # 可选，前端错误追踪
+VITE_SENTRY_TRACES_SAMPLE_RATE="0"      # 可选，前端性能采样率
+VITE_APP_VERSION="1.1.20"               # 可选，前端发布版本标识
+SENTRY_AUTH_TOKEN=""                    # 可选，发布构建上传 source map
+SENTRY_ORG=""                           # 可选，Sentry 组织 slug
+SENTRY_PROJECT=""                       # 可选，Sentry 项目 slug
+SENTRY_RELEASE=""                       # 可选，覆盖 source map release 名称
 ```
 
 ## 许可证

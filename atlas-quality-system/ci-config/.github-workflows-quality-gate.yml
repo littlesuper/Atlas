@@ -1,0 +1,607 @@
+# GitHub Actions 质量门禁工作流
+# 文件位置: .github/workflows/quality-gate.yml
+# 
+# 这个工作流是Atlas项目的"机器把关",每次PR触发,
+# 任何检查失败都阻止合并。
+#
+# 业务人员注意:不要为了"过CI"而修改这个文件,
+# 也不要绕过失败的检查。如果某个检查持续误报,
+# 联系AI代码守护者评估。
+
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+# 取消同一PR的旧的运行,节省资源
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ==============================================================
+  # Job 1: 安全扫描
+  # ==============================================================
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 完整历史,用于密钥扫描
+
+      # CodeQL代码安全分析
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript  # Python项目改为python
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      # 密钥扫描(扫描整个git历史)
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+      # Semgrep通用安全规则
+      - name: Semgrep Security Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/javascript
+            p/typescript
+
+  # ==============================================================
+  # Job 2: 静态分析(代码质量)
+  # ==============================================================
+  static-analysis:
+    name: 📊 Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ESLint代码规范
+      - name: ESLint
+        run: npm run lint -- --max-warnings 0
+
+      # Prettier格式检查
+      - name: Prettier
+        run: npm run format:check
+
+      # TypeScript类型检查(严格模式)
+      - name: TypeScript
+        run: npm run typecheck
+
+      # stylelint CSS规范
+      - name: Stylelint
+        run: npm run lint:style
+        continue-on-error: false
+
+      # 代码复杂度检查
+      - name: Code Complexity
+        run: npx eslint --rule 'complexity: [error, 10]' --rule 'max-lines-per-function: [error, 50]' src/
+
+      # 死代码检测
+      - name: Dead Code Detection
+        run: npx ts-prune
+
+  # ==============================================================
+  # Job 3: 依赖安全检查
+  # ==============================================================
+  dependency-check:
+    name: 📦 Dependency Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      # npm audit - 已知漏洞
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+      # Snyk漏洞扫描(需配置SNYK_TOKEN)
+      - name: Snyk Security
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+        continue-on-error: false
+
+      # 许可证检查
+      - name: License Check
+        run: |
+          npx license-checker --production --failOn 'GPL;AGPL;LGPL;CDDL;MPL'
+
+  # ==============================================================
+  # Job 4: 单元测试
+  # ==============================================================
+  unit-tests:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        run: npm run test:unit -- --coverage --reporter=verbose
+
+      - name: Check coverage thresholds
+        run: |
+          # 强制覆盖率门槛
+          npx vitest run --coverage \
+            --coverage.thresholds.lines=75 \
+            --coverage.thresholds.branches=70 \
+            --coverage.thresholds.functions=85 \
+            --coverage.thresholds.statements=75
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/coverage-final.json
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ==============================================================
+  # Job 5: 集成测试(包含真实数据库)
+  # ==============================================================
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: atlas_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_test
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_test
+          REDIS_URL: redis://localhost:6379
+
+  # ==============================================================
+  # Job 6: 端到端(E2E)测试
+  # ==============================================================
+  e2e-tests:
+    name: 🎭 E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: atlas_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+        ports:
+          - 5432:5432
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Setup test database
+        run: |
+          npm run db:migrate
+          npm run db:seed:test
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run E2E tests
+        run: npx playwright test --project=${{ matrix.browser }}
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 7
+
+  # ==============================================================
+  # Job 7: 视觉回归测试
+  # ==============================================================
+  visual-regression:
+    name: 🎨 Visual Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Publish to Chromatic
+        uses: chromaui/action@latest
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          exitZeroOnChanges: false
+
+  # ==============================================================
+  # Job 8: 可访问性测试
+  # ==============================================================
+  accessibility:
+    name: ♿ Accessibility Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run accessibility tests
+        run: npm run test:a11y
+
+      - name: Lighthouse CI
+        run: |
+          npm install -g @lhci/cli@0.13.x
+          lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+  # ==============================================================
+  # Job 9: 性能测试
+  # ==============================================================
+  performance-tests:
+    name: ⚡ Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Bundle size check
+        run: |
+          npm run analyze
+          npx bundlesize
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6 performance tests
+        run: k6 run --out json=k6-results.json tests/performance/api-load.js
+
+      - name: Check performance regression
+        run: node scripts/check-perf-regression.js k6-results.json
+
+  # ==============================================================
+  # Job 10: 变更测试(Mutation Testing)
+  # ==============================================================
+  mutation-tests:
+    name: 🧬 Mutation Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # 比较慢,只在main分支或带mutation-test标签的PR运行
+    if: |
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.pull_request.labels.*.name, 'mutation-test')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Stryker mutation tests
+        run: npx stryker run
+
+      - name: Check mutation score
+        run: |
+          MUTATION_SCORE=$(jq '.score' reports/mutation/mutation.json)
+          if (( $(echo "$MUTATION_SCORE < 60" | bc -l) )); then
+            echo "❌ Mutation score $MUTATION_SCORE is below threshold 60"
+            exit 1
+          fi
+
+  # ==============================================================
+  # Job 11: AI Code Review
+  # ==============================================================
+  ai-code-review:
+    name: 🤖 AI Code Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            **/*.ts
+            **/*.tsx
+            **/*.js
+            **/*.jsx
+            **/*.py
+
+      - name: Run Claude Code Review
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          changed-files: ${{ steps.changed-files.outputs.all_changed_files }}
+          claude-md-path: ./CLAUDE.md
+          severity-threshold: high
+
+  # ==============================================================
+  # Job 12: 架构合规检查
+  # ==============================================================
+  architecture-check:
+    name: 🏛️ Architecture Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check dependency rules
+        run: npx depcruise --config .dependency-cruiser.js src
+
+      - name: Check for circular dependencies
+        run: npx madge --circular src/
+
+      - name: Detect unused dependencies
+        run: npx depcheck
+
+  # ==============================================================
+  # Job 13: 数据库迁移测试
+  # ==============================================================
+  migration-tests:
+    name: 🗄️ Migration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: contains(github.event.pull_request.changed_files, 'migrations')
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: atlas_migration_test
+        options: >-
+          --health-cmd pg_isready
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test migration up
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_migration_test
+
+      - name: Test migration down(rollback)
+        run: npm run db:migrate:rollback
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_migration_test
+
+      - name: Test migration up again
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/atlas_migration_test
+
+  # ==============================================================
+  # 汇总:所有检查必须通过
+  # ==============================================================
+  all-checks-passed:
+    name: ✅ All Checks Passed
+    runs-on: ubuntu-latest
+    needs:
+      - security-scan
+      - static-analysis
+      - dependency-check
+      - unit-tests
+      - integration-tests
+      - e2e-tests
+      - accessibility
+      - architecture-check
+    if: always()
+    steps:
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ needs.security-scan.result }}" != "success" ]] ||
+             [[ "${{ needs.static-analysis.result }}" != "success" ]] ||
+             [[ "${{ needs.dependency-check.result }}" != "success" ]] ||
+             [[ "${{ needs.unit-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.integration-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.e2e-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.accessibility.result }}" != "success" ]] ||
+             [[ "${{ needs.architecture-check.result }}" != "success" ]]; then
+            echo "❌ Some checks failed"
+            exit 1
+          fi
+          echo "✅ All checks passed"
+
+# ==============================================================
+# 配置说明
+# ==============================================================
+#
+# 必须的GitHub Secrets:
+# - SNYK_TOKEN: Snyk API token (https://snyk.io)
+# - CODECOV_TOKEN: Codecov token (https://codecov.io)
+# - CHROMATIC_PROJECT_TOKEN: Chromatic token (https://chromatic.com)
+# - LHCI_GITHUB_APP_TOKEN: Lighthouse CI app token
+# - ANTHROPIC_API_KEY: Anthropic API key (用于AI Code Review)
+#
+# 必须的分支保护规则(在GitHub仓库Settings中配置):
+# - main分支必须通过PR合并
+# - 必须通过 "All Checks Passed" 检查
+# - 至少1人审查批准(CODEOWNERS自动指派)
+# - 必须解决所有Conversations
+# - 不允许force push
+# - 不允许直接push
+#
+# 业务人员注意:
+# - 本工作流不能被关闭/绕过
+# - 任何检查失败都阻止PR合并
+# - 如认为某个检查持续误报,联系AI代码守护者
+# - 不允许 --no-verify 跳过本地pre-commit

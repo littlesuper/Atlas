@@ -36,9 +36,8 @@ const RoleMembersTab: React.FC = () => {
         roleMembersApi.list(),
         rolesApi.list(),
       ]);
-      const members = (membersRes as any)?.data || membersRes;
-      setRoleMembers(Array.isArray(members) ? members : []);
-      setRoles(Array.isArray(rolesRes) ? rolesRes : []);
+      setRoleMembers(membersRes.data.data || []);
+      setRoles(rolesRes.data || []);
     } catch {
       Message.error('加载角色成员失败');
     } finally {
@@ -49,7 +48,7 @@ const RoleMembersTab: React.FC = () => {
   const loadUsers = useCallback(async () => {
     try {
       const res = await usersApi.list({ pageSize: 1000 });
-      setUsers((res as any)?.data || res.data || []);
+      setUsers(res.data.data || []);
     } catch {
       Message.error('加载用户列表失败');
     }
@@ -153,7 +152,7 @@ const RoleMembersTab: React.FC = () => {
               {
                 title: '姓名',
                 dataIndex: 'user',
-                render: (user: any) => (
+                render: (user: RoleMember['user']) => (
                   <span>
                     {user.realName}
                     {user.canLogin === false && (

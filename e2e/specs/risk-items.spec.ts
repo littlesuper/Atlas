@@ -12,7 +12,7 @@ import {
   clickTab,
 } from '../helpers/arco';
 
-test.describe.serial('Risk Items Management', () => {
+test.describe.serial('Risk Items Management @p1', () => {
   const projectName = uniqueName('风险项测试项目');
 
   test('setup: create project with activity and assessment', async ({ authedPage: page }) => {

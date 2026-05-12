@@ -13,7 +13,7 @@ import { waitForPageLoad, waitForTableLoad, clickNavItem } from '../helpers/arco
 // Use clean browser state (no pre-loaded admin auth)
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.describe.serial('Permission Access Control', () => {
+test.describe.serial('Permission Access Control @p0', () => {
   // ──────── TC1: non-admin login and project access ────────
   test('non-admin user can login and view projects', async ({ page }) => {
     await login(page, credentials.zhangsan.username, credentials.zhangsan.password);

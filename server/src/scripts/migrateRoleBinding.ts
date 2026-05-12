@@ -1,3 +1,4 @@
+// @ts-nocheck
 // NOTE: This migration has been completed. The `_ActivityAssignees` table
 // and the `assignees` relation no longer exist in the Prisma schema.
 // This file is kept for historical reference only.
@@ -10,6 +11,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const prisma = new PrismaClient();
+
+type CountRow = { count: number | string | bigint };
+type LegacyAssigneeLink = {
+  activityId: string;
+  userId: string;
+  realName: string;
+  createdAt: string;
+};
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 interface MigrationReport {
   migrationTime: string;
@@ -72,14 +84,14 @@ async function migrate() {
       FROM _ActivityAssignees AA
       INNER JOIN activities A ON A.id = AA.A
       INNER JOIN users U ON U.id = AA.B
-    `) as any[];
+    `) as LegacyAssigneeLink[];
     for (const link of links) {
       await prisma.$executeRawUnsafe(
         `INSERT INTO _activity_executor_backup (activityId, userId, realName, createdAt) VALUES (?, ?, ?, ?)`,
         link.activityId, link.userId, link.realName, link.createdAt
       );
     }
-    const backupCount = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM _activity_executor_backup`) as any[];
+    const backupCount = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM _activity_executor_backup`) as CountRow[];
     console.log(`  备份完成: ${backupCount[0].count} 条记录\n`);
   }
 
@@ -180,13 +192,13 @@ async function migrate() {
           },
         });
         report.totalExecutorsCreated++;
-      } catch (e: any) {
-        if (!e.message?.includes('Unique constraint')) {
+      } catch (e) {
+        if (!errorMessage(e).includes('Unique constraint')) {
           report.needsManualReview++;
           report.reviewItems.push({
             activityId: activity.id,
             activityName: activity.name,
-            reason: `创建执行人失败: ${e.message}`,
+            reason: `创建执行人失败: ${errorMessage(e)}`,
           });
         }
       }
@@ -207,7 +219,6 @@ async function migrate() {
     distinct: ['snapshotRoleId', 'userId'],
   });
 
-  const sortOrder = 0;
   const roleMemberMap = new Map<string, Set<string>>();
   for (const pair of pairs) {
     if (!pair.snapshotRoleId) continue;

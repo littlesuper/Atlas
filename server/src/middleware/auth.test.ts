@@ -399,4 +399,287 @@ describe('authenticate middleware', () => {
       expect(res2.status).toHaveBeenCalledWith(403);
     });
   });
+
+  it('authenticates successfully when token is passed via query parameter', async () => {
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(VALID_USER);
+    mockFindMany.mockResolvedValue([]);
+
+    const req = {
+      headers: {},
+      query: { token: 'query-token' },
+    } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.user).toBeDefined();
+    expect(req.user!.id).toBe('u1');
+  });
+
+  it('returns 401 when token is in blacklist', async () => {
+    vi.mock('../utils/tokenBlacklist', () => ({
+      isTokenBlacklisted: vi.fn().mockReturnValue(false),
+      blacklistToken: vi.fn(),
+    }));
+    const { isTokenBlacklisted } = await import('../utils/tokenBlacklist');
+    vi.mocked(isTokenBlacklisted).mockReturnValue(true);
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+
+    const req = mockReq('Bearer blacklisted-token');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.stringContaining('失效') }));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('attaches user with empty roles and permissions when user has no roles', async () => {
+    const { isTokenBlacklisted } = await import('../utils/tokenBlacklist');
+    vi.mocked(isTokenBlacklisted).mockReturnValue(false);
+
+    const userNoRoles = { ...VALID_USER, userRoles: [] };
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(userNoRoles);
+    mockFindMany.mockResolvedValue([]);
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.user!.roles).toEqual([]);
+    expect(req.user!.permissions).toEqual([]);
+    expect(req.user!.collaboratingProjectIds).toEqual([]);
+  });
+
+  it('ignores non-string query token parameter', async () => {
+    const req = {
+      headers: {},
+      query: { token: ['array', 'value'] },
+    } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when database query throws an error', async () => {
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockRejectedValue(new Error('DB connection lost'));
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: '服务器内部错误' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when Authorization header has Bearer with no token', async () => {
+    const req = mockReq('Bearer ');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when Authorization header has Bearer with only whitespace', async () => {
+    const req = mockReq('Bearer   ');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('re-queries DB after cache entry expires naturally via TTL', async () => {
+    vi.useFakeTimers();
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(VALID_USER);
+    mockFindMany.mockResolvedValue([]);
+
+    const req1 = mockReq('Bearer valid-token');
+    await authenticate(req1, mockRes(), vi.fn());
+    expect(mockFindUnique).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+    const req2 = mockReq('Bearer valid-token');
+    const next2 = vi.fn();
+    await authenticate(req2, mockRes(), next2);
+    expect(mockFindUnique).toHaveBeenCalledTimes(2);
+    expect(next2).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('handles token with Bearer prefix followed by special characters', async () => {
+    const { isTokenBlacklisted } = await import('../utils/tokenBlacklist');
+    vi.mocked(isTokenBlacklisted).mockReturnValue(false);
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(VALID_USER);
+    mockFindMany.mockResolvedValue([]);
+
+    const req = mockReq('Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ1MSJ9.sig');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(mockVerify).toHaveBeenCalledWith('eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ1MSJ9.sig', 'test-secret');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('prefers Authorization header token over query parameter', async () => {
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(VALID_USER);
+    mockFindMany.mockResolvedValue([]);
+
+    const req = {
+      headers: { authorization: 'Bearer header-token' },
+      query: { token: 'query-token' },
+    } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(mockVerify).toHaveBeenCalledWith('header-token', 'test-secret');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('returns 500 when projectMember findMany rejects', async () => {
+    const { isTokenBlacklisted } = await import('../utils/tokenBlacklist');
+    vi.mocked(isTokenBlacklisted).mockReturnValue(false);
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(VALID_USER);
+    mockFindMany.mockRejectedValue(new Error('PM query failed'));
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+    await authenticate(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: '服务器内部错误' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('handles user with null username in token payload', async () => {
+    mockVerify.mockReturnValue({ userId: 'u1', username: null });
+    mockFindUnique.mockResolvedValue({ ...VALID_USER, username: null });
+    mockFindMany.mockResolvedValue([]);
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.user!.username).toBeNull();
+  });
+
+  it('handles user with empty string realName', async () => {
+    const { isTokenBlacklisted } = await import('../utils/tokenBlacklist');
+    vi.mocked(isTokenBlacklisted).mockReturnValue(false);
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue({ ...VALID_USER, realName: '' });
+    mockFindMany.mockResolvedValue([]);
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.user!.realName).toBe('');
+  });
+
+  it('returns 401 when Authorization header uses Basic scheme', async () => {
+    const req = mockReq('Basic dXNlcjpwYXNz');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when Authorization header is just "Bearer" without space', async () => {
+    const req = mockReq('Bearer');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('handles token payload with missing userId field', async () => {
+    mockVerify.mockReturnValue({ username: 'testuser' });
+    mockFindUnique.mockResolvedValue(null);
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('attaches user with single permission from single role', async () => {
+    const singlePermUser = {
+      ...VALID_USER,
+      userRoles: [{
+        role: {
+          id: 'r1', name: 'Viewer', description: null,
+          rolePermissions: [{ permission: { resource: 'report', action: 'read' } }],
+        },
+      }],
+    };
+    mockVerify.mockReturnValue({ userId: 'u1', username: 'testuser' });
+    mockFindUnique.mockResolvedValue(singlePermUser);
+    mockFindMany.mockResolvedValue([]);
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
+    const next = vi.fn();
+    await authenticate(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.user!.permissions).toEqual(['report:read']);
+  });
+
+  it('returns 401 when Authorization header contains only whitespace', async () => {
+    const req = mockReq('   ');
+    const res = mockRes();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { Request } from 'express';
 
 const prisma = new PrismaClient();
@@ -16,7 +16,7 @@ export interface AuditLogParams {
 
 export async function auditLog(params: AuditLogParams): Promise<void> {
   try {
-    const user = (params.req as any).user;
+    const user = params.req.user;
     const userId = params.userId || user?.id || '';
     const userName = params.userName || user?.realName || user?.username || '';
     let ipAddress =
@@ -36,7 +36,7 @@ export async function auditLog(params: AuditLogParams): Promise<void> {
         resourceType: params.resourceType,
         resourceId: params.resourceId || null,
         resourceName: params.resourceName || null,
-        changes: params.changes ? (params.changes as any) : undefined,
+        changes: params.changes ? (params.changes as unknown as Prisma.InputJsonValue) : undefined,
         ipAddress: ipAddress || null,
       },
     });

@@ -1,0 +1,78 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application-checks:
+    name: Application Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: cd server && npx prisma validate && npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Server typecheck
+        run: npm run typecheck --workspace=server
+
+      - name: Server role binding regression tests
+        run: npm test --workspace=server -- roleMembers roleMembershipResolver
+
+      - name: Server activity import regression tests
+        run: npm test --workspace=server -- excelActivityParser activities performance chaos
+
+      - name: Client unit tests
+        run: npm test --workspace=client
+
+      - name: Client build
+        run: npm run build --workspace=client
+
+      - name: E2E P0 tests
+        run: npm run test:e2e:p0
+
+      - name: E2E accessibility tests
+        run: npm run test:e2e:a11y
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Report high severity advisories
+        run: npm audit --audit-level=high

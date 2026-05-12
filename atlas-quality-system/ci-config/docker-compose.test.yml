@@ -1,0 +1,191 @@
+# Docker Compose 测试环境配置
+# 文件位置: docker-compose.test.yml
+#
+# 用途:在本地或CI中启动完整的测试环境
+# 使用方法:
+#   docker compose -f docker-compose.test.yml up -d
+#   npm run test:integration
+#   docker compose -f docker-compose.test.yml down -v
+
+version: '3.8'
+
+services:
+  # ============================================================
+  # PostgreSQL测试数据库
+  # ============================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: atlas-test-postgres
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: atlas_test
+    ports:
+      - '5433:5432'  # 用5433避免和本地开发库冲突
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test -d atlas_test']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /var/lib/postgresql/data  # 用内存,测试更快
+    volumes:
+      - ./scripts/db/test-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  # ============================================================
+  # Redis测试缓存
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-test-redis
+    ports:
+      - '6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --save '' --appendonly no  # 不持久化,测试更快
+
+  # ============================================================
+  # MailHog - 测试邮件服务(捕获邮件不实际发送)
+  # ============================================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: atlas-test-mailhog
+    ports:
+      - '1025:1025'  # SMTP
+      - '8025:8025'  # Web UI(查看捕获的邮件)
+    environment:
+      MH_STORAGE: memory
+
+  # ============================================================
+  # MinIO - 测试对象存储(S3兼容)
+  # ============================================================
+  minio:
+    image: minio/minio:latest
+    container_name: atlas-test-minio
+    ports:
+      - '9000:9000'   # API
+      - '9001:9001'   # Console
+    environment:
+      MINIO_ROOT_USER: testkey
+      MINIO_ROOT_PASSWORD: testsecret
+    command: server /data --console-address ':9001'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # WireMock - Mock外部HTTP服务
+  # ============================================================
+  wiremock:
+    image: wiremock/wiremock:latest
+    container_name: atlas-test-wiremock
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./tests/wiremock/mappings:/home/wiremock/mappings:ro
+      - ./tests/wiremock/__files:/home/wiremock/__files:ro
+    command:
+      - --port=8080
+      - --verbose
+      - --global-response-templating
+
+  # ============================================================
+  # Toxiproxy - 网络故障注入(测试系统韧性)
+  # ============================================================
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:latest
+    container_name: atlas-test-toxiproxy
+    ports:
+      - '8474:8474'  # API
+      - '5434:5434'  # 代理后的Postgres
+      - '6381:6381'  # 代理后的Redis
+    command: ['-host=0.0.0.0', '-config=/config/toxiproxy.json']
+    volumes:
+      - ./tests/toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro
+
+  # ============================================================
+  # 应用服务(可选,通常在测试中单独启动)
+  # ============================================================
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.test
+  #   container_name: atlas-test-app
+  #   ports:
+  #     - '3001:3000'
+  #   environment:
+  #     NODE_ENV: test
+  #     DATABASE_URL: postgresql://test:test@postgres:5432/atlas_test
+  #     REDIS_URL: redis://redis:6379
+  #     SMTP_HOST: mailhog
+  #     SMTP_PORT: 1025
+  #     S3_ENDPOINT: http://minio:9000
+  #     S3_ACCESS_KEY: testkey
+  #     S3_SECRET_KEY: testsecret
+  #     S3_BUCKET: atlas-test
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     mailhog:
+  #       condition: service_started
+  #     minio:
+  #       condition: service_healthy
+
+# ============================================================
+# 网络配置
+# ============================================================
+networks:
+  default:
+    name: atlas-test-network
+
+# ============================================================
+# 业务人员使用说明
+# ============================================================
+#
+# 1. 启动所有测试服务:
+#    docker compose -f docker-compose.test.yml up -d
+#
+# 2. 查看服务状态:
+#    docker compose -f docker-compose.test.yml ps
+#
+# 3. 查看日志:
+#    docker compose -f docker-compose.test.yml logs -f
+#
+# 4. 跑测试:
+#    npm run test:integration
+#    或在测试中连接:
+#    DATABASE_URL=postgresql://test:test@localhost:5433/atlas_test
+#    REDIS_URL=redis://localhost:6380
+#
+# 5. 停止并清理:
+#    docker compose -f docker-compose.test.yml down -v
+#    (-v 表示同时删除volumes)
+#
+# 6. 查看捕获的测试邮件:
+#    打开 http://localhost:8025
+#
+# 7. 查看测试存储:
+#    打开 http://localhost:9001 (账号: testkey / testsecret)
+#
+# ============================================================
+# 与生产环境的差异说明
+# ============================================================
+#
+# 这个配置仅用于测试,与生产环境的差异:
+#
+# 1. 数据库用 tmpfs(内存),不持久化
+# 2. Redis不持久化(--save '')
+# 3. 邮件不真实发送(用MailHog捕获)
+# 4. 对象存储用本地MinIO(替代AWS S3)
+# 5. 资源限制宽松
+# 6. 没有HTTPS
+# 7. 简化的密码
+#
+# 这些都是合理的测试简化,不要混淆为生产配置。

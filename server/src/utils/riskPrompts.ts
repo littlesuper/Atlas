@@ -174,7 +174,19 @@ export function buildRiskUserPrompt(context: RiskContext): string {
  * 从 AI 返回的文本中解析 JSON
  * 支持纯 JSON 和 ```json ... ``` 代码块格式
  */
-export function parseAIResponse(content: string): any {
+export interface ParsedRiskAIResponse {
+  riskLevel?: string;
+  summary?: string;
+  riskFactors?: unknown[];
+  suggestions?: string[];
+  aiInsights?: string;
+  trendPrediction?: string;
+  criticalPathAnalysis?: string;
+  actionItems?: unknown[];
+  resourceBottlenecks?: unknown[];
+}
+
+export function parseAIResponse(content: string): ParsedRiskAIResponse {
   let jsonStr = content.trim();
 
   // Extract from fenced code block
@@ -183,17 +195,17 @@ export function parseAIResponse(content: string): any {
     jsonStr = fenced[1].trim();
   }
 
-  return JSON.parse(jsonStr);
+  return JSON.parse(jsonStr) as ParsedRiskAIResponse;
 }
 
 /**
  * 校验 AI 输出的 riskLevel 是否合法
  */
-export function validateRiskLevel(level: string): string {
+export function validateRiskLevel(level?: string): string {
   const valid = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
   const upper = level?.toUpperCase?.() || '';
   if (valid.includes(upper)) return upper;
   // Chinese fallback
   const cnMap: Record<string, string> = { '低': 'LOW', '中': 'MEDIUM', '高': 'HIGH', '严重': 'CRITICAL' };
-  return cnMap[level] || 'MEDIUM';
+  return level ? cnMap[level] || 'MEDIUM' : 'MEDIUM';
 }

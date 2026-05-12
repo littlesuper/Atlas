@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test';
  * - 风险因素严重性标签正确着色
  * - 亮色/暗色模式均可读
  */
-test.describe('Risk Tag Contrast', () => {
+test.describe('Risk Tag Contrast @p1', () => {
   async function goToRiskTab(page: Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);

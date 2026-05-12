@@ -8,7 +8,7 @@ import {
   pickDateRange,
 } from '../helpers/arco';
 
-test.describe.serial('Comprehensive Inline Editing', () => {
+test.describe.serial('Comprehensive Inline Editing @p2', () => {
   const projectName = uniqueName('内联全面');
   let projectId: string;
   let activityId: string;

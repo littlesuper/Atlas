@@ -13,7 +13,7 @@ import {
  * - 日志筛选
  * - 分页功能
  */
-test.describe('Audit Log', () => {
+test.describe('Audit Log @p2', () => {
   async function goToAuditLog(page: import('@playwright/test').Page) {
     await clickNavItem(page, '系统管理');
     await waitForPageLoad(page);

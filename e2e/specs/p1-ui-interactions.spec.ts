@@ -14,7 +14,7 @@ import {
   waitForPageLoad,
 } from '../helpers/arco';
 
-test.describe.serial('P1 UI Interactions', () => {
+test.describe.serial('P1 UI Interactions @p1', () => {
   const projectName = uniqueName('P1UI项目');
 
   test.afterAll(async ({}) => {});

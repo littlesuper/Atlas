@@ -12,7 +12,7 @@ import type { Page } from '@playwright/test';
  * - 刷新后列宽持久化
  * - 恢复默认清除列宽偏好
  */
-test.describe('Column Resize', () => {
+test.describe('Column Resize @p2', () => {
   /** Navigate to first project detail page and wait for activity table */
   async function goToProjectDetail(page: Page) {
     await page.goto('/projects');

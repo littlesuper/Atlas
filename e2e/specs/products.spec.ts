@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName, text } from '../fixtures/test-data';
 import { clickNavItem, expectMessage, confirmModal, waitForTableLoad } from '../helpers/arco';
 
-test.describe.serial('Product Management', () => {
+test.describe.serial('Product Management @p1', () => {
   const productName = uniqueName(text.productName);
 
   test('view product list', async ({ authedPage: page }) => {

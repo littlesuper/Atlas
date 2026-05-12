@@ -12,7 +12,7 @@ interface AttachmentListProps {
 }
 
 /** 判断 URL 是否为可预览的图片 */
-const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(url);
+export const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(url);
 
 const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, section, readOnly = false }) => {
   const [uploading, setUploading] = useState(false);

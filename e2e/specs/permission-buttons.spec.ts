@@ -7,7 +7,7 @@ import { waitForTableLoad, clickNavItem, waitForPageLoad } from '../helpers/arco
  * 权限按钮可见性测试
  * 验证不同权限的用户看到/看不到对应的操作按钮
  */
-base.describe.serial('Permission-Based Button Visibility', () => {
+base.describe.serial('Permission-Based Button Visibility @p1', () => {
 
   // ──────── TC1: admin sees all CRUD buttons ────────
   base('admin user sees all management buttons', async ({ page }) => {

@@ -8,24 +8,23 @@ import {
   InputNumber,
   Message,
 } from '@arco-design/web-react';
+import type { ColumnProps } from '@arco-design/web-react/es/Table/interface';
 import {
   IconEdit,
   IconDelete,
   IconDragDotVertical,
   IconPlus,
 } from '@arco-design/web-react/icon';
-import { Activity, User, ProjectMember } from '../types';
+import { Activity, User, ProjectMember, Role } from '../types';
 import {
   ACTIVITY_STATUS_MAP,
   ACTIVITY_TYPE_MAP,
   DEPENDENCY_TYPE_MAP,
   PHASE_OPTIONS,
-  PROJECT_MEMBER_ROLE_MAP,
-  PROJECT_MEMBER_ROLE_KEYS,
 } from '../utils/constants';
 import { calcWorkdays, addWorkdays } from '../utils/workday';
 import dayjs from 'dayjs';
-import { activitiesApi } from '../api';
+import { activitiesApi, roleMembersApi } from '../api';
 
 // 自动展开的 Select 包装
 const AutoOpenSelect: React.FC<React.ComponentProps<typeof Select> & { onDismiss: () => void }> = ({ onDismiss, children, ...props }) => {
@@ -139,12 +138,14 @@ function formatSeq(n: number): string {
 }
 
 const dateFmt = (d?: string | null) => d ? dayjs(d).format('YY年MM月DD日') : '-';
+const TYPE_LABEL_TO_CODE: Record<string, string> = { FS: '0', SS: '1', FF: '2', SF: '3' };
 
 export { AutoOpenSelect, AutoOpenDatePicker, AutoOpenRangePicker, PHASE_COLOR, formatSeq, dateFmt };
 
 interface UseActivityColumnsOptions {
   activities: Activity[];
   users: User[];
+  roles: Role[];
   project: { managerId: string; id: string; manager?: { id: string; realName?: string; username?: string }; members?: ProjectMember[] } | null;
   isArchived: boolean;
   canManage: boolean;
@@ -193,7 +194,7 @@ export const COLUMN_WIDTH_MAP: Record<string, number> = {
 
 export function useActivityColumns(opts: UseActivityColumnsOptions) {
   const {
-    activities, users, project, isArchived,
+    activities, roles, isArchived,
     canManage, canCreate, criticalActivityIds,
     inlineEditing, setInlineEditing, inlineValue, setInlineValue,
     startInlineEdit, showUndoMessage, commitInlineEdit, commitSelectEdit,
@@ -209,47 +210,6 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     activities.forEach((a, i) => map.set(a.id, i + 1));
     return map;
   }, [activities]);
-
-  // 项目成员按角色分组：负责人下拉的选项数据来源
-  const assigneeRoleOptions = useMemo(() => {
-    const byRole = new Map<string, { userId: string; name: string }[]>();
-    const pushUser = (role: string, userId: string, name: string) => {
-      if (!byRole.has(role)) byRole.set(role, []);
-      const list = byRole.get(role)!;
-      if (!list.some((u) => u.userId === userId)) list.push({ userId, name });
-    };
-
-    if (project?.manager) {
-      const m = project.manager;
-      pushUser('PROJECT_MANAGER', m.id, m.realName || m.username || m.id.slice(0, 6));
-    } else if (project?.managerId) {
-      const u = users.find((x) => x.id === project.managerId);
-      if (u) pushUser('PROJECT_MANAGER', u.id, u.realName || u.username || u.id.slice(0, 6));
-    }
-
-    project?.members?.forEach((m) => {
-      const role = m.role || 'COLLABORATOR';
-      const userId = m.user.id;
-      const name = m.user.realName || m.user.username || userId.slice(0, 6);
-      pushUser(role, userId, name);
-    });
-
-    const orderedKeys: string[] = ['PROJECT_MANAGER', ...PROJECT_MEMBER_ROLE_KEYS];
-    return orderedKeys
-      .filter((k) => byRole.has(k))
-      .map((k) => {
-        const meta =
-          k === 'PROJECT_MANAGER'
-            ? { label: '项目经理', color: 'red' as const }
-            : PROJECT_MEMBER_ROLE_MAP[k as keyof typeof PROJECT_MEMBER_ROLE_MAP];
-        return {
-          key: k,
-          label: meta.label,
-          color: meta.color as string,
-          users: byRole.get(k)!,
-        };
-      });
-  }, [project?.manager, project?.managerId, project?.members, users]);
 
   const getSeq = useCallback((activity: Activity): string => {
     return formatSeq(activitySeqMap.get(activity.id) || 0);
@@ -274,7 +234,6 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
   }, [activitySeqMap]);
 
   // 解析前置依赖文本
-  const TYPE_LABEL_TO_CODE: Record<string, string> = { FS: '0', SS: '1', FF: '2', SF: '3' };
   const parsePredecessorText = useCallback((text: string, selfId: string): { id: string; type: string; lag: number }[] | null => {
     const trimmed = text.trim();
     if (!trimmed) return [];
@@ -379,7 +338,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
   }, []);
 
   // 表格列配置
-  const columnMap = useMemo<Record<string, { title: string; width?: number; dataIndex?: string; fixed?: 'right'; onHeaderCell?: () => Record<string, unknown>; render?: (...args: any[]) => React.ReactNode }>>(() => ({
+  const columnMap = useMemo<Record<string, ColumnProps<Activity>>>(() => ({
     id: {
       title: 'ID',
       width: columnWidths.id,
@@ -547,14 +506,9 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       onHeaderCell: () => ({ 'data-column-key': 'assignee' }),
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeIds') {
-          const currentAssigneeIds = new Set(record.executors?.map((e) => e.userId) ?? []);
-          const preselectedRoles = assigneeRoleOptions
-            .filter((opt) => opt.users.some((u) => currentAssigneeIds.has(u.userId)))
-            .map((opt) => opt.key);
-
-          if (assigneeRoleOptions.length === 0) {
+          if (roles.length === 0) {
             return (
-              <Tooltip content="请先在项目编辑页配置项目成员">
+              <Tooltip content="请先在角色管理中创建角色">
                 <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>无可选角色</span>
               </Tooltip>
             );
@@ -562,45 +516,47 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
 
           return (
             <AutoOpenSelect
-              mode="multiple"
               size="small"
+              style={{ width: 200 }}
+              value={record.roleId || undefined}
               allowClear
               showSearch
+              placeholder="选择角色"
               filterOption={(input, option) => {
                 const key = option?.props?.value as string;
-                const opt = assigneeRoleOptions.find((o) => o.key === key);
-                if (!opt) return false;
-                const lower = input.toLowerCase();
-                return (
-                  opt.label.toLowerCase().includes(lower) ||
-                  opt.users.some((u) => u.name.toLowerCase().includes(lower))
-                );
+                const role = roles.find((r) => r.id === key);
+                if (!role) return false;
+                return role.name.toLowerCase().includes(input.toLowerCase());
               }}
-              style={{ width: 200 }}
-              value={preselectedRoles}
-              placeholder="选择角色"
               onDismiss={() => setInlineEditing(null)}
-              onChange={(roleKeys: string[]) => {
+              onChange={async (roleId: string | undefined) => {
                 setInlineEditing(null);
-                const userIdSet = new Set<string>();
-                for (const k of roleKeys) {
-                  const opt = assigneeRoleOptions.find((o) => o.key === k);
-                  if (opt) opt.users.forEach((u) => userIdSet.add(u.userId));
-                }
-                const newIds = Array.from(userIdSet);
                 const oldIds = record.executors?.map((e) => e.userId) ?? [];
-                activitiesApi.update(record.id, { executorIds: newIds }).then(() => {
-                  loadActivities();
-                  showUndoMessage(record.id, { executorIds: oldIds }, record.name);
-                }).catch(() => Message.error('更新失败'));
+                const oldRoleId = record.roleId ?? null;
+                if (roleId) {
+                  try {
+                    const { data: preview } = await roleMembersApi.preview(roleId);
+                    const ids = (preview.members || []).map((m) => m.userId);
+                    await activitiesApi.update(record.id, { roleId, executorIds: ids });
+                    loadActivities();
+                    showUndoMessage(record.id, { roleId: oldRoleId, executorIds: oldIds }, record.name);
+                  } catch {
+                    Message.error('更新失败');
+                  }
+                } else {
+                  try {
+                    await activitiesApi.update(record.id, { roleId: null, executorIds: [] });
+                    loadActivities();
+                    showUndoMessage(record.id, { roleId: oldRoleId, executorIds: oldIds }, record.name);
+                  } catch {
+                    Message.error('更新失败');
+                  }
+                }
               }}
             >
-              {assigneeRoleOptions.map((opt) => (
-                <Select.Option key={opt.key} value={opt.key}>
-                  <Tag color={opt.color} size="small" style={{ marginRight: 6 }}>{opt.label}</Tag>
-                  <span style={{ color: 'var(--color-text-2)' }}>
-                    {opt.users.map((u) => u.name).join('、')}
-                  </span>
+              {roles.map((r) => (
+                <Select.Option key={r.id} value={r.id}>
+                  <Tag size="small" style={{ marginRight: 6 }}>{r.name}</Tag>
                 </Select.Option>
               ))}
             </AutoOpenSelect>
@@ -828,8 +784,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       },
     },
   }), [
-    inlineEditing, inlineValue, users, project, activities, activitySeqMap,
-    assigneeRoleOptions,
+    inlineEditing, inlineValue, roles,
     canManage, criticalActivityIds, columnWidths, hasDependencies,
     getSeq, getPredecessorSeq, getPredecessorTooltip, commitPredecessorEdit, commitPlanDurationEdit,
     startInlineEdit, setInlineEditing, setInlineValue, commitInlineEdit, commitSelectEdit,

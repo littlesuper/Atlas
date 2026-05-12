@@ -12,6 +12,13 @@ import { IconPlus, IconDelete } from '@arco-design/web-react/icon';
 import { checkItemsApi } from '../../../api';
 import { CheckItem } from '../../../types';
 
+export function computeCheckProgress(items: CheckItem[]): { checked: number; total: number; percent: number } {
+  const checked = items.filter((i) => i.checked).length;
+  const total = items.length;
+  const percent = total > 0 ? Math.round((checked / total) * 100) : 0;
+  return { checked, total, percent };
+}
+
 interface CheckItemsProps {
   activityId: string;
 }
@@ -90,9 +97,10 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
     setEditingId(null);
   };
 
-  const checkedCount = items.filter((i) => i.checked).length;
-  const totalCount = items.length;
-  const percent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
+  const { checkedCount, totalCount, percent } = (() => {
+    const p = computeCheckProgress(items);
+    return { checkedCount: p.checked, totalCount: p.total, percent: p.percent };
+  })();
 
   return (
     <Spin loading={loading} style={{ width: '100%' }}>

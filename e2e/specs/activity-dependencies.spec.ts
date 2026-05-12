@@ -17,7 +17,7 @@ import {
  * - 内联编辑依赖
  * - 依赖变更后级联更新
  */
-test.describe.serial('Activity Dependencies', () => {
+test.describe.serial('Activity Dependencies @p0', () => {
   const projectName = uniqueName('依赖测试项目');
   const activity1 = '依赖活动A_' + Date.now();
   const activity2 = '依赖活动B_' + Date.now();

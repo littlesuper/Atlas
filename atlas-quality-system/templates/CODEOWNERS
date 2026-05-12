@@ -1,0 +1,124 @@
+# CODEOWNERS - 关键文件审查规则
+#
+# 本文件定义哪些文件的修改必须由特定人员审查。
+# GitHub会自动指派审查者,PR必须获得他们的批准才能合并。
+#
+# 语法: <文件路径模式>  <审查者>
+# 优先级: 后面的规则覆盖前面的规则
+
+# 默认所有文件都需要"AI代码守护者"审查
+*  @ai-code-guardian
+
+# === 高危文件:必须双人审查 ===
+
+# 数据库迁移
+/migrations/  @ai-code-guardian @senior-engineer
+/prisma/migrations/  @ai-code-guardian @senior-engineer
+/alembic/  @ai-code-guardian @senior-engineer
+
+# 认证授权代码
+/src/auth/  @ai-code-guardian @security-team
+/src/middleware/auth*  @ai-code-guardian @security-team
+/src/features/auth/  @ai-code-guardian @security-team
+
+# 支付/财务相关
+/src/payment/  @ai-code-guardian @senior-engineer
+/src/billing/  @ai-code-guardian @senior-engineer
+/src/features/payment/  @ai-code-guardian @senior-engineer
+
+# 用户隐私数据处理
+/src/features/user/  @ai-code-guardian @security-team
+
+# === 基础设施文件:DevOps审查 ===
+
+# CI/CD配置
+/.github/workflows/  @ai-code-guardian @devops-team
+/.github/actions/  @ai-code-guardian @devops-team
+
+# 容器配置
+/Dockerfile*  @ai-code-guardian @devops-team
+/docker-compose*.yml  @ai-code-guardian @devops-team
+/.dockerignore  @ai-code-guardian @devops-team
+
+# K8s配置(如有)
+/k8s/  @ai-code-guardian @devops-team
+/helm/  @ai-code-guardian @devops-team
+
+# 部署脚本
+/scripts/deploy*  @ai-code-guardian @devops-team
+
+# === 配置文件:谨慎修改 ===
+
+# 项目宪法
+/CLAUDE.md  @ai-code-guardian
+/templates/CLAUDE.md  @ai-code-guardian
+
+# 依赖文件
+/package.json  @ai-code-guardian
+/package-lock.json  @ai-code-guardian
+/yarn.lock  @ai-code-guardian
+/pnpm-lock.yaml  @ai-code-guardian
+/requirements.txt  @ai-code-guardian
+/poetry.lock  @ai-code-guardian
+/pyproject.toml  @ai-code-guardian
+
+# Lint/格式化配置(避免随意放松)
+/.eslintrc*  @ai-code-guardian
+/.prettierrc*  @ai-code-guardian
+/tsconfig*.json  @ai-code-guardian
+/.pre-commit-config.yaml  @ai-code-guardian
+
+# 环境变量示例(防止泄密)
+/.env.example  @ai-code-guardian @security-team
+/.env.*.example  @ai-code-guardian @security-team
+
+# === 测试基础设施 ===
+
+# 测试配置
+/vitest.config.ts  @ai-code-guardian
+/jest.config.*  @ai-code-guardian
+/playwright.config.ts  @ai-code-guardian
+/pytest.ini  @ai-code-guardian
+
+# 测试fixtures(防止误删)
+/tests/fixtures/  @ai-code-guardian
+
+# === 文档:产品负责人审查 ===
+
+# 需求文档
+/docs/requirements/  @product-owner @ai-code-guardian
+
+# API文档
+/docs/api/  @ai-code-guardian
+/openapi.yaml  @ai-code-guardian
+
+# === 特殊保护 ===
+
+# 安全策略文档
+/SECURITY.md  @ai-code-guardian @security-team
+
+# 隐私政策实现
+/src/privacy/  @ai-code-guardian @security-team @legal-team
+
+# 任何包含 "secret" 或 "credential" 的文件
+**/secrets/  @ai-code-guardian @security-team
+**/credentials/  @ai-code-guardian @security-team
+
+# === 团队设置示例 ===
+#
+# 在GitHub中创建以下团队/角色:
+# - @ai-code-guardian: AI代码守护者(必须存在!)
+# - @senior-engineer: 高级工程师(可外部顾问)
+# - @security-team: 安全负责人(可兼职)
+# - @devops-team: 运维负责人(可外包)
+# - @product-owner: 产品负责人
+# - @legal-team: 法务(如涉及合规)
+#
+# 如果暂时没有这些角色,先全部指向"AI代码守护者"
+# 等团队成长后逐步细化
+
+# === 注意事项 ===
+# 1. 此文件本身的修改也需要 @ai-code-guardian 审查
+# 2. 不要随意删除规则,即使觉得"没必要"
+# 3. 新增高危目录时,主动添加保护规则
+# 4. 业务人员不能担任CODEOWNER(避免AI写AI审)

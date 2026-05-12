@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -53,7 +53,7 @@ const PROGRESS_COLOR: Record<string, string> = {
 };
 
 /** 计算 ISO 周的日期范围 */
-const getWeekRange = (year: number, weekNumber: number) => {
+export const getWeekRange = (year: number, weekNumber: number) => {
   const d = dayjs().year(year).isoWeek(weekNumber).startOf('isoWeek' as dayjs.OpUnitType);
   return `${d.format('MM-DD')} ~ ${d.add(6, 'day').format('MM-DD')}`;
 };
@@ -64,6 +64,29 @@ interface WeekGroup {
   weekNumber: number;
   label: string;
   reports: WeeklyReport[];
+}
+
+export function groupReportsByWeek(reports: WeeklyReport[]): WeekGroup[] {
+  const map = new Map<string, WeeklyReport[]>();
+  for (const r of reports) {
+    const key = `${r.year}-${r.weekNumber}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(r);
+  }
+  const groups: WeekGroup[] = [];
+  for (const [key, groupReports] of map) {
+    const [y, w] = key.split('-').map(Number);
+    groupReports.sort((a, b) => (a.project?.name || '').localeCompare(b.project?.name || ''));
+    groups.push({
+      key,
+      year: y,
+      weekNumber: w,
+      label: `${y} 年第 ${w} 周 · ${getWeekRange(y, w)}`,
+      reports: groupReports,
+    });
+  }
+  groups.sort((a, b) => a.year !== b.year ? b.year - a.year : b.weekNumber - a.weekNumber);
+  return groups;
 }
 
 const WeeklyReportsSummary: React.FC = () => {
@@ -83,7 +106,7 @@ const WeeklyReportsSummary: React.FC = () => {
   const year = currentWeek?.year();
   const weekNumber = currentWeek?.isoWeek();
 
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     setLoading(true);
     try {
       if (currentWeek && year !== undefined && weekNumber !== undefined) {
@@ -103,9 +126,9 @@ const WeeklyReportsSummary: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentWeek, productLine, weekNumber, year]);
 
-  const loadDrafts = async () => {
+  const loadDrafts = useCallback(async () => {
     setDraftsLoading(true);
     try {
       const res = await weeklyReportsApi.getDrafts();
@@ -115,17 +138,17 @@ const WeeklyReportsSummary: React.FC = () => {
     } finally {
       setDraftsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadReports();
-  }, [year, weekNumber, productLine]);
+  }, [loadReports]);
 
   useEffect(() => {
     if (activeTab === 'drafts') {
       loadDrafts();
     }
-  }, [activeTab]);
+  }, [activeTab, loadDrafts]);
 
   const handleSubmit = (report: WeeklyReport) => {
     Modal.confirm({
@@ -163,26 +186,7 @@ const WeeklyReportsSummary: React.FC = () => {
 
   // ===== 按周次分组逻辑 =====
   const weekGroups = useMemo<WeekGroup[]>(() => {
-    const map = new Map<string, WeeklyReport[]>();
-    for (const r of reports) {
-      const key = `${r.year}-${r.weekNumber}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
-    }
-    const groups: WeekGroup[] = [];
-    for (const [key, groupReports] of map) {
-      const [y, w] = key.split('-').map(Number);
-      groupReports.sort((a, b) => (a.project?.name || '').localeCompare(b.project?.name || ''));
-      groups.push({
-        key,
-        year: y,
-        weekNumber: w,
-        label: `${y} 年第 ${w} 周 · ${getWeekRange(y, w)}`,
-        reports: groupReports,
-      });
-    }
-    groups.sort((a, b) => a.year !== b.year ? b.year - a.year : b.weekNumber - a.weekNumber);
-    return groups;
+    return groupReportsByWeek(reports);
   }, [reports]);
 
   // ===== 已提交周报的表格列 =====
@@ -314,12 +318,12 @@ const WeeklyReportsSummary: React.FC = () => {
         return (
           <Space>
             <Tooltip content="编辑">
-              <Button type="text" icon={<IconEdit />} size="small"
+              <Button type="text" icon={<IconEdit />} size="small" aria-label="编辑周报"
                 onClick={() => navigate(`/weekly-reports/${record.id}/edit`)} />
             </Tooltip>
             {canDelete(record) && (
               <Tooltip content="删除">
-                <Button type="text" status="danger" icon={<IconDelete />} size="small"
+                <Button type="text" status="danger" icon={<IconDelete />} size="small" aria-label="删除周报"
                   onClick={() => handleDelete(record)} />
               </Tooltip>
             )}
@@ -339,16 +343,16 @@ const WeeklyReportsSummary: React.FC = () => {
       render: (_: unknown, record: WeeklyReport) => (
         <Space>
           <Tooltip content="编辑">
-            <Button type="text" icon={<IconEdit />} size="small"
+            <Button type="text" icon={<IconEdit />} size="small" aria-label="编辑草稿"
               onClick={() => navigate(`/weekly-reports/${record.id}/edit`)} />
           </Tooltip>
           <Tooltip content="提交">
-            <Button type="text" icon={<IconSend />} size="small"
+            <Button type="text" icon={<IconSend />} size="small" aria-label="提交周报"
               onClick={() => handleSubmit(record)} />
           </Tooltip>
           {canDelete(record) && (
             <Tooltip content="删除">
-              <Button type="text" status="danger" icon={<IconDelete />} size="small"
+              <Button type="text" status="danger" icon={<IconDelete />} size="small" aria-label="删除草稿"
                 onClick={() => handleDelete(record)} />
             </Tooltip>
           )}
@@ -374,6 +378,7 @@ const WeeklyReportsSummary: React.FC = () => {
                       type="text"
                       size="small"
                       icon={<IconLeft />}
+                      aria-label="上一周"
                       style={{ height: 28 }}
                       onClick={() =>
                         setCurrentWeek((d) => (d ? d.subtract(1, 'week') : dayjs().subtract(1, 'week')))
@@ -400,6 +405,7 @@ const WeeklyReportsSummary: React.FC = () => {
                       type="text"
                       size="small"
                       icon={<IconRight />}
+                      aria-label="下一周"
                       style={{ height: 28 }}
                       onClick={() =>
                         setCurrentWeek((d) => (d ? d.add(1, 'week') : dayjs().add(1, 'week')))

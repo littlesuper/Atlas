@@ -17,7 +17,7 @@ import {
  * - 修改角色权限
  * - 删除角色
  */
-test.describe.serial('Role Management', () => {
+test.describe.serial('Role Management @p1', () => {
   const roleName = uniqueName(text.roleName);
   const updatedRoleName = uniqueName('已修改角色');
 

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { clickNavItem, clickTab, waitForPageLoad } from '../helpers/arco';
 
-test.describe.serial('Navigation', () => {
+test.describe.serial('Navigation @p1', () => {
   test('sidebar navigation to major sections', async ({ authedPage: page }) => {
     await clickNavItem(page, '项目管理');
     await expect(page).toHaveURL(/\/projects/);

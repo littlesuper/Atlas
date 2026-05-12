@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
@@ -75,7 +75,7 @@ router.get(
       const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
       const skip = (pageNum - 1) * pageSizeNum;
 
-      const where: any = {};
+      const where: Prisma.UserWhereInput = {};
       if (keyword) {
         where.OR = [
           { username: { contains: keyword as string } },
@@ -376,7 +376,7 @@ router.put(
         }
       }
 
-      const updateData: any = {};
+      const updateData: Prisma.UserUpdateInput = {};
       if (req.body.username) updateData.username = req.body.username;
       if (realName) updateData.realName = realName;
       if (wecomUserId !== undefined) updateData.wecomUserId = wecomUserId || null;

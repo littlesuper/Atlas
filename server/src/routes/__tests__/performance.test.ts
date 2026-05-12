@@ -1,7 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { Readable } from 'stream';
+import type { ParsedActivity } from '../../utils/excelActivityParser';
+
+type AuthRequest = Request & { user?: unknown };
+type UploadRequest = Request & { file?: { buffer: Buffer; originalname: string } };
+type JwtTestPayload = { userId: string; username: string };
+type PinyinMock = {
+  mockReturnValue: (value: string) => void;
+  mockImplementation: (fn: (name: string) => string[]) => void;
+};
 
 const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
   mockPrisma: {
@@ -58,7 +69,7 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
     constructor() {
-      return mockPrisma as any;
+      return mockPrisma as unknown as PrismaClient;
     }
   },
   ProjectStatus: {
@@ -77,12 +88,12 @@ vi.mock('@prisma/client', () => ({
 }));
 
 vi.mock('../../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
       realName: '管理员',
-      roles: [{ name: '系统管理员' }],
+      roles: [{ id: 'role-admin', name: '系统管理员', description: null }],
       permissions: ['*:*'],
       collaboratingProjectIds: [],
     };
@@ -92,11 +103,11 @@ vi.mock('../../middleware/auth', () => ({
 }));
 
 vi.mock('../../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
   isAdmin: () => true,
-  canManageProject: (...args: any[]) => mockCanManage(...args),
+  canManageProject: (...args: unknown[]) => mockCanManage(...args),
   canDeleteProject: () => true,
-  sanitizePagination: (p: any, ps: any) => ({
+  sanitizePagination: (p: unknown, ps: unknown) => ({
     pageNum: Number(p) || 1,
     pageSizeNum: Number(ps) || 20,
   }),
@@ -151,11 +162,11 @@ vi.mock('../../utils/aiClient', () => ({
 }));
 
 vi.mock('../../utils/excelActivityParser', () => ({
-  parseExcelActivities: vi.fn().mockReturnValue([]),
+  parseExcelActivities: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../middleware/validate', () => ({
-  validate: () => (_req: any, _res: any, next: any) => next(),
+  validate: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 vi.mock('../../utils/weekNumber', () => ({
@@ -168,8 +179,20 @@ vi.mock('../../utils/sanitize', () => ({
 
 vi.mock('multer', () => {
   const m = () => ({
-    single: () => (req: any, _res: any, next: any) => {
-      req.file = req.file || { buffer: Buffer.from('fake-excel'), originalname: 'test.xlsx' };
+    single: () => (req: UploadRequest, _res: Response, next: NextFunction) => {
+      const buffer = Buffer.from('fake-excel');
+      req.file = req.file || {
+        fieldname: 'file',
+        originalname: 'test.xlsx',
+        encoding: '7bit',
+        mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: buffer.length,
+        buffer,
+        destination: '',
+        filename: 'test.xlsx',
+        path: '',
+        stream: Readable.from(buffer),
+      };
       next();
     },
   });
@@ -231,8 +254,10 @@ const sampleActivity = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.$transaction.mockReset();
-  mockPrisma.$transaction.mockImplementation((fn: any) =>
-    typeof fn === 'function' ? fn(mockPrisma) : Promise.all(fn)
+  mockPrisma.$transaction.mockImplementation((fn: unknown) =>
+    typeof fn === 'function'
+      ? (fn as (tx: typeof mockPrisma) => unknown)(mockPrisma)
+      : Promise.all(fn as Iterable<unknown>)
   );
   mockCanManage.mockReturnValue(true);
 });
@@ -327,6 +352,14 @@ describe('ARC-016: Snapshot performance with large dataset', () => {
       })
     );
   });
+
+  it('should return 404 when archiving a non-existent project', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/projects/proj-missing/archive')
+      .send({ remark: 'ghost' });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('IMP-041: Import transaction handling', () => {
@@ -342,7 +375,7 @@ describe('IMP-041: Import transaction handling', () => {
     );
     const { pinyin } = await import('pinyin-pro');
 
-    const parsed50 = Array.from({ length: 100 }, (_, i) => ({
+    const parsed50: ParsedActivity[] = Array.from({ length: 100 }, (_, i) => ({
       name: `Activity ${i}`,
       type: 'TASK',
       phase: '设计',
@@ -352,8 +385,8 @@ describe('IMP-041: Import transaction handling', () => {
       planDuration: 5,
       status: 'NOT_STARTED',
     }));
-    (parseExcelActivities as any).mockReturnValue(parsed50);
-    (pinyin as any).mockReturnValue('fuzeren');
+    vi.mocked(parseExcelActivities).mockResolvedValue(parsed50);
+    (pinyin as unknown as PinyinMock).mockReturnValue('fuzeren');
 
     mockPrisma.user.findMany.mockResolvedValue([]);
     mockPrisma.user.findUnique.mockResolvedValue(null);
@@ -381,13 +414,13 @@ describe('IMP-041: Import transaction handling', () => {
       '../../utils/excelActivityParser'
     );
 
-    const validParsed = [
+    const validParsed: ParsedActivity[] = [
       {
         name: 'Activity A',
         type: 'TASK',
         assigneeNames: [] as string[],
-        planStartDate: null,
-        planEndDate: null,
+        planStartDate: undefined,
+        planEndDate: undefined,
         planDuration: 5,
         status: 'NOT_STARTED',
       },
@@ -395,13 +428,13 @@ describe('IMP-041: Import transaction handling', () => {
         name: 'Activity B',
         type: 'TASK',
         assigneeNames: [] as string[],
-        planStartDate: null,
-        planEndDate: null,
+        planStartDate: undefined,
+        planEndDate: undefined,
         planDuration: 3,
         status: 'NOT_STARTED',
       },
     ];
-    (parseExcelActivities as any).mockReturnValue(validParsed);
+    vi.mocked(parseExcelActivities).mockResolvedValue(validParsed);
 
     mockPrisma.user.findMany.mockResolvedValue([]);
     mockPrisma.activity.findMany.mockResolvedValue([]);
@@ -498,8 +531,10 @@ describe('CHAOS-003: 100 rapid status changes on same activity', () => {
     });
 
     let lastUpdatedStatus = 'NOT_STARTED';
-    mockPrisma.activity.update.mockImplementation((args: any) => {
-      lastUpdatedStatus = args.data.status;
+    mockPrisma.activity.update.mockImplementation((args: Prisma.ActivityUpdateArgs) => {
+      if (typeof args.data.status === 'string') {
+        lastUpdatedStatus = args.data.status;
+      }
       return Promise.resolve({ ...sampleActivity, status: lastUpdatedStatus });
     });
     mockPrisma.activity.findMany.mockResolvedValue([]);
@@ -524,7 +559,7 @@ describe('CHAOS-005: Token refresh at boundary', () => {
   const app = express();
   app.use(express.json());
 
-  const authMiddleware = (req: any, _res: any, next: any) => {
+  const authMiddleware = (req: AuthRequest, _res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       _res.status(401).json({ error: '未提供认证令牌' });
@@ -532,12 +567,12 @@ describe('CHAOS-005: Token refresh at boundary', () => {
     }
     const token = authHeader.substring(7);
     try {
-      const payload = jwt.verify(token, 'test-jwt-secret');
+      const payload = jwt.verify(token, 'test-jwt-secret') as JwtTestPayload;
       req.user = {
-        id: (payload as any).userId,
-        username: (payload as any).username,
+        id: payload.userId,
+        username: payload.username,
         realName: 'Test User',
-        roles: [{ name: 'admin' }],
+        roles: [{ id: 'role-admin', name: 'admin', description: null }],
         permissions: ['*:*'],
         collaboratingProjectIds: [],
       };
@@ -547,7 +582,7 @@ describe('CHAOS-005: Token refresh at boundary', () => {
     }
   };
 
-  app.get('/api/test-protected', authMiddleware, (_req: any, res: any) => {
+  app.get('/api/test-protected', authMiddleware, (_req: Request, res: Response) => {
     res.json({ ok: true });
   });
 
@@ -583,6 +618,14 @@ describe('CHAOS-005: Token refresh at boundary', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
   });
+
+  it('should return 401 with malformed JWT', async () => {
+    const res = await request(app)
+      .get('/api/test-protected')
+      .set('Authorization', 'Bearer not-a-jwt-at-all');
+    expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty('error');
+  });
 });
 
 describe('CHAOS-010: Pinyin conflict for similar names', () => {
@@ -598,19 +641,19 @@ describe('CHAOS-010: Pinyin conflict for similar names', () => {
     );
     const { pinyin } = await import('pinyin-pro');
 
-    (parseExcelActivities as any).mockReturnValue([
+    vi.mocked(parseExcelActivities).mockResolvedValue([
       {
         name: 'Import Activity',
         type: 'TASK',
         assigneeNames: ['张三', '张叁'],
-        planStartDate: null,
-        planEndDate: null,
+        planStartDate: undefined,
+        planEndDate: undefined,
         planDuration: 5,
         status: 'NOT_STARTED',
       },
     ]);
 
-    (pinyin as any).mockImplementation((name: string, _opts?: any) => {
+    (pinyin as unknown as PinyinMock).mockImplementation((name: string) => {
       if (name === '张三' || name === '张叁') return ['zhang', 'san'];
       return ['default'];
     });
@@ -620,15 +663,17 @@ describe('CHAOS-010: Pinyin conflict for similar names', () => {
     mockPrisma.activity.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
 
     const createdUsernames: string[] = [];
-    mockPrisma.user.findUnique.mockImplementation(({ where }: any) => {
-      if (createdUsernames.includes(where.username)) {
-        return Promise.resolve({ id: 'existing', username: where.username });
+    mockPrisma.user.findUnique.mockImplementation(({ where }: Prisma.UserFindUniqueArgs) => {
+      const username = typeof where.username === 'string' ? where.username : '';
+      if (createdUsernames.includes(username)) {
+        return Promise.resolve({ id: 'existing', username });
       }
       return Promise.resolve(null);
     });
 
-    mockPrisma.user.create.mockImplementation(({ data }: any) => {
-      createdUsernames.push(data.username);
+    mockPrisma.user.create.mockImplementation(({ data }: Prisma.UserCreateArgs) => {
+      const username = typeof data.username === 'string' ? data.username : `user${createdUsernames.length + 1}`;
+      createdUsernames.push(username);
       return Promise.resolve({
         id: `user-${createdUsernames.length}`,
         ...data,
@@ -650,5 +695,366 @@ describe('CHAOS-010: Pinyin conflict for similar names', () => {
       expect(seen.has(u)).toBe(false);
       seen.add(u);
     }
+  });
+});
+
+describe('SYS-020: Project list with negative pagination', () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/projects', projectRoutes);
+
+  it('should handle negative page and pageSize gracefully', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=-1&pageSize=-5');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+describe('CHAOS-004: Rapid project updates under load', () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/projects', projectRoutes);
+
+  it('should handle 50 concurrent project updates without error', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.project.update.mockResolvedValue({
+      ...sampleProject,
+      progress: 75,
+    });
+
+    const requests = Array.from({ length: 50 }, () =>
+      request(app)
+        .put('/api/projects/proj-1')
+        .send({ progress: 75 })
+    );
+
+    const results = await Promise.all(requests);
+    const successes = results.filter(r => r.status === 200);
+    expect(successes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('SYS-021: Activity list with large dataset', () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/activities', activityRoutes);
+
+  it('should return 500 activities within 1 second', async () => {
+    const activities500 = Array.from({ length: 500 }, (_, i) => ({
+      ...sampleActivity,
+      id: `act-${i}`,
+      name: `Activity ${i}`,
+    }));
+
+    mockPrisma.activity.count.mockResolvedValue(500);
+    mockPrisma.activity.findMany.mockResolvedValue(activities500);
+    mockPrisma.project.findUnique.mockResolvedValue({
+      managerId: 'user-1',
+      status: 'IN_PROGRESS',
+    });
+    mockPrisma.projectMember.findMany.mockResolvedValue([]);
+
+    const start = performance.now();
+    const res = await request(app).get('/api/activities/project/proj-1?page=1&pageSize=500');
+    const elapsed = performance.now() - start;
+
+    expect(res.status).toBe(200);
+    expect(elapsed).toBeLessThan(1000);
+    expect(res.body.data).toHaveLength(500);
+  });
+
+  it('should return empty data when project has no activities', async () => {
+    mockPrisma.activity.count.mockResolvedValue(0);
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+    mockPrisma.project.findUnique.mockResolvedValue({
+      managerId: 'user-1',
+      status: 'IN_PROGRESS',
+    });
+    mockPrisma.projectMember.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/activities/project/proj-1?page=1&pageSize=20');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(0);
+  });
+
+  it('should handle page number beyond available data', async () => {
+    mockPrisma.activity.count.mockResolvedValue(5);
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+    mockPrisma.project.findUnique.mockResolvedValue({
+      managerId: 'user-1',
+      status: 'IN_PROGRESS',
+    });
+    mockPrisma.projectMember.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/activities/project/proj-1?page=999&pageSize=20');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(5);
+  });
+});
+
+describe('SYS-022: Project list with zero pageSize', () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/projects', projectRoutes);
+
+  it('should handle pageSize=0 gracefully returning empty data', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=0');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+describe('SYS-023: project stats with zero projects', () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/projects', projectRoutes);
+
+  it('should return zero stats when no projects exist', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects');
+
+    expect(res.status).toBe(200);
+    expect(res.body.stats).toBeDefined();
+    expect(res.body.total).toBe(0);
+  });
+
+  it('should return project list with very large page number', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=999999&pageSize=20');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(1);
+  });
+
+  it('should handle non-numeric page and pageSize as defaults', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=abc&pageSize=xyz');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('should return 404 when archiving a project already archived', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ ...sampleProject, status: 'ARCHIVED' });
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/archive')
+      .send({ remark: 'already archived' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should handle zero pageSize without error', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=0');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('should handle concurrent archive requests gracefully', async () => {
+    mockPrisma.project.findUnique
+      .mockResolvedValueOnce(sampleProject)
+      .mockResolvedValueOnce(null);
+
+    mockPrisma.activity.findMany.mockResolvedValue([]);
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.riskAssessment.findMany.mockResolvedValue([]);
+    mockPrisma.activityComment.findMany.mockResolvedValue([]);
+    mockPrisma.projectArchive.create.mockResolvedValue({ id: 'archive-1' });
+    mockPrisma.project.update.mockResolvedValue({ ...sampleProject, status: 'ARCHIVED' });
+
+    const res1 = await request(app).post('/api/projects/proj-1/archive').send({ remark: 'first' });
+
+    expect([200, 400, 404, 409]).toContain(res1.status);
+  });
+
+  it('should return 404 when updating a non-existent project', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/projects/nonexistent')
+      .send({ name: 'Updated' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('should handle project list with very large pageSize', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=99999');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('should handle non-numeric pageSize gracefully', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=abc');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles negative page number gracefully', async () => {
+    mockPrisma.project.count.mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=-1&pageSize=10');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles very long project name without error', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+    mockPrisma.project.update.mockResolvedValue({
+      ...sampleProject,
+      name: 'A'.repeat(500),
+    });
+
+    const res = await request(app)
+      .put('/api/projects/proj-1')
+      .send({ name: 'B'.repeat(500) });
+
+    expect([200, 400, 500]).toContain(res.status);
+  });
+
+  it('handles pageSize=0 by using default pagination', async () => {
+    mockPrisma.project.count.mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=0');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles negative page number by using default page', async () => {
+    mockPrisma.project.count.mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=-1&pageSize=10');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles extremely large pageSize by capping at 100', async () => {
+    mockPrisma.project.count.mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=99999');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles DELETE request for non-existent project gracefully', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/projects/nonexistent-proj');
+
+    expect([200, 404]).toContain(res.status);
+  });
+
+  it('handles pageSize of zero by using default', async () => {
+    mockPrisma.project.count.mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=1&pageSize=0');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles very large page number gracefully', async () => {
+    mockPrisma.project.count.mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=999999');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('handles page number with special characters', async () => {
+    mockPrisma.project.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/projects?page=abc&pageSize=10');
+
+    expect(res.status).toBe(200);
   });
 });

@@ -9,7 +9,7 @@ import {
   expectMessage,
 } from '../helpers/arco';
 
-test.describe.serial('P1 Project & Activity UI Tests', () => {
+test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
   async function getToken(page: import('@playwright/test').Page): Promise<string> {
     return (await page.evaluate(() => localStorage.getItem('accessToken'))) || '';
   }

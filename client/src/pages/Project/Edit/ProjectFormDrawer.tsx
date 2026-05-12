@@ -28,6 +28,8 @@ import {
 const { RangePicker } = DatePicker;
 const { Row, Col } = Grid;
 
+export const getUserLabel = (u: User) => u.realName || u.username || u.id.slice(0, 8);
+
 type RoleKey = keyof typeof PROJECT_MEMBER_ROLE_MAP;
 
 interface ProjectFormDrawerProps {
@@ -216,7 +218,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
 
   const availableUsers = (_role: RoleKey) => users.filter((u) => u.id !== managerId);
 
-  const userLabel = (u: User) => u.realName || u.username || u.id.slice(0, 8);
+  const userLabel = getUserLabel;
 
   return (
     <Drawer

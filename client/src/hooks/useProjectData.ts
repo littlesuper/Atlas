@@ -1,11 +1,24 @@
 import { useState, useCallback } from 'react';
 import { Message } from '@arco-design/web-react';
-import { projectsApi, activitiesApi, usersApi } from '../api';
-import { Project, Activity, User } from '../types';
+import { projectsApi, activitiesApi, usersApi, rolesApi } from '../api';
+import { Project, Activity, User, Role, Product, WeeklyReport, RiskAssessment } from '../types';
 
 interface UseProjectDataOptions {
   projectId: string | undefined;
   snapshotId: string | undefined;
+}
+
+type SnapshotProject = Omit<Partial<Project>, 'members'> & {
+  managerName?: string;
+  members?: Array<{ userId: string; realName: string }>;
+};
+
+interface ProjectSnapshotData {
+  project?: SnapshotProject;
+  activities?: Activity[];
+  products?: Product[];
+  weeklyReports?: WeeklyReport[];
+  riskAssessments?: RiskAssessment[];
 }
 
 export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions) {
@@ -14,15 +27,16 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
   const [project, setProject] = useState<Project | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [criticalActivityIds, setCriticalActivityIds] = useState<string[]>([]);
 
   // 快照模式子 tab 数据
   const [snapshotMeta, setSnapshotMeta] = useState<{ archivedAt: string; remark?: string } | null>(null);
-  const [snapshotWeeklyReports, setSnapshotWeeklyReports] = useState<any[] | null>(null);
-  const [snapshotProducts, setSnapshotProducts] = useState<any[] | null>(null);
-  const [snapshotRiskAssessments, setSnapshotRiskAssessments] = useState<any[] | null>(null);
+  const [snapshotWeeklyReports, setSnapshotWeeklyReports] = useState<WeeklyReport[] | null>(null);
+  const [snapshotProducts, setSnapshotProducts] = useState<Product[] | null>(null);
+  const [snapshotRiskAssessments, setSnapshotRiskAssessments] = useState<RiskAssessment[] | null>(null);
 
   const loadProject = useCallback(async () => {
     if (!projectId) return;
@@ -62,6 +76,15 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
     }
   }, []);
 
+  const loadRoles = useCallback(async () => {
+    try {
+      const res = await rolesApi.list();
+      setRoles(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      console.error('加载角色失败');
+    }
+  }, []);
+
   const loadCriticalPath = useCallback(async () => {
     if (!projectId) return;
     try {
@@ -77,17 +100,17 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
       const res = await projectsApi.getProjectArchive(snapshotId);
       const data = res.data;
       setSnapshotMeta({ archivedAt: data.archivedAt, remark: data.remark });
-      const snap = data.snapshot;
+      const snap = data.snapshot as ProjectSnapshotData;
       if (snap.project) {
         setProject({
           ...snap.project,
           id: projectId || '',
-          members: snap.project.members?.map((m: any) => ({ user: { id: m.userId, realName: m.realName, username: '' } })) || [],
+          members: snap.project.members?.map((m) => ({ user: { id: m.userId, realName: m.realName, username: '' } })) || [],
           manager: { id: snap.project.managerId, realName: snap.project.managerName || '', username: '' },
-        } as any);
+        } as Project);
       }
       if (snap.activities) {
-        const flat = [...snap.activities].sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+        const flat = [...snap.activities].sort((a, b) => a.sortOrder - b.sortOrder);
         setActivities(flat);
       }
       setSnapshotProducts(snap.products || []);
@@ -103,7 +126,7 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
   return {
     project, setProject,
     activities, setActivities,
-    users,
+    users, roles,
     loading,
     activitiesLoading,
     criticalActivityIds,
@@ -115,6 +138,7 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
     loadProject,
     loadActivities,
     loadUsers,
+    loadRoles,
     loadCriticalPath,
     loadSnapshotData,
   };

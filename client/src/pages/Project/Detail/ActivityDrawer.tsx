@@ -32,8 +32,8 @@ import dayjs from 'dayjs';
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
 
 // 三方联动辅助
-type DateTriple = { start: dayjs.Dayjs | null; end: dayjs.Dayjs | null; dur: number | null };
-function resolveTriple(t: DateTriple, changed: 'start' | 'end' | 'dur'): DateTriple {
+export type DateTriple = { start: dayjs.Dayjs | null; end: dayjs.Dayjs | null; dur: number | null };
+export function resolveTriple(t: DateTriple, changed: 'start' | 'end' | 'dur'): DateTriple {
   const { start, end, dur } = t;
   if (changed === 'start') {
     if (start && end) return { start, end, dur: calcWorkdays(start, end) };
@@ -56,9 +56,24 @@ interface ActivityDrawerProps {
   users: User[];
   activitySeqMap: Map<string, number>;
   defaultAssigneeId?: string;
-  onSubmit: (values: any, planDuration: number | null, actualDuration: number | null, formDeps: { id: string; type: string; lag: number }[]) => Promise<void>;
+  onSubmit: (values: ActivityDrawerValues, planDuration: number | null, actualDuration: number | null, formDeps: { id: string; type: string; lag: number }[]) => Promise<void>;
   onImportFile: (file: File) => void;
 }
+
+export type ActivityDrawerValues = {
+  name: string;
+  description?: string;
+  type?: string;
+  phase?: string;
+  status?: string;
+  planStart?: Parameters<typeof dayjs>[0];
+  planEnd?: Parameters<typeof dayjs>[0];
+  actualStart?: Parameters<typeof dayjs>[0];
+  actualEnd?: Parameters<typeof dayjs>[0];
+  roleId?: string | null;
+  executorIds?: string[];
+  notes?: string;
+};
 
 const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
   visible,
@@ -77,23 +92,41 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
   const [actualDuration, setActualDuration] = useState<number | null>(null);
   const [formDeps, setFormDeps] = useState<Array<{ id: string; type: string; lag: number }>>([]);
   const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [roleUserIds, setRoleUserIds] = useState<string[] | null>(null);
+
+  const syncExecutorSearchA11yLabel = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      document
+        .querySelectorAll<HTMLInputElement>('.arco-drawer .arco-input-tag-input')
+        .forEach((input) => input.setAttribute('aria-label', '执行人搜索'));
+    });
+  }, []);
 
   React.useEffect(() => {
-    rolesApi.list().then((roles: any) => {
-      setRoleOptions(Array.isArray(roles) ? roles : []);
+    rolesApi.list().then((res) => {
+      setRoleOptions(res.data);
     }).catch(() => {});
   }, []);
+
+  React.useEffect(() => {
+    if (visible) {
+      syncExecutorSearchA11yLabel();
+    }
+  }, [roleUserIds, syncExecutorSearchA11yLabel, visible]);
 
   const handleRoleChange = async (value: string | undefined) => {
     if (value) {
       try {
-        const preview: any = await roleMembersApi.preview(value);
-        const ids = (preview.members || (preview.data?.members) || []).map((m: any) => m.userId);
+        const { data: preview } = await roleMembersApi.preview(value);
+        const ids = (preview.members || []).map((m) => m.userId);
+        setRoleUserIds(ids);
         form.setFieldsValue({ executorIds: ids });
       } catch {
+        setRoleUserIds([]);
         form.setFieldsValue({ executorIds: [] });
       }
     } else {
+      setRoleUserIds(null);
       form.setFieldsValue({ executorIds: [] });
     }
   };
@@ -119,9 +152,16 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
       actualStart: activity.startDate ? dayjs(activity.startDate) : undefined,
       actualEnd: activity.endDate ? dayjs(activity.endDate) : undefined,
       roleId: activity.roleId ?? undefined,
-      executorIds: activity.executors?.map((e: any) => e.userId) ?? [],
+      executorIds: activity.executors?.map((e) => e.userId) ?? [],
       notes: activity.notes,
     });
+    if (activity.roleId) {
+      roleMembersApi.preview(activity.roleId).then(({ data: preview }) => {
+        setRoleUserIds((preview.members || []).map((m) => m.userId));
+      }).catch(() => {});
+    } else {
+      setRoleUserIds(null);
+    }
     const rawDeps = activity.dependencies;
     const deps = Array.isArray(rawDeps)
       ? rawDeps
@@ -138,13 +178,14 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
         setPlanDuration(null);
         setActualDuration(null);
         setFormDeps([]);
+        setRoleUserIds(null);
         form.resetFields();
         if (defaultAssigneeId) {
           form.setFieldsValue({ executorIds: [defaultAssigneeId] });
         }
       }
     }
-  }, [visible, editingActivity]);
+  }, [defaultAssigneeId, editingActivity, form, populateFormFromActivity, visible]);
 
   // 三方联动：计划时间
   const handlePlanChange = (changed: 'start' | 'end' | 'dur', value: dayjs.Dayjs | number | null) => {
@@ -217,7 +258,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx"
                   style={{ display: 'none' }}
                   onChange={handleImportExcel}
                 />
@@ -295,10 +336,10 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
             </Select>
           </Form.Item>
           <Form.Item label="执行人" field="executorIds">
-            <Select mode="multiple" placeholder="按角色自动填入，可调整" allowClear showSearch filterOption={(input, option) =>
+            <Select mode="multiple" placeholder={roleUserIds !== null ? '已按角色筛选' : '请选择角色后自动填入'} allowClear showSearch filterOption={(input, option) =>
               (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
             }>
-              {users.map((u) => (
+              {(roleUserIds !== null ? users.filter(u => roleUserIds.includes(u.id)) : users).map((u) => (
                 <Select.Option key={u.id} value={u.id}>
                   {u.realName}{!u.canLogin ? ' (仅联系人)' : ''}
                 </Select.Option>
@@ -324,7 +365,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
             </Button>
           </div>
           {formDeps.length === 0 ? (
-            <div style={{ color: 'var(--color-text-4)', fontSize: 13, padding: '4px 0' }}>无前置依赖</div>
+            <div style={{ color: 'var(--color-text-2)', fontSize: 13, padding: '4px 0' }}>无前置依赖</div>
           ) : (
             formDeps.map((dep, idx) => (
               <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
@@ -366,6 +407,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
                   ))}
                 </Select>
                 <InputNumber
+                  max={9999}
                   value={dep.lag}
                   onChange={(v) => {
                     const next = [...formDeps];
@@ -416,6 +458,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
           <Form.Item label="计划工期(天)">
             <InputNumber
               min={1}
+              max={9999}
               value={planDuration ?? undefined}
               onChange={(v) => handlePlanChange('dur', v ?? null)}
               placeholder="计划工期"
@@ -443,6 +486,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
           <Form.Item label="实际工期(天)">
             <InputNumber
               min={1}
+              max={9999}
               value={actualDuration ?? undefined}
               onChange={(v) => handleActualChange('dur', v ?? null)}
               placeholder="实际工期"

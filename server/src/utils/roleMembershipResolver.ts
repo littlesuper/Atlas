@@ -3,35 +3,29 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export async function resolveRoleMembers(roleId: string) {
-  const members = await prisma.roleMember.findMany({
-    where: { roleId, isActive: true },
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    include: { user: { select: { id: true, realName: true, canLogin: true } } },
+  const userRoles = await prisma.userRole.findMany({
+    where: { roleId },
+    include: { user: { select: { id: true, realName: true, canLogin: true, status: true } } },
   });
-  return members.map((m) => m.user);
+  return userRoles.filter(ur => ur.user.status === 'ACTIVE').map((ur) => ur.user);
 }
 
 export async function autoAssignByRole(roleId: string): Promise<string[]> {
-  const members = await prisma.roleMember.findMany({
-    where: { roleId, isActive: true },
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    select: { userId: true },
+  const userRoles = await prisma.userRole.findMany({
+    where: { roleId },
+    include: { user: { select: { id: true, status: true } } },
   });
-  return members.map((m) => m.userId);
+  return userRoles.filter(ur => ur.user.status === 'ACTIVE').map((ur) => ur.user.id);
 }
 
 export async function findRolesByUser(
   userId: string,
-  options?: { includeInactive?: boolean }
 ) {
-  const where: any = { userId };
-  if (!options?.includeInactive) where.isActive = true;
-
-  const records = await prisma.roleMember.findMany({
-    where,
-    select: { roleId: true, isActive: true },
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId },
+    select: { roleId: true },
   });
-  return records.map((r) => ({ roleId: r.roleId, isActive: r.isActive }));
+  return userRoles.map((r) => ({ roleId: r.roleId, isActive: true }));
 }
 
 export async function findActiveActivitiesByExecutor(userId: string) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Tag, Message } from '@arco-design/web-react';
 import { productsApi } from '../../../api';
 import { Product } from '../../../types';
@@ -10,14 +10,19 @@ import {
 interface ProductsTabProps {
   projectId: string;
   isArchived?: boolean;
-  snapshotData?: any[] | null;
+  snapshotData?: Product[] | null;
+}
+
+export function formatModelRevision(model?: string, revision?: string): string {
+  const parts = [model, revision].filter(Boolean);
+  return parts.join(' ') || '-';
 }
 
 const ProductsTab: React.FC<ProductsTabProps> = ({ projectId, snapshotData }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
       const response = await productsApi.list({ projectId });
@@ -27,15 +32,15 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ projectId, snapshotData }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (snapshotData) {
-      setProducts(snapshotData as Product[]);
+      setProducts(snapshotData);
     } else {
       loadProducts();
     }
-  }, [projectId, snapshotData]);
+  }, [snapshotData, loadProducts]);
 
   const columns = [
     {
@@ -47,10 +52,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ projectId, snapshotData }) =>
     {
       title: '型号 + 版本号',
       width: 180,
-      render: (_: unknown, record: Product) => {
-        const parts = [record.model, record.revision].filter(Boolean);
-        return parts.join(' ') || '-';
-      },
+      render: (_: unknown, record: Product) => formatModelRevision(record.model, record.revision),
     },
     {
       title: '类别',

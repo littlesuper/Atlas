@@ -18,7 +18,7 @@ import {
  * - 提交周报
  * - 删除周报
  */
-test.describe.serial('Weekly Report Form', () => {
+test.describe.serial('Weekly Report Form @p1', () => {
   const projectName = uniqueName('周报表单项目');
 
   // ──────── setup ────────

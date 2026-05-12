@@ -1,1 +1,2 @@
+git diff --check
 npx lint-staged

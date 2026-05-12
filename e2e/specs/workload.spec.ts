@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { clickNavItem, waitForPageLoad } from '../helpers/arco';
 
-test.describe.serial('Workload Analysis', () => {
+test.describe.serial('Workload Analysis @p1', () => {
   test('navigate to workload page', async ({ authedPage: page }) => {
     // Click the "项目资源" nav item in the header
     await clickNavItem(page, '项目资源');

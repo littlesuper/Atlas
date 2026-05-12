@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Form, Input, Button, Message, Spin } from '@arco-design/web-react';
 import { wecomConfigApi } from '../../api';
 
@@ -7,7 +7,7 @@ const WecomManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
       const res = await wecomConfigApi.get();
@@ -25,11 +25,11 @@ const WecomManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form]);
 
   useEffect(() => {
     loadConfig();
-  }, []);
+  }, [loadConfig]);
 
   const handleSave = async () => {
     try {

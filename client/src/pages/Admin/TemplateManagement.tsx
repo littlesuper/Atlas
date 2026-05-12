@@ -21,18 +21,77 @@ import {
   IconLeft,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../layouts/MainLayout';
-import { templatesApi } from '../../api';
+import { templatesApi, rolesApi } from '../../api';
 import { ProjectTemplate, TemplateActivity, ActivityType } from '../../types';
 import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS, DEPENDENCY_TYPE_MAP } from '../../utils/constants';
 import dayjs from 'dayjs';
 
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
+const LABEL_TO_TYPE = Object.fromEntries(
+  Object.entries(DEPENDENCY_TYPE_MAP).map(([k, v]) => [v.label, k])
+);
 
 let _idCounter = 0;
 const genId = (): string =>
   typeof crypto?.randomUUID === 'function'
     ? crypto.randomUUID()
     : `tmp-${Date.now()}-${++_idCounter}`;
+
+export const formatSeq = (n: number): string => String(n).padStart(3, '0');
+
+export function getPredecessorSeqHelper(
+  activity: TemplateActivity,
+  activitySeqMap: Map<string, number>,
+): string {
+  if (!activity.dependencies || activity.dependencies.length === 0) return '';
+  return activity.dependencies.map((dep) => {
+    const seq = activitySeqMap.get(dep.id);
+    const seqStr = seq != null ? formatSeq(seq) : '?';
+    const typeLabel = DEPENDENCY_TYPE_MAP[dep.type as keyof typeof DEPENDENCY_TYPE_MAP]?.label || 'FS';
+    const lag = dep.lag ?? 0;
+    const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
+    return `${seqStr}${typeLabel}${lagStr}`;
+  }).join(', ');
+}
+
+export function parsePredecessorTextHelper(
+  text: string,
+  selfId: string,
+  seqToIdMap: Map<number, string>,
+): TemplateActivity['dependencies'] {
+  if (!text.trim()) return null;
+  const parts = text.split(/[,，]\s*/);
+  const deps: { id: string; type: string; lag?: number }[] = [];
+  for (const part of parts) {
+    const m = part.trim().match(/^(\d+)\s*(FS|SS|FF|SF)?\s*([+-]\d+)?$/i);
+    if (!m) continue;
+    const seq = parseInt(m[1], 10);
+    const id = seqToIdMap.get(seq);
+    if (!id || id === selfId) continue;
+    const typeLabel = (m[2] || 'FS').toUpperCase();
+    const type = LABEL_TO_TYPE[typeLabel] || '0';
+    const lag = m[3] ? parseInt(m[3], 10) : 0;
+    deps.push({ id, type, ...(lag !== 0 ? { lag } : {}) });
+  }
+  return deps.length > 0 ? deps : null;
+}
+
+export function remapActivityIds(
+  activities: TemplateActivity[],
+  idGenerator: () => string = genId,
+): { activities: TemplateActivity[]; idMap: Map<string, string> } {
+  const newActs = activities.map((a) => ({ ...a, id: idGenerator() }));
+  const idMap = new Map<string, string>();
+  activities.forEach((orig, i) => idMap.set(orig.id, newActs[i].id));
+  const remapped = newActs.map((a) => ({
+    ...a,
+    dependencies: a.dependencies?.map((d: { id: string; type: string; lag?: number }) => ({
+      ...d,
+      id: idMap.get(d.id) || d.id,
+    })) || null,
+  }));
+  return { activities: remapped, idMap };
+}
 
 const TemplateManagement: React.FC = () => {
   const [form] = Form.useForm();
@@ -42,6 +101,7 @@ const TemplateManagement: React.FC = () => {
   const [editing, setEditing] = useState<ProjectTemplate | null>(null);
   const [activities, setActivities] = useState<TemplateActivity[]>([]);
   const [saving, setSaving] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
 
   // 拖拽排序状态
   const dragIndexRef = useRef(-1);
@@ -64,6 +124,9 @@ const TemplateManagement: React.FC = () => {
 
   useEffect(() => {
     loadTemplates();
+    rolesApi.list().then((res) => {
+      setRoleOptions(res.data);
+    }).catch(() => {});
   }, [loadTemplates]);
 
   const handleOpen = async (tpl?: ProjectTemplate) => {
@@ -116,26 +179,12 @@ const TemplateManagement: React.FC = () => {
     try {
       const res = await templatesApi.get(tpl.id);
       const full = res.data;
-      const acts = (full.activities || []).map((a) => ({
-        ...a,
-        id: genId(),
-      }));
-      const idMap = new Map<string, string>();
-      (full.activities || []).forEach((orig, i) => {
-        idMap.set(orig.id, acts[i].id);
-      });
-      const remapped = acts.map((a) => ({
-        ...a,
-        dependencies: a.dependencies?.map((d: { id: string; type: string; lag?: number }) => ({
-          ...d,
-          id: idMap.get(d.id) || d.id,
-        })) || null,
-      }));
+      const { activities: remapped } = remapActivityIds(full.activities || []);
 
       await templatesApi.create({
         name: `${full.name} (副本)`,
         description: full.description || undefined,
-        activities: remapped as any,
+        activities: remapped,
       });
       Message.success('模板复制成功');
       loadTemplates();
@@ -160,6 +209,7 @@ const TemplateManagement: React.FC = () => {
           planDuration: a.planDuration || null,
           dependencies: a.dependencies || null,
           notes: a.notes || null,
+          roleId: a.roleId || null,
           sortOrder: a.sortOrder ?? idx,
         })),
       };
@@ -168,7 +218,7 @@ const TemplateManagement: React.FC = () => {
         await templatesApi.update(editing.id, data);
         Message.success('模板更新成功');
       } else {
-        await templatesApi.create(data as any);
+        await templatesApi.create(data);
         Message.success('模板创建成功');
       }
 
@@ -195,12 +245,13 @@ const TemplateManagement: React.FC = () => {
         planDuration: null,
         dependencies: null,
         notes: null,
+        roleId: null,
         sortOrder: prev.length,
       },
     ]);
   };
 
-  const insertActivity = (atIndex: number) => {
+  const insertActivity = React.useCallback((atIndex: number) => {
     setActivities((prev) => {
       const newAct: TemplateActivity = {
         id: genId(),
@@ -211,21 +262,22 @@ const TemplateManagement: React.FC = () => {
         planDuration: null,
         dependencies: null,
         notes: null,
+        roleId: null,
         sortOrder: atIndex,
       };
       const next = [...prev];
       next.splice(atIndex, 0, newAct);
       return next.map((a, i) => ({ ...a, sortOrder: i }));
     });
-  };
+  }, [editing?.id]);
 
-  const updateActivity = (id: string, field: string, value: unknown) => {
+  const updateActivity = React.useCallback((id: string, field: string, value: unknown) => {
     setActivities((prev) =>
       prev.map((a) => (a.id === id ? { ...a, [field]: value } : a))
     );
-  };
+  }, []);
 
-  const removeActivity = (id: string) => {
+  const removeActivity = React.useCallback((id: string) => {
     setActivities((prev) => {
       return prev
         .filter((a) => a.id !== id)
@@ -234,65 +286,41 @@ const TemplateManagement: React.FC = () => {
           dependencies: a.dependencies?.filter((d) => d.id !== id) || null,
         }));
     });
-  };
+  }, []);
 
   // ---- 前置依赖：MS Project 格式 ----
 
-  // id → 1-based seq
-  const activitySeqMap = new Map<string, number>();
-  activities.forEach((a, i) => activitySeqMap.set(a.id, i + 1));
+  const activitySeqMap = React.useMemo(() => {
+    const m = new Map<string, number>();
+    activities.forEach((a, i) => m.set(a.id, i + 1));
+    return m;
+  }, [activities]);
 
-  const LABEL_TO_TYPE = Object.fromEntries(
-    Object.entries(DEPENDENCY_TYPE_MAP).map(([k, v]) => [v.label, k])
-  );
+  const seqToIdMap = React.useMemo(() => {
+    const m = new Map<number, string>();
+    activities.forEach((a, i) => m.set(i + 1, a.id));
+    return m;
+  }, [activities]);
 
-  const formatSeq = (n: number): string => String(n).padStart(3, '0');
-
-  const getSeq = (record: TemplateActivity): string => {
+  const getSeq = React.useCallback((record: TemplateActivity): string => {
     const idx = activitySeqMap.get(record.id);
     return idx != null ? formatSeq(idx) : '?';
-  };
+  }, [activitySeqMap]);
 
-  const getPredecessorSeq = (activity: TemplateActivity): string => {
-    if (!activity.dependencies || activity.dependencies.length === 0) return '';
-    return activity.dependencies.map((dep) => {
-      const seq = activitySeqMap.get(dep.id);
-      const seqStr = seq != null ? formatSeq(seq) : '?';
-      const typeLabel = DEPENDENCY_TYPE_MAP[dep.type as keyof typeof DEPENDENCY_TYPE_MAP]?.label || 'FS';
-      const lag = dep.lag ?? 0;
-      const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
-      return `${seqStr}${typeLabel}${lagStr}`;
-    }).join(', ');
-  };
+  const getPredecessorSeq = React.useCallback((activity: TemplateActivity): string => {
+    return getPredecessorSeqHelper(activity, activitySeqMap);
+  }, [activitySeqMap]);
 
-  // seq → id
-  const seqToIdMap = new Map<number, string>();
-  activities.forEach((a, i) => seqToIdMap.set(i + 1, a.id));
-
-  const parsePredecessorText = (text: string, selfId: string): TemplateActivity['dependencies'] => {
-    if (!text.trim()) return null;
-    const parts = text.split(/[,，]\s*/);
-    const deps: { id: string; type: string; lag?: number }[] = [];
-    for (const part of parts) {
-      const m = part.trim().match(/^(\d+)\s*(FS|SS|FF|SF)?\s*([+-]\d+)?$/i);
-      if (!m) continue;
-      const seq = parseInt(m[1], 10);
-      const id = seqToIdMap.get(seq);
-      if (!id || id === selfId) continue;
-      const typeLabel = (m[2] || 'FS').toUpperCase();
-      const type = LABEL_TO_TYPE[typeLabel] || '0';
-      const lag = m[3] ? parseInt(m[3], 10) : 0;
-      deps.push({ id, type, ...(lag !== 0 ? { lag } : {}) });
-    }
-    return deps.length > 0 ? deps : null;
-  };
+  const parsePredecessorText = React.useCallback((text: string, selfId: string): TemplateActivity['dependencies'] => {
+    return parsePredecessorTextHelper(text, selfId, seqToIdMap);
+  }, [seqToIdMap]);
 
   // ---- 拖拽排序 ----
 
-  const handleMouseDown = (e: React.MouseEvent, index: number) => {
+  const handleMouseDown = React.useCallback((e: React.MouseEvent, index: number) => {
     e.preventDefault();
     dragIndexRef.current = index;
-  };
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent, index: number) => {
     if (dragIndexRef.current === -1) return;
@@ -420,8 +448,7 @@ const TemplateManagement: React.FC = () => {
     },
   ];
 
-  // Activity table columns — direct form controls
-  const activityColumns = [
+  const activityColumns = React.useMemo(() => [
     {
       title: '',
       width: 44,
@@ -453,13 +480,17 @@ const TemplateManagement: React.FC = () => {
     {
       title: '活动名称',
       dataIndex: 'name',
-      width: 240,
+      width: 220,
       render: (_: string, record: TemplateActivity) => (
         <Input
-          size="small"
-          value={record.name}
+          key={record.id + '-name'}
+          defaultValue={record.name}
           placeholder="活动名称"
-          onChange={(v) => updateActivity(record.id, 'name', v)}
+          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
+          onBlur={(e) => {
+            const v = (e.target as HTMLInputElement).value;
+            if (v !== record.name) updateActivity(record.id, 'name', v);
+          }}
         />
       ),
     },
@@ -469,8 +500,8 @@ const TemplateManagement: React.FC = () => {
       width: 100,
       render: (_: string, record: TemplateActivity) => (
         <Select
-          size="small"
           value={record.type}
+          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
           onChange={(v) => updateActivity(record.id, 'type', v)}
         >
           {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
@@ -485,14 +516,37 @@ const TemplateManagement: React.FC = () => {
       width: 110,
       render: (_: string | null, record: TemplateActivity) => (
         <Select
-          size="small"
           value={record.phase || undefined}
           allowClear
           placeholder="阶段"
+          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
           onChange={(v) => updateActivity(record.id, 'phase', v || null)}
         >
           {PHASE_OPTIONS.map((p) => (
             <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
+          ))}
+        </Select>
+      ),
+    },
+    {
+      title: '角色',
+      dataIndex: 'roleId',
+      width: 120,
+      render: (_: string | null, record: TemplateActivity) => (
+        <Select
+          key={record.id + '-role'}
+          value={record.roleId || undefined}
+          allowClear
+          placeholder="角色"
+          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
+          onChange={(v) => updateActivity(record.id, 'roleId', v || null)}
+          showSearch
+          filterOption={(input, option) =>
+            (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
+          }
+        >
+          {roleOptions.map(r => (
+            <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>
           ))}
         </Select>
       ),
@@ -503,13 +557,13 @@ const TemplateManagement: React.FC = () => {
       width: 100,
       render: (_: number | null, record: TemplateActivity) => (
         <InputNumber
-          size="small"
-          style={{ width: '100%' }}
+          key={record.id + '-dur'}
+          style={{ width: '100%', background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
           min={1}
           precision={0}
           suffix="天"
-          value={record.planDuration ?? undefined}
-          onChange={(v) => updateActivity(record.id, 'planDuration', v != null && v > 0 ? v : null)}
+          defaultValue={record.planDuration ?? undefined}
+          onBlur={(v) => updateActivity(record.id, 'planDuration', v != null && Number(v) > 0 ? Number(v) : null)}
         />
       ),
     },
@@ -519,11 +573,14 @@ const TemplateManagement: React.FC = () => {
       width: 150,
       render: (_: TemplateActivity['dependencies'], record: TemplateActivity) => (
         <Input
-          size="small"
-          value={getPredecessorSeq(record)}
+          key={record.id + '-deps'}
+          defaultValue={getPredecessorSeq(record)}
           placeholder="如: 3FS+2, 5"
-          style={{ fontFamily: 'monospace', fontSize: 12 }}
-          onChange={(v) => updateActivity(record.id, 'dependencies', parsePredecessorText(v, record.id))}
+          style={{ fontFamily: 'monospace', fontSize: 12, background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
+          onBlur={(e) => {
+            const v = (e.target as HTMLInputElement).value;
+            updateActivity(record.id, 'dependencies', parsePredecessorText(v, record.id));
+          }}
         />
       ),
     },
@@ -542,7 +599,7 @@ const TemplateManagement: React.FC = () => {
         </Tooltip>
       ),
     },
-  ];
+  ], [updateActivity, removeActivity, insertActivity, handleMouseDown, roleOptions, getSeq, getPredecessorSeq, parsePredecessorText]);
 
   if (mode === 'edit') {
     return (
@@ -567,11 +624,11 @@ const TemplateManagement: React.FC = () => {
             field="name"
             rules={[{ required: true, message: '请输入模板名称' }]}
           >
-            <Input placeholder="如：标准路由器项目模板" style={{ width: 280 }} />
+            <Input placeholder="如：标准路由器项目模板" style={{ width: 280, background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }} />
           </Form.Item>
 
           <Form.Item label="描述" field="description">
-            <Input placeholder="模板描述（选填）" style={{ width: 360 }} />
+            <Input placeholder="模板描述（选填）" style={{ width: 360, background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }} />
           </Form.Item>
         </Form>
 
@@ -583,7 +640,6 @@ const TemplateManagement: React.FC = () => {
         </div>
 
         <Table
-          size="small"
           columns={activityColumns}
           data={activities}
           rowKey="id"

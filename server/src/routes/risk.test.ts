@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -24,11 +27,11 @@ const { mockPrisma, mockAssessRisk, mockBuildContext, mockTrimContext, mockCallA
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -42,10 +45,10 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
-  sanitizePagination: (page: any, pageSize: any) => ({
-    pageNum: parseInt(page) || 1,
-    pageSizeNum: parseInt(pageSize) || 20,
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  sanitizePagination: (page: unknown, pageSize: unknown) => ({
+    pageNum: parseInt(String(page), 10) || 1,
+    pageSizeNum: parseInt(String(pageSize), 10) || 20,
   }),
 }));
 
@@ -70,7 +73,7 @@ vi.mock('../utils/aiClient', () => ({
 }));
 
 vi.mock('../middleware/validate', () => ({
-  validate: () => (_req: any, _res: any, next: any) => next(),
+  validate: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -478,7 +481,7 @@ describe('RISK-006: RiskItem status transitions OPEN → IN_PROGRESS → RESOLVE
     vi.clearAllMocks();
     const inProgressItem = { ...openItem, status: 'IN_PROGRESS' };
     mockPrisma.riskItem.findUnique.mockResolvedValue(inProgressItem);
-    mockPrisma.riskItem.update.mockImplementation((args: any) => {
+    mockPrisma.riskItem.update.mockImplementation((args: { data: Record<string, unknown> }) => {
       return Promise.resolve({
         ...inProgressItem,
         ...args.data,
@@ -546,5 +549,160 @@ describe('AI-013: same project AI evaluation rate limiting', () => {
       expect(res.status).toBe(200);
     });
     expect(mockPrisma.riskAssessment.create).toHaveBeenCalledTimes(3);
+  });
+
+  it('GET /summary returns 500 on database error', async () => {
+    mockPrisma.project.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/risk/summary');
+    expect(res.status).toBe(500);
+  });
+
+  it('skips projects with no risk assessments in summary', async () => {
+    const projects = [
+      { id: 'p1', name: '项目A' },
+      { id: 'p2', name: '项目B' },
+    ];
+    mockPrisma.project.findMany.mockResolvedValue(projects);
+    mockPrisma.riskAssessment.findFirst
+      .mockResolvedValueOnce({ riskLevel: 'HIGH', assessedAt: new Date() })
+      .mockResolvedValueOnce(null);
+
+    const res = await request(app).get('/api/risk/summary');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].projectName).toBe('项目A');
+  });
+
+  it('GET /dashboard returns 500 on database error', async () => {
+    mockPrisma.project.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/risk/dashboard');
+    expect(res.status).toBe(500);
+  });
+
+  it('GET /insights returns 500 on database error', async () => {
+    mockPrisma.project.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/risk/dashboard/insights');
+    expect(res.status).toBe(500);
+  });
+
+  it('GET /project/:projectId returns 500 on database error', async () => {
+    mockPrisma.project.findUnique.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/risk/project/p1');
+    expect(res.status).toBe(500);
+  });
+
+  it('POST /assess returns 500 when buildRiskContext throws', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'p1', name: '项目A' });
+    mockBuildContext.mockRejectedValue(new Error('Context fail'));
+
+    const res = await request(app).post('/api/risk/project/p1/assess');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('DELETE /:id returns 500 on database error', async () => {
+    mockPrisma.riskAssessment.findUnique.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).delete('/api/risk/ra1');
+    expect(res.status).toBe(500);
+  });
+
+  it('GET /summary returns empty array when no projects', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/risk/summary');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('GET /comparison returns UNCHANGED when both assessments have same level', async () => {
+    mockPrisma.riskAssessment.findMany.mockResolvedValue([
+      { riskLevel: 'MEDIUM', assessedAt: new Date(), riskFactors: [] },
+      { riskLevel: 'MEDIUM', assessedAt: new Date(), riskFactors: [] },
+    ]);
+
+    const res = await request(app).get('/api/risk/project/p1/comparison');
+
+    expect(res.status).toBe(200);
+    expect(res.body.changes.levelChange).toBe('UNCHANGED');
+  });
+
+  it('POST /assess handles AI returning malformed JSON gracefully', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'p1', name: '项目A' });
+    mockCallAi.mockResolvedValue({ content: 'not valid json {' });
+    mockAssessRisk.mockResolvedValue({
+      riskLevel: 'LOW',
+      factors: [],
+      suggestions: [],
+    });
+    mockPrisma.riskAssessment.create.mockResolvedValue({ id: 'ra-fb', source: 'rule_engine' });
+
+    const res = await request(app).post('/api/risk/project/p1/assess');
+
+    expect(res.status).toBe(200);
+    expect(res.body.source).toBe('rule_engine');
+  });
+
+  it('GET risk-history returns empty for unknown project', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/risk/project/p-empty/history');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /summary returns empty array when no projects exist', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/risk/summary');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('GET risk-history returns 500 on database error', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/risk/project/p-missing/history');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET risk-history returns 404 when project not found and db throws', async () => {
+    mockPrisma.project.findUnique.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/risk/project/p1/history');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET risk-assessment returns 404 for non-existent project', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/risk/project/p-missing/assessment');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET risk-assessment handles missing project gracefully', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/risk/project/p-missing-2/assessment');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /dashboard returns 200 with empty projects', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/risk/dashboard');
+
+    expect(res.status).toBe(200);
   });
 });

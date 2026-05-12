@@ -14,7 +14,7 @@ import {
  * - 支持 .xlsx/.xls 格式
  * - 导入成功后显示撤回功能
  */
-test.describe.serial('Activity Batch Import', () => {
+test.describe.serial('Activity Batch Import @smoke', () => {
   const projectName = uniqueName('导入测试项目');
 
   async function goToProject(page: import('@playwright/test').Page) {

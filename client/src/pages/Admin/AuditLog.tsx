@@ -16,6 +16,14 @@ import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
+export function formatChangeData(changes: Record<string, { from: unknown; to: unknown }>): { field: string; from: unknown; to: unknown }[] {
+  return Object.entries(changes).map(([field, change]) => ({
+    field,
+    from: change.from,
+    to: change.to,
+  }));
+}
+
 const AuditLogTab: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,7 +53,7 @@ const AuditLogTab: React.FC = () => {
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { page, pageSize };
+      const params: Parameters<typeof auditLogsApi.list>[0] = { page, pageSize };
       if (userId) params.userId = userId;
       if (action) params.action = action;
       if (resourceType) params.resourceType = resourceType;
@@ -53,7 +61,7 @@ const AuditLogTab: React.FC = () => {
       if (dateRange && dateRange[1]) params.endDate = dateRange[1];
       if (keyword) params.keyword = keyword;
 
-      const res = await auditLogsApi.list(params as any);
+      const res = await auditLogsApi.list(params);
       setLogs(res.data.data || []);
       setTotal(res.data.total || 0);
     } catch {
@@ -126,11 +134,7 @@ const AuditLogTab: React.FC = () => {
       return <span style={{ color: 'var(--color-text-3)' }}>无变更详情</span>;
     }
 
-    const changeData = Object.entries(record.changes).map(([field, change]) => ({
-      field,
-      from: change.from,
-      to: change.to,
-    }));
+    const changeData = formatChangeData(record.changes);
 
     const changeColumns = [
       {

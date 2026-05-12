@@ -31,14 +31,27 @@ import riskItemsRoutes from './routes/riskItems';
 import checkItemsRoutes from './routes/checkItems';
 import holidaysRoutes from './routes/holidays';
 import roleMembersRoutes from './routes/roleMembers';
+import featureFlagsRoutes from './routes/featureFlags';
+import { evaluateMetricAlerts } from './utils/alertRules';
 import { startScheduledJobs } from './utils/scheduler';
 import { refreshHolidayCache } from './utils/workday';
 import { logger } from './utils/logger';
 import { requestId } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
+import { captureServerError, flushMonitoring, initMonitoring } from './utils/monitoring';
+import { businessMetrics, snapshotBusinessMetrics } from './utils/businessMetrics';
+import { formatPrometheusMetrics } from './utils/prometheusMetrics';
+import {
+  createRequestMetrics,
+  isMetricsRequestAuthorized,
+  recordRequestMetric,
+  snapshotRequestMetrics,
+} from './utils/requestMetrics';
 import { setupSwagger } from './swagger';
 
 // ==================== 安全校验 ====================
+
+initMonitoring();
 
 const DEFAULT_JWT_SECRETS = ['hw-system-jwt-secret', 'hw-system-refresh-secret'];
 
@@ -65,6 +78,9 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 const prisma = new PrismaClient();
 const PORT = Number(process.env.PORT) || 3000;
+const requestMetrics = createRequestMetrics({
+  slowRequestThresholdMs: Number(process.env.SLOW_REQUEST_THRESHOLD_MS ?? 1000),
+});
 
 // ==================== 中间件配置 ====================
 
@@ -83,6 +99,18 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 // 请求 ID + 结构化日志
 app.use(requestId);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    recordRequestMetric(requestMetrics, {
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    });
+  });
+  next();
+});
 if (process.env.NODE_ENV !== 'test') {
   app.use(httpLogger);
 }
@@ -114,14 +142,80 @@ app.use('/uploads', express.static(uploadsPath));
 // ==================== 路由注册 ====================
 
 // 健康检查接口
-app.get('/api/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    version: getVersion(),
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+app.get('/api/health', async (req: Request, res: Response) => {
+  const databaseStartedAt = Date.now();
+  const checks = {
+    database: {
+      status: 'ok' as 'ok' | 'error',
+      latencyMs: 0,
+    },
+  };
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database.latencyMs = Date.now() - databaseStartedAt;
+
+    res.json({
+      status: 'ok',
+      version: getVersion(),
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      requestId: req.id,
+      checks,
+    });
+  } catch (error) {
+    checks.database.status = 'error';
+    checks.database.latencyMs = Date.now() - databaseStartedAt;
+    captureServerError(error, {
+      requestId: req.id,
+      tags: { source: 'healthcheck', dependency: 'database' },
+      req,
+    });
+    logger.error({ err: error, requestId: req.id }, '健康检查数据库探测失败');
+
+    res.status(503).json({
+      status: 'degraded',
+      version: getVersion(),
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      requestId: req.id,
+      checks,
+    });
+  }
 });
+
+app.get('/api/metrics', (req: Request, res: Response) => {
+  if (!isMetricsRequestAuthorized(req.headers, process.env.NODE_ENV, process.env.METRICS_TOKEN)) {
+    res.status(401).json({ error: 'Unauthorized', requestId: req.id });
+    return;
+  }
+
+  const requests = snapshotRequestMetrics(requestMetrics);
+  const business = snapshotBusinessMetrics(businessMetrics);
+  const metricsPayload = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    requestId: req.id,
+    process: {
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+    },
+    requests,
+    business,
+    alerts: evaluateMetricAlerts({ requests }),
+  };
+
+  if (req.query.format === 'prometheus') {
+    res
+      .type('text/plain; version=0.0.4; charset=utf-8')
+      .send(formatPrometheusMetrics(metricsPayload));
+    return;
+  }
+
+  res.json(metricsPayload);
+});
+
+app.use('/api/feature-flags', featureFlagsRoutes);
 
 // 认证路由（登录接口限流）
 app.use('/api/auth/login', loginLimiter);
@@ -206,9 +300,18 @@ app.use((req: Request, res: Response) => {
 
 // 全局错误处理
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  captureServerError(err, {
+    requestId: req.id,
+    tags: {
+      source: 'express',
+      statusCode: 500,
+    },
+    req,
+  });
   logger.error({ err, requestId: req.id }, '服务器错误');
   res.status(500).json({
     error: '服务器内部错误',
+    requestId: req.id,
     message: process.env.NODE_ENV === 'development' ? err.message : undefined,
   });
 });
@@ -235,6 +338,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 const shutdown = async (signal: string) => {
   logger.info(`收到 ${signal} 信号，正在关闭服务器...`);
   server.close(async () => {
+    await flushMonitoring();
     await prisma.$disconnect();
     logger.info('数据库连接已关闭');
     process.exit(0);

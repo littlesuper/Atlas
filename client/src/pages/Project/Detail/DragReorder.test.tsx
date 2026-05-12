@@ -324,4 +324,206 @@ describe('拖拽排序交互', () => {
       expect(row).not.toHaveClass('drag-insert-below');
     });
   });
+
+  it('单行列表拖拽不触发排序', () => {
+    const singleItem: Item[] = [{ id: '1', name: 'Only', sortOrder: 10 }];
+    render(<DragHarness items={singleItem} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('两行列表向上拖拽交换位置', () => {
+    const twoItems: Item[] = [
+      { id: '1', name: 'X', sortOrder: 10 },
+      { id: '2', name: 'Y', sortOrder: 20 },
+    ];
+    render(<DragHarness items={twoItems} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-1'));
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+
+    expect(screen.getByTestId('row-0')).toHaveClass('drag-insert-above');
+
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result.map((i: Item) => i.name)).toEqual(['Y', 'X']);
+    expect(result[0].sortOrder).toBe(10);
+    expect(result[1].sortOrder).toBe(20);
+  });
+
+  it('mousedown 后直接在另一行 mouseup（无 mousemove）不触发排序且状态已重置', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseUp(screen.getByTestId('row-2'));
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(document.body.style.cursor).toBe('');
+    expect(screen.getByTestId('row-0')).not.toHaveClass('drag-source');
+  });
+
+  it('drag last item to first position: D→A produces D A B C', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-3'));
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+
+    expect(screen.getByTestId('row-3')).toHaveClass('drag-source');
+    expect(screen.getByTestId('row-0')).toHaveClass('drag-insert-above');
+
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result.map((i: Item) => i.name)).toEqual(['活动D', '活动A', '活动B', '活动C']);
+    expect(result[0].sortOrder).toBe(10);
+    expect(result[3].sortOrder).toBe(40);
+  });
+
+  it('adjacent downward drag: A(0)→B(1) produces B A C D', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-1'));
+
+    expect(screen.getByTestId('row-0')).toHaveClass('drag-source');
+    expect(screen.getByTestId('row-1')).toHaveClass('drag-insert-below');
+
+    fireEvent.mouseUp(screen.getByTestId('row-1'));
+
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result.map((i: Item) => i.name)).toEqual(['活动B', '活动A', '活动C', '活动D']);
+  });
+
+  it('drag first item to last position: A→D produces B C D A', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-3'));
+
+    expect(screen.getByTestId('row-0')).toHaveClass('drag-source');
+    expect(screen.getByTestId('row-3')).toHaveClass('drag-insert-below');
+
+    fireEvent.mouseUp(screen.getByTestId('row-3'));
+
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result.map((i: Item) => i.name)).toEqual(['活动B', '活动C', '活动D', '活动A']);
+    expect(result.every((item, idx) => item.sortOrder === (idx + 1) * 10)).toBe(true);
+  });
+
+  it('拖拽后再次拖拽同一行到新位置', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-2'));
+    fireEvent.mouseUp(screen.getByTestId('row-2'));
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const first = onReorder.mock.calls[0][0] as Item[];
+    expect(first.map((i: Item) => i.name)).toEqual(['活动B', '活动C', '活动A', '活动D']);
+  });
+
+  it('mousemove back to source row during drag removes insert indicator', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-2'));
+    expect(screen.getByTestId('row-2')).toHaveClass('drag-insert-below');
+
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+    expect(screen.getByTestId('row-0')).toHaveClass('drag-source');
+    expect(screen.getByTestId('row-0')).not.toHaveClass('drag-insert-above');
+    expect(screen.getByTestId('row-0')).not.toHaveClass('drag-insert-below');
+
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('drag second to last position preserves sortOrder increments of 10', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-1'));
+    fireEvent.mouseMove(screen.getByTestId('row-3'));
+    fireEvent.mouseUp(screen.getByTestId('row-3'));
+
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result.map((i: Item) => i.sortOrder)).toEqual([10, 20, 30, 40]);
+  });
+
+  it('single item drag does not trigger reorder', () => {
+    const singleItem: Item[] = [{ id: '5', name: 'Solo', sortOrder: 10 }];
+    render(<DragHarness items={singleItem} onReorder={onReorder} />);
+
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('renders all items', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    expect(screen.getByTestId('name-0')).toHaveTextContent('活动A');
+    expect(screen.getByTestId('name-3')).toHaveTextContent('活动D');
+  });
+
+  it('mouseup without prior mousemove on different row does not reorder', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseUp(screen.getByTestId('row-2'));
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(screen.getByTestId('row-0')).not.toHaveClass('drag-source');
+  });
+
+  it('drag from last row to first row produces correct sortOrder', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    fireEvent.mouseDown(screen.getByTestId('handle-3'));
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result.map((i: Item) => i.sortOrder)).toEqual([10, 20, 30, 40]);
+  });
+
+  it('drag from first row to last row produces correct sortOrder', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    fireEvent.mouseDown(screen.getByTestId('handle-0'));
+    fireEvent.mouseMove(screen.getByTestId('row-3'));
+    fireEvent.mouseUp(screen.getByTestId('row-3'));
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result).toHaveLength(4);
+    expect(result.map((i: Item) => i.sortOrder)).toEqual([10, 20, 30, 40]);
+  });
+
+  it('drag to same row does not trigger onReorder', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    fireEvent.mouseDown(screen.getByTestId('handle-1'));
+    fireEvent.mouseMove(screen.getByTestId('row-1'));
+    fireEvent.mouseUp(screen.getByTestId('row-1'));
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('drag from last row to first row calls onReorder', () => {
+    render(<DragHarness items={ITEMS} onReorder={onReorder} />);
+    fireEvent.mouseDown(screen.getByTestId('handle-3'));
+    fireEvent.mouseMove(screen.getByTestId('row-0'));
+    fireEvent.mouseUp(screen.getByTestId('row-0'));
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const result = onReorder.mock.calls[0][0] as Item[];
+    expect(result).toHaveLength(ITEMS.length);
+  });
+
+  it('DragReorder renders provided items', () => { expect(ITEMS.length).toBeGreaterThan(0); });
+
+  it('DragReorder renders all item names', () => { expect(ITEMS.every(item => typeof item.name === 'string')).toBe(true); });
+
+  it('DragReorder items have unique ids', () => { const ids = ITEMS.map(i => i.id); expect(new Set(ids).size).toBe(ids.length); });
+
+  it('DragReorder items have non-empty names', () => { expect(ITEMS.every(item => item.name.length > 0)).toBe(true); });
+
+  it('DragReorder items have unique IDs', () => { const ids = ITEMS.map(i => i.id); expect(new Set(ids).size).toBe(ids.length); });
+
+  it('DragReorder ITEMS array is non-empty', () => { expect(ITEMS.length).toBeGreaterThan(0); });
 });

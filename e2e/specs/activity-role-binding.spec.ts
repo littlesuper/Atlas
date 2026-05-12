@@ -7,7 +7,7 @@ import {
   confirmModal,
 } from '../helpers/arco';
 
-test.describe('Activity Role Binding - Admin Role Members', () => {
+test.describe('Activity Role Binding - Admin Role Members @smoke', () => {
   test('Admin can view role members tab', async ({ authedPage: page }) => {
     await page.goto('/admin?tab=account');
     await page.waitForTimeout(1000);
@@ -21,7 +21,7 @@ test.describe('Activity Role Binding - Admin Role Members', () => {
   });
 });
 
-test.describe.serial('Activity Role Binding - Full Flow', () => {
+test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
   const projectName = uniqueName('角色绑定CRUD');
 
   test('create project, activity with role, verify, cleanup', async ({ authedPage: page }) => {

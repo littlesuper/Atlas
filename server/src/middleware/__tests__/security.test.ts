@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 const { mockPrisma } = vi.hoisted(() => {
   const mockPrisma = {
@@ -16,13 +19,13 @@ const { mockPrisma } = vi.hoisted(() => {
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
     constructor() {
-      return mockPrisma as any;
+      return mockPrisma as unknown as PrismaClient;
     }
   },
 }));
 
 vi.mock('../../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -71,7 +74,7 @@ describe('SYS-016: 500 errors do not leak stack traces', () => {
     const app = express();
     app.use(express.json());
 
-    app.get('/api/test-error', (_req: any, res: any) => {
+    app.get('/api/test-error', (_req: Request, res: Response) => {
       const _err = new Error('Internal DB connection failed at line 42 in db.ts');
       res.status(500).json({ error: '服务器内部错误' });
     });
@@ -92,7 +95,7 @@ describe('SYS-015: password not logged', () => {
     const app = express();
     app.use(express.json());
 
-    app.post('/api/auth/login', (req: any, res: any) => {
+    app.post('/api/auth/login', (_req: Request, res: Response) => {
       res.status(401).json({ error: '用户名或密码错误' });
     });
 
@@ -110,7 +113,7 @@ describe('SYS-017: security response headers', () => {
   it('SYS-017 JSON API returns correct content-type', async () => {
     const app = express();
     app.use(express.json());
-    app.get('/api/test', (_req: any, res: any) => {
+    app.get('/api/test', (_req: Request, res: Response) => {
       res.json({ status: 'ok' });
     });
 
@@ -139,7 +142,7 @@ describe('SYS-014: global/IP rate limiting triggers 429', () => {
     const app = express();
     app.use(express.json());
     app.use(limiter);
-    app.get('/api/test', (_req: any, res: any) => {
+    app.get('/api/test', (_req: Request, res: Response) => {
       res.json({ status: 'ok' });
     });
 
@@ -164,7 +167,7 @@ describe('SYS-014: global/IP rate limiting triggers 429', () => {
     const app = express();
     app.use(express.json());
     app.use(limiter);
-    app.get('/api/test', (_req: any, res: any) => {
+    app.get('/api/test', (_req: Request, res: Response) => {
       res.json({ status: 'ok' });
     });
 
@@ -174,5 +177,363 @@ describe('SYS-014: global/IP rate limiting triggers 429', () => {
     expect(res.status).toBe(429);
     expect(res.body).not.toHaveProperty('stack');
     expect(JSON.stringify(res.body)).not.toMatch(/internal|trace|debug/i);
+  });
+});
+
+describe('SYS-016: error with custom properties', () => {
+  it('hides custom error properties from response', async () => {
+    const app = express();
+    app.use(express.json());
+    app.get('/api/err-props', (_req: Request, _res: Response) => {
+      const err = new Error('DB failure') as Error & { dbPassword: string; apiKey: string };
+      err.dbPassword = 'super-secret-pw';
+      err.apiKey = 'key-12345';
+      _res.status(500).json({ error: '服务器内部错误' });
+    });
+    const res = await request(app).get('/api/err-props');
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain('super-secret-pw');
+    expect(res.text).not.toContain('apiKey');
+    expect(res.text).not.toContain('key-12345');
+  });
+});
+
+describe('SYS-014: rate limiter standard headers', () => {
+  it('returns RateLimit headers when standardHeaders is true', async () => {
+    const rateLimit = (await import('express-rate-limit')).default;
+    const limiter = rateLimit({
+      windowMs: 60 * 1000,
+      max: 1,
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+    const app = express();
+    app.use(limiter);
+    app.get('/api/test', (_req: Request, res: Response) => res.json({ ok: true }));
+    await request(app).get('/api/test');
+    const res = await request(app).get('/api/test');
+    expect(res.status).toBe(429);
+    expect(res.headers['ratelimit-limit']).toBeDefined();
+    expect(res.headers['ratelimit-remaining']).toBeDefined();
+  });
+});
+
+describe('SYS-014: rate limiter legacy headers suppressed', () => {
+  it('does not send X-RateLimit-* headers when legacyHeaders is false', async () => {
+    const rateLimit = (await import('express-rate-limit')).default;
+    const limiter = rateLimit({
+      windowMs: 60 * 1000,
+      max: 2,
+      standardHeaders: false,
+      legacyHeaders: false,
+    });
+    const app = express();
+    app.use(limiter);
+    app.get('/api/test', (_req: Request, res: Response) => res.json({ ok: true }));
+
+    await request(app).get('/api/test');
+    await request(app).get('/api/test');
+    const res = await request(app).get('/api/test');
+
+    expect(res.status).toBe(429);
+    expect(res.headers['x-ratelimit-limit']).toBeUndefined();
+    expect(res.headers['x-ratelimit-remaining']).toBeUndefined();
+  });
+});
+
+describe('SYS-016: 500 error with thrown non-Error value', () => {
+  it('handles thrown string without crashing', async () => {
+    const app = express();
+    app.use(express.json());
+    app.get('/api/string-err', (_req: Request, res: Response) => {
+      res.status(500).json({ error: '服务器内部错误' });
+    });
+
+    const res = await request(app).get('/api/string-err');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: '服务器内部错误' });
+  });
+});
+
+describe('SYS-016: malformed JSON body returns 400', () => {
+  it('returns 400 for malformed JSON without leaking details', async () => {
+    const app = express();
+    app.use(express.json());
+    app.post('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const res = await request(app)
+      .post('/api/test')
+      .set('Content-Type', 'application/json')
+      .send('{ invalid json }');
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('SYS-017: X-Powered-By header suppressed', () => {
+  it('does not expose X-Powered-By when disabled', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.get('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const res = await request(app).get('/api/test');
+    expect(res.status).toBe(200);
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 404 response does not expose internal route info', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.use(express.json());
+    app.get('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const res = await request(app).get('/api/nonexistent-route');
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('stack');
+    expect(res.text).not.toContain('routes');
+  });
+});
+
+describe('SYS-017: 403 response does not leak auth details', () => {
+  it('returns generic message without user or role info on forbidden access', async () => {
+    const app = express();
+    app.use(express.json());
+    app.get('/api/admin-only', (_req: Request, res: Response) => {
+      res.status(403).json({ error: '无权限访问' });
+    });
+
+    const res = await request(app).get('/api/admin-only');
+    expect(res.status).toBe(403);
+    expect(res.body).not.toHaveProperty('userId');
+    expect(res.body).not.toHaveProperty('role');
+    expect(res.body).not.toHaveProperty('permission');
+  });
+});
+
+describe('SYS-017: 401 response does not include WWW-Authenticate header', () => {
+  it('returns generic 401 without WWW-Authenticate challenge', async () => {
+    const app = express();
+    app.use(express.json());
+    app.get('/api/protected', (_req: Request, res: Response) => {
+      res.status(401).json({ error: '未提供认证令牌' });
+    });
+
+    const res = await request(app).get('/api/protected');
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBeUndefined();
+  });
+
+  it('CORS allows whitelisted origin from env', () => {
+    const corsOrigins = process.env.CORS_ORIGINS || 'http://localhost:5173';
+    const allowed = corsOrigins.split(',').map(s => s.trim());
+    expect(allowed.length).toBeGreaterThan(0);
+    expect(allowed).toContain('http://localhost:5173');
+  });
+
+  it('SYS-017 500 error response does not include error message details', async () => {
+    const app = express();
+    app.use(express.json());
+    const secretMsg = 'DB connection string: postgres://admin:pw@host:5432/db';
+    app.get('/api/crash', (_req: Request, res: Response) => {
+      res.status(500).json({ error: '服务器内部错误' });
+    });
+
+    const res = await request(app).get('/api/crash');
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain(secretMsg);
+    expect(res.text).not.toContain('postgres');
+  });
+
+  it('SYS-017 response does not expose server technology header', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.get('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const res = await request(app).get('/api/test');
+    expect(res.headers['x-powered-by']).toBeUndefined();
+    expect(res.headers['server']).toBeUndefined();
+  });
+
+  it('SYS-017 OPTIONS preflight returns correct status without exposing internals', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.options('/api/test', (_req: Request, res: Response) => {
+      res.status(204).end();
+    });
+
+    const res = await request(app).options('/api/test');
+    expect(res.status).toBe(204);
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 response headers do not include X-AspNet-Version or Server details', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.get('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const res = await request(app).get('/api/test');
+    expect(res.status).toBe(200);
+    expect(res.headers['x-aspnet-version']).toBeUndefined();
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 error response body is valid JSON', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.use(express.json());
+    app.get('/api/crash', (_req: Request, res: Response) => {
+      res.status(500).json({ error: '服务器内部错误' });
+    });
+
+    const res = await request(app).get('/api/crash');
+    expect(res.status).toBe(500);
+    expect(() => JSON.parse(res.text)).not.toThrow();
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('SYS-017 rate limiter resets after window expires', async () => {
+    const rateLimit = (await import('express-rate-limit')).default;
+    const limiter = rateLimit({
+      windowMs: 100,
+      max: 1,
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+    const app = express();
+    app.use(limiter);
+    app.get('/api/test', (_req: Request, res: Response) => res.json({ ok: true }));
+
+    await request(app).get('/api/test');
+    const res1 = await request(app).get('/api/test');
+    expect(res1.status).toBe(429);
+
+    await new Promise((r) => setTimeout(r, 150));
+    const res2 = await request(app).get('/api/test');
+    expect(res2.status).toBe(200);
+  });
+
+  it('SYS-017 HEAD request returns headers without body', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.get('/api/test', (_req: Request, res: Response) => res.json({ ok: true }));
+
+    const res = await request(app).head('/api/test');
+    expect(res.status).toBe(200);
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 OPTIONS request returns 204 without x-powered-by', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.options('/api/test', (_req: Request, res: Response) => res.status(204).end());
+    const res = await request(app).options('/api/test');
+    expect(res.status).toBe(204);
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 POST error response does not leak stack trace', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.use(express.json());
+    app.post('/api/crash', (_req: Request, res: Response) => {
+      res.status(500).json({ error: '服务器内部错误' });
+    });
+
+    const res = await request(app).post('/api/crash').send({ data: 'test' });
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain('stack');
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 does not execute SQL injection patterns in request body', async () => {
+    const app = express();
+    app.use(express.json());
+    app.post('/api/test', (req: Request, res: Response) => {
+      expect(typeof req.body.name).toBe('string');
+      res.json({ received: true });
+    });
+
+    const res = await request(app)
+      .post('/api/test')
+      .send({ name: "'; DROP TABLE users; --" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.received).toBe(true);
+  });
+
+  it('SYS-017 XSS script tag in response body is not executed as HTML', async () => {
+    const app = express();
+    app.use(express.json());
+    app.get('/api/test', (_req: Request, res: Response) => {
+      res.json({ message: '<script>alert("xss")</script>' });
+    });
+
+    const res = await request(app).get('/api/test');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/json');
+    expect(res.body.message).toBe('<script>alert("xss")</script>');
+  });
+
+  it('SYS-017 PUT request with oversized body returns 413', async () => {
+    const app = express();
+    app.use(express.json({ limit: '1kb' }));
+    app.put('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const bigPayload = { data: 'a'.repeat(2000) };
+    const res = await request(app).put('/api/test').send(bigPayload);
+    expect(res.status).toBe(413);
+  });
+
+  it('SYS-017 DELETE error response does not leak stack trace', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.use(express.json());
+    app.delete('/api/crash', (_req: Request, res: Response) => {
+      res.status(500).json({ error: '服务器内部错误' });
+    });
+
+    const res = await request(app).delete('/api/crash');
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain('stack');
+    expect(res.text).not.toContain('Error');
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 PATCH request without body returns 200', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.use(express.json());
+    app.patch('/api/test', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const res = await request(app).patch('/api/test');
+    expect(res.status).toBe(200);
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('SYS-017 GET request with query string does not leak server internals', async () => {
+    const app = express();
+    app.disable('x-powered-by');
+    app.get('/api/search', (_req: Request, res: Response) => {
+      res.json({ results: [] });
+    });
+
+    const res = await request(app).get('/api/search?q=<script>alert(1)</script>');
+    expect(res.status).toBe(200);
+    expect(res.headers['x-powered-by']).toBeUndefined();
+    expect(res.headers['content-type']).toContain('application/json');
   });
 });

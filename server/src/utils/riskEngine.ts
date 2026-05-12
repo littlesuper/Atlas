@@ -187,8 +187,8 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
   // 4. 评估资源分配
   const unassignedActivities = allActivities.filter(
     (a) =>
-      (a as any).executors?.length === 0 &&
-      !(a as any).roleId &&
+      a.executors.length === 0 &&
+      !a.roleId &&
       a.status !== ActivityStatus.COMPLETED &&
       a.status !== ActivityStatus.CANCELLED
   );
@@ -355,7 +355,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
       a.status !== ActivityStatus.COMPLETED &&
       a.status !== ActivityStatus.CANCELLED
     ) {
-      for (const ex of (a as any).executors || []) {
+      for (const ex of a.executors) {
         executorIds.add(ex.userId);
       }
     }
@@ -363,7 +363,7 @@ export async function assessProjectRisk(projectId: string): Promise<RiskAssessme
 
   const userNameMap = new Map<string, string>();
   for (const a of allActivities) {
-    for (const ex of (a as any).executors || []) {
+    for (const ex of a.executors) {
       if (!userNameMap.has(ex.userId)) {
         userNameMap.set(ex.userId, ex.user?.realName || ex.userId);
       }

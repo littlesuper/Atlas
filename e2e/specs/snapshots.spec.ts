@@ -11,7 +11,7 @@ import {
   searchProject,
 } from '../helpers/arco';
 
-test.describe.serial('Project Snapshot Management', () => {
+test.describe.serial('Project Snapshot Management @p1', () => {
   const projectName = uniqueName('快照测试项目');
   const activityName1 = uniqueName('快照活动A');
   const activityName2 = uniqueName('快照活动B');

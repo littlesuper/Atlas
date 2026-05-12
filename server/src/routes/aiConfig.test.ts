@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -25,11 +28,11 @@ const { mockPrisma, mockFetch } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -43,7 +46,7 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 // ─── Global fetch mock ──────────────────────────────────────────────────────
@@ -345,5 +348,251 @@ describe('GET /api/ai-config/usage-stats', () => {
     expect(res.body.totals.totalTokens).toBe(1500);
     expect(res.body.dailyStats).toBeDefined();
     expect(res.body.recentLogs).toBeDefined();
+  });
+
+  it('filters usage stats by date range', async () => {
+    mockPrisma.aiUsageLog.aggregate.mockResolvedValue({
+      _sum: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      _count: 0,
+    });
+    mockPrisma.aiUsageLog.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const res = await request(app).get('/api/ai-config/usage-stats?startDate=2026-01-01&endDate=2026-06-01');
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.aiUsageLog.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdAt: expect.objectContaining({
+            gte: expect.any(Date),
+            lte: expect.any(Date),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('returns 500 on usage stats database error', async () => {
+    mockPrisma.aiUsageLog.aggregate.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/ai-config/usage-stats');
+
+    expect(res.status).toBe(500);
+  });
+});
+
+describe('POST /api/ai-config/fetch-models', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns model list from API', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: 'gpt-4o' }, { id: 'gpt-4o-mini' }] }),
+    });
+
+    const res = await request(app)
+      .post('/api/ai-config/fetch-models')
+      .send({ apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: 'sk-test' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.models).toEqual(['gpt-4o', 'gpt-4o-mini']);
+  });
+
+  it('returns failure when required fields missing', async () => {
+    const res = await request(app)
+      .post('/api/ai-config/fetch-models')
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.models).toEqual([]);
+  });
+
+  it('returns failure on API error', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: async () => 'Forbidden',
+    });
+
+    const res = await request(app)
+      .post('/api/ai-config/fetch-models')
+      .send({ apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: 'sk-bad' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toMatch(/403/);
+  });
+
+  it('uses real apiKey from config when masked', async () => {
+    mockPrisma.aiConfig.findUnique.mockResolvedValue({ id: 'c1', apiKey: 'sk-real-key' });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: 'model-a' }] }),
+    });
+
+    await request(app)
+      .post('/api/ai-config/fetch-models')
+      .send({ apiUrl: 'https://api.com/v1/chat/completions', apiKey: '****1234', configId: 'c1' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-real-key' }),
+      }),
+    );
+  });
+});
+
+describe('POST /api/ai-config/test-connection edge cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('uses real apiKey from config when provided with masked key', async () => {
+    mockPrisma.aiConfig.findUnique.mockResolvedValue({ id: 'c1', apiKey: 'sk-real-key-1234' });
+    mockFetch.mockResolvedValue({ ok: true, text: async () => '{}' });
+
+    await request(app)
+      .post('/api/ai-config/test-connection')
+      .send({ apiUrl: 'https://api.com/v1/chat/completions', apiKey: '****1234', configId: 'c1' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-real-key-1234' }),
+      }),
+    );
+  });
+
+  it('returns failure on network error', async () => {
+    mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    const res = await request(app)
+      .post('/api/ai-config/test-connection')
+      .send({ apiUrl: 'https://api.com/v1/chat/completions', apiKey: 'sk-test' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('ECONNREFUSED');
+  });
+});
+
+describe('DELETE /api/ai-config/:id edge case', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPrisma.aiConfig.findUnique.mockResolvedValue({ id: 'c1', name: 'config' });
+    mockPrisma.aiConfig.delete.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).delete('/api/ai-config/c1');
+
+    expect(res.status).toBe(500);
+  });
+});
+
+describe('PUT /api/ai-config/:id edge cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPrisma.aiConfig.findUnique.mockResolvedValue({ id: 'c1', name: 'config', apiKey: 'sk-test', apiUrl: '', modelName: '', features: '' });
+    mockPrisma.aiConfig.findMany.mockResolvedValue([]);
+    mockPrisma.aiConfig.update.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app)
+      .put('/api/ai-config/c1')
+      .send({ name: 'updated' });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('removes feature assignments from other configs on update', async () => {
+    const otherConfig = { id: 'c2', name: 'Other', apiKey: '', apiUrl: '', modelName: '', features: 'risk,weekly_report', updatedAt: new Date() };
+    mockPrisma.aiConfig.findUnique.mockResolvedValue({ id: 'c1', name: 'Main', apiKey: '', apiUrl: '', modelName: '', features: '' });
+    mockPrisma.aiConfig.findMany.mockResolvedValue([otherConfig]);
+    mockPrisma.aiConfig.update.mockResolvedValue({ id: 'c1', name: 'Main', apiKey: '', apiUrl: '', modelName: '', features: 'risk' });
+
+    await request(app)
+      .put('/api/ai-config/c1')
+      .send({ features: 'risk' });
+
+    expect(mockPrisma.aiConfig.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'c2' },
+        data: { features: 'weekly_report' },
+      }),
+    );
+  });
+
+  it('GET returns empty array when no configs exist', async () => {
+    mockPrisma.aiConfig.findMany.mockResolvedValue([]);
+    mockPrisma.aiUsageLog.aggregate.mockResolvedValue({ _sum: { tokenCount: 0 } });
+
+    const res = await request(app).get('/api/ai-config');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toBeDefined();
+  });
+
+  it('POST create returns 500 on database error', async () => {
+    mockPrisma.aiConfig.findMany.mockResolvedValue([]);
+    mockPrisma.aiConfig.create.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app)
+      .post('/api/ai-config')
+      .send({ name: 'New Config', apiKey: 'sk-test', apiUrl: 'https://api.test.com', modelName: 'gpt-4' });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET masks apiKey returning empty string for empty apiKey', async () => {
+    mockPrisma.aiConfig.findMany.mockResolvedValue([{ id: '1', name: 'Test', apiKey: '', apiUrl: '', modelName: 'gpt', features: '' }]);
+
+    const res = await request(app).get('/api/ai-config');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].apiKey).toBe('');
+  });
+
+  it('GET returns 500 on database error', async () => {
+    mockPrisma.aiConfig.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/ai-config');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET returns empty array when no configs exist', async () => {
+    mockPrisma.aiConfig.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/ai-config');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('DELETE config returns 404 for non-existent id', async () => {
+    mockPrisma.aiConfig.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/ai-config/nonexistent');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('POST returns 400 when name is missing', async () => {
+    const res = await request(app)
+      .post('/api/ai-config')
+      .send({ apiKey: 'sk-test', apiUrl: 'https://api.test.com' });
+
+    expect(res.status).toBe(400);
   });
 });

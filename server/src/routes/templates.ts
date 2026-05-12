@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { ActivityType, Prisma, PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { isAdmin } from '../middleware/permission';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../utils/dependencyScheduler';
@@ -9,6 +9,26 @@ import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+function routeParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
+}
+
+type TemplateActivityInput = {
+  id?: string;
+  name: string;
+  type?: ActivityType;
+  phase?: string | null;
+  planDuration?: number | null;
+  dependencies?: Prisma.InputJsonValue | null;
+  notes?: string | null;
+  roleId?: string | null;
+  sortOrder?: number | null;
+};
+
+function nullableJson(value: Prisma.InputJsonValue | null | undefined): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue {
+  return value == null ? Prisma.DbNull : value;
+}
 
 // ======================== 模板 CRUD ========================
 
@@ -38,7 +58,7 @@ router.get('/', authenticate, async (_req: Request, res: Response): Promise<void
 router.get('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const template = await prisma.projectTemplate.findUnique({
-      where: { id: req.params.id },
+      where: { id: routeParam(req.params.id) },
       include: {
         activities: {
           orderBy: { sortOrder: 'asc' },
@@ -79,14 +99,15 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
         description,
         activities: activities?.length
           ? {
-              create: activities.map((a: any, idx: number) => ({
+              create: (activities as TemplateActivityInput[]).map((a, idx: number) => ({
                 id: a.id, // 允许前端指定 id 以维持依赖引用
                 name: a.name,
                 type: a.type || 'TASK',
                 phase: a.phase || null,
                 planDuration: a.planDuration || null,
-                dependencies: a.dependencies || null,
+                dependencies: nullableJson(a.dependencies),
                 notes: a.notes || null,
+                roleId: a.roleId || null,
                 sortOrder: a.sortOrder ?? idx,
               })),
             }
@@ -115,7 +136,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const { id } = req.params;
+    const id = routeParam(req.params.id);
     const { name, description, activities } = req.body;
 
     const existing = await prisma.projectTemplate.findUnique({ where: { id } });
@@ -140,15 +161,16 @@ router.put('/:id', authenticate, async (req: Request, res: Response): Promise<vo
         await tx.templateActivity.deleteMany({ where: { templateId: id } });
         if (activities.length > 0) {
           await tx.templateActivity.createMany({
-            data: activities.map((a: any, idx: number) => ({
+            data: (activities as TemplateActivityInput[]).map((a, idx: number) => ({
               id: a.id,
               templateId: id,
               name: a.name,
               type: a.type || 'TASK',
               phase: a.phase || null,
               planDuration: a.planDuration || null,
-              dependencies: a.dependencies || null,
+              dependencies: nullableJson(a.dependencies),
               notes: a.notes || null,
+              roleId: a.roleId || null,
               sortOrder: a.sortOrder ?? idx,
             })),
           });
@@ -179,7 +201,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
       return;
     }
 
-    const { id } = req.params;
+    const id = routeParam(req.params.id);
     const existing = await prisma.projectTemplate.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ error: '模板不存在' });
@@ -194,6 +216,58 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
   }
 });
 
+// ======================== 模板复制 ========================
+
+router.post('/:id/copy', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isAdmin(req)) {
+      res.status(403).json({ error: '仅管理员可复制模板' });
+      return;
+    }
+
+    const id = routeParam(req.params.id);
+    const existing = await prisma.projectTemplate.findUnique({
+      where: { id },
+      include: { activities: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!existing) {
+      res.status(404).json({ error: '模板不存在' });
+      return;
+    }
+
+    const copyName = req.body.name || `${existing.name}（副本）`;
+
+    const copied = await prisma.projectTemplate.create({
+      data: {
+        name: copyName,
+        description: existing.description,
+        activities: existing.activities.length
+          ? {
+              create: (existing.activities as TemplateActivityInput[]).map((a, idx: number) => ({
+                name: a.name,
+                type: a.type || 'TASK',
+                phase: a.phase || null,
+                planDuration: a.planDuration || null,
+                dependencies: nullableJson(a.dependencies),
+                notes: a.notes || null,
+                roleId: a.roleId || null,
+                sortOrder: a.sortOrder ?? idx,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        activities: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    res.status(201).json(copied);
+  } catch (error) {
+    logger.error({ err: error }, '复制模板错误');
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
 // ======================== 模板实例化 ========================
 
 /**
@@ -203,7 +277,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
  */
 router.post('/:id/instantiate', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = routeParam(req.params.id);
     const { projectId, startDate } = req.body;
 
     if (!projectId || !startDate) {
@@ -263,8 +337,10 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
         const predecessors: PredecessorData[] = deps.map((d) => {
           const resolved = resolvedDates.get(d.id)!;
           return {
+            id: d.id,
             planStartDate: resolved.planStartDate,
             planEndDate: resolved.planEndDate,
+            planDuration: resolved.planDuration,
           };
         });
 
@@ -315,8 +391,9 @@ router.post('/:id/instantiate', authenticate, async (req: Request, res: Response
             planStartDate: dates?.planStartDate || null,
             planEndDate: dates?.planEndDate || null,
             planDuration: dates?.planDuration || ta.planDuration || null,
-            dependencies: mappedDeps.length > 0 ? mappedDeps : null,
+            dependencies: mappedDeps.length > 0 ? mappedDeps : Prisma.DbNull,
             notes: ta.notes,
+            roleId: ta.roleId,
             sortOrder: ta.sortOrder,
           },
         });

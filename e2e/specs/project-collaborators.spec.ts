@@ -7,7 +7,7 @@ import {
   createProjectViaPage,
 } from '../helpers/arco';
 
-test.describe.serial('Project Collaborators', () => {
+test.describe.serial('Project Collaborators @p1', () => {
   const projectName = uniqueName('协作者');
   let projectId: string;
 

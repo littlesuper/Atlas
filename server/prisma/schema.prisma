@@ -59,6 +59,7 @@ model Role {
   rolePermissions RolePermission[]
   members         RoleMember[]
   activities      Activity[]   @relation("ActivityRole")
+  templateActivities TemplateActivity[]
 
   @@map("roles")
 }
@@ -160,17 +161,26 @@ model ProjectMember {
 }
 
 model Holiday {
-  id        String   @id @default(uuid())
-  date      DateTime @unique
+  id        String        @id @default(uuid())
+  date      DateTime      @unique
   name      String
-  type      String   @default("HOLIDAY") // HOLIDAY 放假 / MAKEUP 调休补班
+  type      String        @default("HOLIDAY") // HOLIDAY 放假 / MAKEUP 调休补班
   year      Int
-  source    String   @default("manual") // manual / generated
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  source    HolidaySource @default(BUILT_IN)
+  sourceUrl String?
+  syncedAt  DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   @@index([year])
   @@map("holidays")
+}
+
+enum HolidaySource {
+  OFFICIAL_API
+  BUILT_IN
+  ALGORITHM
+  MANUAL_INPUT
 }
 
 enum ActivityType {
@@ -318,10 +328,12 @@ model TemplateActivity {
   planDuration Int?         // 预估工期（工作日）
   dependencies Json?        // 模板内依赖 [{id, type, lag}]，id 为同模板内的 TemplateActivity.id
   notes        String?
+  roleId       String?
   sortOrder    Int          @default(0)
 
   // 关联关系
-  template ProjectTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template     ProjectTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  role         Role?            @relation(fields: [roleId], references: [id])
 
   @@index([templateId])
   @@map("template_activities")

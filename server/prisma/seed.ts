@@ -281,6 +281,12 @@ async function main() {
 
   console.log(`已创建 ${4 + functionalRoles.length} 个角色`);
 
+  const hwDevRole = await prisma.role.findFirst({ where: { name: '硬件开发' } });
+  const swDevRole = await prisma.role.findFirst({ where: { name: '软件开发' } });
+  const collabRole = await prisma.role.findFirst({ where: { name: '项目协作者' } });
+  const hwTestRole = await prisma.role.findFirst({ where: { name: '硬件测试' } });
+  const structRole = await prisma.role.findFirst({ where: { name: '结构工程师' } });
+
   // 3. 创建用户
   console.log('创建用户...');
 
@@ -293,7 +299,7 @@ async function main() {
       password: await bcrypt.hash('admin123', 10),
       realName: '系统管理员',
       status: 'ACTIVE',
-      mustChangePassword: true,
+      mustChangePassword: false,
     },
   });
 
@@ -367,6 +373,22 @@ async function main() {
 
   console.log('已创建 3 个用户');
 
+  console.log('创建角色成员映射...');
+  const roleMemberDefs = [
+    { userId: zhangsanUser.id, roleId: hwDevRole!.id, sortOrder: 1 },
+    { userId: zhangsanUser.id, roleId: collabRole!.id, sortOrder: 2 },
+    { userId: lisiUser.id, roleId: productManagerRole.id, sortOrder: 1 },
+    { userId: lisiUser.id, roleId: swDevRole!.id, sortOrder: 2 },
+  ];
+  for (const rm of roleMemberDefs) {
+    await prisma.roleMember.upsert({
+      where: { roleId_userId: { roleId: rm.roleId, userId: rm.userId } },
+      update: { sortOrder: rm.sortOrder, isActive: true },
+      create: { roleId: rm.roleId, userId: rm.userId, sortOrder: rm.sortOrder, createdBy: adminUser.id },
+    });
+  }
+  console.log(`已创建 ${roleMemberDefs.length} 条角色成员映射`);
+
   // 4. 创建示例项目
   console.log('创建示例项目...');
 
@@ -409,7 +431,9 @@ async function main() {
       startDate: new Date('2026-01-15'),
       endDate: new Date('2026-02-15'),
       duration: 23,
-      assignees: { connect: [{ id: zhangsanUser.id }] },
+      executors: {
+        create: [{ userId: zhangsanUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 1,
     },
   });
@@ -427,7 +451,9 @@ async function main() {
       planEndDate: new Date('2026-03-15'),
       planDuration: 20,
       startDate: new Date('2026-02-16'),
-      assignees: { connect: [{ id: zhangsanUser.id }] },
+      executors: {
+        create: [{ userId: zhangsanUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 2,
       dependencies: [{ id: activity1.id, type: '0' }],
     },
@@ -619,6 +645,8 @@ async function main() {
 
   for (let i = 0; i < p2Activities.length; i++) {
     const a = p2Activities[i];
+    const assigneeUserId = a.assignee === 'z' ? z : l;
+    const roleId = a.assignee === 'z' ? hwDevRole!.id : swDevRole!.id;
     await prisma.activity.create({
       data: {
         projectId: project2.id,
@@ -633,7 +661,10 @@ async function main() {
         startDate: a.start ? new Date(a.start) : undefined,
         endDate: a.end ? new Date(a.end) : undefined,
         duration: a.dur,
-        assignees: { connect: [{ id: a.assignee === 'z' ? z : l }] },
+        roleId,
+        executors: {
+          create: [{ userId: assigneeUserId, source: 'ROLE_AUTO', snapshotRoleId: roleId, assignedBy: adminUser.id }],
+        },
         sortOrder: (i + 1) * 10,
         notes: a.notes,
       },
@@ -712,7 +743,9 @@ async function main() {
       planEndDate: new Date('2026-04-15'),
       planDuration: 33,
       startDate: new Date('2026-03-01'),
-      assignees: { connect: [{ id: lisiUser.id }] },
+      executors: {
+        create: [{ userId: lisiUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 10,
     },
   });
@@ -731,7 +764,9 @@ async function main() {
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-03-12'),
       duration: 9,
-      assignees: { connect: [{ id: lisiUser.id }] },
+      executors: {
+        create: [{ userId: lisiUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 20,
       notes: '对比 Logitech、Razer、自研方案三个方向',
       dependencies: [{ id: p3a1.id, type: '0' }],
@@ -750,7 +785,9 @@ async function main() {
       planEndDate: new Date('2026-04-10'),
       planDuration: 20,
       startDate: new Date('2026-03-13'),
-      assignees: { connect: [{ id: lisiUser.id }] },
+      executors: {
+        create: [{ userId: lisiUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 30,
       dependencies: [{ id: p3a2.id, type: '0' }],
     },
@@ -767,7 +804,9 @@ async function main() {
       planStartDate: new Date('2026-04-01'),
       planEndDate: new Date('2026-04-15'),
       planDuration: 11,
-      assignees: { connect: [{ id: zhangsanUser.id }] },
+      executors: {
+        create: [{ userId: zhangsanUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 40,
       notes: '向日葵远控 SDK v3.x 接口评估与 PoC',
     },
@@ -784,7 +823,9 @@ async function main() {
       planStartDate: new Date('2026-04-16'),
       planEndDate: new Date('2026-07-15'),
       planDuration: 65,
-      assignees: { connect: [{ id: zhangsanUser.id }] },
+      executors: {
+        create: [{ userId: zhangsanUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 50,
     },
   });
@@ -800,7 +841,9 @@ async function main() {
       planStartDate: new Date('2026-04-16'),
       planEndDate: new Date('2026-05-20'),
       planDuration: 25,
-      assignees: { connect: [{ id: zhangsanUser.id }] },
+      executors: {
+        create: [{ userId: zhangsanUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 60,
       notes: '候选: RK3566 / MT8183 / 高通 QCM2290',
     },
@@ -817,7 +860,9 @@ async function main() {
       planStartDate: new Date('2026-05-01'),
       planEndDate: new Date('2026-05-30'),
       planDuration: 22,
-      assignees: { connect: [{ id: lisiUser.id }] },
+      executors: {
+        create: [{ userId: lisiUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 70,
     },
   });
@@ -833,7 +878,9 @@ async function main() {
       planStartDate: new Date('2026-07-16'),
       planEndDate: new Date('2026-10-31'),
       planDuration: 77,
-      assignees: { connect: [{ id: zhangsanUser.id }] },
+      executors: {
+        create: [{ userId: zhangsanUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 80,
     },
   });
@@ -849,7 +896,9 @@ async function main() {
       planStartDate: new Date('2026-11-01'),
       planEndDate: new Date('2026-12-31'),
       planDuration: 43,
-      assignees: { connect: [{ id: lisiUser.id }] },
+      executors: {
+        create: [{ userId: lisiUser.id, source: 'MANUAL_ADD', assignedBy: adminUser.id }],
+      },
       sortOrder: 90,
     },
   });

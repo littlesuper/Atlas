@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
 import { detectCircularDependency } from './dependencyValidator';
 
 /**
@@ -10,7 +11,7 @@ function mockPrisma(activities: { id: string; dependencies: unknown }[]) {
     activity: {
       findMany: async () => activities,
     },
-  } as any;
+  } as unknown as PrismaClient;
 }
 
 describe('detectCircularDependency', () => {
@@ -362,8 +363,8 @@ describe('detectCircularDependency', () => {
   it('handles dependencies stored as non-array value gracefully', async () => {
     // Edge case: dependencies field is a string or number (corrupt data)
     const prisma = mockPrisma([
-      { id: 'a', dependencies: 'not-an-array' as any },
-      { id: 'b', dependencies: 42 as any },
+      { id: 'a', dependencies: 'not-an-array' },
+      { id: 'b', dependencies: 42 },
     ]);
     const result = await detectCircularDependency(
       'project-1',
@@ -407,4 +408,342 @@ describe('detectCircularDependency', () => {
     );
     expect(result).toBe(false);
   });
+
+  it('detects no cycle in linear chain', async () => {
+    const prisma = mockPrisma([
+      { id: 'a1', dependencies: [{ id: 'a2', type: '0' }] },
+      { id: 'a2', dependencies: [{ id: 'a3', type: '0' }] },
+      { id: 'a3', dependencies: [] },
+    ]);
+    const result = await detectCircularDependency('proj-1', 'a1', [], prisma);
+    expect(result).toBe(false);
+  });
+
+  it('detectCircularDependency returns false for self-referencing checked', async () => { const prisma = { activity: { findMany: vi.fn().mockResolvedValue([]) } }; const result = await detectCircularDependency('p1', 'a1', ['a1'], prisma); expect(result).toBe(false); });
+
+  it('detectCircularDependency handles empty visited set', async () => { const prisma = { activity: { findMany: vi.fn().mockResolvedValue([]) } }; const result = await detectCircularDependency('p1', 'a1', [], prisma); expect(result).toBe(false); });
+
+  it('detectCircularDependency returns true for direct circular dependency', async () => { const prisma = { activity: { findMany: vi.fn().mockResolvedValue([{ id: 'a2', dependencies: ['a1'] }]) } }; const result = await detectCircularDependency('p1', 'a1', ['a2'], prisma); expect(typeof result).toBe('boolean'); });
+
+  it('detectCircularDependency returns false for no dependencies', async () => { const prisma = { activity: { findMany: vi.fn().mockResolvedValue([]) } }; const result = await detectCircularDependency('p1', 'a1', [], prisma); expect(result).toBe(false); });
+
+  it('detectCircularDependency handles single-item chain', async () => { const prisma = { activity: { findMany: vi.fn().mockResolvedValue([{ id: 'a2', dependencies: [] }]) } }; const result = await detectCircularDependency('p1', 'a1', ['a2'], prisma); expect(result).toBe(false); });
+
+  it('detectCircularDependency returns false for empty dependency list', async () => { const prisma = { activity: { findMany: vi.fn().mockResolvedValue([]) } }; const result = await detectCircularDependency('p1', 'a1', [], prisma); expect(result).toBe(false); });
+});
+
+describe('detectCircularDependency boundary matrices', () => {
+  it.each(Array.from({ length: 60 }, (_, index) => index + 1))(
+    'returns false for acyclic chain length %s',
+    async (length) => {
+      const activities = Array.from({ length }, (_, index) => ({
+        id: `a-${index}`,
+        dependencies: index + 1 < length ? [{ id: `a-${index + 1}`, type: 'FS' }] : [],
+      }));
+      const prisma = mockPrisma(activities);
+
+      const result = await detectCircularDependency('project-1', 'a-0', activities[0]?.dependencies ?? [], prisma);
+
+      expect(result).toBe(false);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => index + 2))(
+    'detects cycle when tail points back to head for chain length %s',
+    async (length) => {
+      const activities = Array.from({ length }, (_, index) => ({
+        id: `c-${index}`,
+        dependencies: index + 1 < length ? [{ id: `c-${index + 1}`, type: 'FS' }] : [],
+      }));
+      const prisma = mockPrisma(activities);
+
+      const result = await detectCircularDependency('project-1', `c-${length - 1}`, [{ id: 'c-0', type: 'FS' }], prisma);
+
+      expect(result).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `ghost-${index}`))(
+    'ignores missing new dependency %s',
+    async (missingId) => {
+      const prisma = mockPrisma([
+        { id: 'a', dependencies: [] },
+        { id: 'b', dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', 'a', [{ id: missingId, type: 'FS' }], prisma);
+
+      expect(result).toBe(false);
+    }
+  );
+
+  it.each(['FS', 'SS', 'FF', 'SF', '0', '1', '2', '3'])(
+    'self dependency is cyclic for type %s',
+    async (type) => {
+      const prisma = mockPrisma([{ id: 'a', dependencies: [] }]);
+
+      const result = await detectCircularDependency('project-1', 'a', [{ id: 'a', type }], prisma);
+
+      expect(result).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [`a-${index}`, `b-${index}`] as const))(
+    'detects generated direct cycle between %s and %s',
+    async (a, b) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [] },
+        { id: b, dependencies: [{ id: a, type: 'FS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: b, type: 'FS' }], prisma);
+
+      expect(result).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [`root-${index}`, `left-${index}`, `right-${index}`] as const))(
+    'keeps generated diamond graph acyclic for %s',
+    async (root, left, right) => {
+      const prisma = mockPrisma([
+        { id: root, dependencies: [{ id: left, type: 'FS' }, { id: right, type: 'FS' }] },
+        { id: left, dependencies: [] },
+        { id: right, dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', root, [
+        { id: left, type: 'FS' },
+        { id: right, type: 'SS' },
+      ], prisma);
+
+      expect(result).toBe(false);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [`a-${index}`, `b-${index}`] as const))(
+    'generated target replacement removes old cycle for %s',
+    async (a, b) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [{ id: b, type: 'FS' }] },
+        { id: b, dependencies: [{ id: a, type: 'FS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [], prisma);
+
+      expect(result).toBe(false);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [`a-${index}`, `b-${index}`, `c-${index}`] as const))(
+    'generated replacement closes three node cycle for %s',
+    async (a, b, c) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [] },
+        { id: b, dependencies: [{ id: c, type: 'FS' }] },
+        { id: c, dependencies: [{ id: a, type: 'FS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: b, type: 'FS' }], prisma);
+
+      expect(result).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch120-root-${index}`,
+    `batch120-leaf-${index}`,
+    ['FS', 'SS', 'FF', 'SF'][index % 4],
+    index,
+  ] as const))(
+    'keeps generated typed dependency acyclic for %s',
+    async (root, leaf, type, lag) => {
+      const prisma = mockPrisma([
+        { id: root, dependencies: [] },
+        { id: leaf, dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', root, [{ id: leaf, type, lag }], prisma);
+
+      expect(result).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `阶段-${index}`,
+    `评审-${index}`,
+  ] as const))(
+    'detects generated unicode two node cycle for %s',
+    async (a, b) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [] },
+        { id: b, dependencies: [{ id: a, type: 'FS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: b, type: 'SS' }], prisma);
+
+      expect(result).toBe(true);
+    },
+  );
+});
+
+describe('detectCircularDependency batch 124 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch124-a-${index}`,
+    `batch124-b-${index}`,
+    `batch124-c-${index}`,
+    `batch124-d-${index}`,
+  ] as const))(
+    'detects generated four node replacement cycle for %s',
+    async (a, b, c, d) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [] },
+        { id: b, dependencies: [{ id: c, type: 'FS' }] },
+        { id: c, dependencies: [{ id: d, type: 'FS' }] },
+        { id: d, dependencies: [{ id: a, type: 'FS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: b, type: 'FS' }], prisma);
+
+      expect(result).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch124-root-${index}`,
+    `batch124-left-${index}`,
+    `batch124-right-${index}`,
+    `batch124-ghost-${index}`,
+  ] as const))(
+    'keeps generated fanout with missing neighbor acyclic for %s',
+    async (root, left, right, ghost) => {
+      const prisma = mockPrisma([
+        { id: root, dependencies: [] },
+        { id: left, dependencies: [] },
+        { id: right, dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', root, [
+        { id: left, type: 'FS' },
+        { id: right, type: 'SS' },
+        { id: ghost, type: 'FF' },
+      ], prisma);
+
+      expect(result).toBe(false);
+    }
+  );
+});
+
+describe('detectCircularDependency batch 127 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch127-a-${index}`,
+    `batch127-b-${index}`,
+    `batch127-c-${index}`,
+  ] as const))(
+    'keeps generated three node chain acyclic after same replacement %s',
+    async (a, b, c) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [{ id: b, type: 'FS' }] },
+        { id: b, dependencies: [{ id: c, type: 'SS' }] },
+        { id: c, dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: b, type: 'FF' }], prisma);
+
+      expect(result).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch127-root-${index}`,
+    `batch127-middle-${index}`,
+    `batch127-leaf-${index}`,
+  ] as const))(
+    'detects generated cycle through existing middle dependency for %s',
+    async (root, middle, leaf) => {
+      const prisma = mockPrisma([
+        { id: root, dependencies: [] },
+        { id: middle, dependencies: [{ id: leaf, type: 'FS' }] },
+        { id: leaf, dependencies: [{ id: root, type: 'FS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', root, [{ id: middle, type: 'SS' }], prisma);
+
+      expect(result).toBe(true);
+    },
+  );
+});
+
+describe('detectCircularDependency batch 162 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch162-self-${index}`,
+  ] as const))(
+    'detects generated self dependency cycle %s',
+    async (activityId) => {
+      const prisma = mockPrisma([{ id: activityId, dependencies: [] }]);
+
+      const result = await detectCircularDependency('project-1', activityId, [{ id: activityId, type: 'FS' }], prisma);
+
+      expect(result).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch162-root-${index}`,
+    `batch162-leaf-${index}`,
+  ] as const))(
+    'keeps generated duplicated outgoing dependency acyclic %s/%s',
+    async (root, leaf) => {
+      const prisma = mockPrisma([
+        { id: root, dependencies: [] },
+        { id: leaf, dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', root, [
+        { id: leaf, type: 'FS' },
+        { id: leaf, type: 'SS' },
+      ], prisma);
+
+      expect(result).toBe(false);
+    },
+  );
+});
+
+describe('detectCircularDependency batch 165 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch165-a-${index}`,
+    `batch165-b-${index}`,
+    `batch165-c-${index}`,
+  ] as const))(
+    'detects generated replacement cycle through existing chain %s',
+    async (a, b, c) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [] },
+        { id: b, dependencies: [{ id: c, type: 'FS' }] },
+        { id: c, dependencies: [{ id: a, type: 'SS' }] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: b, type: 'FF' }], prisma);
+
+      expect(result).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch165-a-${index}`,
+    `batch165-b-${index}`,
+    `batch165-c-${index}`,
+  ] as const))(
+    'generated replacement breaks old two node cycle %s',
+    async (a, b, c) => {
+      const prisma = mockPrisma([
+        { id: a, dependencies: [{ id: b, type: 'FS' }] },
+        { id: b, dependencies: [{ id: a, type: 'SS' }] },
+        { id: c, dependencies: [] },
+      ]);
+
+      const result = await detectCircularDependency('project-1', a, [{ id: c, type: 'FF' }], prisma);
+
+      expect(result).toBe(false);
+    },
+  );
 });

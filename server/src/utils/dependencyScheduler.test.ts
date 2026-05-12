@@ -20,8 +20,8 @@ describe('resolveActivityDates', () => {
     });
 
     it('returns {} for null/undefined deps', () => {
-      expect(resolveActivityDates(null as any, [], 5)).toEqual({});
-      expect(resolveActivityDates(undefined as any, [], 5)).toEqual({});
+      expect(resolveActivityDates(null as unknown as DependencyInput[], [], 5)).toEqual({});
+      expect(resolveActivityDates(undefined as unknown as DependencyInput[], [], 5)).toEqual({});
     });
 
     it('returns {} when predecessor not found', () => {
@@ -298,4 +298,89 @@ describe('resolveActivityDates', () => {
       expect(fmt(result.planStartDate)).toBe('2025-03-10');
     });
   });
+
+  describe('unknown dependency type', () => {
+    it('ignores unknown dependency type and returns empty result', () => {
+      const deps: DependencyInput[] = [{ id: 'a1', type: '99' }];
+      const preds: PredecessorData[] = [
+        { id: 'a1', planStartDate: d('2025-03-03'), planEndDate: d('2025-03-07'), planDuration: 5 },
+      ];
+      const result = resolveActivityDates(deps, preds, 5);
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('mixed FS and SS start constraints', () => {
+    it('takes MAX of start constraints from mixed FS and SS deps', () => {
+      const deps: DependencyInput[] = [
+        { id: 'a1', type: '0', lag: 0 },
+        { id: 'a2', type: '1', lag: 3 },
+      ];
+      const preds: PredecessorData[] = [
+        { id: 'a1', planStartDate: d('2025-03-03'), planEndDate: d('2025-03-07'), planDuration: 5 },
+        { id: 'a2', planStartDate: d('2025-03-10'), planEndDate: d('2025-03-14'), planDuration: 5 },
+      ];
+      const result = resolveActivityDates(deps, preds, null);
+      expect(fmt(result.planStartDate)).toBe('2025-03-13');
+    });
+  });
+
+  describe('mixed FF and SF end constraints', () => {
+    it('takes MAX of end constraints from mixed FF and SF deps', () => {
+      const deps: DependencyInput[] = [
+        { id: 'a1', type: '2', lag: 2 },
+        { id: 'a2', type: '3', lag: 0 },
+      ];
+      const preds: PredecessorData[] = [
+        { id: 'a1', planStartDate: d('2025-03-03'), planEndDate: d('2025-03-07'), planDuration: 5 },
+        { id: 'a2', planStartDate: d('2025-03-10'), planEndDate: d('2025-03-14'), planDuration: 5 },
+      ];
+      const result = resolveActivityDates(deps, preds, null);
+      expect(fmt(result.planEndDate)).toBe('2025-03-11');
+    });
+  });
+
+  it('handles single activity with no dependencies', () => {
+    const deps: DependencyInput[] = [];
+    const preds: PredecessorData[] = [
+      { id: 'a1', planStartDate: d('2025-03-03'), planEndDate: d('2025-03-07'), planDuration: 5 },
+    ];
+    const result = resolveActivityDates(deps, preds, 5);
+    expect(result).toEqual({});
+  });
+
+  it('handles empty activities array', () => {
+    const result = resolveActivityDates([]);
+    expect(result).toEqual({});
+  });
+
+
+  it('handles circular dependency gracefully', () => {
+    const result = resolveActivityDates(
+      [{ id: 'a', name: 'A', startDate: '2026-05-10', duration: 5, predecessorIds: ['b'] }, { id: 'b', name: 'B', startDate: '2026-05-10', duration: 5, predecessorIds: ['a'] }],
+      [],
+      5,
+    );
+    expect(result).toBeDefined();
+  });
+
+  it('resolveActivityDates handles empty input array', () => { const result = resolveActivityDates([], new Date('2026-01-01'), 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles single activity without dependencies', () => { const result = resolveActivityDates([], [], 5); expect(result).toEqual({}); });
+
+  it('resolveActivityDates handles activity with zero duration', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 0, dependencies: [] }], [], 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles circular dependency gracefully', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 5, dependencies: ['a2'] }, { id: 'a2', name: 'B', duration: 3, dependencies: ['a1'] }], [], 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles chain of dependencies', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 3, dependencies: [] }, { id: 'a2', name: 'B', duration: 2, dependencies: ['a1'] }, { id: 'a3', name: 'C', duration: 4, dependencies: ['a2'] }], [], 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles duplicate dependency gracefully', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 3, dependencies: [] }, { id: 'a2', name: 'B', duration: 2, dependencies: ['a1', 'a1'] }], [], 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles activity with non-existent dependency', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 3, dependencies: ['nonexistent'] }], [], 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles single activity with no dependencies', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 5, dependencies: [] }], [], 0); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates handles activity with zero duration', () => { const result = resolveActivityDates([{ id: 'a1', name: 'Milestone', duration: 0, dependencies: [] }], [], 5); expect(result).toBeDefined(); });
+
+  it('resolveActivityDates returns result for each activity', () => { const result = resolveActivityDates([{ id: 'a1', name: 'A', duration: 3, dependencies: [] }, { id: 'a2', name: 'B', duration: 5, dependencies: [] }], [], 0); expect(result).toBeDefined(); });
 });

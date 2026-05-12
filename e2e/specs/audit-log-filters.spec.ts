@@ -7,7 +7,7 @@ import { waitForTableLoad, clickTab, clickSubNav } from '../helpers/arco';
  * - 按日期范围筛选
  * - 关键词搜索
  */
-test.describe('Audit Log Advanced Filters', () => {
+test.describe('Audit Log Advanced Filters @p2', () => {
 
   async function goToAuditLog(page: import('@playwright/test').Page) {
     await page.goto('/admin');

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { clickNavItem, clickTab, waitForTableLoad, waitForPageLoad } from '../helpers/arco';
 
-test.describe.serial('System Admin', () => {
+test.describe.serial('System Admin @p1', () => {
   test('AI management tab: view config', async ({ authedPage: page }) => {
     await clickNavItem(page, '系统管理');
     await waitForPageLoad(page);

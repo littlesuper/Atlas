@@ -12,11 +12,12 @@
   "dependencies": {
     "@arco-design/color": "^0.4.0",
     "@arco-design/web-react": "^2.66.2",
+    "@sentry/react": "^10.51.0",
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-react": "^1.0.6",
-    "axios": "^1.7.9",
+    "axios": "^1.16.0",
     "dayjs": "^1.11.13",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.4.2",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",
     "i18next": "^25.10.5",
@@ -28,6 +29,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/dompurify": "^3.0.5",
@@ -37,7 +39,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^28.1.0",
     "typescript": "^5.7.2",
-    "vite": "^7.0.5",
+    "vite": "^7.3.2",
     "vitest": "^4.0.18"
   }
 }

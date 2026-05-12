@@ -1,0 +1,262 @@
+# Pre-commit Hooks 配置
+# 文件位置: .pre-commit-config.yaml
+#
+# 这个文件定义了"提交代码前自动检查",防止低质量代码进入仓库。
+# 业务人员只需运行 `pre-commit install` 一次,之后每次git commit会自动触发。
+#
+# 如果某个检查失败,commit会被阻止——这是好事,说明代码有问题。
+
+repos:
+  # ============================================================
+  # 通用检查(所有项目都要)
+  # ============================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        description: 移除行尾空格
+      - id: end-of-file-fixer
+        description: 确保文件以换行符结尾
+      - id: check-yaml
+        description: YAML语法检查
+        exclude: ^(\.github-workflows-.*\.yml)$
+      - id: check-json
+        description: JSON语法检查
+      - id: check-toml
+        description: TOML语法检查
+      - id: check-merge-conflict
+        description: 检查未解决的合并冲突标记
+      - id: check-case-conflict
+        description: 防止大小写不同的同名文件
+      - id: check-added-large-files
+        args: ['--maxkb=1000']  # 不允许超过1MB的文件
+        description: 防止大文件意外提交
+      - id: detect-private-key
+        description: 检测私钥泄露
+      - id: detect-aws-credentials
+        description: 检测AWS密钥泄露
+        args: ['--allow-missing-credentials']
+      - id: mixed-line-ending
+        description: 统一换行符为LF
+
+  # ============================================================
+  # 密钥扫描(防止意外提交密钥)
+  # ============================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        description: 全面密钥/敏感信息检测
+        args:
+          - '--baseline'
+          - '.secrets.baseline'
+        exclude: |
+          (?x)^(
+            package-lock\.json|
+            yarn\.lock|
+            pnpm-lock\.yaml|
+            poetry\.lock|
+            \.secrets\.baseline
+          )$
+
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.78.0
+    hooks:
+      - id: trufflehog
+        description: 深度密钥扫描(扫描git历史)
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
+        language: system
+        stages: ['commit', 'push']
+
+  # ============================================================
+  # JavaScript/TypeScript 检查
+  # ============================================================
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.10.0
+    hooks:
+      - id: eslint
+        description: ESLint代码规范
+        files: \.(js|jsx|ts|tsx)$
+        types: [file]
+        additional_dependencies:
+          - eslint@9.10.0
+          - typescript-eslint@8.0.0
+          - eslint-plugin-react@7.35.0
+          - eslint-plugin-react-hooks@4.6.0
+          - eslint-plugin-jsx-a11y@6.10.0
+          - eslint-plugin-security@3.0.0
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        description: 代码格式化
+        types_or: [javascript, jsx, ts, tsx, css, scss, json, yaml, markdown]
+        exclude: |
+          (?x)^(
+            package-lock\.json|
+            \.next/.*|
+            dist/.*|
+            build/.*
+          )$
+
+  # TypeScript类型检查(本地)
+  - repo: local
+    hooks:
+      - id: typescript-check
+        name: TypeScript Type Check
+        entry: npx tsc --noEmit
+        language: system
+        types: [ts, tsx]
+        pass_filenames: false
+        description: 严格类型检查
+
+  # ============================================================
+  # Python 检查(如果是Python后端)
+  # ============================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.0
+    hooks:
+      - id: ruff
+        description: Python lint(快速)
+        args: [--fix]
+      - id: ruff-format
+        description: Python格式化
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        description: Python类型检查
+        args: ['--strict']
+        additional_dependencies:
+          - 'pydantic>=2.0'
+          - 'types-requests'
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        description: Python安全扫描
+        args: ['-c', 'pyproject.toml']
+        additional_dependencies: ['bandit[toml]']
+
+  # ============================================================
+  # SQL 检查
+  # ============================================================
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.1.1
+    hooks:
+      - id: sqlfluff-lint
+        description: SQL规范检查
+        files: \.sql$
+      - id: sqlfluff-fix
+        description: SQL自动修复
+
+  # ============================================================
+  # Markdown 检查
+  # ============================================================
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.41.0
+    hooks:
+      - id: markdownlint
+        description: Markdown规范检查
+        args: ['--fix']
+
+  # ============================================================
+  # Dockerfile 检查(如果使用Docker)
+  # ============================================================
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.13.0-beta
+    hooks:
+      - id: hadolint-docker
+        description: Dockerfile最佳实践
+        files: Dockerfile.*
+
+  # ============================================================
+  # 提交信息规范
+  # ============================================================
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []  # 用默认配置: feat/fix/docs/style/refactor/test/chore/perf/build/ci
+
+  # ============================================================
+  # 自定义本地检查
+  # ============================================================
+  - repo: local
+    hooks:
+      # 检查是否有 console.log
+      - id: no-console-log
+        name: No console.log in production code
+        entry: bash -c 'grep -rn "console\.log" src/ --include="*.ts" --include="*.tsx" --exclude-dir="__tests__" && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
+        description: 生产代码中不应有console.log
+
+      # 检查是否有 TODO/FIXME 在主分支
+      - id: no-todo-in-main
+        name: No TODO/FIXME in main
+        entry: bash -c 'if [ "$BRANCH" = "main" ]; then grep -rn "TODO\|FIXME" src/ && exit 1 || exit 0; else exit 0; fi'
+        language: system
+        pass_filenames: false
+        description: main分支不应有TODO/FIXME
+
+      # 单元测试快速版(只测改动的文件)
+      - id: unit-test-changed
+        name: Unit tests for changed files
+        entry: npx vitest run --changed --passWithNoTests
+        language: system
+        types: [ts, tsx]
+        pass_filenames: false
+        description: 跑改动文件的单元测试
+
+      # 检查依赖是否更新
+      - id: check-dependencies
+        name: Check dependencies are up to date
+        entry: bash -c 'if [ -f package.json ] && [ package.json -nt node_modules/.package-lock.json ]; then echo "Run npm install first" && exit 1; fi'
+        language: system
+        pass_filenames: false
+        files: package.json|package-lock.json
+
+# ============================================================
+# 全局配置
+# ============================================================
+default_language_version:
+  python: python3.11
+  node: '20.x'
+
+# 默认对所有stage启用
+default_stages: [commit]
+
+# 失败时不继续后续hook(可选,有时全部跑完更好)
+fail_fast: false
+
+# 从CI跳过这些(因为CI会更全面跑)
+# CI会用 SKIP=mutation-test pre-commit run --all-files
+
+# ============================================================
+# 业务人员使用说明
+# ============================================================
+#
+# 1. 安装pre-commit(只需一次):
+#    pip install pre-commit
+#    或 brew install pre-commit (macOS)
+#
+# 2. 在仓库中安装hooks(只需一次):
+#    pre-commit install
+#    pre-commit install --hook-type commit-msg
+#
+# 3. 之后每次 git commit 会自动运行检查
+#
+# 4. 手动运行所有检查:
+#    pre-commit run --all-files
+#
+# 5. 临时跳过检查(强烈不推荐!仅紧急情况):
+#    git commit --no-verify
+#    (但这会绕过质量门禁,绝对避免)
+#
+# 6. 更新hooks版本:
+#    pre-commit autoupdate

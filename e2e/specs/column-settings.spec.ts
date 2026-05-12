@@ -8,7 +8,7 @@ import { waitForTableLoad, clickTab } from '../helpers/arco';
  * - 验证列隐藏/显示效果
  * - 重置列设置
  */
-test.describe('Column Settings', () => {
+test.describe('Column Settings @p2', () => {
   async function goToProjectDetail(page: import('@playwright/test').Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);

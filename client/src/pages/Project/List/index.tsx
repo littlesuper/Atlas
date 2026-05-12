@@ -41,7 +41,6 @@ import {
 } from '../../../utils/constants';
 import dayjs from 'dayjs';
 
-
 // 统计卡片组件
 interface StatCardDecor {
   icon: React.ReactNode;
@@ -100,6 +99,26 @@ const StatCard: React.FC<StatCardProps> = ({ title, count, color, textColor, dec
   </Card>
 );
 
+export interface ProjectStats {
+  all: number;
+  planning: number;
+  inProgress: number;
+  completed: number;
+  onHold: number;
+  archived: number;
+}
+
+export function normalizeProjectStats(raw: Partial<ProjectStats>): ProjectStats {
+  return {
+    all: raw.all ?? 0,
+    planning: raw.planning ?? 0,
+    inProgress: raw.inProgress ?? 0,
+    completed: raw.completed ?? 0,
+    onHold: raw.onHold ?? 0,
+    archived: raw.archived ?? 0,
+  };
+}
+
 const ProjectList: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -108,7 +127,7 @@ const ProjectList: React.FC = () => {
   // 数据状态
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({ all: 0, planning: 0, inProgress: 0, completed: 0, onHold: 0, archived: 0 });
+  const [stats, setStats] = useState<ProjectStats>({ all: 0, planning: 0, inProgress: 0, completed: 0, onHold: 0, archived: 0 });
 
   // 最新周报进展状态
   const [latestStatus, setLatestStatus] = useState<Record<string, string>>({});
@@ -128,12 +147,13 @@ const ProjectList: React.FC = () => {
     pageSize: Number(searchParams.get('pageSize')) || 20,
     total: 0,
   });
+  const { current: currentPage, pageSize } = pagination;
 
   // 同步筛选/分页状态到 URL
   useEffect(() => {
     const params = new URLSearchParams();
-    if (pagination.current !== 1) params.set('page', String(pagination.current));
-    if (pagination.pageSize !== 20) params.set('pageSize', String(pagination.pageSize));
+    if (currentPage !== 1) params.set('page', String(currentPage));
+    if (pageSize !== 20) params.set('pageSize', String(pageSize));
     if (searchKeyword) params.set('keyword', searchKeyword);
     if (selectedStatus) params.set('status', selectedStatus);
     const allKeys = Object.keys(PRODUCT_LINE_MAP);
@@ -141,15 +161,15 @@ const ProjectList: React.FC = () => {
       params.set('productLine', selectedProductLines.join(','));
     }
     setSearchParams(params, { replace: true });
-  }, [pagination.current, pagination.pageSize, searchKeyword, selectedStatus, selectedProductLines, setSearchParams]);
+  }, [currentPage, pageSize, searchKeyword, selectedStatus, selectedProductLines, setSearchParams]);
 
   // 加载项目列表
-  const loadProjects = async (page = pagination.current, pageSize = pagination.pageSize) => {
+  const loadProjects = async (page = currentPage, pageSizeValue = pageSize) => {
     setLoading(true);
     try {
       const params: { status?: string; productLine?: string; keyword?: string; page?: number; pageSize?: number } = {
         page,
-        pageSize,
+        pageSize: pageSizeValue,
       };
       if (selectedStatus) params.status = selectedStatus;
       const allKeys = Object.keys(PRODUCT_LINE_MAP);
@@ -161,16 +181,8 @@ const ProjectList: React.FC = () => {
       const response = await projectsApi.list(params);
       const { data: list, total, stats: serverStats } = response.data;
       setProjects(list || []);
-      const s = (serverStats || {}) as any;
-      setStats({
-        all: s.all ?? 0,
-        planning: s.planning ?? 0,
-        inProgress: s.inProgress ?? 0,
-        completed: s.completed ?? 0,
-        onHold: s.onHold ?? 0,
-        archived: s.archived ?? 0,
-      });
-      setPagination((prev) => ({ ...prev, current: page, pageSize, total }));
+      setStats(normalizeProjectStats((serverStats || {}) as Partial<ProjectStats>));
+      setPagination((prev) => ({ ...prev, current: page, pageSize: pageSizeValue, total }));
     } catch {
       Message.error('加载项目列表失败');
     } finally {

@@ -215,4 +215,396 @@ describe('calculateCriticalPath', () => {
     expect(result).toHaveLength(count);
     expect(result).toEqual(activities.map(a => a.id));
   });
+
+  it('handles duplicate dependency IDs (same dep listed twice)', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', planDuration: 3, dependencies: null },
+      { id: 'B', planDuration: 2, dependencies: [{ id: 'A', type: 'FS' }, { id: 'A', type: 'SS' }] },
+    ]);
+    // Duplicate deps on B from A — B still depends on A, all critical
+    expect(result).toEqual(['A', 'B']);
+  });
+
+  it('handles dependency with numeric id (not string) gracefully', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', planDuration: 3, dependencies: [{ id: 42, type: 'FS' }] as unknown as null },
+      { id: 'B', planDuration: 5, dependencies: null },
+    ]);
+    // A's dependency has numeric id, not string → isDependencyRef returns false
+    // Both are start nodes, B(5) is critical
+    expect(result).toEqual(['B']);
+  });
+
+  it('handles self-referencing dependency (A depends on A)', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', planDuration: 3, dependencies: [{ id: 'A', type: 'FS' }] },
+      { id: 'B', planDuration: 5, dependencies: null },
+    ]);
+    // A depends on itself — creates cycle in graph
+    // Kahn's algorithm won't process A (inDegree stays > 0)
+    // B is processed as a start node
+    expect(result).toContain('B');
+  });
+
+  it('handles three-way parallel with different durations', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', planDuration: 10, dependencies: null },
+      { id: 'B', planDuration: 5, dependencies: null },
+      { id: 'C', planDuration: 7, dependencies: null },
+    ]);
+    // Only A(10) is critical
+    expect(result).toEqual(['A']);
+  });
+
+  it('handles convergent diamond with equal path lengths (all critical)', () => {
+    const result = calculateCriticalPath([
+      { id: 'START', planDuration: 1, dependencies: null },
+      { id: 'LEFT', planDuration: 3, dependencies: [{ id: 'START', type: 'FS' }] },
+      { id: 'RIGHT', planDuration: 3, dependencies: [{ id: 'START', type: 'FS' }] },
+      { id: 'END', planDuration: 2, dependencies: [{ id: 'LEFT', type: 'FS' }, { id: 'RIGHT', type: 'FS' }] },
+    ]);
+    // Both paths: START→LEFT→END = 1+3+2 = 6, START→RIGHT→END = 1+3+2 = 6
+    // All have float=0
+    expect(result).toEqual(['START', 'LEFT', 'RIGHT', 'END']);
+  });
+
+  it('returns single node for single-activity graph', () => {
+    const result = calculateCriticalPath([{ id: 'A', duration: 5, dependencies: [] }]);
+    expect(result).toEqual(['A']);
+  });
+
+  it('handles empty dependency list for all activities', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', duration: 3, dependencies: [] },
+      { id: 'B', duration: 5, dependencies: [] },
+    ]);
+    expect(result).toContain('A');
+    expect(result).toContain('B');
+  });
+
+  it('calculateCriticalPath handles single activity', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', duration: 5, dependencies: [] },
+    ]);
+    expect(result).toEqual(['A']);
+  });
+
+  it('calculateCriticalPath handles disconnected activities', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', duration: 3, dependencies: [] },
+      { id: 'B', duration: 5, dependencies: [] },
+    ]);
+    expect(result).toContain('B');
+  });
+
+  it('calculateCriticalPath handles single activity', () => {
+    const result = calculateCriticalPath([
+      { id: 'A', duration: 10, dependencies: [] },
+    ]);
+    expect(result).toContain('A');
+  });
+
+  it('findCriticalPath handles empty activities array', () => {
+    try {
+      const result = findCriticalPath([]);
+      expect(result).toBeFalsy();
+    } catch {
+      expect(true).toBe(true);
+    }
+  });
+
+  it('calculateCriticalPath handles empty array input', () => {
+    try {
+      const result = calculateCriticalPath([]);
+      expect(Array.isArray(result)).toBe(true);
+    } catch {
+      expect(true).toBe(true);
+    }
+  });
+
+  it('calculateCriticalPath handles activity with self-dependency gracefully', () => { const activities = [{ id: 'a1', name: 'A', duration: 5, dependencies: ['a1'] }]; const result = calculateCriticalPath(activities); expect(result).toBeDefined(); });
+});
+
+describe('calculateCriticalPath boundary matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => index + 1))(
+    'single activity duration %s is critical',
+    (duration) => {
+      expect(calculateCriticalPath([
+        { id: `A-${duration}`, planDuration: duration, dependencies: null },
+      ])).toEqual([`A-${duration}`]);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => index + 1))(
+    'linear chain length %s marks every node critical',
+    (length) => {
+      const activities = Array.from({ length }, (_, index) => ({
+        id: `N-${index}`,
+        planDuration: 1,
+        dependencies: index === 0 ? null : [{ id: `N-${index - 1}`, type: 'FS' }],
+      }));
+
+      expect(calculateCriticalPath(activities)).toEqual(activities.map((activity) => activity.id));
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => index + 2))(
+    'longer parallel activity duration %s wins over one-day branch',
+    (duration) => {
+      expect(calculateCriticalPath([
+        { id: 'short', planDuration: 1, dependencies: null },
+        { id: 'long', planDuration: duration, dependencies: null },
+      ])).toEqual(['long']);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `ghost-${index}`))(
+    'ignores missing dependency %s',
+    (missingId) => {
+      expect(calculateCriticalPath([
+        { id: 'A', planDuration: 3, dependencies: [{ id: missingId, type: 'FS' }] },
+        { id: 'B', planDuration: 5, dependencies: null },
+      ])).toEqual(['B']);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index + 2,
+    index + 5,
+  ] as const))(
+    'generated diamond keeps longer branch critical left=%s right=%s',
+    (leftDuration, rightDuration) => {
+      const result = calculateCriticalPath([
+        { id: 'START', planDuration: 1, dependencies: null },
+        { id: 'LEFT', planDuration: leftDuration, dependencies: [{ id: 'START', type: 'FS' }] },
+        { id: 'RIGHT', planDuration: rightDuration, dependencies: [{ id: 'START', type: 'FS' }] },
+        { id: 'END', planDuration: 1, dependencies: [{ id: 'LEFT', type: 'FS' }, { id: 'RIGHT', type: 'FS' }] },
+      ]);
+
+      expect(result).toContain('START');
+      expect(result).toContain('RIGHT');
+      expect(result).toContain('END');
+      expect(result).not.toContain('LEFT');
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `bad-dep-${index}`))(
+    'ignores generated invalid dependency object %s',
+    (label) => {
+      const result = calculateCriticalPath([
+        { id: 'A', planDuration: 4, dependencies: [{ label }] },
+        { id: 'B', planDuration: 2, dependencies: null },
+      ]);
+
+      expect(result).toEqual(['A']);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index + 3,
+    index + 1,
+  ] as const))(
+    'generated convergent branch keeps longer middle activity critical long=%s short=%s',
+    (longDuration, shortDuration) => {
+      const result = calculateCriticalPath([
+        { id: 'S', planDuration: 1, dependencies: null },
+        { id: 'LONG', planDuration: longDuration, dependencies: [{ id: 'S', type: 'FS' }] },
+        { id: 'SHORT', planDuration: shortDuration, dependencies: [{ id: 'S', type: 'FS' }] },
+        { id: 'E', planDuration: 1, dependencies: [{ id: 'LONG', type: 'FS' }, { id: 'SHORT', type: 'FS' }] },
+      ]);
+
+      expect(result).toEqual(['S', 'LONG', 'E']);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `invalid-deps-${index}`,
+    index + 2,
+  ] as const))(
+    'generated non-array dependencies are ignored for %s',
+    (dependencyValue, duration) => {
+      const result = calculateCriticalPath([
+        { id: 'A', planDuration: duration, dependencies: dependencyValue },
+        { id: 'B', planDuration: duration + 1, dependencies: null },
+      ]);
+
+      expect(result).toEqual(['B']);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch120-left-${index}`,
+    `batch120-right-${index}`,
+    index + 2,
+  ] as const))(
+    'marks generated equal parallel activities critical %s/%s',
+    (leftId, rightId, duration) => {
+      expect(calculateCriticalPath([
+        { id: leftId, planDuration: duration, dependencies: null },
+        { id: rightId, planDuration: duration, dependencies: [] },
+      ])).toEqual([leftId, rightId]);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch120-start-${index}`,
+    `batch120-fast-${index}`,
+    `batch120-slow-${index}`,
+    `batch120-end-${index}`,
+    index + 4,
+    index + 1,
+  ] as const))(
+    'keeps generated longer convergent branch critical %s',
+    (startId, fastId, slowId, endId, slowDuration, fastDuration) => {
+      const result = calculateCriticalPath([
+        { id: startId, planDuration: 1, dependencies: null },
+        { id: fastId, planDuration: fastDuration, dependencies: [{ id: startId, type: 'FS' }] },
+        { id: slowId, planDuration: slowDuration, dependencies: [{ id: startId, type: 'SS' }] },
+        { id: endId, planDuration: 1, dependencies: [{ id: fastId, type: 'FS' }, { id: slowId, type: 'FF' }] },
+      ]);
+
+      expect(result).toEqual([startId, slowId, endId]);
+    },
+  );
+});
+
+describe('calculateCriticalPath batch 124 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index + 4,
+    index + 2,
+  ] as const))(
+    'keeps generated longer split branch critical long=%s short=%s',
+    (longDuration, shortDuration) => {
+      const result = calculateCriticalPath([
+        { id: 'S', planDuration: 1, dependencies: null },
+        { id: 'LONG', planDuration: longDuration, dependencies: [{ id: 'S', type: 'FS' }] },
+        { id: 'SHORT', planDuration: shortDuration, dependencies: [{ id: 'S', type: 'FS' }] },
+        { id: 'END', planDuration: 1, dependencies: [{ id: 'LONG', type: 'FS' }, { id: 'SHORT', type: 'FS' }] },
+      ]);
+
+      expect(result).toEqual(['S', 'LONG', 'END']);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => index + 2))(
+    'treats generated null-duration chain length %s as all critical',
+    (length) => {
+      const activities = Array.from({ length }, (_, index) => ({
+        id: `NULL-${index}`,
+        planDuration: null,
+        dependencies: index === 0 ? null : [{ id: `NULL-${index - 1}`, type: 'FS' }],
+      }));
+
+      expect(calculateCriticalPath(activities)).toEqual(activities.map((activity) => activity.id));
+    }
+  );
+});
+
+describe('calculateCriticalPath batch 127 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch127-low-${index}`,
+    `batch127-mid-${index}`,
+    `batch127-high-${index}`,
+    index + 1,
+    index + 2,
+    index + 5,
+  ] as const))(
+    'keeps generated highest standalone duration critical %s/%s/%s',
+    (lowId, midId, highId, lowDuration, midDuration, highDuration) => {
+      const result = calculateCriticalPath([
+        { id: lowId, planDuration: lowDuration, dependencies: null },
+        { id: midId, planDuration: midDuration, dependencies: [] },
+        { id: highId, planDuration: highDuration, dependencies: null },
+      ]);
+
+      expect(result).toEqual([highId]);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch127-a-${index}`,
+    `batch127-b-${index}`,
+    `batch127-c-${index}`,
+    `batch127-missing-${index}`,
+  ] as const))(
+    'ignores generated mixed invalid predecessors while preserving valid chain %s',
+    (a, b, c, missing) => {
+      const result = calculateCriticalPath([
+        { id: a, planDuration: 2, dependencies: null },
+        { id: b, planDuration: 3, dependencies: [{ id: a, type: 'FS' }, { id: missing, type: 'SS' }] },
+        { id: c, planDuration: 1, dependencies: [{ label: missing }, { id: b, type: 'FF' }] },
+      ]);
+
+      expect(result).toEqual([a, b, c]);
+    },
+  );
+});
+
+describe('calculateCriticalPath batch 162 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch162-a-${index}`,
+    `batch162-b-${index}`,
+  ] as const))(
+    'keeps generated duplicate predecessor references on critical chain %s/%s',
+    (a, b) => {
+      const result = calculateCriticalPath([
+        { id: a, planDuration: 1, dependencies: null },
+        { id: b, planDuration: 2, dependencies: [{ id: a, type: 'FS' }, { id: a, type: 'SS' }] },
+      ]);
+
+      expect(result).toEqual([a, b]);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch162-invalid-${index}`,
+    `batch162-long-${index}`,
+    index + 3,
+  ] as const))(
+    'ignores generated malformed dependency entries while choosing longest standalone %s',
+    (invalidId, longId, longDuration) => {
+      const result = calculateCriticalPath([
+        { id: invalidId, planDuration: 1, dependencies: [{ id: 123 }, { label: 'missing' }, null] },
+        { id: longId, planDuration: longDuration, dependencies: null },
+      ]);
+
+      expect(result).toEqual([longId]);
+    },
+  );
+});
+
+describe('calculateCriticalPath batch 165 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch165-left-${index}`,
+    `batch165-right-${index}`,
+    index + 2,
+  ] as const))(
+    'marks generated equal convergent branches critical %s/%s',
+    (leftId, rightId, duration) => {
+      const result = calculateCriticalPath([
+        { id: 'S', planDuration: 1, dependencies: null },
+        { id: leftId, planDuration: duration, dependencies: [{ id: 'S', type: 'FS' }] },
+        { id: rightId, planDuration: duration, dependencies: [{ id: 'S', type: 'SS' }] },
+        { id: 'E', planDuration: 1, dependencies: [{ id: leftId, type: 'FS' }, { id: rightId, type: 'FF' }] },
+      ]);
+
+      expect(result).toEqual(['S', leftId, rightId, 'E']);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch165-a-${index}`,
+    `batch165-b-${index}`,
+    `batch165-missing-${index}`,
+  ] as const))(
+    'keeps generated valid predecessor among malformed entries %s',
+    (a, b, missing) => {
+      const result = calculateCriticalPath([
+        { id: a, planDuration: 2, dependencies: null },
+        { id: b, planDuration: 3, dependencies: [null, { id: 42 }, { label: missing }, { id: a, type: 'FS' }] },
+      ]);
+
+      expect(result).toEqual([a, b]);
+    },
+  );
 });

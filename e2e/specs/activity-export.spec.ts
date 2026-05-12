@@ -17,7 +17,7 @@ import {
  * - 导入按钮可见性
  * - 导出文件内容验证（通过下载事件）
  */
-test.describe.serial('Activity Import & Export', () => {
+test.describe.serial('Activity Import & Export @p1', () => {
   const projectName = uniqueName('导出测试项目');
   const activityName = '导出活动_' + Date.now();
 

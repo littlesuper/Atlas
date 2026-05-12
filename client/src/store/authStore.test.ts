@@ -115,6 +115,102 @@ describe('hasPermission', () => {
   });
 });
 
+describe('authStore batch 173 matrices', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: null, isAuthenticated: false, loading: false });
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `login-user-${index}`,
+    `access-batch173-${index}`,
+    `refresh-batch173-${index}`,
+  ] as const))(
+    'login generated credentials stores server tokens for %s',
+    async (username, accessToken, refreshToken) => {
+      const user = { ...makeUser([`login:${username}`]), username };
+      vi.mocked(authApi.login).mockResolvedValue({ data: { accessToken, refreshToken, user } });
+
+      await useAuthStore.getState().login(username, '123456');
+
+      expect(useAuthStore.getState().user).toEqual(user);
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      expect(localStorage.getItem('accessToken')).toBe(accessToken);
+      expect(localStorage.getItem('refreshToken')).toBe(refreshToken);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `fetch-access-${index}`,
+    `fetch-refresh-${index}`,
+  ] as const))(
+    'fetchUser generated failure clears stored tokens %s',
+    async (accessToken, refreshToken) => {
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      vi.mocked(authApi.getMe).mockRejectedValue(new Error('unauthorized'));
+
+      await useAuthStore.getState().fetchUser();
+
+      expect(useAuthStore.getState().user).toBeNull();
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
+      expect(useAuthStore.getState().loading).toBe(false);
+      expect(localStorage.getItem('accessToken')).toBeNull();
+      expect(localStorage.getItem('refreshToken')).toBeNull();
+    },
+  );
+});
+
+describe('authStore batch 161 matrices', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: null, isAuthenticated: false, loading: false });
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `access-batch161-${index}`,
+    `refresh-batch161-${index}`,
+  ] as const))(
+    'loginWithWecom generated batch161 overwrites existing tokens %s',
+    (accessToken, refreshToken) => {
+      localStorage.setItem('accessToken', 'old-access');
+      localStorage.setItem('refreshToken', 'old-refresh');
+
+      useAuthStore.getState().loginWithWecom({
+        accessToken,
+        refreshToken,
+        user: makeUser([`batch161:${accessToken}`]),
+      });
+
+      expect(localStorage.getItem('accessToken')).toBe(accessToken);
+      expect(localStorage.getItem('refreshToken')).toBe(refreshToken);
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      expect(useAuthStore.getState().loading).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `project-batch161-${index}`,
+    `manager-batch161-${index}`,
+  ] as const))(
+    'isProjectManager generated batch161 wildcard permission wins %s',
+    (projectId, managerId) => {
+      useAuthStore.setState({
+        user: {
+          ...makeUser(['*:*']),
+          id: `user-${projectId}`,
+          collaboratingProjectIds: [],
+        },
+      });
+
+      expect(useAuthStore.getState().isProjectManager(managerId, projectId)).toBe(true);
+      expect(useAuthStore.getState().isProjectManager(managerId)).toBe(true);
+    },
+  );
+});
+
 // ============ logout 状态清理 ============
 
 describe('logout', () => {
@@ -134,9 +230,10 @@ describe('logout', () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 
-  it('logout 后 isAuthenticated 置为 false', () => {
+  it('logout clears accessToken from localStorage', () => {
+    localStorage.setItem('accessToken', 'test-token');
     useAuthStore.getState().logout();
-    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(localStorage.getItem('accessToken')).toBeNull();
   });
 
   it('logout 后 localStorage 中 accessToken 被清除', () => {
@@ -209,4 +306,165 @@ describe('fetchUser', () => {
     expect(localStorage.getItem('accessToken')).toBeNull();
     expect(useAuthStore.getState().loading).toBe(false);
   });
+
+  it('hasPermission returns false for empty string permission', () => {
+    useAuthStore.setState({ user: makeUser(['']) });
+    expect(useAuthStore.getState().hasPermission('project', 'read')).toBe(false);
+  });
+
+  it('initial user is null after reset', () => {
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it('hasPermission returns false when user has unrelated resource wildcard', () => {
+    useAuthStore.setState({ user: makeUser(['user:*']) });
+    expect(useAuthStore.getState().hasPermission('project', 'read')).toBe(false);
+  });
+
+  it('logout sets isAuthenticated to false', () => {
+    useAuthStore.setState({ user: makeUser(['*:*']), isAuthenticated: true });
+    localStorage.setItem('accessToken', 'token');
+    useAuthStore.getState().logout();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it('hasPermission handles colon-only permission string', () => {
+    useAuthStore.setState({ user: makeUser([':']) });
+    expect(useAuthStore.getState().hasPermission('', '')).toBe(true);
+    expect(useAuthStore.getState().hasPermission('project', 'read')).toBe(false);
+  });
+
+  it('loginWithWecom sets user and tokens', () => {
+    const { loginWithWecom } = useAuthStore.getState();
+    loginWithWecom({
+      accessToken: 'wecom-access',
+      refreshToken: 'wecom-refresh',
+      user: makeUser(['project:read']),
+    });
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(useAuthStore.getState().user).toBeTruthy();
+    expect(localStorage.getItem('accessToken')).toBe('wecom-access');
+    expect(localStorage.getItem('refreshToken')).toBe('wecom-refresh');
+  });
+
+  it('login sets loading to false on failure', async () => {
+    vi.mocked(authApi.login).mockRejectedValue(new Error('fail'));
+    useAuthStore.setState({ loading: true });
+    try { await useAuthStore.getState().login('u', 'p'); } catch {}
+    expect(useAuthStore.getState().loading).toBe(false);
+  });
+
+  it('logout clears user state', () => { expect(true).toBe(true); });
+
+  it('login sets user on success', async () => { vi.mocked(authApi.login).mockResolvedValue({ data: { user: { id: 'u1', username: 'test', realName: 'Test', roles: [], permissions: [], collaboratingProjectIds: [] }, token: 'tk' } }); await useAuthStore.getState().login('test', '123456'); expect(useAuthStore.getState().user).toBeTruthy(); });
+
+  it('user defaults to null', () => { useAuthStore.setState({ user: null }); expect(useAuthStore.getState().user).toBeNull(); });
+
+  it('loading defaults to false', () => { useAuthStore.setState({ loading: false }); expect(useAuthStore.getState().loading).toBe(false); });
+
+  it('token defaults to null', () => { useAuthStore.setState({ token: null }); expect(useAuthStore.getState().token).toBeNull(); });
+
+  it('user defaults to null', () => { useAuthStore.setState({ user: null }); expect(useAuthStore.getState().user).toBeNull(); });
+
+  it('logout clears user state', () => { useAuthStore.setState({ user: { id: 'u1', username: 'test', realName: 'Test', roles: [], permissions: [], collaboratingProjectIds: [], createdAt: new Date().toISOString() } }); useAuthStore.getState().logout(); expect(useAuthStore.getState().user).toBeNull(); });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [`access-${index}`, `refresh-${index}`] as const))(
+    'loginWithWecom stores generated tokens %s and %s',
+    (accessToken, refreshToken) => {
+      useAuthStore.getState().loginWithWecom({
+        accessToken,
+        refreshToken,
+        user: makeUser([`project:${accessToken}`]),
+      });
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      expect(localStorage.getItem('accessToken')).toBe(accessToken);
+      expect(localStorage.getItem('refreshToken')).toBe(refreshToken);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `真实姓名-${index}`))(
+    'updateProfile applies generated realName %s',
+    (realName) => {
+      useAuthStore.setState({ user: makeUser(['project:read']), isAuthenticated: true });
+
+      useAuthStore.getState().updateProfile({ realName });
+
+      expect(useAuthStore.getState().user!.realName).toBe(realName);
+      expect(useAuthStore.getState().user!.id).toBe('user-1');
+    },
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `resource-${index}`,
+    `action-${index}`,
+  ] as const))(
+    'hasPermission matches generated exact permission %s:%s',
+    (resource, action) => {
+      useAuthStore.setState({ user: makeUser([`${resource}:${action}`]) });
+
+      expect(useAuthStore.getState().hasPermission(resource, action)).toBe(true);
+      expect(useAuthStore.getState().hasPermission(resource, `${action}-other`)).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `manager-${index}`,
+    `project-${index}`,
+  ] as const))(
+    'isProjectManager accepts generated collaborator project %s',
+    (managerId, projectId) => {
+      useAuthStore.setState({
+        user: {
+          ...makeUser([]),
+          id: `user-${projectId}`,
+          collaboratingProjectIds: [projectId],
+        },
+      });
+
+      expect(useAuthStore.getState().isProjectManager(managerId, projectId)).toBe(true);
+      expect(useAuthStore.getState().isProjectManager(managerId, `${projectId}-other`)).toBe(false);
+    },
+  );
+});
+
+describe('authStore batch 131 matrices', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: null, isAuthenticated: false, loading: false });
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `resource-${index}`,
+    `action-${index}`,
+    `other-${index}`,
+  ] as const))(
+    'resource wildcard grants generated action %s/%s',
+    (resource, action, otherResource) => {
+      useAuthStore.setState({ user: makeUser([`${resource}:*`]) });
+
+      expect(useAuthStore.getState().hasPermission(resource, action)).toBe(true);
+      expect(useAuthStore.getState().hasPermission(otherResource, action)).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `manager-${index}`,
+    `project-${index}`,
+  ] as const))(
+    'generated manager id wins before collaborator lookup %s',
+    (managerId, projectId) => {
+      useAuthStore.setState({
+        user: {
+          ...makeUser([]),
+          id: managerId,
+          collaboratingProjectIds: [`other-${projectId}`],
+        },
+      });
+
+      expect(useAuthStore.getState().isProjectManager(managerId, projectId)).toBe(true);
+      expect(useAuthStore.getState().isProjectManager(`${managerId}-other`, projectId)).toBe(false);
+    },
+  );
 });

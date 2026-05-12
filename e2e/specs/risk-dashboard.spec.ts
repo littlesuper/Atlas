@@ -12,7 +12,7 @@ import {
   clickTab,
 } from '../helpers/arco';
 
-test.describe.serial('Risk Dashboard', () => {
+test.describe.serial('Risk Dashboard @p1', () => {
   const projectName = uniqueName('风险仪表盘测试');
 
   test('setup: create project with activity and trigger assessment', async ({ authedPage: page }) => {

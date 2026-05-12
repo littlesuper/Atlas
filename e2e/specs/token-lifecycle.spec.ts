@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { credentials } from '../fixtures/test-data';
 
-test.describe.serial('Token Lifecycle (AUTH-016/017/033)', () => {
+test.describe.serial('Token Lifecycle (AUTH-016/017/033) @p0', () => {
   async function getToken(page: import('@playwright/test').Page): Promise<string> {
     return (await page.evaluate(() => localStorage.getItem('accessToken'))) || '';
   }

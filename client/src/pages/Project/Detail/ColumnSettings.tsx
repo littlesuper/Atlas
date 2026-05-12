@@ -22,6 +22,14 @@ interface ColumnSettingsProps {
   extraActions?: React.ReactNode;
 }
 
+export function buildOrderedDefs(order: string[], columnDefs: ColumnDef[]): ColumnDef[] {
+  return order.map((key) => columnDefs.find((d) => d.key === key)).filter((d): d is ColumnDef => !!d);
+}
+
+export function toggleColumnVisible(visible: string[], key: string, checked: boolean): string[] {
+  return checked ? [...visible, key] : visible.filter((k) => k !== key);
+}
+
 const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onChange, defaultPrefs, extraActions }) => {
   const [popoverVisible, setPopoverVisible] = useState(false);
 
@@ -30,15 +38,10 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
   const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
   const draggingRef = useRef(false);
 
-  // Build ordered list of column defs (only those with labels, i.e., excluding drag handle)
-  const orderedDefs = prefs.order
-    .map((key) => columnDefs.find((d) => d.key === key))
-    .filter((d): d is ColumnDef => !!d);
+  const orderedDefs = buildOrderedDefs(prefs.order, columnDefs);
 
   const handleToggle = (key: string, checked: boolean) => {
-    const newVisible = checked
-      ? [...prefs.visible, key]
-      : prefs.visible.filter((k) => k !== key);
+    const newVisible = toggleColumnVisible(prefs.visible, key, checked);
     onChange({ ...prefs, visible: newVisible });
   };
 

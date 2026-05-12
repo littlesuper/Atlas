@@ -11,7 +11,7 @@ import { waitForTableLoad, clickTab, waitForPageLoad } from '../helpers/arco';
  * - 甘特图 Tab
  * - 各 Tab 之间切换不丢失数据
  */
-test.describe('Project Detail Tabs', () => {
+test.describe('Project Detail Tabs @p1', () => {
   async function goToProjectDetail(page: import('@playwright/test').Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);

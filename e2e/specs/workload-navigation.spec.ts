@@ -7,7 +7,7 @@ import { waitForTableLoad, clickNavItem, waitForPageLoad } from '../helpers/arco
  * - 需关注列表中点击活动跳转
  * - 需关注列表中点击项目名跳转
  */
-test.describe('Workload Page Navigation', () => {
+test.describe('Workload Page Navigation @p1', () => {
 
   // ──────── TC1: navigate to workload page ────────
   test('workload page loads with stat cards', async ({ authedPage: page }) => {

@@ -19,8 +19,13 @@ function _parseChineseDate(dateStr: string): string | null {
 
 let TOKEN = '';
 
-async function api(method: string, path: string, body?: any): Promise<any> {
-  const opts: any = {
+type ApiRecord = Record<string, unknown>;
+type ApiEntity = ApiRecord & { id?: string; error?: unknown; data?: unknown };
+type UserSummary = { id: string; username?: string; realName: string };
+type ActivitySummary = { id: string };
+
+async function api<T = ApiRecord>(method: string, path: string, body?: unknown): Promise<T> {
+  const opts: RequestInit = {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -31,9 +36,9 @@ async function api(method: string, path: string, body?: any): Promise<any> {
   const res = await fetch(`${BASE_URL}${path}`, opts);
   const text = await res.text();
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as T;
   } catch {
-    return { error: text, status: res.status };
+    return { error: text, status: res.status } as T;
   }
 }
 
@@ -43,7 +48,10 @@ async function login() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: 'admin123' }),
   });
-  const data = await res.json();
+  const data = await res.json() as { accessToken?: string };
+  if (!data.accessToken) {
+    throw new Error('登录响应缺少 accessToken');
+  }
   TOKEN = data.accessToken;
   console.log('✓ 登录成功');
 }
@@ -84,22 +92,22 @@ function _parseAssignees(raw: string): string[] {
 
 async function ensureUsers() {
   // 获取现有用户
-  const existing = await api('GET', '/users?pageSize=100');
-  const users = existing.data || existing;
+  const existing = await api<{ data?: UserSummary[] } | UserSummary[]>('GET', '/users?pageSize=100');
+  const users = Array.isArray(existing) ? existing : existing.data || [];
 
   for (const u of users) {
     // 通过 realName 映射
     USER_ID_MAP[u.realName] = u.id;
   }
 
-  console.log(`✓ 现有用户 ${users.length} 人: ${users.map((u: any) => u.realName).join(', ')}`);
+  console.log(`✓ 现有用户 ${users.length} 人: ${users.map((u) => u.realName).join(', ')}`);
 
   // 创建缺失的用户
   for (const [realName, info] of Object.entries(PEOPLE)) {
     if (USER_ID_MAP[realName]) continue;
 
     console.log(`  创建用户: ${realName} (${info.username})`);
-    const result = await api('POST', '/users', {
+    const result = await api<ApiEntity>('POST', '/users', {
       username: info.username,
       email: info.email,
       password: '123456',
@@ -113,8 +121,8 @@ async function ensureUsers() {
     } else if (result.error) {
       console.log(`  ✗ 创建失败: ${realName} - ${result.error}`);
       // 尝试查找已存在的用户
-      const retry = await api('GET', '/users?pageSize=100');
-      const retryUsers = retry.data || retry;
+      const retry = await api<{ data?: UserSummary[] } | UserSummary[]>('GET', '/users?pageSize=100');
+      const retryUsers = Array.isArray(retry) ? retry : retry.data || [];
       for (const u of retryUsers) {
         if (u.realName === realName || u.username === info.username) {
           USER_ID_MAP[realName] = u.id;
@@ -189,7 +197,7 @@ const ACTIVITIES: RawActivity[] = [
   { phase: 'DVT', name: '【测试】DVT整机测试-软件', assignees: '田萌', planDuration: 15, planStartDate: '2026-05-08', planEndDate: '2026-05-29', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【测试】DVT整机测试-工厂', assignees: '刘前程', planDuration: 10, planStartDate: '2026-05-08', planEndDate: '2026-05-22', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【结构】T0 模具评审', assignees: '叶鹏飞', planDuration: 2, planStartDate: '2026-05-15', planEndDate: '2026-05-18', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
-  { phase: 'DVT', name: '【商务流程】试产、量产下单', assignees: '刘前程', planDuration: 7, planStartDate: '2026-05-06', planEndDate: '2026-05-14', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '提前下整机生产订单' },
+  { phase: 'DVT', name: '【商务流程】试产、量产下单', assignees: '刘前程', planDuration: 7, planStartDate: '2026-05-06', planEndDate: '2026-05-14', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '提前下整机生产订单', notes: '' },
   { phase: 'DVT', name: '【结构】T0 样品生产', assignees: '刘前程', planDuration: 3, planStartDate: '2026-05-19', planEndDate: '2026-05-21', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【包材】样品确认(二次)', assignees: '成颖欣, 莫学舞', planDuration: 2, planStartDate: '2026-05-22', planEndDate: '2026-05-25', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
   { phase: 'DVT', name: '【结构】T0 样品试装', assignees: '叶鹏飞', planDuration: 2, planStartDate: '2026-05-22', planEndDate: '2026-05-25', actualStartDate: null, actualEndDate: null, isMilestone: false, status: '', notes: '' },
@@ -222,8 +230,8 @@ const ACTIVITIES: RawActivity[] = [
 
 async function deleteExistingActivities() {
   // 获取项目现有活动
-  const res = await api('GET', `/activities?projectId=${PROJECT_ID}&pageSize=200`);
-  const activities = res.data || res || [];
+  const res = await api<{ data?: ActivitySummary[] } | ActivitySummary[]>('GET', `/activities?projectId=${PROJECT_ID}&pageSize=200`);
+  const activities = Array.isArray(res) ? res : res.data || [];
   if (activities.length > 0) {
     console.log(`  删除 ${activities.length} 个现有活动...`);
     for (const a of activities) {
@@ -263,7 +271,7 @@ async function createActivities() {
 
     // 创建阶段父活动
     console.log(`\n▶ 创建阶段: ${phaseNames[phase]} (${phaseActivities.length} 个任务)`);
-    const phaseResult = await api('POST', '/activities', {
+    const phaseResult = await api<ApiEntity>('POST', '/activities', {
       projectId: PROJECT_ID,
       name: phaseNames[phase],
       type: 'PHASE',
@@ -306,7 +314,7 @@ async function createActivities() {
       if (act.isMilestone) notesParts.push('⭐ 关键节点');
       if (act.notes) notesParts.push(act.notes);
 
-      const body: any = {
+      const body: ApiRecord = {
         projectId: PROJECT_ID,
         name: act.name,
         type: act.isMilestone ? 'MILESTONE' : 'TASK',
@@ -324,7 +332,7 @@ async function createActivities() {
       if (act.actualEndDate) body.endDate = act.actualEndDate;
       if (assigneeIds.length > 0) body.assigneeIds = assigneeIds;
 
-      const result = await api('POST', '/activities', body);
+      const result = await api<ApiEntity>('POST', '/activities', body);
       if (result.id) {
         totalCreated++;
         const assigneeStr = assigneeNames.join(', ');

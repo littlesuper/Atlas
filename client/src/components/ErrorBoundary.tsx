@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo } from 'react';
 import { Button, Result } from '@arco-design/web-react';
+import { captureAppError } from '../utils/monitoring';
 
 interface Props {
   children: React.ReactNode;
@@ -22,6 +23,10 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo);
+    captureAppError(error, {
+      tags: { source: 'ErrorBoundary' },
+      extra: { componentStack: errorInfo.componentStack },
+    });
   }
 
   handleReset = () => {

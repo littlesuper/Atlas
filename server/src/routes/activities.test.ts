@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import type { Prisma, PrismaClient } from '@prisma/client';
+
+type ExecutorCreateInput = { source?: string };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -33,8 +36,10 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
     },
-    $transaction: vi.fn((fn: any) =>
-      typeof fn === 'function' ? fn(mockPrisma) : Promise.all(fn)
+    $transaction: vi.fn((fn: unknown) =>
+      typeof fn === 'function'
+        ? (fn as (client: typeof mockPrisma) => unknown)(mockPrisma)
+        : Promise.all(fn as Promise<unknown>[])
     ),
   },
   mockCanManage: vi.fn().mockReturnValue(true),
@@ -43,11 +48,11 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class {
-    constructor() {
-      return mockPrisma as any;
-    }
-  },
+	  PrismaClient: class {
+	    constructor() {
+	      return mockPrisma as unknown as PrismaClient;
+	    }
+	  },
   ActivityType: { TASK: 'TASK', MILESTONE: 'MILESTONE', PHASE: 'PHASE' },
   ActivityStatus: {
     NOT_STARTED: 'NOT_STARTED',
@@ -58,12 +63,12 @@ vi.mock('@prisma/client', () => ({
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: Request, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
       realName: '管理员',
-      roles: [{ name: '系统管理员' }],
+      roles: [{ id: 'role-admin', name: '系统管理员', description: null }],
       permissions: ['*:*'],
       collaboratingProjectIds: [],
     };
@@ -72,9 +77,9 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
-  canManageProject: (...args: any[]) => mockCanManage(...args),
-  sanitizePagination: (p: any, ps: any) => ({
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  canManageProject: (...args: unknown[]) => mockCanManage(...args),
+  sanitizePagination: (p: unknown, ps: unknown) => ({
     pageNum: Number(p) || 1,
     pageSizeNum: Number(ps) || 20,
   }),
@@ -110,14 +115,14 @@ vi.mock('../utils/aiClient', () => ({
   callAi: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('../utils/excelActivityParser', () => ({
-  parseExcelActivities: vi.fn().mockReturnValue([]),
+  parseExcelActivities: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../middleware/validate', () => ({
-  validate: () => (_req: any, _res: any, next: any) => next(),
+  validate: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 vi.mock('multer', () => {
   const m = () => ({
-    single: () => (_req: any, _res: any, next: any) => next(),
+    single: () => (_req: Request, _res: Response, next: NextFunction) => next(),
   });
   m.memoryStorage = vi.fn();
   m.diskStorage = vi.fn();
@@ -188,6 +193,7 @@ const sampleActivity2 = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env.FEATURE_FLAGS;
   mockCanManage.mockReturnValue(true);
 });
 
@@ -205,6 +211,20 @@ describe('GET /api/activities/project/:projectId', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(2);
     expect(res.body[0].name).toBe('测试活动');
+    expect(res.body[0].checkItems).toEqual([
+      { id: 'ci-1', checked: true },
+      { id: 'ci-2', checked: false },
+    ]);
+    expect(mockPrisma.activity.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          checkItems: {
+            select: { id: true, checked: true, sortOrder: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+        }),
+      }),
+    );
   });
 
   it('should return paginated list when page/pageSize provided', async () => {
@@ -346,7 +366,7 @@ describe('GET /api/activities/project/:projectId/critical-path', () => {
   it('should return empty array when no activities', async () => {
     mockPrisma.activity.findMany.mockResolvedValue([]);
     const { calculateCriticalPath } = await import('../utils/criticalPath');
-    (calculateCriticalPath as any).mockReturnValue([]);
+    vi.mocked(calculateCriticalPath).mockReturnValue([]);
 
     const res = await request(app).get(
       '/api/activities/project/proj-1/critical-path'
@@ -617,7 +637,7 @@ describe('POST /api/activities', () => {
     const { detectCircularDependency } = await import(
       '../utils/dependencyValidator'
     );
-    (detectCircularDependency as any).mockResolvedValue(true);
+    vi.mocked(detectCircularDependency).mockResolvedValue(true);
 
     const res = await request(app).post('/api/activities').send({
       projectId: 'proj-1',
@@ -629,7 +649,7 @@ describe('POST /api/activities', () => {
     expect(res.body.error).toBe('存在循环依赖，无法保存');
 
     // Reset mock
-    (detectCircularDependency as any).mockResolvedValue(false);
+    vi.mocked(detectCircularDependency).mockResolvedValue(false);
   });
 
   it('should return 403 when user cannot manage project', async () => {
@@ -943,7 +963,7 @@ describe('POST /api/activities/project/:projectId/ai-schedule', () => {
     mockPrisma.project.findMany.mockResolvedValue([]);
 
     const { callAi } = await import('../utils/aiClient');
-    (callAi as any).mockResolvedValue({
+    vi.mocked(callAi).mockResolvedValue({
       content: JSON.stringify({
         suggestions: [{ name: 'A', suggestedDuration: 10, reason: '建议' }],
         risks: [],
@@ -959,7 +979,29 @@ describe('POST /api/activities/project/:projectId/ai-schedule', () => {
     expect(res.body.summary).toBe('AI总结');
 
     // Reset
-    (callAi as any).mockResolvedValue(null);
+    vi.mocked(callAi).mockResolvedValue(null);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POST /api/activities/project/:projectId/import-excel — Excel 导入
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('POST /api/activities/project/:projectId/import-excel', () => {
+  it('should reject import before DB access when activity.import flag is disabled', async () => {
+    process.env.FEATURE_FLAGS = '!activity.import';
+
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/import-excel')
+      .send({});
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({
+      error: 'FEATURE_DISABLED',
+      feature: 'activity.import',
+      message: '活动导入功能已临时关闭',
+    });
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -1089,6 +1131,25 @@ describe('PUT /api/activities/:id', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('PUT /api/activities/batch-update', () => {
+  it('should reject batch update before DB access when activity.bulk-mutation flag is disabled', async () => {
+    process.env.FEATURE_FLAGS = '!activity.bulk-mutation';
+
+    const res = await request(app)
+      .put('/api/activities/batch-update')
+      .send({
+        ids: ['act-1', 'act-2'],
+        updates: { status: 'IN_PROGRESS' },
+      });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({
+      error: 'FEATURE_DISABLED',
+      feature: 'activity.bulk-mutation',
+      message: '活动批量变更功能已临时关闭',
+    });
+    expect(mockPrisma.activity.findMany).not.toHaveBeenCalled();
+  });
+
   it('should batch update activities successfully', async () => {
     mockPrisma.activity.findMany.mockResolvedValue([
       { id: 'act-1', projectId: 'proj-1' },
@@ -1192,8 +1253,12 @@ describe('Activity Role Binding: POST /api/activities with roleId', () => {
     });
 
     expect(res.status).toBe(201);
-    const createCall = mockPrisma.activity.create.mock.calls[0][0];
-    const sources = createCall.data.executors.create.map((e: any) => e.source);
+    const createCall = mockPrisma.activity.create.mock.calls[0][0] as Prisma.ActivityCreateArgs;
+    const executorCreate = createCall.data.executors?.create as unknown;
+    const executorCreates = (Array.isArray(executorCreate) ? executorCreate : [executorCreate])
+      .filter((e): e is ExecutorCreateInput => typeof e === 'object' && e !== null);
+    const sources = executorCreates
+      .map((e) => e.source);
     expect(sources).toContain('MANUAL_ADD');
   });
 
@@ -1405,6 +1470,22 @@ describe('DELETE /api/activities/:id', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('DELETE /api/activities/batch-delete', () => {
+  it('should reject batch delete before DB access when activity.bulk-mutation flag is disabled', async () => {
+    process.env.FEATURE_FLAGS = '!activity.bulk-mutation';
+
+    const res = await request(app)
+      .delete('/api/activities/batch-delete')
+      .send({ ids: ['act-1', 'act-2'] });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({
+      error: 'FEATURE_DISABLED',
+      feature: 'activity.bulk-mutation',
+      message: '活动批量变更功能已临时关闭',
+    });
+    expect(mockPrisma.activity.findMany).not.toHaveBeenCalled();
+  });
+
   it('should batch delete activities successfully', async () => {
     mockPrisma.activity.findMany.mockResolvedValue([
       { id: 'act-1', projectId: 'proj-1' },
@@ -1564,11 +1645,12 @@ describe('ACT-014: 5-level nested tree structure', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(5);
-    expect(res.body.find((a: any) => a.id === 'l4').parentId).toBe('l3');
-    expect(res.body.find((a: any) => a.id === 'l3').parentId).toBe('l2');
-    expect(res.body.find((a: any) => a.id === 'l2').parentId).toBe('l1');
-    expect(res.body.find((a: any) => a.id === 'l1').parentId).toBe('l0');
-    expect(res.body.find((a: any) => a.id === 'l0').parentId).toBeNull();
+    const body = res.body as Array<{ id: string; parentId: string | null }>;
+    expect(body.find((a) => a.id === 'l4')?.parentId).toBe('l3');
+    expect(body.find((a) => a.id === 'l3')?.parentId).toBe('l2');
+    expect(body.find((a) => a.id === 'l2')?.parentId).toBe('l1');
+    expect(body.find((a) => a.id === 'l1')?.parentId).toBe('l0');
+    expect(body.find((a) => a.id === 'l0')?.parentId).toBeNull();
   });
 });
 
@@ -1616,5 +1698,33 @@ describe('ACT-040: cross-project batch update returns 400', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('批量操作仅支持同一项目的活动');
+  });
+});
+
+describe('DELETE /api/activities/:id - permission edge case', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('should return 403 when user cannot manage project for delete', async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue(sampleActivity);
+    mockPrisma.project.findUnique.mockResolvedValue({
+      managerId: 'other-user',
+      status: 'IN_PROGRESS',
+    });
+    mockCanManage.mockReturnValue(false);
+
+    const res = await request(app).delete('/api/activities/act-1');
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('只能删除自己负责的项目中的活动');
+  });
+
+  it('should return 500 when delete operation throws database error', async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue(sampleActivity);
+    mockPrisma.project.findUnique.mockResolvedValue({ managerId: 'user-1', status: 'IN_PROGRESS' });
+    mockPrisma.activity.delete.mockRejectedValue(new Error('DB error'));
+
+    const res = await request(app).delete('/api/activities/act-1');
+
+    expect(res.status).toBe(500);
   });
 });

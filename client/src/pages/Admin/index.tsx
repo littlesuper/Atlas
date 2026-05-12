@@ -33,62 +33,16 @@ import AiManagement from './AiManagement';
 import AuditLogTab from './AuditLog';
 import WecomManagement from './WecomManagement';
 import HolidayManagement from './HolidayManagement';
-import RoleMembersTab from './RoleMembersTab';
 import dayjs from 'dayjs';
 import { pinyin } from 'pinyin-pro';
 
-// 内联角色编辑器：挂载后强制展开下拉，外部点击触发提交
-interface InlineRoleEditorProps {
-  roles: Role[];
-  initialValue: string[];
-  loading: boolean;
-  onChange: (value: string[]) => void;
-  onCommit: () => void;
+export function resolveTab(urlTab: string, visibleTabs: string[]): string {
+  return visibleTabs.includes(urlTab) ? urlTab : (visibleTabs[0] || 'ai');
 }
-const InlineRoleEditor: React.FC<InlineRoleEditorProps> = ({ roles, initialValue, loading, onChange, onCommit }) => {
-  const [popupVisible, setPopupVisible] = React.useState(false);
-  const [value, setValue] = React.useState<string[]>(initialValue);
 
-  // 挂载后下一帧强制展开（避开 React 同步事件循环导致的关闭）
-  React.useEffect(() => {
-    const t = setTimeout(() => setPopupVisible(true), 0);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <Select
-      size="small"
-      mode="multiple"
-      showSearch
-      allowClear
-      popupVisible={popupVisible}
-      onVisibleChange={(v) => {
-        setPopupVisible(v);
-        if (!v) onCommit();
-      }}
-      filterOption={(input, option) => {
-        const label = String(option?.props?.value ?? '');
-        return label.toLowerCase().includes(input.toLowerCase());
-      }}
-      value={value}
-      onChange={(v) => {
-        const arr = v as string[];
-        setValue(arr);
-        onChange(arr);
-      }}
-      loading={loading}
-      disabled={loading}
-      style={{ width: '100%' }}
-      placeholder="搜索或选择角色"
-    >
-      {roles.map((r) => (
-        <Select.Option key={r.id} value={r.name}>
-          {r.name}
-        </Select.Option>
-      ))}
-    </Select>
-  );
-};
+export function generateUsername(realName: string): string {
+  return pinyin(realName, { toneType: 'none', type: 'array' }).join('');
+}
 
 const AdminPage: React.FC = () => {
   const { hasPermission } = useAuthStore();
@@ -113,14 +67,14 @@ const AdminPage: React.FC = () => {
   }, [hasPermission]);
 
   const urlTab = searchParams.get('tab') || '';
-  const mainTab = visibleTabs.includes(urlTab) ? urlTab : (visibleTabs[0] || 'ai');
+  const mainTab = resolveTab(urlTab, visibleTabs);
 
   // URL 上的 tab 不在可见列表中时，自动纠正 URL
   useEffect(() => {
     if (visibleTabs.length > 0 && urlTab !== mainTab) {
       setSearchParams({ tab: mainTab }, { replace: true });
     }
-  }, [mainTab, urlTab, visibleTabs]);
+  }, [mainTab, setSearchParams, urlTab, visibleTabs]);
 
   // 用户数据
   const [users, setUsers] = useState<User[]>([]);
@@ -146,10 +100,10 @@ const AdminPage: React.FC = () => {
   const [permissions, setPermissions] = useState<Permission[]>([]);
 
   // 加载用户列表
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const params: any = {};
+      const params: Parameters<typeof usersApi.list>[0] = {};
       if (userSearchKeyword) params.keyword = userSearchKeyword;
       if (canLoginFilter) params.canLogin = canLoginFilter;
       const response = await usersApi.list(params);
@@ -159,10 +113,10 @@ const AdminPage: React.FC = () => {
     } finally {
       setUsersLoading(false);
     }
-  };
+  }, [canLoginFilter, userSearchKeyword]);
 
   // 加载角色列表
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
     setRolesLoading(true);
     try {
       const response = await rolesApi.list();
@@ -172,31 +126,30 @@ const AdminPage: React.FC = () => {
     } finally {
       setRolesLoading(false);
     }
-  };
+  }, []);
 
   // 加载权限列表
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
       const response = await rolesApi.getPermissions();
       setPermissions(response.data);
     } catch (error) {
       console.error('加载权限列表失败', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (mainTab === 'account') {
-      loadUsers();
       loadRoles();
       loadPermissions();
     }
-  }, [mainTab]);
+  }, [loadPermissions, loadRoles, mainTab]);
 
   useEffect(() => {
     if (mainTab === 'account') {
       loadUsers();
     }
-  }, [userSearchKeyword, canLoginFilter]);
+  }, [loadUsers, mainTab]);
 
   // 处理搜索
   const handleUserSearch = useMemo(() => {
@@ -242,7 +195,7 @@ const AdminPage: React.FC = () => {
       }).filter(Boolean) || [];
 
       if (editingUser) {
-        const updateData: any = {
+        const updateData: Parameters<typeof usersApi.update>[1] = {
           realName: values.realName,
           wecomUserId: values.wecomUserId || null,
           canLogin: formCanLogin,
@@ -431,19 +384,21 @@ const AdminPage: React.FC = () => {
               minHeight: 22,
               padding: '2px 4px',
               borderRadius: 4,
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 4,
             }}
             title={canEdit ? '单击编辑角色' : undefined}
           >
-            <Space wrap>
-              {userRoles.map((role) => (
-                <Tag key={role} color="blue">
-                  {role}
-                </Tag>
-              ))}
-              {userRoles.length === 0 && (
-                <span style={{ color: 'var(--color-text-4)' }}>-</span>
-              )}
-            </Space>
+            {userRoles.map((role) => (
+              <Tag key={role} color="blue">
+                {role}
+              </Tag>
+            ))}
+            {userRoles.length === 0 && (
+              <span style={{ color: 'var(--color-text-4)' }}>-</span>
+            )}
           </div>
         );
       },
@@ -674,9 +629,6 @@ const AdminPage: React.FC = () => {
                   <Tabs.TabPane key="wecom" title="企微配置">
                     <WecomManagement />
                   </Tabs.TabPane>
-                  <Tabs.TabPane key="roleMembers" title="角色成员">
-                    <RoleMembersTab />
-                  </Tabs.TabPane>
                 </Tabs>
           </Tabs.TabPane>
           )}
@@ -730,8 +682,7 @@ const AdminPage: React.FC = () => {
               placeholder="请输入姓名"
               onChange={(value) => {
                 if (!editingUser && value) {
-                  const py = pinyin(value, { toneType: 'none', type: 'array' }).join('');
-                  userForm.setFieldValue('username', py);
+                  userForm.setFieldValue('username', generateUsername(value));
                 }
               }}
             />

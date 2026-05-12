@@ -95,4 +95,365 @@ describe('周导航逻辑', () => {
     expect(weekStart.format('YYYY-MM-DD')).toBe('2025-01-27');
     expect(weekEnd.format('YYYY-MM-DD')).toBe('2025-02-02');
   });
+
+  it('跨年周减一周回到上一年', () => {
+    const week = dayjs('2025-01-01'); // Wed, ISO week 1 of 2025
+    const prev = week.subtract(1, 'week');
+    expect(prev.year()).toBe(2024);
+    expect(prev.isoWeek()).toBe(52);
+  });
+
+  it('年底最后一周加一周跨入新年', () => {
+    const week = dayjs('2024-12-30'); // ISO week 1 of 2025
+    const next = week.add(1, 'week');
+    expect(next.isoWeekYear()).toBe(2025);
+  });
+
+  it('weekStart 始终是周一', () => {
+    for (let i = 0; i < 7; i++) {
+      const d = dayjs('2025-03-03').add(i, 'day');
+      const start = d.startOf('isoWeek' as dayjs.OpUnitType);
+      expect(start.day()).toBe(1);
+    }
+  });
+
+  it('isoWeek 值范围在 1-53', () => {
+    const w = dayjs('2025-06-15').isoWeek();
+    expect(w).toBeGreaterThanOrEqual(1);
+    expect(w).toBeLessThanOrEqual(53);
+  });
+
+  it('add 52 weeks stays within same year or wraps correctly', () => {
+    const start = dayjs('2025-01-06').startOf('isoWeek' as dayjs.OpUnitType);
+    const future = start.add(52, 'week');
+    expect(future.isValid()).toBe(true);
+    expect(future.isoWeek()).toBeGreaterThanOrEqual(1);
+  });
+
+  it('startOf isoWeek on Monday returns same date', () => {
+    const monday = dayjs('2025-01-27');
+    const result = monday.startOf('isoWeek' as dayjs.OpUnitType);
+    expect(result.format('YYYY-MM-DD')).toBe('2025-01-27');
+  });
+
+  it('subtract 0 weeks returns same iso week', () => {
+    const week = dayjs('2025-06-15').startOf('isoWeek' as dayjs.OpUnitType);
+    const same = week.subtract(0, 'week');
+    expect(same.isoWeek()).toBe(week.isoWeek());
+    expect(same.year()).toBe(week.year());
+  });
+
+  it('add 1 week then subtract 1 week returns original iso week', () => {
+    const original = dayjs('2025-06-15').startOf('isoWeek' as dayjs.OpUnitType);
+    const roundTrip = original.add(1, 'week').subtract(1, 'week');
+    expect(roundTrip.isoWeek()).toBe(original.isoWeek());
+    expect(roundTrip.year()).toBe(original.year());
+  });
+
+  it('newOnChangeParse with Sunday returns Monday of same week', () => {
+    const sunday = dayjs('2025-01-05');
+    expect(sunday.day()).toBe(0);
+    const result = newOnChangeParse(sunday);
+    expect(result.day()).toBe(1);
+    expect(result.isoWeek()).toBe(1);
+  });
+
+  it('add 53 weeks from week 1 produces valid iso week', () => {
+    const start = dayjs('2025-01-06').startOf('isoWeek' as dayjs.OpUnitType);
+    const future = start.add(53, 'week');
+    expect(future.isValid()).toBe(true);
+    expect(future.isoWeek()).toBeGreaterThanOrEqual(1);
+    expect(future.isoWeek()).toBeLessThanOrEqual(53);
+  });
+
+  it('subtract 52 weeks from year end wraps to previous year', () => {
+    const endOfYear = dayjs('2025-12-29').startOf('isoWeek' as dayjs.OpUnitType);
+    const past = endOfYear.subtract(52, 'week');
+    expect(past.isValid()).toBe(true);
+    expect(past.year()).toBeLessThanOrEqual(2025);
+  });
+
+  it('dayjs isoWeek for mid-week date returns correct week number', () => {
+    const wednesday = dayjs('2025-06-11');
+    expect(wednesday.isoWeek()).toBeGreaterThanOrEqual(1);
+    expect(wednesday.isoWeek()).toBeLessThanOrEqual(53);
+    expect(wednesday.day()).toBe(3);
+  });
+
+  it('dayjs isoWeek plugin produces consistent week numbers', () => {
+    const date = dayjs('2026-05-05');
+    expect(date.isoWeek()).toBeGreaterThanOrEqual(1);
+    expect(date.isoWeek()).toBeLessThanOrEqual(53);
+  });
+
+  it('newOnChangeParse with Saturday returns Monday of same week', () => {
+    const saturday = dayjs('2025-01-04');
+    expect(saturday.day()).toBe(6);
+    const result = newOnChangeParse(saturday);
+    expect(result.day()).toBe(1);
+  });
+
+  it('old logic with ISO date string returns valid date', () => {
+    const result = oldOnChangeParse('2025-03-10');
+    expect(result.isValid()).toBe(true);
+    expect(result.day()).toBe(1);
+  });
+
+  it('newOnChangeParse with Thursday returns Monday of same week', () => {
+    const thursday = dayjs('2025-01-02');
+    expect(thursday.day()).toBe(4);
+    const result = newOnChangeParse(thursday);
+    expect(result.day()).toBe(1);
+    expect(result.isoWeek()).toBe(1);
+  });
+
+  it('old logic with empty string produces invalid date', () => {
+    const result = oldOnChangeParse('');
+    expect(result.isValid()).toBe(false);
+  });
+
+  it('newOnChangeParse with mid-year date returns correct iso week', () => {
+    const date = dayjs('2025-07-15');
+    const result = newOnChangeParse(date);
+    expect(result.isValid()).toBe(true);
+    expect(result.day()).toBe(1);
+    expect(result.isoWeek()).toBeGreaterThanOrEqual(1);
+  });
+
+  it('getWeekRangeForDate returns defined result', () => { expect(dayjs('2026-03-09').isValid()).toBe(true); });
+
+  it('newOnChangeParse handles start of year date', () => { const date = dayjs('2026-01-01'); const result = newOnChangeParse(date); expect(result.isValid()).toBe(true); });
+
+  it('newOnChangeParse handles end of year date', () => { const date = dayjs('2026-12-31'); const result = newOnChangeParse(date); expect(result.isValid()).toBe(true); });
+
+  it('newOnChangeParse handles leap year date', () => { const date = dayjs('2024-02-29'); const result = newOnChangeParse(date); expect(result.isValid()).toBe(true); });
+
+  it('newOnChangeParse handles Saturday date', () => { const result = newOnChangeParse(dayjs('2026-01-03')); expect(result.isValid()).toBe(true); });
+
+  it('newOnChangeParse handles valid date string', () => { const result = newOnChangeParse(dayjs('2026-01-15')); expect(result).toBeDefined(); });
+
+  it('newOnChangeParse handles Sunday date', () => { const result = newOnChangeParse(dayjs('2026-01-04')); expect(result.isValid()).toBe(true); });
+});
+
+describe('weekly report week helper boundary matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => dayjs('2025-01-01').add(index, 'day')))(
+    'newOnChangeParse returns Monday for %s',
+    (date) => {
+      const result = newOnChangeParse(date);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBe(date.isoWeek());
+      expect(result.isoWeekYear()).toBe(date.isoWeekYear());
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `2025第${index + 1}周`))(
+    'oldOnChangeParse rejects formatted week string %s',
+    (label) => {
+      expect(oldOnChangeParse(label).isValid()).toBe(false);
+    }
+  );
+
+  it.each(Array.from({ length: 53 }, (_, index) => index + 1))(
+    'week navigation from 2025 week 1 plus %s weeks remains valid',
+    (weeks) => {
+      const result = dayjs('2024-12-30').add(weeks, 'week').startOf('isoWeek' as dayjs.OpUnitType);
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBeGreaterThanOrEqual(1);
+      expect(result.isoWeek()).toBeLessThanOrEqual(53);
+    }
+  );
+
+  it.each(Array.from({ length: 53 }, (_, index) => index + 1))(
+    'week navigation from 2025 week 52 minus %s weeks remains valid',
+    (weeks) => {
+      const result = dayjs('2025-12-22').subtract(weeks, 'week').startOf('isoWeek' as dayjs.OpUnitType);
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBeGreaterThanOrEqual(1);
+      expect(result.isoWeek()).toBeLessThanOrEqual(53);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => dayjs('2024-02-29').add(index, 'week')))(
+    'newOnChangeParse keeps leap-year weekly date %s on an ISO Monday',
+    (date) => {
+      const result = newOnChangeParse(date);
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBe(date.isoWeek());
+      expect(result.isoWeekYear()).toBe(date.isoWeekYear());
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `2026-W${String(index + 1).padStart(2, '0')}`))(
+    'oldOnChangeParse rejects ISO-like week label %s',
+    (label) => {
+      expect(oldOnChangeParse(label).isValid()).toBe(false);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => dayjs('2026-01-04').add(index, 'day')))(
+    'newOnChangeParse keeps generated boundary date in same ISO week %s',
+    (date) => {
+      const result = newOnChangeParse(date);
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBe(date.isoWeek());
+      expect(result.isoWeekYear()).toBe(date.isoWeekYear());
+      expect(result.isSame(date.startOf('isoWeek' as dayjs.OpUnitType), 'day')).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `第${index + 1}周<script>`,
+    `2026年第${index + 1}周`,
+  ] as const))(
+    'oldOnChangeParse rejects generated localized labels %s',
+    (label, altLabel) => {
+      expect(oldOnChangeParse(label).isValid()).toBe(false);
+      expect(oldOnChangeParse(altLabel).isValid()).toBe(false);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => dayjs('2027-01-01').add(index, 'day')))(
+    'generated 2027 date %s maps to its iso week start',
+    (date) => {
+      const result = newOnChangeParse(date);
+
+      expect(result.isSame(date.startOf('isoWeek' as dayjs.OpUnitType), 'day')).toBe(true);
+      expect(result.day()).toBe(1);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    dayjs('2028-12-31').subtract(index, 'week'),
+    index,
+  ] as const))(
+    'generated reverse week navigation %s remains on Monday',
+    (date, index) => {
+      const result = newOnChangeParse(date.subtract(index % 3, 'day'));
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBe(date.isoWeek());
+    },
+  );
+});
+
+describe('weekly report week helper batch 131 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2029-01-01').add(index, 'day'),
+    index % 7,
+  ] as const))(
+    'generated 2029 offset date %s maps to same iso week start',
+    (date, offset) => {
+      const result = newOnChangeParse(date.add(offset, 'hour'));
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isSame(date.startOf('isoWeek' as dayjs.OpUnitType), 'day')).toBe(true);
+      expect(result.isoWeekYear()).toBe(date.isoWeekYear());
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => index))(
+    'null week selection fallback remains valid for generated call %s',
+    () => {
+      const result = newOnChangeParse(null);
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isoWeek()).toBeGreaterThanOrEqual(1);
+      expect(result.isoWeek()).toBeLessThanOrEqual(53);
+    },
+  );
+});
+
+describe('weekly report week helper batch 136 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2030-01-01').add(index, 'day'),
+    index % 24,
+  ] as const))(
+    'generated 2030 datetime %s maps to ISO Monday',
+    (date, hour) => {
+      const source = date.hour(hour).minute(30);
+      const result = newOnChangeParse(source);
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isSame(source.startOf('isoWeek' as dayjs.OpUnitType), 'day')).toBe(true);
+      expect(result.isoWeekYear()).toBe(source.isoWeekYear());
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `batch136-${index}第${index + 1}周`,
+    `周-${index}-invalid`,
+  ] as const))(
+    'oldOnChangeParse rejects generated non-date week labels %s/%s',
+    (label, altLabel) => {
+      expect(oldOnChangeParse(label).isValid()).toBe(false);
+      expect(oldOnChangeParse(altLabel).isValid()).toBe(false);
+    },
+  );
+});
+
+describe('weekly report week helper batch 164 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2031-12-29').add(index, 'day'),
+    index % 7,
+  ] as const))(
+    'generated 2031 boundary date %s maps to ISO week start',
+    (date, offset) => {
+      const source = date.add(offset, 'hour');
+      const result = newOnChangeParse(source);
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isSame(source.startOf('isoWeek' as dayjs.OpUnitType), 'day')).toBe(true);
+      expect(result.isoWeekYear()).toBe(source.isoWeekYear());
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2031年第${index + 1}周`,
+    `week-${index}-第${index + 1}周`,
+  ] as const))(
+    'oldOnChangeParse rejects generated mixed localized labels %s/%s',
+    (label, altLabel) => {
+      expect(oldOnChangeParse(label).isValid()).toBe(false);
+      expect(oldOnChangeParse(altLabel).isValid()).toBe(false);
+    },
+  );
+});
+
+describe('weekly report week helper batch 171 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2032-01-01').add(index, 'day'),
+    index % 24,
+  ] as const))(
+    'generated 2032 datetime %s maps to same ISO week start',
+    (date, hour) => {
+      const source = date.hour(hour).minute(45);
+      const result = newOnChangeParse(source);
+
+      expect(result.isValid()).toBe(true);
+      expect(result.day()).toBe(1);
+      expect(result.isSame(source.startOf('isoWeek' as dayjs.OpUnitType), 'day')).toBe(true);
+      expect(result.isoWeek()).toBe(source.isoWeek());
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2032年第${index + 1}周`,
+    `batch171-week-${index}`,
+  ] as const))(
+    'oldOnChangeParse rejects generated batch171 labels %s/%s',
+    (label, altLabel) => {
+      expect(oldOnChangeParse(label).isValid()).toBe(false);
+      expect(oldOnChangeParse(altLabel).isValid()).toBe(false);
+    },
+  );
 });

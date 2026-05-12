@@ -1,6 +1,6 @@
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
-import { PrismaClient, ActivityType } from '@prisma/client';
+import { Prisma, PrismaClient, ActivityStatus, ActivityType, type Priority } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, canManageProject, sanitizePagination } from '../middleware/permission';
 import { calculateWorkdays } from '../utils/workday';
@@ -14,9 +14,75 @@ import { calculateCriticalPath } from '../utils/criticalPath';
 import { pinyin } from 'pinyin-pro';
 import { logger } from '../utils/logger';
 import { autoAssignByRole } from '../utils/roleMembershipResolver';
+import { businessMetrics, recordBusinessEvent } from '../utils/businessMetrics';
+import { isFeatureEnabled, parseFeatureFlags } from '../utils/featureFlags';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const requireFeatureFlag = (feature: string, message: string) =>
+  (_req: Request, res: Response, next: NextFunction) => {
+    if (!isFeatureEnabled(parseFeatureFlags(process.env.FEATURE_FLAGS), feature, true)) {
+      res.status(503).json({
+        error: 'FEATURE_DISABLED',
+        feature,
+        message,
+      });
+      return;
+    }
+    next();
+  };
+
+type ActivityExecutorUser = {
+  user: { id: string; realName: string; username?: string | null };
+};
+
+type ActivityWithExecutorUsers = {
+  executors?: ActivityExecutorUser[];
+};
+
+type ActivityWithRole = {
+  role?: { name: string } | null;
+};
+
+type ReorderItem = { id: string; sortOrder: number };
+type BatchActivityInput = {
+  projectId: string;
+  name: string;
+  description?: string | null;
+  type?: string;
+  phase?: string | null;
+  status?: string;
+  priority?: string;
+  planStartDate?: string | Date | null;
+  planEndDate?: string | Date | null;
+  planDuration?: number | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  duration?: number | null;
+  dependencies?: unknown;
+  notes?: string | null;
+  sortOrder?: number;
+  executorIds?: string[];
+  assigneeIds?: string[];
+};
+
+const isDependencyInput = (value: unknown): value is DependencyInput =>
+  typeof value === 'object' &&
+  value !== null &&
+  'id' in value &&
+  typeof (value as { id?: unknown }).id === 'string';
+
+const dependenciesFromJson = (value: unknown): DependencyInput[] =>
+  Array.isArray(value) ? value.filter(isDependencyInput) : [];
+
+const executorUsers = (activity: ActivityWithExecutorUsers) =>
+  activity.executors?.map((executor) => executor.user) ?? [];
+
+const queryString = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : undefined;
+  return typeof value === 'string' ? value : undefined;
+};
 
 async function buildExecutorsForActivity(
   roleId: string | null | undefined,
@@ -53,8 +119,18 @@ const EXECUTOR_INCLUDE = {
     orderBy: [{ assignedAt: 'asc' }],
   },
   role: { select: { id: true, name: true } },
-};
+} satisfies Prisma.ActivityInclude;
 
+const ACTIVITY_LIST_INCLUDE = {
+  ...EXECUTOR_INCLUDE,
+  checkItems: {
+    select: { id: true, checked: true, sortOrder: true },
+    orderBy: { sortOrder: 'asc' },
+  },
+  _count: {
+    select: { checkItems: true },
+  },
+} satisfies Prisma.ActivityInclude;
 
 /**
  * 查询前置活动并调用调度器计算日期
@@ -97,8 +173,7 @@ async function cascadeUpdateDependents(
 
   const reverseDeps = new Map<string, string[]>();
   for (const a of allActivities) {
-    if (!a.dependencies || !Array.isArray(a.dependencies)) continue;
-    for (const dep of a.dependencies as any[]) {
+    for (const dep of dependenciesFromJson(a.dependencies)) {
       const list = reverseDeps.get(dep.id);
       if (list) list.push(a.id);
       else reverseDeps.set(dep.id, [a.id]);
@@ -124,7 +199,7 @@ async function cascadeUpdateDependents(
       });
       if (!depActivity || !depActivity.dependencies) continue;
 
-      const deps = depActivity.dependencies as unknown as DependencyInput[];
+      const deps = dependenciesFromJson(depActivity.dependencies);
       const resolved = await computeDatesFromDeps(deps, depActivity.planDuration);
 
       if (!resolved.planStartDate && !resolved.planEndDate) continue;
@@ -137,7 +212,7 @@ async function cascadeUpdateDependents(
 
       if (!startChanged && !endChanged) continue;
 
-      const cascadeData: any = {};
+      const cascadeData: Prisma.ActivityUncheckedUpdateInput = {};
       if (resolved.planStartDate) cascadeData.planStartDate = resolved.planStartDate;
       if (resolved.planEndDate) cascadeData.planEndDate = resolved.planEndDate;
       if (resolved.planDuration !== undefined) cascadeData.planDuration = resolved.planDuration;
@@ -175,19 +250,6 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
       return;
     }
 
-    const includeAssignee = {
-      executors: {
-        include: {
-          user: { select: { id: true, realName: true, canLogin: true } },
-        },
-        orderBy: [{ assignedAt: 'asc' }],
-      },
-      role: { select: { id: true, name: true } },
-      _count: {
-        select: { checkItems: true },
-      },
-    };
-
     // 分页模式：当请求携带 page 或 pageSize 参数时返回扁平分页结果
     if (page !== undefined || pageSize !== undefined) {
       const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
@@ -199,7 +261,7 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
           orderBy: { sortOrder: 'asc' },
           skip,
           take: pageSizeNum,
-          include: includeAssignee,
+          include: ACTIVITY_LIST_INCLUDE,
         }),
         prisma.activity.count({ where: { projectId } }),
       ]);
@@ -212,7 +274,7 @@ router.get('/project/:projectId', authenticate, async (req: Request, res: Respon
     const activities = await prisma.activity.findMany({
       where: { projectId },
       orderBy: { sortOrder: 'asc' },
-      include: includeAssignee,
+      include: ACTIVITY_LIST_INCLUDE,
     });
 
     res.json(activities);
@@ -273,17 +335,18 @@ router.get('/project/:projectId/gantt', authenticate, async (req: Request, res: 
         duration: activity.duration,
         parent: '0',
         type,
-        assignee: (activity as any).executors?.map((e: any) => e.user.realName).join(', ') || '',
+        assignee: executorUsers(activity).map((user) => user.realName).join(', ') || '',
         status: activity.status,
         priority: activity.priority,
       };
     });
 
     // 构建依赖关系
-    const links: any[] = [];
+    const links: Array<{ id: string; source: string; target: string; type: string }> = [];
     activities.forEach((activity) => {
-      if (activity.dependencies && Array.isArray(activity.dependencies)) {
-        (activity.dependencies as any[]).forEach((dep: any) => {
+      const deps = dependenciesFromJson(activity.dependencies);
+      if (deps.length > 0) {
+        deps.forEach((dep) => {
           links.push({
             id: `${dep.id}-${activity.id}`,
             source: dep.id,
@@ -320,7 +383,7 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
     }
 
     const created = await prisma.$transaction(
-      items.map((item: any) => {
+      (items as BatchActivityInput[]).map((item) => {
         const effectiveExecutorIds: string[] = Array.isArray(item.executorIds)
           ? item.executorIds
           : Array.isArray(item.assigneeIds)
@@ -335,17 +398,17 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
             projectId: item.projectId,
             name: item.name,
             description: item.description || null,
-            type: item.type || ActivityType.TASK,
+            type: (item.type as ActivityType | undefined) || ActivityType.TASK,
             phase: item.phase || null,
-            status: item.status || 'NOT_STARTED',
-            priority: item.priority || 'MEDIUM',
+            status: (item.status as ActivityStatus | undefined) || ActivityStatus.NOT_STARTED,
+            priority: (item.priority as Priority | undefined) || 'MEDIUM',
             planStartDate: item.planStartDate ? new Date(item.planStartDate) : null,
             planEndDate: item.planEndDate ? new Date(item.planEndDate) : null,
             planDuration: planDuration || null,
             startDate: item.startDate ? new Date(item.startDate) : null,
             endDate: item.endDate ? new Date(item.endDate) : null,
             duration: item.duration || null,
-            dependencies: item.dependencies || null,
+            dependencies: item.dependencies ? item.dependencies as Prisma.InputJsonValue : undefined,
             notes: item.notes || null,
             sortOrder: item.sortOrder || 0,
             executors: effectiveExecutorIds.length > 0
@@ -353,7 +416,7 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
                   create: effectiveExecutorIds.map((uid: string) => ({
                     userId: uid,
                     source: 'MANUAL_ADD' as const,
-                    assignedBy: (req as any).user?.id,
+                    assignedBy: req.user?.id,
                   })),
                 }
               : undefined,
@@ -458,7 +521,7 @@ router.post(
       }
 
       // 创建活动
-      const currentUserId = (req as any).user?.id;
+      const currentUserId = req.user?.id || '';
       const executorData = await buildExecutorsForActivity(roleId, executorIds, currentUserId);
 
       const activity = await prisma.activity.create({
@@ -505,7 +568,11 @@ router.post(
  * PUT /api/activities/batch-update
  * 批量更新活动（必须在 /:id 之前注册）
  */
-router.put('/batch-update', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
+router.put('/batch-update',
+  authenticate,
+  requirePermission('activity', 'update'),
+  requireFeatureFlag('activity.bulk-mutation', '活动批量变更功能已临时关闭'),
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const { ids, updates } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -528,7 +595,7 @@ router.put('/batch-update', authenticate, requirePermission('activity', 'update'
     }
 
     for (const actId of ids) {
-      const updateData: any = {};
+      const updateData: Prisma.ActivityUpdateArgs['data'] = {};
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.phase !== undefined) updateData.phase = updates.phase;
       if (updates.assigneeIds !== undefined) {
@@ -539,7 +606,7 @@ router.put('/batch-update', authenticate, requirePermission('activity', 'update'
             create: ids.map((uid: string) => ({
               userId: uid,
               source: 'MANUAL_ADD' as const,
-              assignedBy: (req as any).user?.id,
+              assignedBy: req.user?.id,
             })),
           };
         }
@@ -553,7 +620,8 @@ router.put('/batch-update', authenticate, requirePermission('activity', 'update'
     logger.error({ err: error }, '批量更新错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
-});
+  }
+);
 
 /**
  * PUT /api/activities/:id
@@ -613,7 +681,7 @@ router.put(
       }
 
       // 构建更新数据
-      const updateData: any = {};
+      const updateData: Prisma.ActivityUpdateArgs['data'] = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
       if (type !== undefined) updateData.type = type;
@@ -623,7 +691,7 @@ router.put(
       if (roleId !== undefined) updateData.roleId = roleId;
 
       // 处理执行人列表
-      const currentUserId = (req as any).user?.id;
+      const currentUserId = req.user?.id || '';
       const shouldResetExecutors = resetExecutorsByRole === true;
       const effectiveRoleId = roleId !== undefined ? roleId : existingActivity.roleId;
       const roleChanged = roleId !== undefined && roleId !== existingActivity.roleId;
@@ -652,7 +720,7 @@ router.put(
         const roleMemberIds = effectiveRoleId ? await autoAssignByRole(effectiveRoleId) : [];
         const roleMemberSet = new Set(roleMemberIds);
 
-        const executorData = executorIds.map(uid => {
+        const executorData = executorIds.map((uid: string) => {
           if (roleChanged && existingExecutorUserIds.has(uid) && !roleMemberSet.has(uid)) {
             return {
               userId: uid,
@@ -709,14 +777,16 @@ router.put(
       }
 
       // 自动计算计划工期
+      const nextPlanStart = updateData.planStartDate instanceof Date ? updateData.planStartDate : undefined;
+      const nextPlanEnd = updateData.planEndDate instanceof Date ? updateData.planEndDate : undefined;
       if (
-        updateData.planStartDate &&
-        updateData.planEndDate &&
+        nextPlanStart &&
+        nextPlanEnd &&
         updateData.planDuration === undefined
       ) {
         updateData.planDuration = calculateWorkdays(
-          updateData.planStartDate,
-          updateData.planEndDate
+          nextPlanStart,
+          nextPlanEnd
         );
       } else if (
         planStartDate !== undefined &&
@@ -742,14 +812,16 @@ router.put(
       }
 
       // 自动计算实际工期
+      const nextActualStart = updateData.startDate instanceof Date ? updateData.startDate : undefined;
+      const nextActualEnd = updateData.endDate instanceof Date ? updateData.endDate : undefined;
       if (
-        updateData.startDate &&
-        updateData.endDate &&
+        nextActualStart &&
+        nextActualEnd &&
         updateData.duration === undefined
       ) {
         updateData.duration = calculateWorkdays(
-          updateData.startDate,
-          updateData.endDate
+          nextActualStart,
+          nextActualEnd
         );
       } else if (
         startDate !== undefined &&
@@ -784,7 +856,7 @@ router.put(
       // 自动更新项目进度
       await updateProjectProgress(existingActivity.projectId);
 
-      const changes = diffFields(existingActivity as any, activity as any, ['name', 'status', 'type', 'phase', 'planStartDate', 'planEndDate', 'startDate', 'endDate']);
+      const changes = diffFields(existingActivity as unknown as Record<string, unknown>, activity as unknown as Record<string, unknown>, ['name', 'status', 'type', 'phase', 'planStartDate', 'planEndDate', 'startDate', 'endDate']);
       auditLog({ req, action: 'UPDATE', resourceType: 'activity', resourceId: activity.id, resourceName: activity.name, changes });
 
       res.json(activity);
@@ -799,7 +871,11 @@ router.put(
  * DELETE /api/activities/batch-delete
  * 批量删除活动（必须在 /:id 之前注册，否则会被 /:id 捕获）
  */
-router.delete('/batch-delete', authenticate, requirePermission('activity', 'delete'), async (req: Request, res: Response): Promise<void> => {
+router.delete('/batch-delete',
+  authenticate,
+  requirePermission('activity', 'delete'),
+  requireFeatureFlag('activity.bulk-mutation', '活动批量变更功能已临时关闭'),
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -828,7 +904,8 @@ router.delete('/batch-delete', authenticate, requirePermission('activity', 'dele
     logger.error({ err: error }, '批量删除错误');
     res.status(500).json({ error: '服务器内部错误' });
   }
-});
+  }
+);
 
 /**
  * DELETE /api/activities/:id
@@ -916,7 +993,7 @@ router.put('/project/:projectId/reorder', authenticate, requirePermission('activ
 
     // 批量更新排序
     await Promise.all(
-      items.map((item: any) =>
+      (items as ReorderItem[]).map((item) =>
         prisma.activity.update({
           where: { id: item.id },
           data: {
@@ -961,8 +1038,9 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
   try {
     const { projectId } = req.query;
 
-    const where: any = {};
-    if (projectId) where.projectId = projectId as string;
+    const where: Prisma.ActivityWhereInput = {};
+    const projectIdFilter = queryString(projectId);
+    if (projectIdFilter) where.projectId = projectIdFilter;
 
     const activities = await prisma.activity.findMany({
       where,
@@ -997,16 +1075,15 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
       const isActive = a.status !== 'COMPLETED' && a.status !== 'CANCELLED';
       const isOverdue = isActive && a.planEndDate && a.planEndDate < now;
 
-      const effectiveUsers = (a as any).executors?.length > 0
-        ? (a as any).executors.map((e: any) => e.user)
-        : [];
+      const effectiveUsers = executorUsers(a);
 
       for (const u of effectiveUsers) {
         let entry = userMap.get(u.id);
         if (!entry) {
-          entry = { userId: u.id, realName: u.realName, username: u.username, totalActivities: 0, inProgress: 0, notStarted: 0, overdue: 0, totalDuration: 0 };
+          entry = { userId: u.id, realName: u.realName, username: u.username ?? null, totalActivities: 0, inProgress: 0, notStarted: 0, overdue: 0, totalDuration: 0 };
           userMap.set(u.id, entry);
         }
+        if (!entry) continue;
         entry.totalActivities++;
         if (a.status === 'IN_PROGRESS') entry.inProgress++;
         if (a.status === 'NOT_STARTED') entry.notStarted++;
@@ -1025,7 +1102,7 @@ router.get('/workload', authenticate, async (req: Request, res: Response): Promi
           activityName: a.name,
           projectId: a.project.id,
           projectName: a.project.name,
-          assigneeNames: effectiveUsers.map((u: any) => u.realName),
+          assigneeNames: effectiveUsers.map((u) => u.realName),
           planStartDate: a.planStartDate ? a.planStartDate.toISOString() : null,
           planEndDate: a.planEndDate ? a.planEndDate.toISOString() : null,
           overdueDays,
@@ -1111,7 +1188,7 @@ router.post('/project/:projectId/ai-schedule', authenticate, async (req: Request
       take: 10,
     });
 
-    let historicalActivities: any[] = [];
+    let historicalActivities: Array<{ name: string; type: string; phase: string | null; planDuration: number | null; duration: number | null }> = [];
     if (historicalProjects.length > 0) {
       historicalActivities = await prisma.activity.findMany({
         where: {
@@ -1132,7 +1209,7 @@ router.post('/project/:projectId/ai-schedule', authenticate, async (req: Request
       status: a.status,
     }));
 
-    const historyData = historicalActivities.map((a: any) => ({
+    const historyData = historicalActivities.map((a) => ({
       name: a.name,
       type: a.type,
       phase: a.phase,
@@ -1177,12 +1254,12 @@ ${JSON.stringify(historyData, null, 2)}`,
     // 无 AI 时使用基于历史数据的规则引擎
     const suggestions = currentActivities.map((a) => {
       // 查找同名/同类型的历史活动实际工期
-      const similar = historicalActivities.filter((h: any) =>
+      const similar = historicalActivities.filter((h) =>
         h.name === a.name || (h.phase === a.phase && h.type === a.type)
       );
       if (similar.length > 0) {
         const avgDuration = Math.round(
-          similar.reduce((sum: number, h: any) => sum + (h.duration || 0), 0) / similar.length
+          similar.reduce((sum: number, h) => sum + (h.duration || 0), 0) / similar.length
         );
         return {
           name: a.name,
@@ -1225,7 +1302,7 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
     const { projectId } = req.query;
 
     // 查询所有进行中/未开始且有计划日期的活动
-    const where: any = {
+    const where: Prisma.ActivityWhereInput = {
       status: { in: ['NOT_STARTED', 'IN_PROGRESS'] },
       planStartDate: { not: null },
       planEndDate: { not: null },
@@ -1233,7 +1310,8 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
         { executors: { some: {} } },
       ],
     };
-    if (projectId) where.projectId = projectId as string;
+    const projectIdFilter = queryString(projectId);
+    if (projectIdFilter) where.projectId = projectIdFilter;
 
     const activities = await prisma.activity.findMany({
       where,
@@ -1252,9 +1330,7 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
     // 按人员分组，检测时间重叠
     const userActivities = new Map<string, typeof activities>();
     for (const a of activities) {
-      const effectiveUsers = (a as any).executors?.length > 0
-        ? (a as any).executors.map((e: any) => e.user)
-        : [];
+      const effectiveUsers = executorUsers(a);
       for (const u of effectiveUsers) {
         if (!userActivities.has(u.id)) userActivities.set(u.id, []);
         userActivities.get(u.id)!.push(a);
@@ -1298,9 +1374,9 @@ router.get('/resource-conflicts', authenticate, async (req: Request, res: Respon
 
       if (overlapping.length >= 2) {
         const allUsers = [
-          ...((overlapping[0] as any).executors?.map((e: any) => e.user) || []),
+          ...executorUsers(overlapping[0]),
         ];
-        const user = allUsers.find((u: any) => u.id === userId)!;
+        const user = allUsers.find((u) => u.id === userId)!;
         conflicts.push({
           userId,
           realName: user.realName,
@@ -1370,7 +1446,7 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
     const reverseDeps = new Map<string, string[]>();
     for (const a of allActivities) {
       if (!a.dependencies || !Array.isArray(a.dependencies)) continue;
-      for (const dep of a.dependencies as any[]) {
+      for (const dep of dependenciesFromJson(a.dependencies)) {
         const list = reverseDeps.get(dep.id);
         if (list) list.push(a.id);
         else reverseDeps.set(dep.id, [a.id]);
@@ -1496,7 +1572,7 @@ router.post('/project/:projectId/what-if/apply', authenticate, requirePermission
       const { id, newStart, newEnd } = item;
       if (!id) continue;
 
-      const updateData: any = {};
+      const updateData: Prisma.ActivityUncheckedUpdateInput = {};
       if (newStart) updateData.planStartDate = new Date(newStart);
       if (newEnd) updateData.planEndDate = new Date(newEnd);
       if (newStart && newEnd) {
@@ -1716,8 +1792,8 @@ router.get(
           name: a.name,
           type: typeMap[a.type] || a.type,
           status: statusMap[a.status] || a.status,
-          role: (a as any).role?.name || '',
-          assignee: (a as any).executors?.map((e: { user: { realName: string } }) => e.user.realName).join(', ') || '',
+          role: (a as ActivityWithRole).role?.name || '',
+          assignee: executorUsers(a).map((user) => user.realName).join(', ') || '',
           planDuration: a.planDuration ?? '',
           planStart: fmtDate(a.planStartDate),
           planEnd: fmtDate(a.planEndDate),
@@ -1749,10 +1825,10 @@ const excelUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = (file.originalname || '').toLowerCase();
-    if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+    if (ext.endsWith('.xlsx')) {
       cb(null, true);
     } else {
-      cb(new Error('仅支持 .xlsx / .xls 文件'));
+      cb(new Error('仅支持 .xlsx 文件，请将 .xls 文件另存为 .xlsx 后再导入'));
     }
   },
 });
@@ -1761,6 +1837,7 @@ router.post(
   '/project/:projectId/import-excel',
   authenticate,
   requirePermission('activity', 'create'),
+  requireFeatureFlag('activity.import', '活动导入功能已临时关闭'),
   excelUpload.single('file'),
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -1785,7 +1862,7 @@ router.post(
       }
 
       // 解析 Excel
-      const parsed = parseExcelActivities(req.file.buffer);
+      const parsed = await parseExcelActivities(req.file.buffer);
       if (parsed.length === 0) {
         res.json({ success: true, count: 0, skipped: 0, createdUsers: [], activities: [] });
         return;
@@ -1855,6 +1932,16 @@ router.post(
         return;
       }
 
+      const PHASE_ORDER: Record<string, number> = { EVT: 0, DVT: 1, PVT: 2, MP: 3 };
+      toCreate.sort((a, b) => {
+        const pa = PHASE_ORDER[a.phase || ''] ?? 9;
+        const pb = PHASE_ORDER[b.phase || ''] ?? 9;
+        if (pa !== pb) return pa - pb;
+        const da = a.planStartDate ? new Date(a.planStartDate).getTime() : Infinity;
+        const db = b.planStartDate ? new Date(b.planStartDate).getTime() : Infinity;
+        return da - db;
+      });
+
       // 获取当前最大 sortOrder
       const maxSort = await prisma.activity.aggregate({
         where: { projectId },
@@ -1870,7 +1957,7 @@ router.post(
       const roleMap = new Map<string, string>();
       roles.forEach((r) => roleMap.set(r.name, r.id));
 
-      const currentUserId = (req as any).user?.id;
+      const currentUserId = req.user?.id || '';
 
       const executorDataList = await Promise.all(
         toCreate.map(async (a) => {
@@ -1900,12 +1987,12 @@ router.post(
         toCreate.map((a, idx) => {
           const executorData = executorDataList[idx];
 
-          const data: any = {
+          const data: Prisma.ActivityUncheckedCreateInput & { executors?: { create: Array<{ userId: string; source: 'ROLE_AUTO' | 'MANUAL_ADD'; snapshotRoleId?: string | null; assignedBy: string }> } } = {
             projectId,
             name: a.name,
             type: a.type || ActivityType.TASK,
             phase: a.phase || null,
-            status: a.status || 'NOT_STARTED',
+            status: (a.status as ActivityStatus | undefined) || ActivityStatus.NOT_STARTED,
             planStartDate: a.planStartDate || null,
             planEndDate: a.planEndDate || null,
             planDuration: a.planDuration || null,
@@ -1916,8 +2003,10 @@ router.post(
             roleId: a.roleName ? roleMap.get(a.roleName) || null : null,
           };
 
-          if (!data.planDuration && data.planStartDate && data.planEndDate) {
-            data.planDuration = calculateWorkdays(data.planStartDate, data.planEndDate);
+          const dataPlanStart = data.planStartDate instanceof Date ? data.planStartDate : undefined;
+          const dataPlanEnd = data.planEndDate instanceof Date ? data.planEndDate : undefined;
+          if (!data.planDuration && dataPlanStart && dataPlanEnd) {
+            data.planDuration = calculateWorkdays(dataPlanStart, dataPlanEnd);
           }
 
           if (executorData && executorData.length > 0) {
@@ -1938,26 +2027,26 @@ router.post(
       });
 
       // 解析并写回前置依赖（仅引用本次解析中存在 seq 的活动）
-      const depUpdates = toCreate
-        .map((a, idx) => {
-          if (!a.predecessors || a.predecessors.length === 0) return null;
-          const resolved = a.predecessors
-            .map((p) => {
-              const id = seqToActivityId.get(p.seq);
-              return id ? { id, type: p.type, lag: p.lag } : null;
-            })
-            .filter((d): d is { id: string; type: string; lag: number } => d !== null);
-          if (resolved.length === 0) return null;
-          return { activityId: activities[idx].id, dependencies: resolved };
-        })
-        .filter((u): u is { activityId: string; dependencies: { id: string; type: string; lag: number }[] } => u !== null);
+      const depUpdates: Array<{ activityId: string; dependencies: DependencyInput[] }> = [];
+      toCreate.forEach((a, idx) => {
+        if (!a.predecessors || a.predecessors.length === 0) return;
+        const resolved: DependencyInput[] = [];
+        for (const p of a.predecessors) {
+          const id = seqToActivityId.get(p.seq);
+          if (id) resolved.push({ id, type: p.type, lag: p.lag });
+        }
+        const activity = activities[idx];
+        if (activity && resolved.length > 0) {
+          depUpdates.push({ activityId: activity.id, dependencies: resolved });
+        }
+      });
 
       if (depUpdates.length > 0) {
         await prisma.$transaction(
           depUpdates.map((u) =>
             prisma.activity.update({
               where: { id: u.activityId },
-              data: { dependencies: u.dependencies as any },
+              data: { dependencies: u.dependencies as unknown as Prisma.InputJsonValue },
             })
           )
         );
@@ -1974,6 +2063,7 @@ router.post(
         resourceName: `批量导入 ${activities.length} 条活动`,
       });
 
+      recordBusinessEvent(businessMetrics, 'activity.import.succeeded');
       res.json({
         success: true,
         count: activities.length,
@@ -1981,9 +2071,9 @@ router.post(
         createdUsers,
         activities,
       });
-    } catch (error: any) {
+    } catch (error) {
       logger.error({ err: error }, '导入 Excel 活动错误');
-      res.status(500).json({ error: error?.message || '服务器内部错误' });
+      res.status(500).json({ error: error instanceof Error ? error.message : '服务器内部错误' });
     }
   }
 );

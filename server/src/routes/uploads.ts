@@ -109,9 +109,6 @@ const DANGEROUS_SVG_TAGS = new Set([
   'base', 'style', 'noscript', 'template',
 ]);
 
-const DANGEROUS_ATTR_PATTERN = /\bon\w+\s*=/i;
-const DANGEROUS_HREF_PATTERN = /^\s*(javascript|data|vbscript)\s*:/i;
-
 function sanitizeSvg(filePath: string): boolean {
   let content: string;
   try {

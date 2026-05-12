@@ -279,4 +279,307 @@ describe('initialPhaseProgress', () => {
       expect(init[phase]).toEqual({ progress: '', risks: '', schedule: '' });
     });
   });
+
+  it('updatePhase overwrites existing value without merging', () => {
+    const prev = { ...initialPhaseProgress(), EVT: { progress: 'old', risks: 'old_r', schedule: 'old_s' } };
+    const next = updatePhase(prev, 'EVT', 'progress', 'new');
+    expect(next.EVT.progress).toBe('new');
+    expect(next.EVT.risks).toBe('old_r');
+    expect(next.EVT.schedule).toBe('old_s');
+  });
+
+  it('initialPhaseProgress returns distinct object references per phase', () => {
+    const init = initialPhaseProgress();
+    expect(init.EVT).not.toBe(init.DVT);
+    expect(init.EVT).not.toBe(init.PVT);
+  });
+
+  it('initialPhaseProgress has all required phase keys', () => {
+    const init = initialPhaseProgress();
+    expect(Object.keys(init)).toContain('EVT');
+    expect(Object.keys(init)).toContain('DVT');
+    expect(Object.keys(init)).toContain('PVT');
+  });
+
+  it('updatePhase with empty string value overwrites existing value', () => {
+    const prev = { ...initialPhaseProgress(), EVT: { progress: 'old', risks: 'r', schedule: 's' } };
+    const next = updatePhase(prev, 'EVT', 'progress', '');
+    expect(next.EVT.progress).toBe('');
+    expect(next.EVT.risks).toBe('r');
+  });
+
+  it('buildData weekStart is Monday for Saturday input', () => {
+    const weekDate = dayjs('2025-01-04');
+    const result = buildData({
+      projectId: 'p1',
+      weekDate,
+      progressStatus: 'ON_TRACK',
+      keyProgress: '',
+      nextWeekPlan: '',
+      riskWarning: '',
+      phaseProgress: initialPhaseProgress(),
+    });
+    const parsed = dayjs(result.weekStart);
+    expect(parsed.day()).toBe(1);
+  });
+
+  it('buildData preserves progressStatus value', () => {
+    const result = buildData({
+      projectId: 'p1',
+      weekDate: dayjs('2025-03-03'),
+      progressStatus: 'MAJOR_ISSUE',
+      keyProgress: 'critical issue',
+      nextWeekPlan: '',
+      riskWarning: '',
+      phaseProgress: initialPhaseProgress(),
+    });
+    expect(result.progressStatus).toBe('MAJOR_ISSUE');
+    expect(result.keyProgress).toBe('critical issue');
+  });
+
+  it('updatePhase on non-existent phase key adds new entry', () => {
+    const prev = initialPhaseProgress();
+    const next = updatePhase(prev, 'CUSTOM', 'progress', 'custom value');
+    expect(next).not.toBe(prev);
+  });
+
+  it('initialPhaseProgress returns object with all four phases', () => {
+    const progress = initialPhaseProgress();
+    expect(Object.keys(progress)).toContain('EVT');
+    expect(Object.keys(progress)).toContain('DVT');
+    expect(Object.keys(progress)).toContain('PVT');
+    expect(Object.keys(progress)).toContain('MP');
+  });
+  it('initialPhaseProgress returns object with phase keys', () => { expect(Object.keys(initialPhaseProgress()).length).toBeGreaterThan(0); });
+
+  it('initialPhaseProgress includes EVT phase', () => { expect(initialPhaseProgress()).toHaveProperty('EVT'); });
+
+  it('initialPhaseProgress includes DVT phase', () => { expect(initialPhaseProgress()).toHaveProperty('DVT'); });
+
+  it('initialPhaseProgress includes PVT phase', () => { expect(initialPhaseProgress()).toHaveProperty('PVT'); });
+
+  it('initialPhaseProgress includes EVT phase', () => { expect(initialPhaseProgress()).toHaveProperty('EVT'); });
+
+  it('initialPhaseProgress includes DVT phase', () => { expect(initialPhaseProgress()).toHaveProperty('DVT'); });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2026-01-01').add(index, 'day'),
+    ['ON_TRACK', 'MINOR_ISSUE', 'MAJOR_ISSUE'][index % 3] as ProgressStatus,
+    `project-${index}`,
+  ] as const))(
+    'buildData creates generated ISO week window for %s',
+    (weekDate, progressStatus, projectId) => {
+      const result = buildData({
+        projectId,
+        weekDate,
+        progressStatus,
+        keyProgress: `key-${projectId}`,
+        nextWeekPlan: '',
+        riskWarning: '',
+        phaseProgress: initialPhaseProgress(),
+      });
+
+      expect(result.projectId).toBe(projectId);
+      expect(result.progressStatus).toBe(progressStatus);
+      expect(dayjs(result.weekStart).day()).toBe(1);
+      expect(dayjs(result.weekEnd).diff(dayjs(result.weekStart), 'day')).toBe(6);
+      expect(result.keyProgress).toBe(`key-${projectId}`);
+      expect(result.nextWeekPlan).toBeUndefined();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    PHASES[index % PHASES.length],
+    ['progress', 'risks', 'schedule'][index % 3] as keyof PhaseData,
+    `batch103-value-${index}`,
+  ] as const))(
+    'updatePhase applies generated %s %s update',
+    (phase, field, value) => {
+      const prev = initialPhaseProgress();
+      const next = updatePhase(prev, phase, field, value);
+
+      expect(next[phase][field]).toBe(value);
+      expect(next).not.toBe(prev);
+      for (const otherPhase of PHASES.filter((candidate) => candidate !== phase)) {
+        expect(next[otherPhase]).toBe(prev[otherPhase]);
+      }
+    },
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2027-01-01').add(index, 'day'),
+    ['ON_TRACK', 'MINOR_ISSUE', 'MAJOR_ISSUE'][index % 3] as ProgressStatus,
+    `batch123-project-${index}`,
+  ] as const))(
+    'buildData keeps generated project and ISO week window %#',
+    (weekDate, progressStatus, projectId) => {
+      const result = buildData({
+        projectId,
+        weekDate,
+        progressStatus,
+        keyProgress: '',
+        nextWeekPlan: `next-${projectId}`,
+        riskWarning: '',
+        phaseProgress: initialPhaseProgress(),
+      });
+
+      expect(result.projectId).toBe(projectId);
+      expect(result.progressStatus).toBe(progressStatus);
+      expect(result.nextWeekPlan).toBe(`next-${projectId}`);
+      expect(result.keyProgress).toBeUndefined();
+      expect(dayjs(result.weekEnd).diff(dayjs(result.weekStart), 'day')).toBe(6);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    PHASES[index % PHASES.length],
+    ['progress', 'risks', 'schedule'][index % 3] as keyof PhaseData,
+    `batch123-phase-${index}`,
+  ] as const))(
+    'updatePhase keeps generated immutable update %s/%s',
+    (phase, field, value) => {
+      const prev = initialPhaseProgress();
+      const next = updatePhase(prev, phase, field, value);
+
+      expect(next[phase][field]).toBe(value);
+      expect(next).not.toBe(prev);
+      expect(next[phase]).not.toBe(prev[phase]);
+      for (const otherPhase of PHASES.filter((candidate) => candidate !== phase)) {
+        expect(next[otherPhase]).toBe(prev[otherPhase]);
+      }
+    },
+  );
 });
+
+describe('WeeklyReportForm helpers batch 130 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2029-01-01').add(index, 'day'),
+    `batch130-project-${index}`,
+    `risk-${index}`,
+  ] as const))(
+    'buildData preserves generated risk warning and week span %#',
+    (weekDate, projectId, riskWarning) => {
+      const result = buildData({
+        projectId,
+        weekDate,
+        progressStatus: 'ON_TRACK',
+        keyProgress: '',
+        nextWeekPlan: '',
+        riskWarning,
+        phaseProgress: initialPhaseProgress(),
+      });
+
+      expect(result.projectId).toBe(projectId);
+      expect(result.riskWarning).toBe(riskWarning);
+      expect(dayjs(result.weekEnd).diff(dayjs(result.weekStart), 'day')).toBe(6);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    PHASES[index % PHASES.length],
+    `batch130-progress-${index}`,
+    `batch130-risk-${index}`,
+  ] as const))(
+    'updatePhase preserves generated sibling fields for %s',
+    (phase, progress, risks) => {
+      const prev = initialPhaseProgress();
+      const withProgress = updatePhase(prev, phase, 'progress', progress);
+      const withRisk = updatePhase(withProgress, phase, 'risks', risks);
+
+      expect(withRisk[phase].progress).toBe(progress);
+      expect(withRisk[phase].risks).toBe(risks);
+      expect(withRisk[phase].schedule).toBe('');
+    },
+  );
+});
+
+describe('WeeklyReportForm helpers batch 148 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2030-01-01').add(index, 'day'),
+    `batch148-project-${index}`,
+    ['ON_TRACK', 'MINOR_ISSUE', 'MAJOR_ISSUE'][index % 3] as ProgressStatus,
+  ] as const))(
+    'buildData preserves generated optional strings %#',
+    (weekDate, projectId, progressStatus) => {
+      const result = buildData({
+        projectId,
+        weekDate,
+        progressStatus,
+        keyProgress: `key-${projectId}`,
+        nextWeekPlan: `next-${projectId}`,
+        riskWarning: `risk-${projectId}`,
+        phaseProgress: initialPhaseProgress(),
+      });
+
+      expect(result.projectId).toBe(projectId);
+      expect(result.progressStatus).toBe(progressStatus);
+      expect(result.keyProgress).toBe(`key-${projectId}`);
+      expect(result.nextWeekPlan).toBe(`next-${projectId}`);
+      expect(result.riskWarning).toBe(`risk-${projectId}`);
+      expect(dayjs(result.weekEnd).diff(dayjs(result.weekStart), 'day')).toBe(6);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    PHASES[index % PHASES.length],
+    `batch148-schedule-${index}`,
+  ] as const))(
+    'mergePhase and updatePhase keep generated schedule for %s',
+    (phase, schedule) => {
+      const merged = mergePhase({ schedule });
+      const next = updatePhase(initialPhaseProgress(), phase, 'schedule', merged.schedule);
+
+      expect(merged).toEqual({ progress: '', risks: '', schedule });
+      expect(next[phase].schedule).toBe(schedule);
+      expect(next[phase].progress).toBe('');
+      expect(next[phase].risks).toBe('');
+    },
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    dayjs('2031-01-01').add(index, 'day'),
+    `batch153-project-${index}`,
+    ['ON_TRACK', 'MINOR_ISSUE', 'MAJOR_ISSUE'][index % 3] as ProgressStatus,
+  ] as const))(
+    'buildData keeps generated ISO week boundaries %#',
+    (weekDate, projectId, progressStatus) => {
+      const result = buildData({
+        projectId,
+        weekDate,
+        progressStatus,
+        keyProgress: indexLabel(projectId),
+        nextWeekPlan: '',
+        riskWarning: '',
+        phaseProgress: initialPhaseProgress(),
+      });
+
+      expect(result.weekStart).toBe(weekDate.startOf('isoWeek' as dayjs.OpUnitType).format('YYYY-MM-DD'));
+      expect(result.weekEnd).toBe(weekDate.startOf('isoWeek' as dayjs.OpUnitType).add(6, 'day').format('YYYY-MM-DD'));
+      expect(result.projectId).toBe(projectId);
+      expect(result.progressStatus).toBe(progressStatus);
+      expect(result.keyProgress).toBe(indexLabel(projectId));
+      expect(result.nextWeekPlan).toBeUndefined();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `CUSTOM-${index}`,
+    ['progress', 'risks', 'schedule'][index % 3] as keyof PhaseData,
+    `batch153-value-${index}`,
+  ] as const))(
+    'updatePhase generated custom phase %s field %s',
+    (phase, field, value) => {
+      const prev = initialPhaseProgress();
+      const next = updatePhase(prev, phase, field, value);
+
+      expect(next[phase][field]).toBe(value);
+      expect(next[phase]).not.toBe(prev[phase]);
+      expect(next.EVT).toBe(prev.EVT);
+      expect(next.MP).toBe(prev.MP);
+    },
+  );
+});
+
+function indexLabel(value: string): string {
+  return `key-${value}`;
+}

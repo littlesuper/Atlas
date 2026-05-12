@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -13,7 +16,7 @@ const { mockPrisma } = vi.hoisted(() => {
       delete: vi.fn(),
       aggregate: vi.fn(),
     },
-    $transaction: vi.fn((ops: any) => Promise.all(ops)),
+    $transaction: vi.fn((ops: Iterable<unknown>) => Promise.all(ops)),
   };
   return { mockPrisma };
 });
@@ -21,11 +24,11 @@ const { mockPrisma } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -213,8 +216,8 @@ describe('PUT /api/check-items/:id', () => {
   });
 
   it('returns 404 when check item does not exist', async () => {
-    const prismaError = new Error('Record not found');
-    (prismaError as any).code = 'P2025';
+    const prismaError = new Error('Record not found') as Error & { code: string };
+    prismaError.code = 'P2025';
     mockPrisma.checkItem.update.mockRejectedValue(prismaError);
 
     const res = await request(app)
@@ -269,8 +272,8 @@ describe('DELETE /api/check-items/:id', () => {
   });
 
   it('returns 404 when check item does not exist', async () => {
-    const prismaError = new Error('Record not found');
-    (prismaError as any).code = 'P2025';
+    const prismaError = new Error('Record not found') as Error & { code: string };
+    prismaError.code = 'P2025';
     mockPrisma.checkItem.delete.mockRejectedValue(prismaError);
 
     const res = await request(app).delete('/api/check-items/nonexistent');
@@ -376,5 +379,81 @@ describe('CHK-007: XSS in check item title', () => {
         data: expect.objectContaining({ title: xssTitle }),
       })
     );
+  });
+
+  it('GET returns empty array for activity with no check items', async () => {
+    mockPrisma.checkItem.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/check-items/activity/act-empty');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('DELETE returns 500 on database error', async () => {
+    mockPrisma.checkItem.delete.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).delete('/api/check-items/ci-1');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('POST batch-create validates required activityId', async () => {
+    const res = await request(app)
+      .post('/api/check-items/batch')
+      .send({ items: [{ title: 'Item 1' }] });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT update check item returns 500 on database error', async () => {
+    mockPrisma.checkItem.update.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app)
+      .put('/api/check-items/item-1')
+      .send({ title: 'Updated', completed: true });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('DELETE check item returns 500 on database error', async () => {
+    mockPrisma.checkItem.delete.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).delete('/api/check-items/item-1');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET check items returns 200 for valid activity', async () => {
+    mockPrisma.checkItem.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/check-items/activity/act-1');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('POST create check item returns 400 when title is missing', async () => {
+    const res = await request(app)
+      .post('/api/check-items')
+      .send({ activityId: 'act-1' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('GET check items returns empty array for activity with no items', async () => {
+    mockPrisma.checkItem.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/check-items/activity/act-empty');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('PUT reorder handles empty items array', async () => {
+    const res = await request(app)
+      .put('/api/check-items/activity/a1/reorder')
+      .send({ items: [] });
+
+    expect(res.status).toBe(400);
   });
 });

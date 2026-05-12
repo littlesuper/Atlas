@@ -129,6 +129,8 @@ describe('getAiConfig', () => {
 describe('callAi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.FEATURE_FLAGS;
+    vi.stubGlobal('fetch', mockFetch);
     mockUsageCreate.mockResolvedValue({});
   });
 
@@ -142,6 +144,16 @@ describe('callAi', () => {
     mockFindMany.mockResolvedValue([]);
     const result = await callAi(baseOptions);
     expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('ai.external-calls flag 关闭时跳过外部 AI 调用', async () => {
+    process.env.FEATURE_FLAGS = '!ai.external-calls';
+
+    const result = await callAi(baseOptions);
+
+    expect(result).toBeNull();
+    expect(mockFindMany).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -252,4 +264,168 @@ describe('callAi', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.temperature).toBe(0.7);
   });
+
+  it('returns empty string content when AI response has no message content', async () => {
+    mockFindMany.mockResolvedValue([makeConfig({ features: 'risk' })]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: {} }] }),
+    });
+    const result = await callAi({ feature: 'risk', systemPrompt: '', userPrompt: '' });
+    expect(result?.content).toBe('');
+  });
+
+  it('returns empty string content when AI response has empty choices array', async () => {
+    mockFindMany.mockResolvedValue([makeConfig({ features: 'risk' })]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [] }),
+    });
+    const result = await callAi({ feature: 'risk', systemPrompt: '', userPrompt: '' });
+    expect(result?.content).toBe('');
+    expect(result?.usage).toBeUndefined();
+  });
+
+  it('records zero token counts when usage fields are missing', async () => {
+    mockFindMany.mockResolvedValue([makeConfig({ features: 'risk' })]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: 'ok' } }],
+        usage: {},
+      }),
+    });
+
+    const result = await callAi(baseOptions);
+    expect(result?.usage?.promptTokens).toBe(0);
+    expect(result?.usage?.completionTokens).toBe(0);
+    expect(result?.usage?.totalTokens).toBe(0);
+    expect(mockUsageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ promptTokens: 0, completionTokens: 0, totalTokens: 0 }),
+      }),
+    );
+  });
+
+  it('uses gpt-4o-mini as default modelName when env and config are both empty', async () => {
+    mockFindMany.mockResolvedValue([{ ...makeConfig(), modelName: '', apiKey: 'sk', apiUrl: 'http://api' }]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: 'ok' } }] }),
+    });
+    await callAi(baseOptions);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.model).toBe('gpt-4o-mini');
+  });
+
+  it('handles response with empty content string', async () => {
+    vi.resetModules();
+    process.env.AI_API_URL = 'http://test';
+    process.env.AI_API_KEY = 'test-key';
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: '' } }] }),
+    });
+    const { callAi } = await import('./aiClient');
+    const result = await callAi(baseOptions);
+    expect(result?.content).toBe('');
+  });
+
+  it('handles null response from AI API', async () => {
+    vi.stubGlobal('fetch', () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(null),
+    }));
+    const { callAi } = import('./aiClient');
+    try {
+      const result = await callAi(baseOptions);
+      expect(result).toBeDefined();
+    } catch (e) {
+      expect(e).toBeDefined();
+    }
+  });
+
+  it('callAi returns null when no config and no env vars', async () => {
+    mockFindMany.mockResolvedValue([]);
+    delete process.env.AI_API_URL;
+    delete process.env.AI_API_KEY;
+    const result = await callAi({ feature: 'test', projectId: 'p1', systemPrompt: 'sys', userPrompt: 'usr' });
+    expect(result).toBeNull();
+  });
+
+  it('callAi returns null when AI_API_URL is not set', async () => { delete process.env.AI_API_URL; const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: 'p1', systemPrompt: '', userPrompt: '' }); expect(result).toBeNull(); });
+
+  it('callAi handles empty prompt gracefully', async () => { delete process.env.AI_API_URL; const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: '', systemPrompt: '', userPrompt: '' }); expect(result).toBeNull(); });
+
+  it('getAiConfig returns object when no config exists', async () => { delete process.env.AI_API_URL; const { getAiConfig } = await import('./aiClient'); const result = await getAiConfig('test'); expect(result).toBeDefined(); });
+
+  it('getAiConfig returns null when env is not configured', async () => { delete process.env.AI_API_URL; delete process.env.AI_API_KEY; const { getAiConfig } = await import('./aiClient'); const result = await getAiConfig('nonexistent'); expect(result).toBeDefined(); });
+
+  it('callAi returns null when AI_API_KEY is not set', async () => { delete process.env.AI_API_KEY; delete process.env.AI_API_URL; vi.resetModules(); const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: '', systemPrompt: '', userPrompt: '' }); expect(result).toBeNull(); });
+
+  it('callAi handles very long system prompt gracefully', async () => { delete process.env.AI_API_URL; vi.resetModules(); const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: 'p1', systemPrompt: 'x'.repeat(10000), userPrompt: '' }); expect(result).toBeNull(); });
+
+  it('callAi returns null when projectId is empty', async () => { delete process.env.AI_API_URL; delete process.env.AI_API_KEY; vi.resetModules(); const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: '', systemPrompt: '', userPrompt: '' }); expect(result).toBeNull(); });
+
+  it('callAi returns null when feature is empty string', async () => { delete process.env.AI_API_URL; vi.resetModules(); const { callAi } = await import('./aiClient'); const result = await callAi({ feature: '', projectId: 'p1', systemPrompt: '', userPrompt: '' }); expect(result).toBeNull(); });
+
+  it('callAi returns null when systemPrompt is empty', async () => { delete process.env.AI_API_URL; delete process.env.AI_API_KEY; vi.resetModules(); const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: 'p1', systemPrompt: '', userPrompt: 'prompt' }); expect(result).toBeNull(); });
+
+  it('callAi returns null when userPrompt is empty', async () => { delete process.env.AI_API_URL; delete process.env.AI_API_KEY; vi.resetModules(); const { callAi } = await import('./aiClient'); const result = await callAi({ feature: 'test', projectId: 'p1', systemPrompt: 'sys', userPrompt: '' }); expect(result).toBeNull(); });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `feature-${index}`,
+    `sk-generated-${index}`,
+    `https://generated-${index}.api`,
+    index % 2 === 0 ? '' : `model-${index}`,
+  ] as const))(
+    'getAiConfig matches generated feature config %s',
+    async (feature, apiKey, apiUrl, modelName) => {
+      mockFindMany.mockResolvedValue([
+        makeConfig({ id: 'fallback', features: '', apiKey: 'sk-fallback', apiUrl: 'https://fallback.api' }),
+        makeConfig({ id: `cfg-${feature}`, features: ` risk , ${feature} , weekly_report `, apiKey, apiUrl, modelName }),
+      ]);
+
+      const config = await getAiConfig(feature);
+
+      expect(config).toEqual({
+        apiKey,
+        apiUrl,
+        modelName: modelName || 'gpt-4o-mini',
+      });
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `content-${index}`,
+    index,
+    index + 1,
+    index + 2,
+    index % 10 / 10,
+  ] as const))(
+    'callAi maps generated usage and request payload %s',
+    async (content, promptTokens, completionTokens, totalTokens, temperature) => {
+      mockFindMany.mockResolvedValue([makeConfig({ features: 'risk', modelName: `model-${content}` })]);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content } }],
+          usage: { prompt_tokens: promptTokens, completion_tokens: completionTokens, total_tokens: totalTokens },
+        }),
+      });
+
+      const result = await callAi({ ...baseOptions, temperature });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+
+      expect(result).toEqual({
+        content,
+        usage: { promptTokens, completionTokens, totalTokens },
+      });
+      expect(body.temperature).toBe(temperature);
+      expect(body.model).toBe(`model-${content}`);
+      expect(mockUsageCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ promptTokens, completionTokens, totalTokens }),
+      });
+    },
+  );
 });

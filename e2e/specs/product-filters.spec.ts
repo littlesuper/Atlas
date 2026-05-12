@@ -9,7 +9,7 @@ import { waitForTableLoad, waitForPageLoad } from '../helpers/arco';
  * - 按类别筛选
  * - 统计卡片切换
  */
-test.describe('Product Filters & Search', () => {
+test.describe('Product Filters & Search @p1', () => {
 
   // ──────── TC1: search by product name ────────
   test('search products by name', async ({ authedPage: page }) => {

@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Message } from '@arco-design/web-react';
+import { captureAppError } from '../utils/monitoring';
 
 // 创建axios实例
 const request = axios.create({
@@ -132,12 +133,28 @@ request.interceptors.response.use(
       Message.error(errorMessage);
     }
 
+    if (error.response?.status && error.response.status >= 500) {
+      const requestId = error.response.headers?.['x-request-id'];
+      captureAppError(error, {
+        tags: {
+          source: 'api',
+          requestId,
+          statusCode: error.response.status,
+        },
+        extra: {
+          method: originalRequest?.method,
+          url: originalRequest?.url,
+          response: error.response.data,
+        },
+      });
+    }
+
     return Promise.reject(error);
   }
 );
 
 // 提取错误信息
-function getErrorMessage(error: AxiosError): string {
+export function getErrorMessage(error: AxiosError): string {
   if (error.response?.data) {
     const data = error.response.data as { message?: string; error?: string };
     return data.message || data.error || '请求失败';

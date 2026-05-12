@@ -11,7 +11,7 @@ import {
   searchProject,
 } from '../helpers/arco';
 
-test.describe.serial('Activity Comments', () => {
+test.describe.serial('Activity Comments @p1', () => {
   const projectName = uniqueName('评论测试项目');
   const activityName = uniqueName(text.activityName);
   const commentContent = '这是一条E2E测试评论_' + Date.now();

@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName } from '../fixtures/test-data';
 import { waitForTableLoad, clickTab, waitForPageLoad, clickNavItem, expectMessage } from '../helpers/arco';
 
-test.describe.serial('P1 Product UI Tests', () => {
+test.describe.serial('P1 Product UI Tests @p1', () => {
   async function getToken(page: import('@playwright/test').Page): Promise<string> {
     return (await page.evaluate(() => localStorage.getItem('accessToken'))) || '';
   }
@@ -33,35 +33,77 @@ test.describe.serial('P1 Product UI Tests', () => {
 
   // ──────── PROD-028: Compare button not visible with < 2 selected ────────
   test('PROD-028: compare button not visible with < 2 selected', async ({ authedPage: page }) => {
-    await clickNavItem(page, '产品管理');
-    await waitForTableLoad(page);
+    const token = await getToken(page);
+    const productBaseName = uniqueName('对比按钮测试');
 
-    const compareBtn = page.getByRole('button', { name: /对比/ });
-    let isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(isVisible).toBeFalsy();
+    const listResp = await page.request.get('/api/projects?pageSize=1', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const listData = await listResp.json();
+    const projectId = listData.data?.[0]?.id;
+    expect(projectId).toBeTruthy();
 
-    const dataRows = page.locator('main table').last().locator('tbody tr, [role="rowgroup"]:not(:first-child) [role="row"]');
-    const rowCount = await dataRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(2);
+    const createdProductIds: string[] = [];
 
-    await dataRows.nth(0).locator('td, [role="cell"]').first().click();
-    await page.waitForTimeout(300);
+    for (const suffix of ['A', 'B']) {
+      const createResp = await page.request.post('/api/products', {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          name: `${productBaseName}-${suffix}`,
+          model: `CMP-${Date.now()}-${suffix}`,
+          revision: 'V1.0',
+          category: 'ROUTER',
+          status: 'DEVELOPING',
+          projectId,
+        },
+      });
+      expect(createResp.status()).toBeLessThan(400);
+      const created = await createResp.json();
+      createdProductIds.push(created.id);
+    }
 
-    isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(isVisible).toBeFalsy();
+    try {
+      await clickNavItem(page, '产品管理');
+      await waitForTableLoad(page);
 
-    await dataRows.nth(1).locator('td, [role="cell"]').first().click();
-    await page.waitForTimeout(300);
+      await page.getByPlaceholder('搜索产品名称...').fill(productBaseName);
+      await page.waitForTimeout(500);
+      await waitForTableLoad(page);
 
-    await expect(compareBtn).toBeVisible({ timeout: 3_000 });
-    await expect(compareBtn).toHaveText(/对比.*2/);
+      const compareBtn = page.getByRole('button', { name: /对比/ });
+      let isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+      expect(isVisible).toBeFalsy();
 
-    await compareBtn.click();
-    const drawer = page.locator('.arco-drawer:visible');
-    await expect(drawer).toBeVisible({ timeout: 5_000 });
-    await expect(drawer.getByText(/产品对比/)).toBeVisible();
+      const firstRow = page.locator('.arco-table-tr').filter({ hasText: `${productBaseName}-A` });
+      const secondRow = page.locator('.arco-table-tr').filter({ hasText: `${productBaseName}-B` });
+      await expect(firstRow).toBeVisible({ timeout: 10_000 });
+      await expect(secondRow).toBeVisible({ timeout: 10_000 });
 
-    await page.keyboard.press('Escape');
+      await firstRow.locator('td, [role="cell"]').first().click();
+      await page.waitForTimeout(300);
+
+      isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+      expect(isVisible).toBeFalsy();
+
+      await secondRow.locator('td, [role="cell"]').first().click();
+      await page.waitForTimeout(300);
+
+      await expect(compareBtn).toBeVisible({ timeout: 3_000 });
+      await expect(compareBtn).toHaveText(/对比.*2/);
+
+      await compareBtn.click();
+      const drawer = page.locator('.arco-drawer:visible');
+      await expect(drawer).toBeVisible({ timeout: 5_000 });
+      await expect(drawer.getByText(/产品对比/)).toBeVisible();
+
+      await page.keyboard.press('Escape');
+    } finally {
+      for (const id of createdProductIds) {
+        await page.request.delete(`/api/products/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    }
   });
 
   // ──────── PROD-038: Status dropdown shows only allowed transitions ────────

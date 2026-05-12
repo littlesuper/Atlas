@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 interface CacheEntry {
-  data: any;
+  data: unknown;
   expiresAt: number;
 }
 
@@ -30,7 +30,7 @@ export const apiCache = (ttlSeconds: number) => {
 
     // Intercept res.json to cache the response
     const originalJson = res.json.bind(res);
-    res.json = (body: any) => {
+    res.json = (body: unknown) => {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         cache.set(key, {
           data: body,

@@ -16,7 +16,7 @@ import {
  * - 点击日期单元格触发 AutoOpenDatePicker
  * - 点击工期单元格触发 InputNumber
  */
-test.describe.serial('Activity Date Inline Editing', () => {
+test.describe.serial('Activity Date Inline Editing @p1', () => {
   const projectName = uniqueName('日期编辑项目');
   const activityName = uniqueName('日期编辑活动');
 

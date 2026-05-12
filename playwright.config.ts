@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === 'true';
+
 export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
   testDir: './e2e/specs',
@@ -33,14 +35,14 @@ export default defineConfig({
       command: 'npm run dev',
       cwd: './server',
       port: 3000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer,
       timeout: 30_000,
     },
     {
       command: 'npm run dev',
       cwd: './client',
       port: 5173,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer,
       timeout: 30_000,
     },
   ],

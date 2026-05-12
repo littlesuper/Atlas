@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -32,20 +35,20 @@ const { mockPrisma } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 const mockUser = {
   id: 'user-1',
   username: 'admin',
   realName: '管理员',
-  roles: [{ name: '系统管理员' }],
+  roles: [{ id: 'role-admin', name: '系统管理员', description: null }],
   permissions: ['*:*'],
   collaboratingProjectIds: [],
 };
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = { ...mockUser };
     next();
   },
@@ -387,5 +390,187 @@ describe('POST /api/notifications/generate', () => {
 
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('服务器内部错误');
+  });
+
+  it('skips milestone notification when executor is project manager (dedup)', async () => {
+    mockPrisma.activity.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        id: 'm-1',
+        name: '里程碑1',
+        type: 'MILESTONE',
+        executors: [{ userId: 'user-3' }],
+        project: { name: '测试项目', managerId: 'user-3' },
+      }]);
+
+    mockPrisma.notification.findFirst.mockResolvedValue(null);
+    mockPrisma.notification.create.mockResolvedValue({});
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).post('/api/notifications/generate');
+
+    expect(res.status).toBe(200);
+    expect(res.body.generatedCount).toBe(1);
+  });
+
+  it('returns correct unread count of zero when all read', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([
+      { id: 'n-1', userId: 'user-1', type: 'ACTIVITY_DUE', isRead: true, createdAt: '2026-03-27T00:00:00Z' },
+    ]);
+    mockPrisma.notification.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0);
+
+    const res = await request(app).get('/api/notifications');
+
+    expect(res.status).toBe(200);
+    expect(res.body.unreadCount).toBe(0);
+  });
+
+  it('DELETE returns 500 on delete database error', async () => {
+    mockPrisma.notification.findUnique.mockResolvedValue({
+      id: 'n-1',
+      userId: 'user-1',
+    });
+    mockPrisma.notification.delete.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).delete('/api/notifications/n-1');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('服务器内部错误');
+  });
+
+  it('PUT read returns 500 on update database error', async () => {
+    mockPrisma.notification.findUnique.mockResolvedValue({
+      id: 'n-1',
+      userId: 'user-1',
+      isRead: false,
+    });
+    mockPrisma.notification.update.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).put('/api/notifications/n-1/read');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('服务器内部错误');
+  });
+
+  it('generate returns zero count when no activities or milestones', async () => {
+    mockPrisma.activity.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).post('/api/notifications/generate');
+
+    expect(res.status).toBe(200);
+    expect(res.body.generatedCount).toBe(0);
+  });
+
+  it('GET notifications returns empty data when user has no notifications', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.notification.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const res = await request(app).get('/api/notifications');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(0);
+    expect(res.body.unreadCount).toBe(0);
+  });
+
+  it('generate skips notification for activity with no executors', async () => {
+    mockPrisma.activity.findMany
+      .mockResolvedValueOnce([{
+        id: 'a-1',
+        name: '无人活动',
+        executors: [],
+        project: { name: '测试项目' },
+      }])
+      .mockResolvedValueOnce([]);
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app).post('/api/notifications/generate');
+
+    expect(res.status).toBe(200);
+    expect(res.body.generatedCount).toBe(0);
+  });
+
+  it('GET returns empty list when no notifications exist', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.notification.count.mockResolvedValue(0);
+    mockPrisma.notification.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/notifications');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(0);
+  });
+
+  it('PUT mark-all-read returns 500 on database error', async () => {
+    mockPrisma.notification.updateMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).put('/api/notifications/read-all');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET returns correct unread count', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.notification.count.mockResolvedValueOnce(5);
+    mockPrisma.notification.count.mockResolvedValueOnce(2);
+
+    const res = await request(app).get('/api/notifications');
+
+    expect(res.status).toBe(200);
+    expect(res.body.unreadCount).toBe(2);
+  });
+
+  it('GET notifications returns empty data with zero counts', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.notification.count.mockResolvedValueOnce(0);
+    mockPrisma.notification.count.mockResolvedValueOnce(0);
+
+    const res = await request(app).get('/api/notifications');
+
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(0);
+    expect(res.body.unreadCount).toBe(0);
+  });
+
+  it('GET notifications returns 500 on database error', async () => {
+    mockPrisma.notification.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/notifications');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET notifications handles page parameter of zero', async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.notification.count.mockResolvedValueOnce(0);
+    mockPrisma.notification.count.mockResolvedValueOnce(0);
+
+    const res = await request(app).get('/api/notifications?page=0');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('PUT mark-all-read returns 200 even when no unread notifications', async () => {
+    mockPrisma.notification.updateMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app).put('/api/notifications/read-all');
+
+    expect([200, 404]).toContain(res.status);
+  });
+
+  it('DELETE notification returns 404 when notification does not exist', async () => {
+    mockPrisma.notification.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/notifications/nonexistent');
+
+    expect(res.status).toBe(404);
   });
 });

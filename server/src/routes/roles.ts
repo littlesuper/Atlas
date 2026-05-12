@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { authenticate, invalidateAllUserCache } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { logger } from '../utils/logger';
@@ -213,7 +213,7 @@ router.put(
       }
 
       // 3. 更新角色基本信息
-      const updateData: any = {};
+      const updateData: Prisma.RoleUpdateInput = {};
       if (name) updateData.name = name;
       if (description !== undefined) updateData.description = description || null;
 

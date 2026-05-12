@@ -26,9 +26,9 @@ server/src/           # 后端源码
   routes/             # Express 路由（18 个模块）
   middleware/         # auth, permission, validate(Zod), requestId, httpLogger, cache
   schemas/            # Zod 校验 schema（auth, users, projects）
-  utils/              # 工具函数（workday, dependencyScheduler, riskEngine, logger, circuitBreaker 等）
+  utils/              # 工具函数（workday, dependencyScheduler, riskEngine, logger, circuitBreaker, roleMembershipResolver 等）
   swagger.ts          # OpenAPI/Swagger 文档配置
-  prisma/             # schema.prisma（25 个模型）、seed.ts
+  prisma/             # schema.prisma（含 ActivityExecutor、RoleMember 等模型）、seed.ts
 
 e2e/                  # Playwright E2E 测试（55 spec，300+ 用例，含 axe-core 无障碍审计）
 specs/                # 需求规格文档
@@ -75,17 +75,15 @@ npm run lint                   # ESLint 检查
 
 ## 活动角色绑定（Activity Role Binding）
 
-活动的执行人通过 RBAC 角色映射自动填入，支持手动调整。详细规格见 `specs/activity-role-binding-spec.md`。
+活动的执行人通过 RBAC 角色自动填入：选择角色后，系统自动查询拥有该角色的用户（UserRole）并填入执行人列表，支持手动增减。
 
-- **RoleMember**（`server/prisma/schema.prisma`）：全局"角色→人员"映射表
-- **ActivityExecutor**：活动执行人多对多表，含来源标记（`ROLE_AUTO`/`MANUAL_ADD`）和角色快照
+- **ActivityExecutor**：活动执行人多对多表，含来源标记（`ROLE_AUTO`/`MANUAL_ADD`/`MANUAL_KEEP`）和角色快照
 - **Activity.roleId**：活动绑定的角色（可空）
-- **API**: `GET/POST/PATCH/DELETE /api/role-members`、`POST /api/role-members/batch-set`、`GET /api/role-members/preview/:roleId`
-- **管理页面**: 系统管理 → 账号管理 → 角色成员 Tab
-- **迁移脚本**: `server/src/scripts/migrateRoleBinding.ts`（从旧 assignees 迁移到 ActivityExecutor）
-- **验证脚本**: `server/src/scripts/verifyRoleBindingMigration.ts`
-- 创建活动时：若提供 `roleId` 且无 `executorIds`，自动按角色映射填入全员
-- 编辑活动时：`resetExecutorsByRole: true` 可显式按新角色重置执行人
+- **角色来源**：直接读取用户管理中已分配的角色（UserRole 表），无需额外配置
+- **API**: `GET /api/role-members`、`GET /api/role-members/preview/:roleId`（查询角色下的用户）
+- 创建活动时：选择角色 → 自动填入该角色下所有 ACTIVE 用户，执行人下拉仅显示该角色用户
+- 编辑活动时：切换角色 → 执行人列表更新为新角色用户；`resetExecutorsByRole: true` 可显式重置
+- Excel 导入支持"角色"列，按角色名匹配自动填入执行人
 
 ## 用户模型
 
@@ -109,7 +107,7 @@ User 模型支持两种使用场景：
 - 开发环境使用 SQLite，生产环境切换为 PostgreSQL
 - 修改 schema 后需运行 `npx prisma migrate dev --name <描述>` 创建迁移
 - 开发环境也可用 `npx prisma db push` 快速同步 schema（不生成迁移文件）
-- 种子数据包含 3 个测试账号：admin/admin123, zhangsan/123456, lisi/123456
+- 种子数据包含 17 个测试账号，每个角色一个用户，密码统一 `123456`（admin 为 `admin123`）
 
 ## 系统版本号
 
@@ -129,6 +127,54 @@ User 模型支持两种使用场景：
 - `PORT` - 服务端口（默认 3000）
 - `CORS_ORIGINS` - 允许的跨域来源
 - `AI_API_KEY` / `AI_API_URL` - AI 功能配置（可选）
+
+## 测试约定
+
+### 测试文件命名与位置
+
+- 测试文件与源文件同目录，命名 `<moduleName>.test.ts`（前端组件 `.test.tsx`）
+- 跨切面测试放在 `__tests__/` 子目录（如 `server/src/routes/__tests__/performance.test.ts`）
+- 专项测试可用点分后缀（如 `authStore.permission.test.ts`）
+
+### 测试框架与配置
+
+- **单元测试**：Vitest（`globals: true`）
+- **前端环境**：`jsdom`，setup 文件 `client/src/test/setup.ts`（提供 `localStorage`、`matchMedia` mock 和 `@testing-library/jest-dom`）
+- **后端环境**：`node`，无 setup 文件
+- **E2E 测试**：Playwright（`e2e/` 目录，300+ 用例）
+
+### 导入规范
+
+```ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+```
+
+始终显式导入 vitest API，不依赖全局注入。
+
+### Describe / It 命名
+
+- `describe` 使用功能名或 HTTP 端点（英文）
+- `it` 行为描述：后端偏向英文（`should return 404 when...`），前端偏向中文（`未登录时返回 false`）
+- 大型路由测试文件用注释分隔线分组
+
+### Mock 模式
+
+- **后端路由测试**：`vi.hoisted()` 定义 mock 对象 → `vi.mock()` 替换模块（Prisma、auth middleware）
+- **前端组件测试**：`vi.mock()` + `importOriginal` 部分模拟（如 `react-router-dom` 的 `useNavigate`）
+- **Store 测试**：`useAuthStore.setState()` 直接重置状态
+- 每个 `beforeEach` 必须调用 `vi.clearAllMocks()`
+
+### 测试结构
+
+- 纯函数/工具类：单层 `describe('functionName', ...)`
+- HTTP 端点：按方法分组 `describe('GET /api/...', ...)` / `describe('POST /api/...', ...)`
+- 前端功能：按行为分组 `describe('hasPermission', ...)` / `describe('logout', ...)`
+- 参数化测试用 `it.each`
+
+### 断言
+
+- 使用 Vitest 内置 `expect`，不引入额外断言库
+- 前端 DOM 断言可用 `@testing-library/jest-dom` 扩展（`toBeInTheDocument` 等）
 
 ## API 路由前缀
 
@@ -150,5 +196,6 @@ User 模型支持两种使用场景：
 - `/api/notifications` - 通知
 - `/api/check-items` - 活动检查项
 - `/api/risk-items` - 风险项管理
+- `/api/role-members` - 角色成员预览（查询角色下用户）
 - `/api/docs` - Swagger API 文档（仅开发环境）
 - `/api/docs.json` - OpenAPI JSON 规范

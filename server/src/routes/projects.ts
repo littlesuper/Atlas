@@ -1,12 +1,29 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { PrismaClient, ProjectStatus } from '@prisma/client';
+import { PrismaClient, ProjectStatus, type Prisma } from '@prisma/client';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, canDeleteProject, sanitizePagination } from '../middleware/permission';
 import { VALID_PROJECT_STATUSES, VALID_PRIORITIES, isValidProjectStatus, isValidPriority, isValidDateRange, isValidProgress } from '../utils/validation';
 import { logger } from '../utils/logger';
+import { businessMetrics, recordBusinessEvent } from '../utils/businessMetrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+type ProjectMemberSnapshot = {
+  user: {
+    id: string;
+    realName: string;
+    username: string | null;
+  };
+};
+
+const readArchivedProjectStatus = (snapshot: unknown): string | undefined => {
+  if (typeof snapshot !== 'object' || snapshot === null || !('project' in snapshot)) return undefined;
+  const project = (snapshot as { project?: unknown }).project;
+  if (typeof project !== 'object' || project === null || !('status' in project)) return undefined;
+  const status = (project as { status?: unknown }).status;
+  return typeof status === 'string' ? status : undefined;
+};
 
 /**
  * GET /api/projects
@@ -26,7 +43,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const skip = (pageNum - 1) * pageSizeNum;
 
     // 构建筛选条件
-    const where: any = {};
+    const where: Prisma.ProjectWhereInput = {};
 
     // 状态筛选
     if (status) {
@@ -44,14 +61,15 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     // 产品线筛选（支持逗号分隔多值，同时包含productLine为null的项目）
     if (productLine) {
       const lines = (productLine as string).split(',').map(l => l.trim());
+      const existingAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
       where.AND = [
-        ...(where.AND || []),
+        ...existingAnd,
         { OR: [{ productLine: { in: lines } }, { productLine: null }] },
       ];
     }
 
     // 统计条件（不受status和分页影响，仅受productLine和keyword影响）
-    const statsWhere: any = {};
+    const statsWhere: Prisma.ProjectWhereInput = {};
     if (keyword) {
       statsWhere.OR = [
         { name: { contains: keyword as string } },
@@ -60,8 +78,9 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     }
     if (productLine) {
       const lines = (productLine as string).split(',').map(l => l.trim());
+      const existingStatsAnd = Array.isArray(statsWhere.AND) ? statsWhere.AND : statsWhere.AND ? [statsWhere.AND] : [];
       statsWhere.AND = [
-        ...(statsWhere.AND || []),
+        ...existingStatsAnd,
         { OR: [{ productLine: { in: lines } }, { productLine: null }] },
       ];
     }
@@ -289,6 +308,7 @@ router.post(
         },
       });
 
+      recordBusinessEvent(businessMetrics, 'project.created');
       res.status(201).json(project);
     } catch (error) {
       logger.error({ err: error }, '创建项目错误');
@@ -386,7 +406,7 @@ router.put(
       }
 
       // 更新项目
-      const updateData: any = {};
+      const updateData: Prisma.ProjectUncheckedUpdateInput = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
       if (productLine !== undefined) updateData.productLine = productLine;
@@ -781,7 +801,7 @@ router.post(
       const [activities, products, weeklyReports, riskAssessments, activityComments] = await Promise.all([
         prisma.activity.findMany({
           where: { projectId: id },
-          include: { assignees: { select: { id: true, realName: true } } },
+          include: { executors: { include: { user: { select: { id: true, realName: true } } } } },
           orderBy: { sortOrder: 'asc' },
         }),
         prisma.product.findMany({ where: { projectId: id } }),
@@ -806,7 +826,7 @@ router.post(
           progress: project.progress,
           managerId: project.managerId,
           managerName: project.manager?.realName || project.manager?.username,
-          members: project.members.map((m: any) => ({
+          members: project.members.map((m: ProjectMemberSnapshot) => ({
             userId: m.user.id,
             realName: m.user.realName,
             role: 'member',
@@ -824,7 +844,7 @@ router.post(
         const arc = await tx.projectArchive.create({
           data: {
             projectId: id,
-            snapshot: snapshot as any,
+            snapshot: snapshot as unknown as Prisma.InputJsonValue,
             archivedBy: req.user!.id,
             remark: remark || null,
           },
@@ -879,7 +899,7 @@ router.post(
         orderBy: { archivedAt: 'desc' },
       });
 
-      const previousStatus = (latestArchive?.snapshot as any)?.project?.status || 'COMPLETED';
+      const previousStatus = readArchivedProjectStatus(latestArchive?.snapshot) || 'COMPLETED';
       const restoredStatus = (['IN_PROGRESS', 'COMPLETED', 'ON_HOLD'].includes(previousStatus))
         ? previousStatus as ProjectStatus
         : ProjectStatus.COMPLETED;
@@ -936,7 +956,7 @@ router.post(
       const [activities, products, weeklyReports, riskAssessments, activityComments] = await Promise.all([
         prisma.activity.findMany({
           where: { projectId: id },
-          include: { assignees: { select: { id: true, realName: true } } },
+          include: { executors: { include: { user: { select: { id: true, realName: true } } } } },
           orderBy: { sortOrder: 'asc' },
         }),
         prisma.product.findMany({ where: { projectId: id } }),
@@ -960,7 +980,7 @@ router.post(
           progress: project.progress,
           managerId: project.managerId,
           managerName: project.manager?.realName || project.manager?.username,
-          members: project.members.map((m: any) => ({
+          members: project.members.map((m: ProjectMemberSnapshot) => ({
             userId: m.user.id,
             realName: m.user.realName,
             role: 'member',
@@ -976,7 +996,7 @@ router.post(
       const archive = await prisma.projectArchive.create({
         data: {
           projectId: id,
-          snapshot: snapshot as any,
+          snapshot: snapshot as unknown as Prisma.InputJsonValue,
           archivedBy: req.user!.id,
           remark: remark || null,
         },

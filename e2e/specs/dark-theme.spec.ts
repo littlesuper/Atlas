@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { waitForTableLoad } from '../helpers/arco';
 
-test.describe.serial('Dark Theme (THEME-001-003, SYS-007)', () => {
+test.describe.serial('Dark Theme (THEME-001-003, SYS-007) @p1', () => {
   test('THEME-001: toggle to dark theme applies arco-theme=dark', async ({ authedPage: page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);

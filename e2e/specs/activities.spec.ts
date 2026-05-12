@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName, text } from '../fixtures/test-data';
 import { expectMessage, confirmModal, waitForTableLoad, clickDrawerSubmit, openCreateActivityDrawer, searchProject, createProjectViaPage } from '../helpers/arco';
 
-test.describe.serial('Activity Management', () => {
+test.describe.serial('Activity Management @smoke', () => {
   const projectName = uniqueName('活动测试项目');
   const activityName = uniqueName(text.activityName);
 

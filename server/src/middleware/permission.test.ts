@@ -229,4 +229,53 @@ describe('sanitizePagination', () => {
   it('parses valid numeric strings correctly', () => {
     expect(sanitizePagination('3', '25')).toEqual({ pageNum: 3, pageSizeNum: 25 });
   });
+
+  it('permission with no colon separator never matches', () => {
+    const req = mockReq({ permissions: ['admin'] });
+    const res = mockRes();
+    const next = vi.fn();
+    requirePermission('project', 'read')(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('permission with multiple colons matches first two segments', () => {
+    const req = mockReq({ permissions: ['project:read:extra'] });
+    const res = mockRes();
+    const next = vi.fn();
+    requirePermission('project', 'read')(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('sanitizePagination handles very large page number', () => {
+    expect(sanitizePagination('999999', '10')).toEqual({ pageNum: 999999, pageSizeNum: 10 });
+  });
+
+  it('sanitizePagination truncates decimal values', () => {
+    expect(sanitizePagination('2.7', '15.9')).toEqual({ pageNum: 2, pageSizeNum: 15 });
+  });
+
+  it('canDeleteProject returns false for collaborator who is not manager', () => {
+    const req = {
+      user: { id: 'u-collab', permissions: ['project:read'], collaboratingProjectIds: ['p1'] },
+    } as unknown as Request;
+    expect(canDeleteProject(req, 'u-manager')).toBe(false);
+  });
+
+  it('sanitizePagination handles empty string values', () => {
+    expect(sanitizePagination('', '')).toEqual({ pageNum: 1, pageSizeNum: 20 });
+  });
+
+  it('sanitizePagination handles Infinity values', () => {
+    expect(sanitizePagination('Infinity', 'Infinity')).toEqual({ pageNum: 1, pageSizeNum: 20 });
+  });
+
+  it('sanitizePagination caps pageSize at exactly 100', () => {
+    expect(sanitizePagination('1', '100')).toEqual({ pageNum: 1, pageSizeNum: 100 });
+  });
+
+  it('canManageProject returns false when req.user is undefined', () => {
+    const req = { user: undefined } as unknown as Request;
+    expect(canManageProject(req, 'mgr1', 'p1')).toBe(false);
+  });
 });

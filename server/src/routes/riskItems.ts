@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination } from '../middleware/permission';
 import { validate } from '../middleware/validate';
@@ -9,17 +9,41 @@ import { logger } from '../utils/logger';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+type RiskActionItem = {
+  action: string;
+  priority?: string;
+};
+
+type RiskAssessmentEnhancedData = {
+  actionItems?: unknown[];
+};
+
+const isRiskAssessmentEnhancedData = (value: unknown): value is RiskAssessmentEnhancedData =>
+  typeof value === 'object' && value !== null;
+
+const isRiskActionItem = (value: unknown): value is RiskActionItem =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { action?: unknown }).action === 'string';
+
+const queryString = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : undefined;
+  return typeof value === 'string' ? value : undefined;
+};
+
 /**
  * GET /api/risk-items
  * 风险项列表（分页、筛选）
  */
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { projectId, status, page = '1', pageSize = '20' } = req.query;
+    const { page = '1', pageSize = '20' } = req.query;
+    const projectId = queryString(req.query.projectId);
+    const status = queryString(req.query.status);
     const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
     const skip = (pageNum - 1) * pageSizeNum;
 
-    const where: any = {};
+    const where: Prisma.RiskItemWhereInput = {};
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
 
@@ -112,8 +136,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
     }
 
     // Fetch user info for logs
-    const itemAny = item as any;
-    const logs = (itemAny.logs || []) as any[];
+    const logs = item.logs;
     const userIds: string[] = [...new Set(logs.map((l) => l.userId as string))];
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
@@ -148,7 +171,7 @@ router.put('/:id', authenticate, validate({ body: updateRiskItemSchema }), async
       return;
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.RiskItemUncheckedUpdateInput = {};
     const logs: Array<{ action: string; content: string }> = [];
 
     if (title !== undefined && title !== existing.title) {
@@ -291,8 +314,8 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
       return;
     }
 
-    const enhanced = assessment.aiEnhancedData as any;
-    if (!enhanced?.actionItems || !Array.isArray(enhanced.actionItems)) {
+    const enhanced = assessment.aiEnhancedData;
+    if (!isRiskAssessmentEnhancedData(enhanced) || !Array.isArray(enhanced.actionItems)) {
       res.status(400).json({ error: '该评估无可导入的行动项' });
       return;
     }
@@ -305,7 +328,7 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
     };
 
     const created = [];
-    for (const item of enhanced.actionItems) {
+    for (const item of enhanced.actionItems.filter(isRiskActionItem)) {
       // Dedup by title
       const existing = await prisma.riskItem.findFirst({
         where: {
@@ -321,7 +344,7 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
             projectId: assessment.projectId,
             assessmentId,
             title: item.action,
-            severity: priorityToSeverity[item.priority] || 'MEDIUM',
+            severity: item.priority ? priorityToSeverity[item.priority] || 'MEDIUM' : 'MEDIUM',
             source: 'ai',
           },
         });

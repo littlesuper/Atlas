@@ -8,7 +8,7 @@ import { waitForTableLoad, clickDrawerSubmit, pickDateRange, openCreateActivityD
  * - 产品表单必填字段验证
  * - 空表单提交显示错误提示
  */
-test.describe('Form Validation', () => {
+test.describe('Form Validation @p2', () => {
   // ──────── TC1: project form validation ────────
   test('project form shows validation errors on empty submit', async ({ authedPage: page }) => {
     await page.getByRole('button', { name: '新建项目' }).click();

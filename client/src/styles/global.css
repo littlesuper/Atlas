@@ -176,11 +176,66 @@ body {
 }
 
 /* Fix WCAG AA color-contrast for Arco Tag */
+.arco-tag-blue {
+  color: rgb(17, 75, 163) !important;
+}
+.arco-tag-cyan {
+  color: rgb(0, 99, 122) !important;
+}
+.arco-tag-green {
+  color: rgb(10, 110, 26) !important;
+}
+.arco-tag-orange {
+  color: rgb(178, 80, 0) !important;
+}
+.arco-tag-gray {
+  color: rgb(78, 89, 105) !important;
+}
+.arco-tag-red {
+  color: rgb(184, 29, 42) !important;
+}
+.arco-tag-purple {
+  color: rgb(105, 57, 168) !important;
+}
 .arco-tag-checked.arco-tag-blue {
   color: rgb(17, 75, 163) !important;
 }
 .arco-tag-checked.arco-tag-orange {
   color: rgb(166, 69, 0) !important;
+}
+.arco-tag-checked.arco-tag-gray {
+  color: rgb(78, 89, 105) !important;
+}
+
+.arco-textarea-word-limit {
+  color: var(--color-text-2) !important;
+}
+
+.arco-descriptions-item-label {
+  color: var(--color-text-2) !important;
+}
+
+.arco-form-item-label label {
+  color: var(--color-text-1) !important;
+}
+
+.arco-form-item-symbol {
+  color: var(--status-danger-dark) !important;
+}
+
+.arco-modal-footer .arco-btn-secondary:not(.arco-btn-disabled) {
+  color: var(--color-text-1) !important;
+}
+
+.arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled) {
+  background-color: #165dff !important;
+  border-color: #165dff !important;
+  color: #fff !important;
+}
+
+.arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled) span {
+  background-color: #165dff !important;
+  color: #fff !important;
 }
 
 /* 下拉面板样式 */
@@ -217,8 +272,12 @@ body {
 
 /* 空状态样式 */
 .arco-empty {
-  color: var(--color-text-4);
+  color: var(--color-text-2);
   font-size: 14px;
+}
+
+.arco-empty-description {
+  color: var(--color-text-2) !important;
 }
 
 /* ============ wangEditor 富文本编辑器 ============ */
@@ -260,7 +319,7 @@ body {
 
 .toolbar-left {
   font-size: 13px;
-  color: var(--color-text-3);
+  color: var(--color-text-2);
   font-weight: 400;
 }
 

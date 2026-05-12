@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -22,7 +25,7 @@ const { mockPrisma, mockBcrypt } = vi.hoisted(() => {
     project: {
       count: vi.fn(),
     },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
   };
 
   const mockBcrypt = { compare: vi.fn(), hash: vi.fn(() => 'hashed-pw') };
@@ -33,11 +36,11 @@ const { mockPrisma, mockBcrypt } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -52,10 +55,10 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
-  sanitizePagination: (page: any, pageSize: any) => ({
-    pageNum: parseInt(page) || 1,
-    pageSizeNum: parseInt(pageSize) || 20,
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  sanitizePagination: (page: unknown, pageSize: unknown) => ({
+    pageNum: parseInt(String(page), 10) || 1,
+    pageSizeNum: parseInt(String(pageSize), 10) || 20,
   }),
 }));
 
@@ -131,12 +134,22 @@ describe('GET /api/users', () => {
     const res = await request(app).get('/api/users');
     expect(res.status).toBe(500);
   });
+
+  it('GET users handles search with special characters', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users?keyword=%3Cscript%3E');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
 });
 
 describe('POST /api/users', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+    mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));
   });
 
   it('returns 400 when realName is missing', async () => {
@@ -233,7 +246,7 @@ describe('POST /api/users', () => {
 describe('PUT /api/users/:id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+    mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));
   });
 
   it('returns 404 when user does not exist', async () => {
@@ -342,4 +355,136 @@ describe('DELETE /api/users/:id', () => {
     const res = await request(app).delete('/api/users/u1');
     expect(res.status).toBe(500);
   });
+
+  it('clears all roles when roleIds is empty array', async () => {
+    const existing = {
+      id: 'u1',
+      username: 'testuser',
+      realName: 'Test',
+      canLogin: true,
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
+    };
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({
+        ...existing,
+        userRoles: [],
+      });
+    mockPrisma.user.update.mockResolvedValue(existing);
+    mockPrisma.userRole.deleteMany.mockResolvedValue({ count: 2 });
+
+    const res = await request(app)
+      .put('/api/users/u1')
+      .send({ roleIds: [] });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.userRole.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } });
+  });
+
+  it('GET users returns empty array when none exist', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(0);
+  });
+
+  it('GET users returns 500 on database error', async () => {
+    mockPrisma.user.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/users');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET users with keyword filter returns filtered results', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users?keyword=test');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET users with status filter returns filtered results', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users?status=ACTIVE');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET users returns empty array when no users exist', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.total).toBe(0);
+  });
+
+  it('GET users with canLogin=false filter returns only contacts', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users?canLogin=false');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET users returns empty array when no users exist', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/users');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+describe('GET /api/users batch 125 matrices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index % 2 === 0 ? 'true' : 'false',
+    index % 2 === 0,
+  ] as const))(
+    'applies generated canLogin filter %s',
+    async (canLogin, expected) => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      const res = await request(app).get(`/api/users?canLogin=${canLogin}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.user.findMany.mock.calls[0][0].where.canLogin).toBe(expected);
+      expect(mockPrisma.user.count.mock.calls[0][0].where.canLogin).toBe(expected);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => `用户-${index}-<tag>`))(
+    'applies generated keyword search %s',
+    async (keyword) => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      const res = await request(app).get('/api/users').query({ keyword });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.user.findMany.mock.calls[0][0].where.OR).toEqual([
+        { username: { contains: keyword } },
+        { realName: { contains: keyword } },
+      ]);
+    },
+  );
 });

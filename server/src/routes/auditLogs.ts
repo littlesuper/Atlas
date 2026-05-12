@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { logger } from '../utils/logger';
@@ -32,7 +32,7 @@ router.get(
       const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
       const skip = (pageNum - 1) * pageSizeNum;
 
-      const where: any = {};
+      const where: Prisma.AuditLogWhereInput = {};
 
       if (userId) {
         where.userId = userId as string;

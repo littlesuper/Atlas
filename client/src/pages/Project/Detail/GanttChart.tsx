@@ -21,7 +21,7 @@ const VIEW_CONFIG: Record<ViewMode, { label: string; dayWidth: number }> = {
 };
 
 // ============ 颜色配置 ============
-function getStatusProgress(status: string): number {
+export function getStatusProgress(status: string): number {
   if (status === 'COMPLETED') return 100;
   if (status === 'IN_PROGRESS') return 50;
   return 0;
@@ -35,12 +35,12 @@ const STATUS_BAR_COLOR: Record<string, string> = {
 };
 
 // ============ 日期工具 ============
-function daysBetween(start: dayjs.Dayjs, end: dayjs.Dayjs): number {
+export function daysBetween(start: dayjs.Dayjs, end: dayjs.Dayjs): number {
   return end.diff(start, 'day');
 }
 
 // 月份分组
-function getMonthGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
+export function getMonthGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
   const groups: Array<{ label: string; days: number }> = [];
   let cur = start.startOf('month');
   while (cur.isBefore(end) || cur.isSame(end, 'month')) {
@@ -55,7 +55,7 @@ function getMonthGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
 }
 
 // 周分组
-function getWeekGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
+export function getWeekGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
   const groups: Array<{ label: string; days: number }> = [];
   // 对齐到周一
   let cur = start.subtract((start.day() === 0 ? 6 : start.day() - 1), 'day');
@@ -71,7 +71,7 @@ function getWeekGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
 }
 
 // 季度分组（不依赖 dayjs 插件）
-function getQuarterGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
+export function getQuarterGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
   const groups: Array<{ label: string; days: number }> = [];
   const qStartMonth = Math.floor(start.month() / 3) * 3;
   let cur = start.startOf('year').add(qStartMonth, 'month');
@@ -88,7 +88,7 @@ function getQuarterGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
 }
 
 // 年份分组
-function getYearGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
+export function getYearGroups(start: dayjs.Dayjs, end: dayjs.Dayjs) {
   const groups: Array<{ label: string; days: number }> = [];
   let cur = start.startOf('year');
   while (cur.isBefore(end) || cur.isSame(end, 'year')) {

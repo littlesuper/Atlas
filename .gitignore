@@ -6,6 +6,8 @@ node_modules/
 # Testing
 coverage/
 test-results/
+playwright-report/
+blob-report/
 e2e/.auth/
 
 # Production
@@ -25,6 +27,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.log
+server/src/logs/
 
 # IDE
 .idea/
@@ -33,8 +36,7 @@ yarn-error.log*
 *.swo
 *~
 
-# Prisma
-server/src/prisma/migrations/
+# Prisma migrations are source artifacts and should be committed.
 
 # Uploads
 server/uploads/
@@ -45,6 +47,8 @@ server/prisma/backups/
 # Local SQLite DB (never commit)
 server/prisma/*.db
 server/prisma/*.db-journal
+server/prisma/*.db-shm
+server/prisma/*.db-wal
 server/prisma/dev.db.backup_*
 
 # Runtime / deploy artifacts

@@ -1,14 +1,42 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, ActivityStatus } from '@prisma/client';
+import { PrismaClient, ActivityStatus, ReportStatus, type Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, isAdmin, canManageProject, sanitizePagination } from '../middleware/permission';
 import { getWeekNumber } from '../utils/weekNumber';
 import { callAi } from '../utils/aiClient';
 import { sanitizeRichText } from '../utils/sanitize';
 import { logger } from '../utils/logger';
+import { businessMetrics, recordBusinessEvent } from '../utils/businessMetrics';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+type WeeklyReportRisk = {
+  type?: string;
+  description?: string;
+  severity?: string;
+};
+
+type RiskFactor = {
+  factor?: string;
+  severity?: string;
+  description?: string;
+};
+
+type ActivityWithExecutors = {
+  executors?: Array<{ user: { realName: string } }>;
+};
+
+const isWeeklyReportRisk = (value: unknown): value is WeeklyReportRisk =>
+  typeof value === 'object' && value !== null;
+
+const isRiskFactor = (value: unknown): value is RiskFactor =>
+  typeof value === 'object' && value !== null;
+
+const queryString = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : undefined;
+  return typeof value === 'string' ? value : undefined;
+};
 
 /**
  * GET /api/weekly-reports
@@ -25,15 +53,17 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       status,
       productLine,
     } = req.query;
+    const projectIdFilter = queryString(projectId);
+    const statusFilter = queryString(status);
 
     const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
     const skip = (pageNum - 1) * pageSizeNum;
 
     // 构建筛选条件
-    const where: any = {};
+    const where: Prisma.WeeklyReportWhereInput = {};
 
-    if (projectId) {
-      where.projectId = projectId;
+    if (projectIdFilter) {
+      where.projectId = projectIdFilter;
     }
 
     if (year) {
@@ -44,8 +74,8 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       where.weekNumber = parseInt(weekNumber as string);
     }
 
-    if (status) {
-      where.status = status;
+    if (statusFilter) {
+      where.status = statusFilter as ReportStatus;
     } else {
       // 默认排除草稿，只返回已提交和已归档的周报
       where.status = { in: ['SUBMITTED', 'ARCHIVED'] };
@@ -233,6 +263,7 @@ router.get('/project/:projectId/latest', authenticate, async (req: Request, res:
       return;
     }
 
+    recordBusinessEvent(businessMetrics, 'weekly_report.submitted');
     res.json(report);
   } catch (error) {
     logger.error({ err: error }, '获取最新周报错误');
@@ -352,7 +383,7 @@ router.get('/week/:year/:weekNumber', authenticate, async (req: Request, res: Re
     const weekNum = parseInt(weekNumber);
 
     // 构建筛选条件
-    const where: any = {
+    const where: Prisma.WeeklyReportWhereInput = {
       year: yearNum,
       weekNumber: weekNum,
     };
@@ -558,7 +589,7 @@ router.put(
       }
 
       // 构建更新数据
-      const updateData: any = {};
+      const updateData: Prisma.WeeklyReportUncheckedUpdateInput = {};
 
       if (weekStart !== undefined || weekEnd !== undefined) {
         const newWeekStart = weekStart ? new Date(weekStart) : existingReport.weekStart;
@@ -683,9 +714,9 @@ router.post(
 
     // Auto-create RiskItems from weekly report risks array
     try {
-      const risks = existingReport.risks as any[] | null;
-      if (risks && Array.isArray(risks)) {
-        for (const risk of risks) {
+      const risks = existingReport.risks;
+      if (Array.isArray(risks)) {
+        for (const risk of risks.filter(isWeeklyReportRisk)) {
           const title = risk.type || risk.description?.slice(0, 50);
           if (!title) continue;
           // Dedup by title
@@ -859,15 +890,17 @@ router.get('/project/:projectId/risk-prefill', authenticate, async (req: Request
 
     // Build from risk factors
     if (latestAssessment?.riskFactors) {
-      const factors = latestAssessment.riskFactors as any[];
+      const factors = Array.isArray(latestAssessment.riskFactors)
+        ? latestAssessment.riskFactors.filter(isRiskFactor)
+        : [];
       if (factors.length > 0) {
         riskWarning += '<ul>';
         for (const f of factors) {
           if (f.severity !== 'LOW') {
             riskWarning += `<li><strong>[${f.severity}]</strong> ${f.factor}：${f.description}</li>`;
             risks.push({
-              type: f.factor,
-              description: f.description,
+              type: f.factor || '风险因素',
+              description: f.description || '',
               status: 'OPEN',
             });
           }
@@ -984,10 +1017,12 @@ router.post('/project/:projectId/ai-suggestions', authenticate, async (req: Requ
     } catch { /* risk context optional */ }
 
     // 尝试 AI 生成
-    const getAssigneeNames = (a: any) =>
-      a.executors?.length > 0
-        ? a.executors.map((e: any) => e.user.realName).join(', ')
+    const getAssigneeNames = (a: ActivityWithExecutors) => {
+      const executors = a.executors || [];
+      return executors.length > 0
+        ? executors.map((e) => e.user.realName).join(', ')
         : '未分配';
+    };
     try {
       const analysisData = {
         completedThisWeek: completedThisWeek.map((a) => ({

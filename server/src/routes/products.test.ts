@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -22,7 +25,7 @@ const { mockPrisma } = vi.hoisted(() => {
     project: {
       findUnique: vi.fn(),
     },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
   };
 
   return { mockPrisma };
@@ -31,11 +34,11 @@ const { mockPrisma } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -49,10 +52,10 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
-  sanitizePagination: (page: any, pageSize: any) => ({
-    pageNum: parseInt(page) || 1,
-    pageSizeNum: parseInt(pageSize) || 20,
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  sanitizePagination: (page: unknown, pageSize: unknown) => ({
+    pageNum: parseInt(String(page), 10) || 1,
+    pageSizeNum: parseInt(String(pageSize), 10) || 20,
   }),
 }));
 
@@ -62,7 +65,7 @@ vi.mock('../utils/auditLog', () => ({
 }));
 
 vi.mock('../middleware/validate', () => ({
-  validate: () => (_req: any, _res: any, next: any) => next(),
+  validate: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -508,7 +511,7 @@ describe('PROD-002: default status DEVELOPING', () => {
       .mockResolvedValueOnce({ id: 'proj-1', status: 'IN_PROGRESS' })
       .mockResolvedValueOnce({ id: 'proj-1', status: 'IN_PROGRESS' });
     mockPrisma.product.findFirst.mockResolvedValue(null);
-    mockPrisma.product.create.mockImplementation((args: any) => {
+    mockPrisma.product.create.mockImplementation((args: { data: { status?: string } }) => {
       expect(args.data.status).toBe('DEVELOPING');
       return Promise.resolve({ ...sampleProduct, id: 'new-prod' });
     });
@@ -792,7 +795,7 @@ describe('PROD-023: 6th image upload rejected (max 5 images per product)', () =>
 
     mockPrisma.product.findUnique.mockResolvedValue(existing);
     mockPrisma.product.findFirst.mockResolvedValue(null);
-    mockPrisma.product.update.mockImplementation((args: any) => {
+    mockPrisma.product.update.mockImplementation((args: { data: { images?: unknown } }) => {
       return Promise.resolve({ ...existing, images: args.data.images });
     });
     mockPrisma.productChangeLog.create.mockResolvedValue({});
@@ -889,5 +892,40 @@ describe('PROD-019/020/021: ChangeLog CRUD actions', () => {
     expect(mockPrisma.productChangeLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'DELETE' }) })
     );
+  });
+
+  it('GET products returns 500 on database error', async () => {
+    mockPrisma.product.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/products');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET products returns empty array when no products exist', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.product.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/products');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET products with negative page defaults to page 1', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.product.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/products?page=-1');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET products handles keyword filter', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.product.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/products?keyword=test');
+
+    expect(res.status).toBe(200);
   });
 });

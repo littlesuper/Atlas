@@ -9,7 +9,7 @@ import { logger } from '../utils/logger';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-function maskSecret(secret: string): string {
+export function maskSecret(secret: string): string {
   if (!secret) return '';
   return '****' + secret.slice(-4);
 }

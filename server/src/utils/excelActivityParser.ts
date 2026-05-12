@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export interface ParsedDependency {
   seq: number;
@@ -106,6 +106,38 @@ function parsePredecessors(raw: string): ParsedDependency[] {
     .filter((d): d is ParsedDependency => d !== null);
 }
 
+type WorkbookCellValue = ExcelJS.CellValue | undefined;
+
+function isLegacyXls(buffer: Buffer): boolean {
+  return buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+}
+
+function normalizeCellValue(value: WorkbookCellValue): unknown {
+  if (value == null) return undefined;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+
+  if (typeof value === 'object') {
+    if ('richText' in value && Array.isArray(value.richText)) {
+      return value.richText.map((part) => part.text).join('');
+    }
+
+    if ('text' in value && typeof value.text === 'string') {
+      return value.text;
+    }
+
+    if ('result' in value) {
+      return normalizeCellValue(value.result as WorkbookCellValue);
+    }
+
+    if ('formula' in value && typeof value.formula === 'string') {
+      return `=${value.formula}`;
+    }
+  }
+
+  return String(value);
+}
+
 // Excel serial number → Date
 function excelDateToJS(value: unknown): Date | undefined {
   if (value == null || value === '') return undefined;
@@ -115,8 +147,11 @@ function excelDateToJS(value: unknown): Date | undefined {
 
   // 数字 (Excel serial number)
   if (typeof value === 'number') {
-    const d = XLSX.SSF.parse_date_code(value);
-    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d));
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    const wholeDays = Math.floor(value);
+    const fraction = value - wholeDays;
+    const date = new Date(excelEpoch + wholeDays * 86400000 + Math.round(fraction * 86400000));
+    if (!isNaN(date.getTime())) return date;
     return undefined;
   }
 
@@ -144,18 +179,19 @@ function excelDateToJS(value: unknown): Date | undefined {
 /**
  * 自动识别表头行并映射列索引
  */
-function detectColumns(sheet: XLSX.WorkSheet): { headerRow: number; colMap: Record<string, number> } {
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+function detectColumns(sheet: ExcelJS.Worksheet): { headerRow: number; colMap: Record<string, number> } {
   const colMap: Record<string, number> = {};
+  const maxRow = Math.max(sheet.rowCount, 1);
+  const maxColumn = Math.max(sheet.columnCount, 1);
 
   // 扫描前 10 行找表头
-  for (let r = range.s.r; r <= Math.min(range.s.r + 9, range.e.r); r++) {
+  for (let r = 1; r <= Math.min(10, maxRow); r++) {
     let matchCount = 0;
 
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-      if (!cell || !cell.v) continue;
-      const text = String(cell.v).trim();
+    for (let c = 1; c <= maxColumn; c++) {
+      const value = normalizeCellValue(sheet.getRow(r).getCell(c).value);
+      if (!value) continue;
+      const text = String(value).trim();
 
       for (const [field, keywords] of COLUMN_KEYWORDS) {
         if (colMap[field] !== undefined) continue; // already found
@@ -182,7 +218,7 @@ function detectColumns(sheet: XLSX.WorkSheet): { headerRow: number; colMap: Reco
 
   // Fallback: 如果只匹配到 name，也返回
   if (colMap['name'] !== undefined) {
-    return { headerRow: 0, colMap };
+    return { headerRow: 1, colMap };
   }
 
   throw new Error('无法识别 Excel 表头，请确保包含"任务描述"或"活动名称"列');
@@ -191,24 +227,30 @@ function detectColumns(sheet: XLSX.WorkSheet): { headerRow: number; colMap: Reco
 /**
  * 解析 Excel 文件 buffer，返回活动列表
  */
-export function parseExcelActivities(buffer: Buffer): ParsedActivity[] {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-  const sheetName = wb.SheetNames[0];
-  if (!sheetName) throw new Error('Excel 文件中没有工作表');
+export async function parseExcelActivities(buffer: Buffer): Promise<ParsedActivity[]> {
+  if (isLegacyXls(buffer)) {
+    throw new Error('为降低 Excel 解析安全风险，请将 .xls 文件另存为 .xlsx 后再导入');
+  }
 
-  const sheet = wb.Sheets[sheetName];
+  const wb = new ExcelJS.Workbook();
+  const workbookBuffer = buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  ) as ArrayBuffer;
+  await wb.xlsx.load(workbookBuffer as unknown as Parameters<typeof wb.xlsx.load>[0]);
+
+  const sheet = wb.worksheets[0];
+  if (!sheet) throw new Error('Excel 文件中没有工作表');
   const { headerRow, colMap } = detectColumns(sheet);
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
   const activities: ParsedActivity[] = [];
 
   const getCell = (r: number, c: number | undefined): unknown => {
     if (c === undefined) return undefined;
-    const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-    return cell ? cell.v : undefined;
+    return normalizeCellValue(sheet.getRow(r).getCell(c).value);
   };
 
   let fallbackSeq = 1;
-  for (let r = headerRow + 1; r <= range.e.r; r++) {
+  for (let r = headerRow + 1; r <= sheet.rowCount; r++) {
     const name = getCell(r, colMap['name']);
     if (!name || String(name).trim() === '') continue; // 跳过空行
 

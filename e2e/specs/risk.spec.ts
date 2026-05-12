@@ -11,7 +11,7 @@ import {
   searchProject,
 } from '../helpers/arco';
 
-test.describe.serial('Risk Assessment', () => {
+test.describe.serial('Risk Assessment @p1', () => {
   const projectName = uniqueName('风险测试项目');
 
   test('setup: create project with activity for risk assessment', async ({ authedPage: page }) => {

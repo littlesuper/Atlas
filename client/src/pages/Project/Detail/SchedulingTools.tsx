@@ -18,6 +18,11 @@ import { activitiesApi } from '../../../api';
 import { Activity, ResourceConflict, WhatIfResult, AiScheduleSuggestion } from '../../../types';
 import dayjs from 'dayjs';
 
+export const getDateColorHelper = (original: string | null, newDate: string | null) => {
+  if (!original || !newDate) return 'rgb(var(--warning-6))';
+  return dayjs(newDate).isBefore(dayjs(original)) ? 'rgb(var(--success-6))' : 'rgb(var(--warning-6))';
+};
+
 interface SchedulingToolsProps {
   projectId: string;
   activities: Activity[];
@@ -154,11 +159,7 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
     },
   ];
 
-  // Determine color for new dates: green if earlier, orange if later
-  const getDateColor = (original: string | null, newDate: string | null) => {
-    if (!original || !newDate) return 'rgb(var(--warning-6))';
-    return dayjs(newDate).isBefore(dayjs(original)) ? 'rgb(var(--success-6))' : 'rgb(var(--warning-6))';
-  };
+  const getDateColor = getDateColorHelper;
 
   // What-if affected table columns
   const whatIfColumns = [

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Button,
@@ -29,6 +29,12 @@ interface Props {
 
 const FormItem = Form.Item;
 
+export function getApiErrorMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) return undefined;
+  const response = (error as { response?: { data?: { error?: unknown } } }).response;
+  return typeof response?.data?.error === 'string' ? response.data.error : undefined;
+}
+
 const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchived, projectMembers = [] }) => {
   const [items, setItems] = useState<RiskItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -40,10 +46,10 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
   const [commentInput, setCommentInput] = useState('');
   const [form] = Form.useForm();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = { projectId, pageSize: 50 };
+      const params: Parameters<typeof riskItemsApi.list>[0] = { projectId, pageSize: 50 };
       if (statusFilter) params.status = statusFilter;
       const res = await riskItemsApi.list(params);
       setItems(res.data.data || []);
@@ -53,11 +59,11 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId, statusFilter]);
 
   useEffect(() => {
     load();
-  }, [projectId, statusFilter]);
+  }, [load]);
 
   const handleCreate = async () => {
     try {
@@ -71,8 +77,9 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
       setCreateVisible(false);
       form.resetFields();
       load();
-    } catch (e: any) {
-      if (e?.response?.data?.error) Message.error(e.response.data.error);
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error);
+      if (message) Message.error(message);
     }
   };
 
@@ -169,7 +176,7 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
       title: '负责人',
       dataIndex: 'owner',
       width: 90,
-      render: (owner: any) => owner?.realName || '-',
+      render: (owner: RiskItem['owner']) => owner?.realName || '-',
     },
     {
       title: '状态',
@@ -189,7 +196,7 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
     {
       title: '操作',
       width: 80,
-      render: (_: any, record: RiskItem) => !isArchived && (
+      render: (_: unknown, record: RiskItem) => !isArchived && (
         <Space size={4}>
           <IconEdit
             style={{ cursor: 'pointer', color: 'var(--color-text-3)' }}
@@ -212,7 +219,7 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-2)' }}>
           风险项管理
-          {total > 0 && <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--color-text-3)', marginLeft: 8 }}>({total})</span>}
+          {total > 0 && <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--color-text-2)', marginLeft: 8 }}>({total})</span>}
         </div>
         <Space size={8}>
           <Select
@@ -324,7 +331,7 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
             )}
 
             {/* Meta info */}
-            <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 16 }}>
               <div>负责人: {selectedItem.owner?.realName || '未分配'}</div>
               <div>来源: {selectedItem.source}</div>
               <div>创建时间: {dayjs(selectedItem.createdAt).format('YYYY-MM-DD HH:mm')}</div>
@@ -340,7 +347,7 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
                   <Timeline.Item key={log.id}>
                     <div style={{ fontSize: 12 }}>
                       <span style={{ fontWeight: 500 }}>{log.user?.realName || '系统'}</span>
-                      <span style={{ color: 'var(--color-text-3)', marginLeft: 8 }}>
+                      <span style={{ color: 'var(--color-text-2)', marginLeft: 8 }}>
                         {dayjs(log.createdAt).format('MM-DD HH:mm')}
                       </span>
                     </div>
@@ -351,7 +358,7 @@ const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchiv
                 ))}
               </Timeline>
             ) : (
-              <div style={{ fontSize: 12, color: 'var(--color-text-3)' }}>暂无记录</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-2)' }}>暂无记录</div>
             )}
 
             {/* Comment input */}

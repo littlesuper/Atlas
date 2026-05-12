@@ -43,6 +43,23 @@ interface PhaseData {
   schedule: string;
 }
 
+export function mergePhase(p?: Partial<PhaseData>): PhaseData {
+  return {
+    progress: p?.progress || '',
+    risks: p?.risks || '',
+    schedule: p?.schedule || '',
+  };
+}
+
+export function buildEmptyPhaseProgress(): Record<string, PhaseData> {
+  return {
+    EVT: mergePhase(),
+    DVT: mergePhase(),
+    PVT: mergePhase(),
+    MP: mergePhase(),
+  };
+}
+
 const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: React.ReactNode; color: string }> = [
   { value: 'ON_TRACK', label: <><IconCheckCircleFill style={{ marginRight: 4 }} /> 正常</>, color: 'var(--status-success)' },
   { value: 'MINOR_ISSUE', label: <><IconExclamationCircleFill style={{ marginRight: 4 }} /> 轻度阻碍</>, color: 'var(--status-warning)' },
@@ -116,12 +133,7 @@ const WeeklyReportForm: React.FC = () => {
   const [nextWeekPlan, setNextWeekPlan] = useState('');
   const [riskWarning, setRiskWarning] = useState('');
   const [attachments, setAttachments] = useState<ReportAttachment[]>([]);
-  const [phaseProgress, setPhaseProgress] = useState<Record<string, PhaseData>>({
-    EVT: { progress: '', risks: '', schedule: '' },
-    DVT: { progress: '', risks: '', schedule: '' },
-    PVT: { progress: '', risks: '', schedule: '' },
-    MP: { progress: '', risks: '', schedule: '' },
-  });
+  const [phaseProgress, setPhaseProgress] = useState<Record<string, PhaseData>>(buildEmptyPhaseProgress());
 
   // 富文本编辑器 ref（用于 AI 采用按钮）
   const keyProgressRef = useRef<RichTextEditorRef>(null);
@@ -168,11 +180,6 @@ const WeeklyReportForm: React.FC = () => {
         if (r.attachments) {
           setAttachments(r.attachments as ReportAttachment[]);
         }
-        const mergePhase = (p?: Partial<PhaseData>): PhaseData => ({
-          progress: p?.progress || '',
-          risks: p?.risks || '',
-          schedule: p?.schedule || '',
-        });
         if (r.phaseProgress) {
           setPhaseProgress({
             EVT: mergePhase(r.phaseProgress.EVT),

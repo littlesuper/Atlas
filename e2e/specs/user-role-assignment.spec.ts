@@ -18,7 +18,7 @@ import {
  * - 分配/修改用户角色
  * - 切换账户启用/禁用状态
  */
-test.describe.serial('User Role Assignment & Management', () => {
+test.describe.serial('User Role Assignment & Management @p1', () => {
   const userName = uniqueName('角色测试用户');
 
   async function goToUserManagement(page: import('@playwright/test').Page) {

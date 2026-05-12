@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Button,
   Card,
@@ -40,7 +40,7 @@ echarts.use([LineChart, GridComponent, TooltipComponent, MarkAreaComponent, Canv
 interface Props {
   projectId: string;
   isArchived?: boolean;
-  snapshotData?: any[] | null;
+  snapshotData?: RiskAssessment[] | null;
 }
 
 const RISK_LEVEL_CONFIG: Record<string, { color: string; bgVar: string }> = {
@@ -58,7 +58,7 @@ const SEVERITY_COLOR: Record<string, string> = {
 };
 
 /** Normalize Chinese / English / mixed-case risk level to canonical UPPERCASE key */
-function normalizeRiskLevel(level: string): string {
+export function normalizeRiskLevel(level: string): string {
   const upper = level?.toUpperCase?.() || '';
   if (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(upper)) return upper;
   const cnMap: Record<string, string> = { '低': 'LOW', '低风险': 'LOW', '中': 'MEDIUM', '中风险': 'MEDIUM', '高': 'HIGH', '高风险': 'HIGH', '严重': 'CRITICAL', '严重风险': 'CRITICAL' };
@@ -79,6 +79,9 @@ const SOURCE_LABEL: Record<string, { text: string; color: string }> = {
   scheduled_rule: { text: '定时规则', color: 'gray' },
 };
 
+type ChartTooltipParam = { dataIndex?: number };
+type ChartColorParam = { value: number };
+
 const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotData }) => {
   const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
   const [total, setTotal] = useState(0);
@@ -89,7 +92,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
   const [trendData, setTrendData] = useState<RiskAssessment[]>([]);
   const [comparison, setComparison] = useState<RiskComparison | null>(null);
 
-  const load = async (p = page) => {
+  const loadPage = useCallback(async (p: number) => {
     setLoading(true);
     try {
       const res = await riskApi.getHistory(projectId, { page: p, pageSize });
@@ -106,9 +109,9 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
     } finally {
       setLoading(false);
     }
-  };
+  }, [pageSize, projectId]);
 
-  const loadTrend = async () => {
+  const loadTrend = useCallback(async () => {
     try {
       const res = await riskApi.getTrend(projectId);
       const data = res.data;
@@ -120,28 +123,28 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
     } catch {
       // 趋势数据加载失败不影响主功能
     }
-  };
+  }, [projectId]);
 
-  const loadComparison = async () => {
+  const loadComparison = useCallback(async () => {
     try {
       const res = await riskApi.getComparison(projectId);
       setComparison(res.data);
     } catch {
       // silent
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (snapshotData) {
-      setAssessments(snapshotData as RiskAssessment[]);
+      setAssessments(snapshotData);
       setTotal(snapshotData.length);
     } else {
-      load(1);
+      loadPage(1);
       loadTrend();
       loadComparison();
       setPage(1);
     }
-  }, [projectId, snapshotData]);
+  }, [loadComparison, loadPage, loadTrend, snapshotData]);
 
   const handleDelete = (assessmentId: string) => {
     Modal.confirm({
@@ -151,7 +154,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
         try {
           await riskApi.delete(assessmentId);
           Message.success('已删除');
-          load();
+          loadPage(page);
           loadTrend();
           loadComparison();
         } catch {
@@ -166,7 +169,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
     try {
       await riskApi.assess(projectId);
       Message.success('风险评估完成');
-      await Promise.all([load(), loadTrend(), loadComparison()]);
+      await Promise.all([loadPage(page), loadTrend(), loadComparison()]);
     } catch {
       // axios 拦截器已显示后端错误信息
     } finally {
@@ -225,7 +228,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
                     current={page}
                     pageSize={pageSize}
                     total={total}
-                    onChange={(p) => { setPage(p); load(p); }}
+                    onChange={(p) => { setPage(p); loadPage(p); }}
                     showTotal
                     size="small"
                   />
@@ -309,7 +312,7 @@ const RiskTrendChart: React.FC<{ data: RiskAssessment[] }> = ({ data }) => {
       grid: { top: 30, right: 20, bottom: 30, left: 45 },
       tooltip: {
         trigger: 'axis' as const,
-        formatter: (params: any) => {
+        formatter: (params: ChartTooltipParam[]) => {
           const idx = params[0]?.dataIndex;
           if (idx == null) return '';
           const date = dayjs(sorted[idx].assessedAt).format('YYYY-MM-DD HH:mm');
@@ -348,7 +351,7 @@ const RiskTrendChart: React.FC<{ data: RiskAssessment[] }> = ({ data }) => {
           symbolSize: 8,
           lineStyle: { width: 2, color: '#165DFF' },
           itemStyle: {
-            color: (params: any) => {
+            color: (params: ChartColorParam) => {
               const val = params.value;
               if (val >= 3) return '#F53F3F';
               if (val >= 2) return '#FF7D00';

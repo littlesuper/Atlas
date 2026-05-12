@@ -12,7 +12,6 @@ import {
   Modal,
   Tooltip,
   Empty,
-  Progress,
   Select,
   Spin,
   Dropdown,
@@ -29,7 +28,7 @@ import {
   IconSafe,
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
-import { projectsApi, activitiesApi } from '../../../api';
+import { projectsApi, activitiesApi, featureFlagsApi } from '../../../api';
 import ColumnSettings, { ColumnDef } from './ColumnSettings';
 import { useAuthStore } from '../../../store/authStore';
 import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
@@ -38,7 +37,7 @@ import RiskAssessmentTab from './RiskAssessmentTab';
 import ProductsTab from './ProductsTab';
 import SchedulingTools from './SchedulingTools';
 import SnapshotsTab from './SnapshotsTab';
-import ActivityDrawer from './ActivityDrawer';
+import ActivityDrawer, { type ActivityDrawerValues } from './ActivityDrawer';
 import MembersModal from './MembersModal';
 import { Activity } from '../../../types';
 import {
@@ -48,6 +47,7 @@ import {
   ACTIVITY_STATUS_MAP,
   PHASE_OPTIONS,
 } from '../../../utils/constants';
+import { isFeatureEnabled, normalizeFeatureFlags } from '../../../utils/featureFlags';
 import dayjs from 'dayjs';
 
 // Extracted hooks
@@ -59,6 +59,21 @@ import { useDragReorder } from '../../../hooks/useDragReorder';
 import { useActivityColumns, COLUMN_WIDTH_MAP, PHASE_COLOR } from '../../../hooks/useActivityColumns';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
 import ResizableHeaderCell from '../../../components/ResizableHeaderCell';
+
+export const getApiErrorMessage = (err: unknown, fallback: string): string => {
+  if (typeof err === 'object' && err !== null && 'response' in err) {
+    const response = (err as { response?: { data?: { error?: unknown } } }).response;
+    if (typeof response?.data?.error === 'string') return response.data.error;
+  }
+  return fallback;
+};
+
+export const escapeCsvHelper = (v: string) => v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
+
+export const getMsDateHelper = (m: Activity) => {
+  const d = m.planEndDate || m.planStartDate;
+  return d ? dayjs(d) : null;
+};
 
 // 活动列配置定义
 const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
@@ -76,8 +91,32 @@ const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
   { key: 'notes', label: '备注', removable: true },
 ];
 
+export function formatDeps(
+  act: Activity,
+  seqMap: Map<string, number>,
+  depTypeMap: Record<string, string> = { '0': 'FS', '1': 'SS', '2': 'FF', '3': 'SF' },
+): string {
+  if (!act.dependencies) return '';
+  const deps = Array.isArray(act.dependencies) ? act.dependencies
+    : (() => { try { return JSON.parse(act.dependencies as unknown as string); } catch { return []; } })();
+  return deps.map((dep: { id: string; type: string; lag?: number }) => {
+    const seq = seqMap.get(dep.id);
+    const seqStr = seq ? String(seq).padStart(3, '0') : '?';
+    const typeLabel = depTypeMap[dep.type] || 'FS';
+    const lag = dep.lag ?? 0;
+    const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
+    return `${seqStr}${typeLabel}${lagStr}`;
+  }).join(', ');
+}
+
 const DEFAULT_COLUMN_ORDER = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
 const DEFAULT_COLUMN_VISIBLE = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
+
+export function computeSortOrder(activities: { sortOrder: number }[], atIndex: number): number {
+  const prev = atIndex > 0 ? activities[atIndex - 1].sortOrder : 0;
+  const next = atIndex < activities.length ? activities[atIndex].sortOrder : prev + 20;
+  return Math.floor((prev + next) / 2);
+}
 
 const ProjectDetail: React.FC = () => {
   const { id, snapshotId } = useParams<{ id: string; snapshotId?: string }>();
@@ -96,6 +135,7 @@ const ProjectDetail: React.FC = () => {
   const [importUploading, setImportUploading] = useState(false);
   const [membersModalVisible, setMembersModalVisible] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
   const insertAtIndexRef = useRef<number | null>(null);
 
   // 活动列表表头吸顶
@@ -108,11 +148,11 @@ const ProjectDetail: React.FC = () => {
   const { undoStack, pushUndo, handleUndo, lastDescription } = useUndoStack();
 
   const {
-    project, activities, setActivities, users,
+    project, activities, setActivities, users, roles,
     loading, activitiesLoading, criticalActivityIds,
     isSnapshot, snapshotMeta,
     snapshotWeeklyReports, snapshotProducts, snapshotRiskAssessments,
-    loadProject, loadActivities, loadUsers, loadCriticalPath, loadSnapshotData,
+    loadProject, loadActivities, loadUsers, loadRoles, loadCriticalPath, loadSnapshotData,
   } = useProjectData({ projectId: id, snapshotId });
 
   const { columnPrefs, loadColumnPrefs, saveColumnPrefs, defaultPrefs, updateWidthsLocal, persistWidths } = useColumnPrefs({
@@ -124,6 +164,14 @@ const ProjectDetail: React.FC = () => {
   const isArchived = project?.status === 'ARCHIVED' || isSnapshot;
   const canManage = hasPermission('activity', 'update') && isProjectManager(project?.managerId ?? '', project?.id) && !isArchived;
   const canCreate = hasPermission('activity', 'create') && isProjectManager(project?.managerId ?? '', project?.id) && !isArchived;
+  const activityImportEnabled = useMemo(
+    () => isFeatureEnabled(featureFlags, 'activity.import', true),
+    [featureFlags],
+  );
+  const activityBulkMutationEnabled = useMemo(
+    () => isFeatureEnabled(featureFlags, 'activity.bulk-mutation', true),
+    [featureFlags],
+  );
 
   const {
     inlineEditing, setInlineEditing, inlineValue, setInlineValue,
@@ -171,7 +219,7 @@ const ProjectDetail: React.FC = () => {
     startDate: s.startDate || undefined,
     endDate: s.endDate || undefined,
     duration: s.duration ?? undefined,
-    executorIds: (s.executors || []).map((e: any) => e.userId),
+    executorIds: (s.executors || []).map((e) => e.userId),
     notes: s.notes || undefined,
     sortOrder: s.sortOrder,
     dependencies: Array.isArray(s.dependencies)
@@ -207,9 +255,7 @@ const ProjectDetail: React.FC = () => {
 
   const handleInsertActivity = useCallback(async (atIndex: number) => {
     if (!id) return;
-    const prev = atIndex > 0 ? activities[atIndex - 1].sortOrder : 0;
-    const next = atIndex < activities.length ? activities[atIndex].sortOrder : prev + 20;
-    const sortOrder = Math.floor((prev + next) / 2);
+    const sortOrder = computeSortOrder(activities, atIndex);
     try {
       const resp = await activitiesApi.create({
         projectId: id,
@@ -231,7 +277,7 @@ const ProjectDetail: React.FC = () => {
 
   // Drawer submit handler
   const handleDrawerSubmit = useCallback(async (
-    values: any,
+    values: ActivityDrawerValues,
     planDuration: number | null,
     actualDuration: number | null,
     formDeps: { id: string; type: string; lag: number }[]
@@ -256,12 +302,7 @@ const ProjectDetail: React.FC = () => {
       sortOrder: editingActivity
         ? editingActivity.sortOrder
         : insertAtIndexRef.current !== null
-          ? (() => {
-            const idx = insertAtIndexRef.current!;
-            const prev = idx > 0 ? activities[idx - 1].sortOrder : 0;
-            const next = idx < activities.length ? activities[idx].sortOrder : prev + 20;
-            return Math.floor((prev + next) / 2);
-          })()
+          ? computeSortOrder(activities, insertAtIndexRef.current!)
           : (activities.length + 1) * 10,
       dependencies: formDeps.filter((d) => d.id).map((d) => ({
         id: d.id,
@@ -289,7 +330,7 @@ const ProjectDetail: React.FC = () => {
             endDate: snapshot.endDate ? dayjs(snapshot.endDate).format('YYYY-MM-DD') : undefined,
             duration: snapshot.duration ?? undefined,
             roleId: snapshot.roleId ?? null,
-            executorIds: snapshot.executors?.map((e: any) => e.userId) ?? [],
+            executorIds: snapshot.executors?.map((e) => e.userId) ?? [],
             notes: snapshot.notes,
             dependencies: Array.isArray(snapshot.dependencies)
               ? snapshot.dependencies.map((d) => ({ id: d.id, type: d.type, lag: d.lag ?? 0 }))
@@ -313,10 +354,14 @@ const ProjectDetail: React.FC = () => {
   // Import file handler
   const doImportFile = useCallback(async (file: File) => {
     if (!id) return;
+    if (!activityImportEnabled) {
+      Message.warning('活动导入功能已临时关闭');
+      return;
+    }
     setImportUploading(true);
     try {
       const { data } = await activitiesApi.importExcel(id, file);
-      const importedIds = (data.activities || []).map((a: any) => a.id);
+      const importedIds = (data.activities || []).map((a) => a.id);
       const msg = `导入成功，共 ${data.count} 条活动${data.skipped ? `，跳过 ${data.skipped} 条重复` : ''}`;
       if (importedIds.length > 0) {
         pushUndo({
@@ -336,37 +381,22 @@ const ProjectDetail: React.FC = () => {
       setDrawerVisible(false);
       loadActivities();
       loadProject();
-    } catch (err: any) {
-      Message.error(err?.response?.data?.error || '导入失败');
+    } catch (err) {
+      Message.error(getApiErrorMessage(err, '导入失败'));
     } finally {
       setImportUploading(false);
     }
-  }, [id, pushUndo, loadActivities, loadProject]);
+  }, [id, activityImportEnabled, pushUndo, loadActivities, loadProject]);
 
   // Export CSV
   const handleExportExcel = useCallback(() => {
     if (!activities.length) { Message.warning('暂无活动数据'); return; }
     const statusMap: Record<string, string> = { NOT_STARTED: '未开始', IN_PROGRESS: '进行中', COMPLETED: '已完成', CANCELLED: '已取消' };
     const typeMap: Record<string, string> = { TASK: '任务', MILESTONE: '里程碑', PHASE: '阶段' };
-    const depTypeMap: Record<string, string> = { '0': 'FS', '1': 'SS', '2': 'FF', '3': 'SF' };
     const fmtDate = (d?: string | null) => d ? dayjs(d).format('YYYY-MM-DD') : '';
 
     const activitySeqMapLocal = new Map<string, number>();
     activities.forEach((a, i) => activitySeqMapLocal.set(a.id, i + 1));
-
-    const formatDeps = (act: Activity): string => {
-      if (!act.dependencies) return '';
-      const deps = Array.isArray(act.dependencies) ? act.dependencies
-        : (() => { try { return JSON.parse(act.dependencies as unknown as string); } catch { return []; } })();
-      return deps.map((dep: { id: string; type: string; lag?: number }) => {
-        const seq = activitySeqMapLocal.get(dep.id);
-        const seqStr = seq ? String(seq).padStart(3, '0') : '?';
-        const typeLabel = depTypeMap[dep.type] || 'FS';
-        const lag = dep.lag ?? 0;
-        const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
-        return `${seqStr}${typeLabel}${lagStr}`;
-      }).join(', ');
-    };
 
     const headers = ['ID', '前置依赖', '阶段', '活动名称', '类型', '状态', '负责人', '计划工期', '计划开始', '计划结束', '实际开始', '实际结束', '备注'];
     const rows = activities.map((a, i) => [
@@ -376,7 +406,7 @@ const ProjectDetail: React.FC = () => {
       a.name,
       typeMap[a.type] || a.type,
       statusMap[a.status] || a.status,
-      (a.executors || []).map((e: any) => e.user?.realName).filter(Boolean).join(', ') || '-',
+      (a.executors || []).map((e) => e.user?.realName).filter(Boolean).join(', ') || '-',
       a.planDuration != null ? String(a.planDuration) : '',
       fmtDate(a.planStartDate),
       fmtDate(a.planEndDate),
@@ -385,7 +415,8 @@ const ProjectDetail: React.FC = () => {
       a.notes || '',
     ]);
 
-    const escapeCsv = (v: string) => v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
+    const escapeCsv = escapeCsvHelper;
+
     const csv = [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -459,6 +490,10 @@ const ProjectDetail: React.FC = () => {
   // Batch operations
   const handleBatchStatusUpdate = useCallback(async (status: string) => {
     if (selectedIds.size === 0) return;
+    if (!activityBulkMutationEnabled) {
+      Message.warning('活动批量变更功能已临时关闭');
+      return;
+    }
     try {
       const ids = Array.from(selectedIds);
       const oldStatuses = ids.map(sid => ({ id: sid, status: activities.find(a => a.id === sid)?.status }));
@@ -478,10 +513,14 @@ const ProjectDetail: React.FC = () => {
       loadActivities();
       loadProject();
     } catch { Message.error('批量更新失败'); }
-  }, [selectedIds, activities, pushUndo, loadActivities, loadProject]);
+  }, [selectedIds, activityBulkMutationEnabled, activities, pushUndo, loadActivities, loadProject]);
 
   const handleBatchPhaseUpdate = useCallback(async (phase: string) => {
     if (selectedIds.size === 0) return;
+    if (!activityBulkMutationEnabled) {
+      Message.warning('活动批量变更功能已临时关闭');
+      return;
+    }
     try {
       const ids = Array.from(selectedIds);
       const oldPhases = ids.map(sid => ({ id: sid, phase: activities.find(a => a.id === sid)?.phase }));
@@ -499,13 +538,17 @@ const ProjectDetail: React.FC = () => {
       setSelectedIds(new Set());
       loadActivities();
     } catch { Message.error('批量更新失败'); }
-  }, [selectedIds, activities, pushUndo, loadActivities]);
+  }, [selectedIds, activityBulkMutationEnabled, activities, pushUndo, loadActivities]);
 
   const handleBatchAssigneeUpdate = useCallback(async (assigneeIds: string[]) => {
     if (selectedIds.size === 0) return;
+    if (!activityBulkMutationEnabled) {
+      Message.warning('活动批量变更功能已临时关闭');
+      return;
+    }
     try {
       const ids = Array.from(selectedIds);
-      const oldAssignees = ids.map(sid => ({ id: sid, executorIds: (activities.find(a => a.id === sid)?.executors || []).map((e: any) => e.userId) }));
+      const oldAssignees = ids.map(sid => ({ id: sid, executorIds: (activities.find(a => a.id === sid)?.executors || []).map((e) => e.userId) }));
       await activitiesApi.batchUpdate(ids, { executorIds: assigneeIds });
       pushUndo({
         description: `撤回批量修改 ${ids.length} 个活动的负责人`,
@@ -520,10 +563,14 @@ const ProjectDetail: React.FC = () => {
       setSelectedIds(new Set());
       loadActivities();
     } catch { Message.error('批量更新失败'); }
-  }, [selectedIds, activities, pushUndo, loadActivities]);
+  }, [selectedIds, activityBulkMutationEnabled, activities, pushUndo, loadActivities]);
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
+    if (!activityBulkMutationEnabled) {
+      Message.warning('活动批量变更功能已临时关闭');
+      return;
+    }
     Modal.confirm({
       title: '确认批量删除',
       content: `确定要删除选中的 ${selectedIds.size} 个活动吗？`,
@@ -547,7 +594,7 @@ const ProjectDetail: React.FC = () => {
         } catch { Message.error('批量删除失败'); }
       },
     });
-  }, [selectedIds, activities, pushUndo, activityToCreatePayload, loadActivities, loadProject]);
+  }, [selectedIds, activityBulkMutationEnabled, activities, pushUndo, activityToCreatePayload, loadActivities, loadProject]);
 
   // Column widths: merge defaults with user preferences
   const columnWidths = useMemo(() => ({
@@ -562,6 +609,12 @@ const ProjectDetail: React.FC = () => {
   );
 
   // Column resize handler
+  // 把变动函数收纳到 ref，给 tableComponents 提供稳定引用同时保持最新闭包
+  const handleColumnResizeRef = useRef<((key: string, width: number) => void) | null>(null);
+  const fixedColumnKeysRef = useRef<Set<string>>(new Set<string>());
+  const handleMouseMoveRef = useRef<((e: React.MouseEvent, index: number) => void) | null>(null);
+  const handleMouseUpRef = useRef<((e: React.MouseEvent, index: number) => void) | null>(null);
+
   // 稳定的 Table 组件覆写：避免每次 render 重建 row 组件导致整张表重新挂载、
   // 进而把正在编辑的输入框光标重置到末端
   const tableComponents = useMemo(() => ({
@@ -598,13 +651,7 @@ const ProjectDetail: React.FC = () => {
         );
       },
     },
-  }), []);
-
-  // 把变动函数收纳到 ref，给 tableComponents 提供稳定引用同时保持最新闭包
-  const handleColumnResizeRef = useRef<((key: string, width: number) => void) | null>(null);
-  const fixedColumnKeysRef = useRef<Set<string>>(new Set<string>());
-  const handleMouseMoveRef = useRef<((e: React.MouseEvent, index: number) => void) | null>(null);
-  const handleMouseUpRef = useRef<((e: React.MouseEvent, index: number) => void) | null>(null);
+  }), [dragFromRef, dragOverRef]);
 
   const handleColumnResize = useCallback((key: string, width: number) => {
     const newWidths = { ...columnPrefs.widths, [key]: Math.round(width) };
@@ -624,7 +671,7 @@ const ProjectDetail: React.FC = () => {
   const {
     activityColumns, scrollX, activitySeqMap,
   } = useActivityColumns({
-    activities, users, project, isArchived: !!isArchived,
+    activities, users, roles, project, isArchived: !!isArchived,
     canManage, canCreate, criticalActivityIds,
     inlineEditing, setInlineEditing, inlineValue, setInlineValue,
     startInlineEdit, showUndoMessage, commitInlineEdit, commitSelectEdit,
@@ -638,6 +685,22 @@ const ProjectDetail: React.FC = () => {
 
   // === Data loading ===
   useEffect(() => {
+    let mounted = true;
+    featureFlagsApi.snapshot()
+      .then(({ data }) => {
+        if (mounted) setFeatureFlags(normalizeFeatureFlags(data.flags));
+      })
+      .catch(() => {
+        if (mounted) setFeatureFlags({});
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // === Data loading ===
+  useEffect(() => {
     if (isSnapshot) {
       setActiveTab('activities');
       loadSnapshotData();
@@ -648,10 +711,23 @@ const ProjectDetail: React.FC = () => {
       loadProject();
       loadActivities();
       loadUsers();
+      loadRoles();
       loadColumnPrefs();
       loadCriticalPath();
     }
-  }, [id, snapshotId]);
+  }, [
+    id,
+    isSnapshot,
+    loadActivities,
+    loadColumnPrefs,
+    loadCriticalPath,
+    loadProject,
+    loadRoles,
+    loadSnapshotData,
+    loadUsers,
+    searchParams,
+    snapshotId,
+  ]);
 
   // === 活动列表表头吸顶：滚动检测 ===
   useEffect(() => {
@@ -799,7 +875,35 @@ const ProjectDetail: React.FC = () => {
                   label: '时间',
                   value: `${dayjs(project.startDate).format('YYYY-MM-DD')}${project.endDate ? ' ~ ' + dayjs(project.endDate).format('YYYY-MM-DD') : ''}`,
                 },
-                { label: '整体进度', value: <Progress percent={project.progress || 0} size="small" style={{ width: 100 }} /> },
+                {
+                  label: '整体进度',
+                  value: (
+                    <div
+                      role="progressbar"
+                      aria-label="项目整体进度"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={project.progress || 0}
+                      title={`项目整体进度 ${project.progress || 0}%`}
+                      style={{
+                        width: 100,
+                        height: 8,
+                        borderRadius: 999,
+                        background: 'var(--color-fill-3)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${Math.max(0, Math.min(100, project.progress || 0))}%`,
+                          height: '100%',
+                          borderRadius: 999,
+                          background: 'rgb(var(--primary-6))',
+                        }}
+                      />
+                    </div>
+                  ),
+                },
                 { label: '活动数量', value: `${activities.length} 个` },
                 { label: '项目经理', value: project.manager?.realName || project.manager?.username || '-' },
                 {
@@ -817,7 +921,7 @@ const ProjectDetail: React.FC = () => {
                             )}
                           </>
                         )
-                        : <span style={{ color: 'var(--color-text-4)' }}>暂无</span>
+                        : <span style={{ color: 'var(--color-text-2)' }}>暂无</span>
                       }
                       {(useAuthStore.getState().user?.permissions?.includes('*:*') || useAuthStore.getState().user?.id === project.managerId) && (
                         <Button type="text" size="mini" onClick={() => setMembersModalVisible(true)} style={{ padding: '0 4px' }}>管理</Button>
@@ -827,7 +931,7 @@ const ProjectDetail: React.FC = () => {
                 },
               ].map((item, i) => (
                 <Card key={i} style={{ height: 88 }} bodyStyle={{ padding: '12px 16px' }}>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginBottom: 6 }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 6 }}>{item.label}</div>
                   <div style={{ fontSize: 14, fontWeight: 500 }}>{item.value}</div>
                 </Card>
               ))}
@@ -868,7 +972,7 @@ const ProjectDetail: React.FC = () => {
               }, { replace: true });
             }}
             style={{ '--tab-bar-style': 'sticky' } as React.CSSProperties}
-            {...{ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: 'var(--color-bg-1)', marginBottom: 0 } } as any}
+            {...({ tabBarStyle: { position: 'sticky', top: 0, zIndex: 15, background: 'var(--color-bg-1)', marginBottom: 0 } } as { tabBarStyle: React.CSSProperties })}
           >
             {/* 活动列表 */}
             <Tabs.TabPane key="activities" title="活动列表">
@@ -920,7 +1024,17 @@ const ProjectDetail: React.FC = () => {
                           </Menu.Item>
                         )}
                         {canCreate && (
-                          <Menu.Item key="2" onClick={() => setImportModalVisible(true)}>
+                          <Menu.Item
+                            key="2"
+                            disabled={!activityImportEnabled}
+                            onClick={() => {
+                              if (!activityImportEnabled) {
+                                Message.warning('活动导入功能已临时关闭');
+                                return;
+                              }
+                              setImportModalVisible(true);
+                            }}
+                          >
                             <IconUpload style={{ marginRight: 8 }} />
                             批量导入
                           </Menu.Item>
@@ -980,6 +1094,7 @@ const ProjectDetail: React.FC = () => {
                     size="small"
                     placeholder="批量修改状态"
                     style={{ width: 140 }}
+                    disabled={!activityBulkMutationEnabled}
                     onChange={(v) => { if (v) handleBatchStatusUpdate(v); }}
                     value={undefined}
                   >
@@ -991,6 +1106,7 @@ const ProjectDetail: React.FC = () => {
                     size="small"
                     placeholder="批量修改阶段"
                     style={{ width: 120 }}
+                    disabled={!activityBulkMutationEnabled}
                     onChange={(v) => { if (v) handleBatchPhaseUpdate(v); }}
                     value={undefined}
                   >
@@ -1003,6 +1119,7 @@ const ProjectDetail: React.FC = () => {
                     mode="multiple"
                     placeholder="批量修改负责人"
                     style={{ width: 180 }}
+                    disabled={!activityBulkMutationEnabled}
                     onChange={(v: string[]) => { if (v && v.length > 0) handleBatchAssigneeUpdate(v); }}
                     value={undefined}
                     showSearch
@@ -1014,7 +1131,7 @@ const ProjectDetail: React.FC = () => {
                       <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
                     ))}
                   </Select>
-                  <Button size="small" status="danger" onClick={handleBatchDelete}>批量删除</Button>
+                  <Button size="small" status="danger" disabled={!activityBulkMutationEnabled} onClick={handleBatchDelete}>批量删除</Button>
                   <Button size="small" type="text" onClick={() => setSelectedIds(new Set())}>取消选择</Button>
                 </div>
               )}
@@ -1143,7 +1260,7 @@ const ProjectDetail: React.FC = () => {
               if (importUploading) return;
               const input = document.createElement('input');
               input.type = 'file';
-              input.accept = '.xlsx,.xls';
+              input.accept = '.xlsx';
               input.onchange = () => {
                 const file = input.files?.[0];
                 if (file) doImportFile(file);
@@ -1160,7 +1277,7 @@ const ProjectDetail: React.FC = () => {
                   拖拽 Excel 文件到此处
                 </p>
                 <p style={{ marginTop: 4, fontSize: 13, color: 'var(--color-text-3)' }}>
-                  或点击选择文件（.xlsx / .xls，最大 5MB）
+                  或点击选择文件（.xlsx，最大 5MB）
                 </p>
               </>
             )}
@@ -1188,10 +1305,7 @@ const MilestoneTimeline: React.FC<{ activities: Activity[]; handleOpenDrawer: (a
     NOT_STARTED: 'var(--gantt-milestone-pending)', CANCELLED: 'var(--gantt-milestone-overdue)',
   };
 
-  const getMsDate = (m: Activity) => {
-    const d = m.planEndDate || m.planStartDate;
-    return d ? dayjs(d) : null;
-  };
+  const getMsDate = getMsDateHelper;
 
   const dated = milestones.filter(m => getMsDate(m)).sort((a, b) => getMsDate(a)!.valueOf() - getMsDate(b)!.valueOf());
   const undated = milestones.filter(m => !getMsDate(m));
@@ -1278,7 +1392,7 @@ const MilestoneTimeline: React.FC<{ activities: Activity[]; handleOpenDrawer: (a
           const above = idx % 2 === 0;
           const color = statusColor[m.status] || 'var(--gantt-milestone-pending)';
           const stInfo = ACTIVITY_STATUS_MAP[m.status as keyof typeof ACTIVITY_STATUS_MAP];
-          const names = (m.executors || []).map((e: any) => e.user?.realName).filter(Boolean).join('、') || '-';
+          const names = (m.executors || []).map((e) => e.user?.realName).filter(Boolean).join('、') || '-';
           const dateStr = getMsDate(m)!.format('YYYY-MM-DD');
           const cardTop = above ? axisY - stemLen - cardH : axisY + stemLen;
 

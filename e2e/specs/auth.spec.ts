@@ -6,7 +6,7 @@ import { confirmModal } from '../helpers/arco';
 // Auth tests need a clean browser (no pre-loaded storageState)
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.describe.serial('Authentication', () => {
+test.describe.serial('Authentication @smoke', () => {
   test('login with valid credentials redirects to /projects', async ({ page }) => {
     await login(page, credentials.admin.username, credentials.admin.password);
     await expect(page).toHaveURL(/\/projects/);

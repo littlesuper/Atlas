@@ -8,7 +8,7 @@ import { waitForTableLoad, waitForPageLoad } from '../helpers/arco';
  * 判定方式：每个 th 的实际渲染高度不超过单行基准高度（首个 th 高度 + 4px 容差）。
  * 覆盖页面：项目列表、项目详情（活动列表）、产品列表、周报汇总、资源负荷、系统管理（用户/角色/审计日志）。
  */
-test.describe('Table header no-wrap check', () => {
+test.describe('Table header no-wrap check @p2', () => {
   /** 在当前页面检测所有 arco-table 的表头是否存在换行 */
   async function assertNoHeaderWrap(page: import('@playwright/test').Page, pageName: string) {
     const tables = page.locator('.arco-table');

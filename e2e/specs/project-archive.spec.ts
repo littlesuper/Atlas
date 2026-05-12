@@ -15,7 +15,7 @@ import {
  * - 归档项目不显示编辑/删除按钮
  * - 恢复归档项目
  */
-test.describe.serial('Project Archive & Restore', () => {
+test.describe.serial('Project Archive & Restore @p1', () => {
   const projectName = uniqueName('归档测试项目');
 
   // ──────── setup: create project ────────

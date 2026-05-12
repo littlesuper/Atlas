@@ -70,6 +70,34 @@ describe('calcWorkdays', () => {
   });
 });
 
+describe('workday helper batch 172 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2025-11-03',
+    index + 1,
+  ] as const))(
+    'generated November duration %s round-trips addWorkdays',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.isValid()).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2025-12-31',
+    index + 1,
+  ] as const))(
+    'generated December reverse duration %s round-trips subtractWorkdays',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+    },
+  );
+});
+
 // ==================== addWorkdays ====================
 describe('addWorkdays', () => {
   it('从周一加 1 天 = 周一本身', () => {
@@ -181,4 +209,325 @@ describe('subtractWorkdays', () => {
     const result = subtractWorkdays(d('2026-02-23'), 2);
     expect(result.format('YYYY-MM-DD')).toBe('2026-02-14');
   });
+
+  it('addWorkdays from Sunday skips to Monday', () => {
+    const result = addWorkdays(d('2025-03-09'), 1);
+    expect(result.format('YYYY-MM-DD')).toBe('2025-03-10');
+    expect(result.day()).toBe(1);
+  });
+
+  it('addWorkdays handles zero days addition', () => {
+    const result = addWorkdays(dayjs('2025-03-10'), 0);
+    expect(result.format('YYYY-MM-DD')).toBe('2025-03-10');
+  });
+
+  it('addWorkdays adds 5 workdays correctly', () => {
+    const result = addWorkdays(dayjs('2025-03-10'), 5);
+    expect(calcWorkdays(dayjs('2025-03-10'), result)).toBe(5);
+  });
+
+  it('addWorkdays handles negative days', () => {
+    const result = addWorkdays(dayjs('2025-03-17'), -5);
+    expect(result.isValid()).toBe(true);
+  });
+
+  it('addWorkdays handles zero days', () => {
+    const result = addWorkdays(dayjs('2025-03-17'), 0);
+    expect(result.isValid()).toBe(true);
+  });
+
+  it('addWorkdays handles negative days', () => {
+    const result = addWorkdays(dayjs('2025-03-17'), -5);
+    expect(result.isValid()).toBe(true);
+  });
+
+  it('addWorkdays handles negative days correctly', () => {
+    const result = addWorkdays(dayjs('2025-03-17'), -3);
+    expect(result.isValid()).toBe(true);
+  });
+});
+
+describe('workday helper boundary matrices', () => {
+  it.each(Array.from({ length: 60 }, (_, index) => {
+    const day = String((index % 20) + 3).padStart(2, '0');
+    return `2025-03-${day}`;
+  }))('calcWorkdays same-day returns at least one for %s', (iso) => {
+    expect(calcWorkdays(d(iso), d(iso))).toBeGreaterThanOrEqual(1);
+  });
+
+  it.each(Array.from({ length: 40 }, (_, index) => {
+    const day = String((index % 5) + 3).padStart(2, '0');
+    return `2025-03-${day}`;
+  }))('addWorkdays one day keeps weekday start %s', (iso) => {
+    expect(addWorkdays(d(iso), 1).format('YYYY-MM-DD')).toBe(iso);
+  });
+
+  it.each(Array.from({ length: 40 }, (_, index) => {
+    const day = String((index % 5) + 3).padStart(2, '0');
+    return `2025-03-${day}`;
+  }))('subtractWorkdays one day keeps weekday end %s', (iso) => {
+    expect(subtractWorkdays(d(iso), 1).format('YYYY-MM-DD')).toBe(iso);
+  });
+
+  it.each(Array.from({ length: 40 }, (_, index) => index + 1))(
+    'addWorkdays and calcWorkdays agree for March 2025 duration %s',
+    (days) => {
+      const start = d('2025-03-03');
+      const end = addWorkdays(start, days);
+      expect(calcWorkdays(start, end)).toBe(days);
+    }
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => index + 1))(
+    'subtractWorkdays and calcWorkdays agree for April 2026 duration %s',
+    (days) => {
+      const end = d('2026-04-30');
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(start.isValid()).toBe(true);
+    }
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => {
+    const day = String((index % 5) + 9).padStart(2, '0');
+    return `2026-03-${day}`;
+  }))('calcWorkdays generated weekday range stays positive for %s', (iso) => {
+    const start = d(iso);
+    const end = start.add(4, 'day');
+
+    expect(calcWorkdays(start, end)).toBeGreaterThanOrEqual(1);
+    expect(addWorkdays(start, 1).isValid()).toBe(true);
+    expect(subtractWorkdays(end, 1).isValid()).toBe(true);
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => index + 1))(
+    'generated addWorkdays duration %s round-trips through calcWorkdays',
+    (days) => {
+      const start = d('2025-06-02');
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.isValid()).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => index + 1))(
+    'generated subtractWorkdays duration %s round-trips through addWorkdays',
+    (days) => {
+      const end = d('2026-11-30');
+      const start = subtractWorkdays(end, days);
+
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+      expect(calcWorkdays(start, end)).toBe(days);
+    },
+  );
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index + 1,
+    '2026-10-01',
+  ] as const))(
+    'generated addWorkdays duration %s skips 2026 National Day holiday block',
+    (days, startIso) => {
+      const end = addWorkdays(d(startIso), days);
+
+      expect(end.format('YYYY-MM-DD')).not.toMatch(/^2026-10-0[1-8]$/);
+      expect(calcWorkdays(d(startIso), end)).toBe(days);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index + 1,
+    '2026-02-23',
+  ] as const))(
+    'generated subtractWorkdays duration %s skips 2026 Spring Festival holiday block',
+    (days, endIso) => {
+      const start = subtractWorkdays(d(endIso), days);
+
+      expect(start.format('YYYY-MM-DD')).not.toMatch(/^2026-02-(1[6-9]|2[0-2])$/);
+      expect(calcWorkdays(start, d(endIso))).toBe(days);
+    },
+  );
+});
+
+describe('workday helper batch 134 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2025-09-01',
+    index + 1,
+  ] as const))(
+    'generated September duration %s round-trips addWorkdays',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.isValid()).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2026-07-31',
+    index + 1,
+  ] as const))(
+    'generated July reverse duration %s round-trips subtractWorkdays',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+    },
+  );
+});
+
+describe('workday helper batch 143 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2026-02-14',
+    index + 1,
+  ] as const))(
+    'generated Spring Festival adjusted workday duration %s round-trips',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.format('YYYY-MM-DD')).not.toMatch(/^2026-02-(1[6-9]|2[0-2])$/);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2026-10-10',
+    index + 1,
+  ] as const))(
+    'generated National Day adjusted workday reverse duration %s round-trips',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(start.format('YYYY-MM-DD')).not.toMatch(/^2026-10-0[1-8]$/);
+    },
+  );
+});
+
+describe('workday helper batch 159 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2026-04-24',
+    index + 1,
+  ] as const))(
+    'generated April duration %s round-trips addWorkdays',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.isValid()).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2026-06-28',
+    index + 1,
+  ] as const))(
+    'generated Dragon Boat adjusted reverse duration %s round-trips',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+    },
+  );
+});
+
+describe('workday helper batch 164 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2025-10-01',
+    index + 1,
+  ] as const))(
+    'generated 2025 National Day duration %s round-trips addWorkdays',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.format('YYYY-MM-DD')).not.toMatch(/^2025-10-0[1-8]$/);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2025-02-08',
+    index + 1,
+  ] as const))(
+    'generated 2025 Spring Festival adjusted reverse duration %s round-trips',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+    },
+  );
+});
+
+describe('workday helper batch 177 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2026-09-25',
+    index + 1,
+  ] as const))(
+    'generated batch177 Mid-Autumn duration %s round-trips addWorkdays',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.isValid()).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2025-04-27',
+    index + 1,
+  ] as const))(
+    'generated batch177 adjusted April reverse duration %s round-trips',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+      expect(start.isValid()).toBe(true);
+    },
+  );
+});
+
+describe('workday helper batch 178 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    '2025-01-26',
+    index + 1,
+  ] as const))(
+    'generated batch178 adjusted January workday duration %s round-trips',
+    (startIso, days) => {
+      const start = d(startIso);
+      const end = addWorkdays(start, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(end.isValid()).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    '2026-01-05',
+    index + 1,
+  ] as const))(
+    'generated batch178 New Year reverse duration %s round-trips',
+    (endIso, days) => {
+      const end = d(endIso);
+      const start = subtractWorkdays(end, days);
+
+      expect(calcWorkdays(start, end)).toBe(days);
+      expect(addWorkdays(start, days).format('YYYY-MM-DD')).toBe(end.format('YYYY-MM-DD'));
+      expect(start.isValid()).toBe(true);
+    },
+  );
 });

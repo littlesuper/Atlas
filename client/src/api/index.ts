@@ -12,6 +12,12 @@ import {
   ProductChangeLog,
   WeeklyReport,
   ReportAttachment,
+  RiskAssessment,
+  RiskComparison,
+  RiskDashboardData,
+  RiskDashboardInsights,
+  RiskItem,
+  WeeklyReportRisk,
   AiConfig,
   AiUsageStats,
   AuditLog,
@@ -24,6 +30,7 @@ import {
   WorkloadResponse,
   RoleMember,
   RoleMemberPreview,
+  FeatureFlagsSnapshot,
 } from '../types';
 
 // 分页响应结构
@@ -33,6 +40,12 @@ interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
+
+type RiskHistoryResponse = PaginatedResponse<RiskAssessment> | RiskAssessment[];
+type RiskItemInput = Partial<Pick<
+  RiskItem,
+  'assessmentId' | 'title' | 'description' | 'severity' | 'status' | 'ownerId' | 'dueDate' | 'source'
+>> & { projectId?: string };
 
 // ============ 认证 API ============
 export const authApi = {
@@ -122,6 +135,11 @@ export const roleMembersApi = {
 
   preview: (roleId: string) =>
     request.get<RoleMemberPreview>(`/role-members/preview/${roleId}`),
+};
+
+// ============ Feature Flags API ============
+export const featureFlagsApi = {
+  snapshot: () => request.get<FeatureFlagsSnapshot>('/feature-flags'),
 };
 
 // ============ 项目管理 API ============
@@ -436,13 +454,13 @@ export const auditLogsApi = {
 // ============ 风险评估 API ============
 export const riskApi = {
   getHistory: (projectId: string, params?: { page?: number; pageSize?: number }) =>
-    request.get<any>(`/risk/project/${projectId}`, { params }),
+    request.get<RiskHistoryResponse>(`/risk/project/${projectId}`, { params }),
 
   getTrend: (projectId: string) =>
-    request.get<any>(`/risk/project/${projectId}`, { params: { pageSize: 50 } }),
+    request.get<RiskHistoryResponse>(`/risk/project/${projectId}`, { params: { pageSize: 50 } }),
 
   assess: (projectId: string) =>
-    request.post<any>(`/risk/project/${projectId}/assess`),
+    request.post<RiskAssessment>(`/risk/project/${projectId}/assess`),
 
   delete: (id: string) =>
     request.delete(`/risk/${id}`),
@@ -451,37 +469,37 @@ export const riskApi = {
     request.get<Array<{ projectId: string; projectName: string; riskLevel: string; assessedAt: string }>>('/risk/summary'),
 
   getDashboard: () =>
-    request.get<any>('/risk/dashboard'),
+    request.get<RiskDashboardData>('/risk/dashboard'),
 
   getInsights: () =>
-    request.get<any>('/risk/dashboard/insights'),
+    request.get<RiskDashboardInsights>('/risk/dashboard/insights'),
 
   getComparison: (projectId: string) =>
-    request.get<any>(`/risk/project/${projectId}/comparison`),
+    request.get<RiskComparison>(`/risk/project/${projectId}/comparison`),
 };
 
 // ============ 风险项 API ============
 export const riskItemsApi = {
   list: (params?: { projectId?: string; status?: string; page?: number; pageSize?: number }) =>
-    request.get<any>('/risk-items', { params }),
+    request.get<PaginatedResponse<RiskItem>>('/risk-items', { params }),
 
-  create: (data: any) =>
-    request.post<any>('/risk-items', data),
+  create: (data: RiskItemInput) =>
+    request.post<RiskItem>('/risk-items', data),
 
   get: (id: string) =>
-    request.get<any>(`/risk-items/${id}`),
+    request.get<RiskItem>(`/risk-items/${id}`),
 
-  update: (id: string, data: any) =>
-    request.put<any>(`/risk-items/${id}`, data),
+  update: (id: string, data: RiskItemInput) =>
+    request.put<RiskItem>(`/risk-items/${id}`, data),
 
   delete: (id: string) =>
     request.delete(`/risk-items/${id}`),
 
   comment: (id: string, content: string) =>
-    request.post<any>(`/risk-items/${id}/comment`, { content }),
+    request.post<RiskItem>(`/risk-items/${id}/comment`, { content }),
 
   fromAssessment: (assessmentId: string) =>
-    request.post<any>(`/risk-items/from-assessment/${assessmentId}`),
+    request.post<{ created: number }>(`/risk-items/from-assessment/${assessmentId}`),
 };
 
 // ============ 周报管理 API ============
@@ -546,7 +564,7 @@ export const weeklyReportsApi = {
     ),
 
   getRiskPrefill: (projectId: string) =>
-    request.get<{ riskWarning: string; risks: any[] }>(`/weekly-reports/project/${projectId}/risk-prefill`),
+    request.get<{ riskWarning: string; risks: WeeklyReportRisk[] }>(`/weekly-reports/project/${projectId}/risk-prefill`),
 };
 
 // ============ 文件上传 API ============
@@ -601,15 +619,40 @@ export const checkItemsApi = {
 };
 
 // ============ 节假日 API ============
+export type HolidaySource = 'OFFICIAL_API' | 'BUILT_IN' | 'ALGORITHM' | 'MANUAL_INPUT';
+
 export interface Holiday {
   id: string;
   date: string; // YYYY-MM-DD
   name: string;
   type: 'HOLIDAY' | 'MAKEUP';
   year: number;
-  source: string;
+  source: HolidaySource;
+  sourceUrl: string | null;
+  syncedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SourceStatusResult {
+  year: number;
+  existing: number;
+  officialAvailable: boolean;
+  officialPapers: string[];
+  officialDaysCount: number;
+  officialError?: string;
+  builtInAvailable: boolean;
+}
+
+export interface GenerateResult {
+  success: boolean;
+  source: 'OFFICIAL_API' | 'BUILT_IN';
+  count: number;
+  sourceUrl?: string;
+  warning?: string;
+  year: number;
+  deleted: number;
+  message: string;
 }
 
 export const holidaysApi = {
@@ -618,6 +661,9 @@ export const holidaysApi = {
 
   knownYears: () =>
     request.get<{ knownYears: number[] }>('/holidays/known-years'),
+
+  sourceStatus: (year: number) =>
+    request.get<SourceStatusResult>('/holidays/source-status', { params: { year } }),
 
   create: (data: { date: string; name: string; type?: 'HOLIDAY' | 'MAKEUP' }) =>
     request.post<Holiday>('/holidays', data),
@@ -631,16 +677,8 @@ export const holidaysApi = {
   deleteYear: (year: number) =>
     request.delete(`/holidays/year/${year}`),
 
-  generate: (year: number, replaceExisting = true) =>
-    request.post<{
-      success: boolean;
-      year: number;
-      known: boolean;
-      inserted: number;
-      skipped: number;
-      deleted: number;
-      message: string;
-    }>('/holidays/generate', { year, replaceExisting }),
+  generate: (year: number, overwrite = false, preferOfficial = true) =>
+    request.post<GenerateResult>('/holidays/generate', { year, overwrite, preferOfficial }),
 };
 
 // ============ 活动评论 API ============

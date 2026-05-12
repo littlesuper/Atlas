@@ -9,7 +9,7 @@ import { clickNavItem, waitForPageLoad } from '../helpers/arco';
  * - 统计卡片数值展示
  * - 负载条视觉显示
  */
-test.describe('Workload Advanced Features', () => {
+test.describe('Workload Advanced Features @p1', () => {
   async function goToWorkload(page: import('@playwright/test').Page) {
     await clickNavItem(page, '项目资源');
     await waitForPageLoad(page);

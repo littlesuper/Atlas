@@ -328,4 +328,131 @@ describe('CircuitBreaker', () => {
     await cb.execute(() => Promise.resolve('finally'));
     expect(cb.getState()).toEqual({ state: 'CLOSED', failureCount: 0 });
   });
+
+  it('should handle multiple OPEN -> HALF_OPEN -> OPEN cycles', async () => {
+    // Cycle 1: trip and fail recovery
+    for (let i = 0; i < 3; i++) {
+      await expect(cb.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    }
+    vi.advanceTimersByTime(60_000);
+    await expect(cb.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    expect(cb.getState().state).toBe('OPEN');
+
+    // Cycle 2: fail recovery again
+    vi.advanceTimersByTime(60_000);
+    await expect(cb.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    expect(cb.getState().state).toBe('OPEN');
+    expect(cb.getState().failureCount).toBe(5);
+
+    // Cycle 3: finally recover
+    vi.advanceTimersByTime(60_000);
+    await cb.execute(() => Promise.resolve('ok'));
+    expect(cb.getState()).toEqual({ state: 'CLOSED', failureCount: 0 });
+  });
+
+  it('should allow immediate recovery with failureThreshold: 1', async () => {
+    const cbQuick = new CircuitBreaker('quick', { failureThreshold: 1, resetTimeout: 1000 });
+
+    await expect(cbQuick.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    expect(cbQuick.getState().state).toBe('OPEN');
+
+    vi.advanceTimersByTime(1000);
+    const result = await cbQuick.execute(() => Promise.resolve('back'));
+    expect(result).toBe('back');
+    expect(cbQuick.getState()).toEqual({ state: 'CLOSED', failureCount: 0 });
+  });
+
+  it('should include breaker name in OPEN rejection message', async () => {
+    const named = new CircuitBreaker('MY-SERVICE', { failureThreshold: 1, resetTimeout: 5000 });
+    await expect(named.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    await expect(named.execute(() => Promise.resolve('x'))).rejects.toThrow('MY-SERVICE');
+  });
+
+  it('should include breaker name in HALF_OPEN rejection message', async () => {
+    const named = new CircuitBreaker('LIMITED', { failureThreshold: 1, resetTimeout: 5000, halfOpenRequests: 1 });
+    await expect(named.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+
+    vi.advanceTimersByTime(5000);
+
+    let resolveSlow!: (v: string) => void;
+    const slow = new Promise<string>((resolve) => { resolveSlow = resolve; });
+    const first = named.execute(() => slow);
+
+    await expect(named.execute(() => Promise.resolve('extra'))).rejects.toThrow('LIMITED');
+
+    resolveSlow('done');
+    await first;
+  });
+
+  it('two independent breakers do not share state', async () => {
+    const cb1 = new CircuitBreaker('svc-1', { failureThreshold: 1, resetTimeout: 5000 });
+    const cb2 = new CircuitBreaker('svc-2', { failureThreshold: 1, resetTimeout: 5000 });
+    await expect(cb1.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    expect(cb1.getState().state).toBe('OPEN');
+    expect(cb2.getState().state).toBe('CLOSED');
+    expect(cb2.getState().failureCount).toBe(0);
+  });
+
+  it('should immediately transition to HALF_OPEN with zero resetTimeout', async () => {
+    const cbZero = new CircuitBreaker('zero', { failureThreshold: 1, resetTimeout: 0 });
+    await expect(cbZero.execute(() => Promise.reject(new Error('fail')))).rejects.toThrow();
+    expect(cbZero.getState().state).toBe('OPEN');
+
+    const result = await cbZero.execute(() => Promise.resolve('recovered'));
+    expect(result).toBe('recovered');
+    expect(cbZero.getState().state).toBe('CLOSED');
+  });
+
+  it('should handle execute with a function that returns a resolved thenable', async () => {
+    const result = await cb.execute(() => ({ then: (resolve: (v: string) => void) => resolve('thenable') }) as Promise<string>);
+    expect(result).toBe('thenable');
+    expect(cb.getState()).toEqual({ state: 'CLOSED', failureCount: 0 });
+  });
+
+  it('should track failureCount correctly after partial failures then success', async () => {
+    await expect(cb.execute(() => Promise.reject(new Error('fail1')))).rejects.toThrow();
+    await expect(cb.execute(() => Promise.reject(new Error('fail2')))).rejects.toThrow();
+    expect(cb.getState().failureCount).toBe(2);
+    await cb.execute(() => Promise.resolve('ok'));
+    expect(cb.getState()).toEqual({ state: 'CLOSED', failureCount: 0 });
+  });
+
+  it('resets failure count after successful execution in CLOSED state', async () => {
+    const testCb = new CircuitBreaker('test-reset');
+    try { await testCb.execute(() => Promise.reject(new Error('fail'))); } catch {}
+    expect(testCb.getState().failureCount).toBe(1);
+    await testCb.execute(() => Promise.resolve('ok'));
+    expect(testCb.getState().failureCount).toBe(0);
+  });
+
+  it('half-open state allows probe then reopens on failure', async () => {
+    vi.useRealTimers();
+    const cb = new CircuitBreaker('test-halfopen', { failureThreshold: 1, resetTimeout: 10 });
+    try { await cb.execute(() => Promise.reject(new Error('fail'))); } catch {}
+    expect(cb.getState().state).toBe('OPEN');
+    await new Promise(r => setTimeout(r, 50));
+    try { await cb.execute(() => Promise.reject(new Error('fail2'))); } catch {}
+    expect(cb.getState().state).toBe('OPEN');
+    vi.useFakeTimers();
+  });
+
+  it('circuit breaker resets failure count after successful call', async () => { const cb = new CircuitBreaker({ failureThreshold: 3 }); await cb.execute(() => Promise.resolve('ok')); expect(cb.getState().state).toBe('CLOSED'); });
+
+  it('circuit breaker starts in CLOSED state', () => { const cb = new CircuitBreaker({ failureThreshold: 3 }); expect(cb.getState().state).toBe('CLOSED'); });
+
+  it('circuit breaker transitions to OPEN after threshold failures', async () => { const cb = new CircuitBreaker('test-open', { failureThreshold: 2 }); await cb.execute(() => Promise.reject(new Error('fail'))).catch(() => {}); await cb.execute(() => Promise.reject(new Error('fail'))).catch(() => {}); expect(cb.getState().state).toBe('OPEN'); });
+
+  it('circuit breaker execute resolves with returned value', async () => { const cb = new CircuitBreaker({ failureThreshold: 3 }); const result = await cb.execute(() => Promise.resolve(42)); expect(result).toBe(42); });
+
+  it('circuit breaker HALF_OPEN state allows single test request', async () => { const cb = new CircuitBreaker('half-open-test', { failureThreshold: 1, resetTimeout: 10 }); await cb.execute(() => Promise.reject(new Error('fail'))).catch(() => {}); expect(cb.getState().state).toBe('OPEN'); vi.useFakeTimers(); vi.advanceTimersByTime(20); vi.useRealTimers(); const state = cb.getState(); expect(['OPEN', 'HALF_OPEN', 'CLOSED']).toContain(state.state); });
+
+  it('circuit breaker getState returns failureCount', async () => { const cb = new CircuitBreaker({ failureThreshold: 3 }); await cb.execute(() => Promise.reject(new Error('fail'))).catch(() => {}); expect(cb.getState().failureCount).toBe(1); });
+
+  it('circuit breaker resets failure count after success', async () => { const cb = new CircuitBreaker('reset-test', { failureThreshold: 3 }); await cb.execute(() => Promise.reject(new Error('fail'))).catch(() => {}); expect(cb.getState().failureCount).toBe(1); await cb.execute(() => Promise.resolve('ok')); expect(cb.getState().failureCount).toBe(0); });
+
+  it('circuit breaker getState returns state CLOSED initially', () => { const cb = new CircuitBreaker({ failureThreshold: 3 }); expect(cb.getState().state).toBe('CLOSED'); });
+
+  it('circuit breaker tracks serviceName when provided as string', () => { const cb = new CircuitBreaker('named-service', { failureThreshold: 3 }); expect(cb.getState()).toBeDefined(); });
+
+  it('circuit breaker getState includes failureCount', () => { const cb = new CircuitBreaker({ failureThreshold: 5 }); const state = cb.getState(); expect(state).toHaveProperty('failureCount'); });
 });

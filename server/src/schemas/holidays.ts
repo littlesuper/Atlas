@@ -16,5 +16,6 @@ export const updateHolidaySchema = z.object({
 
 export const generateHolidaySchema = z.object({
   year: z.number().int().min(2020).max(2100),
-  replaceExisting: z.boolean().optional().default(true),
+  preferOfficial: z.boolean().optional().default(true),
+  overwrite: z.boolean().optional().default(false),
 });

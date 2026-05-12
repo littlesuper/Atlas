@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -41,7 +44,7 @@ const { mockPrisma, mockCanManage, mockIsAdmin, mockCallAi } = vi.hoisted(() => 
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
     constructor() {
-      return mockPrisma as any;
+      return mockPrisma as unknown as PrismaClient;
     }
   },
   ActivityStatus: {
@@ -53,12 +56,12 @@ vi.mock('@prisma/client', () => ({
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
       realName: '管理员',
-      roles: [{ name: '系统管理员' }],
+      roles: [{ id: 'role-admin', name: '系统管理员', description: null }],
       permissions: ['*:*'],
       collaboratingProjectIds: ['proj-1'],
     };
@@ -67,17 +70,17 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
-  canManageProject: (...args: any[]) => mockCanManage(...args),
-  isAdmin: (req: any) => mockIsAdmin(req),
-  sanitizePagination: (p: any, ps: any) => ({
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  canManageProject: (...args: unknown[]) => mockCanManage(...args),
+  isAdmin: (req: Request) => mockIsAdmin(req),
+  sanitizePagination: (p: unknown, ps: unknown) => ({
     pageNum: Number(p) || 1,
     pageSizeNum: Number(ps) || 20,
   }),
 }));
 
 vi.mock('../utils/sanitize', () => ({
-  sanitizeRichText: (t: any) => t,
+  sanitizeRichText: (t: string | null) => t,
 }));
 
 vi.mock('../utils/weekNumber', () => ({
@@ -85,11 +88,11 @@ vi.mock('../utils/weekNumber', () => ({
 }));
 
 vi.mock('../utils/aiClient', () => ({
-  callAi: (...args: any[]) => mockCallAi(...args),
+  callAi: (...args: unknown[]) => mockCallAi(...args),
 }));
 
 vi.mock('../middleware/validate', () => ({
-  validate: () => (_req: any, _res: any, next: any) => next(),
+  validate: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 // ─── App setup ────────────────────────────────────────────────────────────────
@@ -960,5 +963,49 @@ describe('Weekly Reports Routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
     });
+  });
+
+  it('GET weekly-reports returns 500 on database error', async () => {
+    mockPrisma.weeklyReport.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/weekly-reports?projectId=p1');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET weekly-reports with invalid date range returns results', async () => {
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/weekly-reports?projectId=p1&startDate=invalid');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET weekly-reports with no projectId returns 200 with empty data', async () => {
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/weekly-reports');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET weekly-reports handles missing startDate gracefully', async () => {
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/weekly-reports?projectId=p1');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET weekly-reports handles year filter parameter', async () => {
+    mockPrisma.weeklyReport.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyReport.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/weekly-reports?year=2026');
+
+    expect(res.status).toBe(200);
   });
 });

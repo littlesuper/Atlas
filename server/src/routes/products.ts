@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ProductStatus, ProjectStatus, type Prisma } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import {
@@ -17,10 +17,14 @@ const prisma = new PrismaClient();
 // 上传目录
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
+const isUploadedFile = (file: unknown): file is { url?: string; name?: string } =>
+  typeof file === 'object' && file !== null;
+
 // 清理文件列表中的上传文件（静默处理失败）
-function cleanupFiles(files: Array<{ url?: string; name?: string }> | null | undefined) {
+function cleanupFiles(files: unknown) {
   if (!Array.isArray(files)) return;
   for (const file of files) {
+    if (!isUploadedFile(file)) continue;
     const url = file.url || '';
     const filename = path.basename(url);
     if (!filename) continue;
@@ -50,7 +54,7 @@ async function logProductChange(
         userId,
         userName,
         action,
-        changes: changes ? (changes as any) : undefined,
+        changes: changes ? (changes as unknown as Prisma.InputJsonValue) : undefined,
       },
     });
   } catch {
@@ -86,9 +90,9 @@ router.get('/export', authenticate, async (req: Request, res: Response): Promise
     const keyword = req.query.keyword as string | undefined;
     const projectStatus = req.query.projectStatus as string | undefined;
 
-    const where: any = {};
+    const where: Prisma.ProductWhereInput = {};
 
-    if (status) where.status = status;
+    if (status) where.status = status as ProductStatus;
     if (category) where.category = category;
     if (keyword) {
       where.OR = [
@@ -98,7 +102,7 @@ router.get('/export', authenticate, async (req: Request, res: Response): Promise
       ];
     }
     if (projectStatus) {
-      where.project = { status: projectStatus };
+      where.project = { status: projectStatus as ProjectStatus };
     }
 
     const products = await prisma.product.findMany({
@@ -118,7 +122,7 @@ router.get('/export', authenticate, async (req: Request, res: Response): Promise
       p.revision || '',
       p.category || '',
       p.status,
-      (p.project as any)?.name || '',
+      p.project?.name || '',
       (p.description || '').replace(/[\r\n]+/g, ' '),
       p.specifications ? JSON.stringify(p.specifications) : '',
       p.performance ? JSON.stringify(p.performance) : '',
@@ -161,10 +165,10 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const skip = (pageNum - 1) * pageSizeNum;
 
     // 构建筛选条件
-    const where: any = {};
+    const where: Prisma.ProductWhereInput = {};
 
     if (status) {
-      where.status = status;
+      where.status = status as ProductStatus;
     }
 
     if (category) {
@@ -176,7 +180,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     }
 
     if (projectStatus) {
-      where.project = { status: projectStatus };
+      where.project = { status: projectStatus as ProjectStatus };
     }
 
     if (keyword) {
@@ -188,10 +192,10 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     }
 
     // 统计条件（不受 status 筛选影响）
-    const statsWhere: any = {};
+    const statsWhere: Prisma.ProductWhereInput = {};
     if (category) statsWhere.category = category;
     if (projectId) statsWhere.projectId = projectId;
-    if (projectStatus) statsWhere.project = { status: projectStatus };
+    if (projectStatus) statsWhere.project = { status: projectStatus as ProjectStatus };
     if (keyword) {
       statsWhere.OR = [
         { name: { contains: keyword } },
@@ -411,7 +415,7 @@ router.post(
       });
 
       // 记录变更日志
-      const user = (req as any).user;
+      const user = req.user;
       await logProductChange(product.id, user?.id || '', user?.realName || user?.username || '', 'CREATE');
 
       res.status(201).json(product);
@@ -484,7 +488,7 @@ router.post(
       });
 
       // 记录变更日志
-      const user = (req as any).user;
+      const user = req.user;
       await logProductChange(newProduct.id, user?.id || '', user?.realName || user?.username || '', 'COPY', {
         sourceId: { from: null, to: id },
         sourceRevision: { from: null, to: source.revision },
@@ -598,7 +602,7 @@ router.put(
       }
 
       // 构建更新数据
-      const updateData: any = {};
+      const updateData: Prisma.ProductUncheckedUpdateInput = {};
       if (name !== undefined) updateData.name = name;
       if (model !== undefined) updateData.model = model || null;
       if (revision !== undefined) updateData.revision = revision || null;
@@ -634,7 +638,7 @@ router.put(
       });
 
       // 记录变更日志
-      const user = (req as any).user;
+      const user = req.user;
       await logProductChange(id, user?.id || '', user?.realName || user?.username || '', 'UPDATE', changes);
 
       res.json(product);
@@ -669,7 +673,7 @@ router.delete(
       }
 
       // 记录变更日志（在删除前记录）
-      const user = (req as any).user;
+      const user = req.user;
       await logProductChange(null, user?.id || '', user?.realName || user?.username || '', 'DELETE', {
         productName: { from: existingProduct.name, to: null },
         productModel: { from: existingProduct.model, to: null },
@@ -681,8 +685,8 @@ router.delete(
       });
 
       // 异步清理图片和文档文件
-      cleanupFiles(existingProduct.images as any);
-      cleanupFiles(existingProduct.documents as any);
+      cleanupFiles(existingProduct.images);
+      cleanupFiles(existingProduct.documents);
 
       res.json({ success: true });
     } catch (error) {

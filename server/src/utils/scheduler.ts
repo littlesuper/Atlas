@@ -5,7 +5,7 @@
  */
 
 import cron from 'node-cron';
-import { PrismaClient, ActivityStatus } from '@prisma/client';
+import { PrismaClient, ActivityStatus, type Prisma } from '@prisma/client';
 import { assessProjectRisk } from './riskEngine';
 import { callAi } from './aiClient';
 import { buildRiskContext, trimContextForAI } from './riskContext';
@@ -77,11 +77,11 @@ async function assessSingleProject(projectId: string, projectName: string, manag
   });
 
   let riskLevel: string;
-  let riskFactors: any[];
+  let riskFactors: Prisma.InputJsonValue[];
   let suggestions: string[];
   let source: string;
   let aiInsights: string | null = null;
-  let aiEnhancedData: any = null;
+  let aiEnhancedData: Prisma.InputJsonValue | undefined;
 
   try {
     const context = await buildRiskContext(projectId);
@@ -98,7 +98,9 @@ async function assessSingleProject(projectId: string, projectName: string, manag
     if (aiResult?.content) {
       const parsed = parseAIResponse(aiResult.content);
       riskLevel = validateRiskLevel(parsed.riskLevel);
-      riskFactors = Array.isArray(parsed.riskFactors) ? parsed.riskFactors : context.ruleEngineMetrics.factors;
+      riskFactors = Array.isArray(parsed.riskFactors)
+        ? parsed.riskFactors as unknown as Prisma.InputJsonValue[]
+        : context.ruleEngineMetrics.factors as unknown as Prisma.InputJsonValue[];
       suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
       source = 'scheduled_ai';
       aiInsights = parsed.aiInsights || null;
@@ -107,7 +109,7 @@ async function assessSingleProject(projectId: string, projectName: string, manag
         criticalPathAnalysis: parsed.criticalPathAnalysis || null,
         actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
         resourceBottlenecks: Array.isArray(parsed.resourceBottlenecks) ? parsed.resourceBottlenecks : [],
-      };
+      } as unknown as Prisma.InputJsonValue;
     } else {
       throw new Error('AI 未配置或返回为空');
     }
@@ -115,7 +117,7 @@ async function assessSingleProject(projectId: string, projectName: string, manag
     // Fallback to rule engine
     const result = await assessProjectRisk(projectId);
     riskLevel = result.riskLevel;
-    riskFactors = result.riskFactors;
+    riskFactors = result.riskFactors as unknown as Prisma.InputJsonValue[];
     suggestions = result.suggestions;
     source = 'scheduled_rule';
   }
@@ -157,16 +159,16 @@ async function runThresholdAlerts(): Promise<void> {
       status: { in: [ActivityStatus.NOT_STARTED, ActivityStatus.IN_PROGRESS] },
     },
     include: {
-      assignees: { select: { id: true, realName: true } },
+      executors: { include: { user: { select: { id: true, realName: true } } } },
       project: { select: { id: true, name: true } },
     },
   });
 
   for (const activity of overdueActivities) {
     const overdueDays = Math.ceil((now.getTime() - activity.planEndDate!.getTime()) / (1000 * 60 * 60 * 24));
-    for (const assignee of activity.assignees) {
+    for (const executor of activity.executors) {
       await createNotificationIfNotDuplicate({
-        userId: assignee.id,
+        userId: executor.user.id,
         type: 'RISK_ALERT',
         title: `活动「${activity.name}」逾期 ${overdueDays} 天`,
         content: `项目「${activity.project.name}」中的活动已逾期超过 7 天，请尽快处理`,
@@ -182,15 +184,15 @@ async function runThresholdAlerts(): Promise<void> {
       status: ActivityStatus.NOT_STARTED,
     },
     include: {
-      assignees: { select: { id: true, realName: true } },
+      executors: { include: { user: { select: { id: true, realName: true } } } },
       project: { select: { id: true, name: true } },
     },
   });
 
   for (const activity of upcomingActivities) {
-    for (const assignee of activity.assignees) {
+    for (const executor of activity.executors) {
       await createNotificationIfNotDuplicate({
-        userId: assignee.id,
+        userId: executor.user.id,
         type: 'RISK_ALERT',
         title: `活动「${activity.name}」即将到期`,
         content: `项目「${activity.project.name}」中的活动将在 3 天内到期，但尚未开始`,

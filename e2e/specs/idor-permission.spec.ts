@@ -7,7 +7,7 @@ import {
   createProjectViaPage,
 } from '../helpers/arco';
 
-test.describe.serial('IDOR & Cross-Project Permission', () => {
+test.describe.serial('IDOR & Cross-Project Permission @smoke', () => {
   const projectAName = uniqueName('项目A');
   const projectBName = uniqueName('项目B');
   let projectAId: string;

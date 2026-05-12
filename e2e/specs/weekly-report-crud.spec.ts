@@ -21,7 +21,7 @@ import {
  * - 周报进度状态切换
  * - 删除周报
  */
-test.describe.serial('Weekly Report CRUD', () => {
+test.describe.serial('Weekly Report CRUD @p1', () => {
   const projectName = uniqueName('周报测试项目');
 
   // ──────── setup: create project ────────

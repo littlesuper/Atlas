@@ -21,7 +21,7 @@ import {
  * - Click-outside 关闭编辑
  * - Esc 键退出编辑不保存
  */
-test.describe.serial('Activity Inline Editing', () => {
+test.describe.serial('Activity Inline Editing @p1', () => {
   const projectName = uniqueName('内联编辑项目');
   const activityName = uniqueName('内联编辑活动');
 

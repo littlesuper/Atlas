@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
 
 const { mockPrisma, mockWecom, mockJwt } = vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret';
@@ -19,7 +22,10 @@ const { mockPrisma, mockWecom, mockJwt } = vi.hoisted(() => {
       delete: vi.fn(),
     },
     projectMember: { findMany: vi.fn() },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    wecomConfig: {
+      findFirst: vi.fn(),
+    },
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
   };
 
   const mockWecom = {
@@ -44,7 +50,7 @@ const { mockPrisma, mockWecom, mockJwt } = vi.hoisted(() => {
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
     constructor() {
-      return mockPrisma as any;
+      return mockPrisma as unknown as PrismaClient;
     }
   },
 }));
@@ -56,9 +62,11 @@ vi.mock('bcryptjs', () => ({
 vi.mock('jsonwebtoken', () => ({ default: mockJwt }));
 
 vi.mock('../../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
+      username: 'admin',
+      realName: 'Admin',
       permissions: ['*:*'],
       roles: [],
       collaboratingProjectIds: [],
@@ -68,7 +76,7 @@ vi.mock('../../middleware/auth', () => ({
 }));
 
 vi.mock('../../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 vi.mock('../../utils/wecom', () => mockWecom);
@@ -99,7 +107,7 @@ describe('WeChat OAuth P0 Security Tests', () => {
           redirectUri: 'http://localhost:5173',
         }),
       };
-      mockPrisma.$transaction = vi.fn((fn: any) => fn(mockPrisma));
+      mockPrisma.$transaction = vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));
 
       const app = express();
       app.use(express.json());
@@ -283,5 +291,377 @@ describe('WeChat OAuth P0 Security Tests', () => {
       expect(res.body).not.toHaveProperty('stack');
       expect(res.body).not.toHaveProperty('trace');
     });
+  });
+
+  describe('AUTH-046: wecom login when wecom is disabled', () => {
+    it('AUTH-046 wecom login returns error when wecom is not enabled', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(false);
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({ code: 'test-code' });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  describe('WC-002: config with no stored config still hides secret', () => {
+    it('WC-002 returns empty config without exposing secret when no config exists', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+      mockPrisma.wecomConfig = {
+        findFirst: vi.fn().mockResolvedValue(null),
+      };
+      mockPrisma.$transaction = vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));
+
+      const app = express();
+      app.use(express.json());
+      const wecomConfigRoute = (await import('../wecomConfig')).default;
+      app.use('/api/wecom-config', wecomConfigRoute);
+
+      const res = await request(app).get('/api/wecom-config');
+      expect(res.status).toBe(200);
+      expect(res.body).not.toHaveProperty('corpSecret');
+    });
+  });
+
+  describe('AUTH-047: wecom login with missing code', () => {
+    it('AUTH-047 wecom login without code returns validation error', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  describe('AUTH-048: wecom login with whitespace-only code', () => {
+    it('AUTH-048 whitespace-only code fails at wecom API', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+      mockWecom.getUserInfoByCode.mockRejectedValue(new Error('invalid code'));
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({ code: '   ' });
+
+      expect(res.status).toBe(401);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  describe('WC-018: wecom login with very long code', () => {
+    it('WC-018 extremely long code does not cause server error', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+      mockWecom.getUserInfoByCode.mockRejectedValue(new Error('invalid code'));
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const longCode = 'x'.repeat(10000);
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({ code: longCode });
+
+      expect(res.status).not.toBe(500);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  describe('WC-019: wecom login with null code', () => {
+    it('WC-019 null code returns validation error', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({ code: null });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('error');
+    });
+
+    it('WC-020 empty string code returns validation error', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({ code: '' });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  describe('WC-021: wecom login response does not expose internal state', () => {
+    it('WC-021 wecom error response has error property without stack', async () => {
+      mockWecom.isWecomEnabled.mockReturnValue(true);
+      mockWecom.getUserInfoByCode.mockRejectedValue(new Error('auth failed'));
+
+      const app = express();
+      app.use(express.json());
+      const authRoute = (await import('../auth')).default;
+      app.use('/api/auth', authRoute);
+
+      const res = await request(app)
+        .post('/api/auth/wecom/login')
+        .send({ code: 'valid-code' });
+
+      expect(res.status).toBe(401);
+      expect(res.body).toHaveProperty('error');
+      expect(res.body).not.toHaveProperty('stack');
+      expect(res.body).not.toHaveProperty('trace');
+    });
+  });
+
+  describe('WC-022: wecom login with code containing special characters', () => {
+  it('WC-022 code with url-safe special chars is passed to wecom API', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    mockWecom.getUserInfoByCode.mockRejectedValue(new Error('invalid code'));
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'abc-123_XYZ' });
+
+    expect(res.status).toBe(401);
+    expect(mockWecom.getUserInfoByCode).toHaveBeenCalledWith('abc-123_XYZ');
+  });
+
+  it('WC-023 wecom login with numeric code returns validation error', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    mockWecom.getUserInfoByCode.mockRejectedValue(new Error('invalid code'));
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: 12345 });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('WC-024 wecom login response never includes corpSecret', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    mockWecom.getUserInfoByCode.mockRejectedValue(new Error('fail'));
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'test-code' });
+
+    expect(res.status).toBe(401);
+    expect(JSON.stringify(res.body)).not.toContain('should-never-be-exposed');
+    expect(JSON.stringify(res.body)).not.toContain('corpSecret');
+  });
+
+  it('WC-025 wecom login does not accept GET method', async () => {
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .get('/api/auth/wecom/login');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('WC-026 wecom login with code containing unicode returns 401', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    mockWecom.getUserInfoByCode.mockRejectedValue(new Error('invalid code'));
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: '认证码-🚀' });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('WC-027 wecom login response body is always valid JSON', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    mockWecom.getUserInfoByCode.mockRejectedValue(new Error('fail'));
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'test' });
+
+    expect(res.status).not.toBe(500);
+    expect(() => JSON.parse(res.text)).not.toThrow();
+  });
+
+  it('WC-028 wecom login POST with empty body returns 400', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+});
+
+  it('WC-030 crypto randomBytes generates unique state tokens', () => {
+    const { randomBytes } = require('crypto');
+    const tokens = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      tokens.add(randomBytes(32).toString('hex'));
+    }
+    expect(tokens.size).toBe(50);
+  });
+
+  it('WC-031 wecom login with very long code returns 401', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    mockWecom.getUserInfoByCode.mockRejectedValue(new Error('invalid code'));
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'x'.repeat(10000) });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('WC-032 wecom login with empty code returns error', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+
+    const app = express();
+    app.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    app.use('/api/auth', authRoute);
+
+    const res = await request(app)
+      .post('/api/auth/wecom/login')
+      .send({ code: '' });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('rejects wecom login with excessively long code', async () => {
+    const localApp = express();
+    localApp.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    localApp.use('/api/auth', authRoute);
+
+    const res = await request(localApp)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'a'.repeat(10000) });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('rejects wecom login with missing code field', async () => {
+    const localApp = express();
+    localApp.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    localApp.use('/api/auth', authRoute);
+
+    const res = await request(localApp)
+      .post('/api/auth/wecom/login')
+      .send({});
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('rejects wecom login with code containing null bytes', async () => {
+    const localApp = express();
+    localApp.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    localApp.use('/api/auth', authRoute);
+
+    const res = await request(localApp)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'abc\x00def' });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('rejects null bytes in wecom login code field', async () => {
+    process.env.JWT_SECRET = 'test';
+    const localApp = express();
+    localApp.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    localApp.use('/api/auth', authRoute);
+
+    const res = await request(localApp)
+      .post('/api/auth/wecom/login')
+      .send({ code: 'a\x00b' });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('rejects wecom login with boolean code value', async () => {
+    mockWecom.isWecomEnabled.mockReturnValue(true);
+    const localApp = express();
+    localApp.use(express.json());
+    const authRoute = (await import('../auth')).default;
+    localApp.use('/api/auth', authRoute);
+
+    const res = await request(localApp)
+      .post('/api/auth/wecom/login')
+      .send({ code: true });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });

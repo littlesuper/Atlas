@@ -15,7 +15,7 @@ import {
  * - 复制模板
  * - 删除模板
  */
-test.describe.serial('Template Management', () => {
+test.describe.serial('Template Management @p1', () => {
   const templateName = uniqueName('测试模板');
   const activityName1 = '模板活动A_' + Date.now();
   const activityName2 = '模板活动B_' + Date.now();

@@ -4,7 +4,7 @@ export const createRiskItemSchema = z.object({
   projectId: z.string().min(1, '项目ID不能为空'),
   title: z.string().min(1, '风险项标题不能为空'),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], {
-    errorMap: () => ({ message: '严重度必须为 LOW/MEDIUM/HIGH/CRITICAL' }),
+    error: '严重度必须为 LOW/MEDIUM/HIGH/CRITICAL',
   }),
   description: z.string().nullable().optional(),
   ownerId: z.string().nullable().optional(),

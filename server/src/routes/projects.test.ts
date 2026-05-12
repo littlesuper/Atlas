@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import type { PrismaClient } from '@prisma/client';
+
+type AuthRequest = Request & { user?: unknown };
+type ProjectArchiveCreateArgs = {
+  data: {
+    snapshot: {
+      activities?: unknown[];
+      products?: unknown[];
+      weeklyReports?: unknown[];
+    };
+  };
+};
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -37,7 +49,7 @@ const { mockPrisma } = vi.hoisted(() => {
     weeklyReport: { findMany: vi.fn() },
     riskAssessment: { findMany: vi.fn() },
     activityComment: { findMany: vi.fn() },
-    $transaction: vi.fn((fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
   };
   return { mockPrisma };
 });
@@ -45,7 +57,7 @@ const { mockPrisma } = vi.hoisted(() => {
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
 vi.mock('@prisma/client', () => ({
-  PrismaClient: class { constructor() { return mockPrisma as any; } },
+  PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
   ProjectStatus: {
     IN_PROGRESS: 'IN_PROGRESS',
     COMPLETED: 'COMPLETED',
@@ -55,7 +67,7 @@ vi.mock('@prisma/client', () => ({
 }));
 
 vi.mock('../middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
+  authenticate: (req: AuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
       id: 'user-1',
       username: 'admin',
@@ -70,13 +82,13 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../middleware/permission', () => ({
-  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  requirePermission: () => (_req: Request, _res: Response, next: NextFunction) => next(),
   isAdmin: () => true,
   canManageProject: () => true,
   canDeleteProject: () => true,
-  sanitizePagination: (page: any, pageSize: any) => ({
-    pageNum: parseInt(page) || 1,
-    pageSizeNum: parseInt(pageSize) || 20,
+  sanitizePagination: (page: unknown, pageSize: unknown) => ({
+    pageNum: parseInt(String(page), 10) || 1,
+    pageSizeNum: parseInt(String(pageSize), 10) || 20,
   }),
 }));
 
@@ -626,8 +638,8 @@ describe('PROJ-023: archive snapshot content completeness', () => {
     ]);
     mockPrisma.riskAssessment.findMany.mockResolvedValue([]);
     mockPrisma.activityComment.findMany.mockResolvedValue([]);
-    mockPrisma.projectArchive.create.mockImplementation((args: any) => {
-      const snapshot = args.data.snapshot as any;
+    mockPrisma.projectArchive.create.mockImplementation((args: ProjectArchiveCreateArgs) => {
+      const snapshot = args.data.snapshot;
       expect(snapshot.activities).toHaveLength(2);
       expect(snapshot.products).toHaveLength(1);
       expect(snapshot.weeklyReports).toHaveLength(1);
@@ -861,5 +873,62 @@ describe('PROJ-012: keyword search fuzzy match', () => {
         { description: { contains: 'Test' } },
       ])
     );
+  });
+});
+
+describe('GET /api/projects/archives/:archiveId', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('returns 404 when archive does not exist', async () => {
+    mockPrisma.projectArchive.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/projects/archives/archive-missing');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('归档记录不存在');
+  });
+
+  it('returns archive data when found', async () => {
+    const archiveData = { id: 'arch-1', project: { name: 'Test', status: 'COMPLETED' }, snapshot: '{}' };
+    mockPrisma.projectArchive.findUnique.mockResolvedValue(archiveData);
+
+    const res = await request(app).get('/api/projects/archives/arch-1');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET projects returns 500 on database error', async () => {
+    mockPrisma.project.findMany.mockRejectedValue(new Error('DB fail'));
+
+    const res = await request(app).get('/api/projects');
+
+    expect(res.status).toBe(500);
+  });
+
+  it('GET projects returns empty array when no projects exist', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+    mockPrisma.project.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/projects');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET projects with negative page defaults to page 1', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+    mockPrisma.project.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/projects?page=-1');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET projects handles productLine filter', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+    mockPrisma.project.count.mockResolvedValue(0);
+
+    const res = await request(app).get('/api/projects?productLine=硬件');
+
+    expect(res.status).toBe(200);
   });
 });

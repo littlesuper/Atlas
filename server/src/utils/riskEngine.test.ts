@@ -32,7 +32,11 @@ function makeProject(overrides = {}) {
   };
 }
 
-function makeActivity(overrides: Record<string, any> = {}) {
+type ActivityOverrides = Record<string, unknown> & {
+  assigneeId?: string | null;
+};
+
+function makeActivity(overrides: ActivityOverrides = {}) {
   const { assigneeId, ...rest } = overrides;
   return {
     id: Math.random().toString(),
@@ -182,6 +186,145 @@ describe('assessProjectRisk', () => {
     });
   });
 
+  it('工期偏差 >30% → 高风险因子"工期偏差严重"', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    mockActivityFindMany.mockResolvedValue([
+      makeActivity({ status: 'COMPLETED', duration: 20, planDuration: 10, assigneeId: 'u1' }),
+      makeActivity({ status: 'COMPLETED', duration: 15, planDuration: 10, assigneeId: 'u1' }),
+    ]);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('工期偏差'));
+    expect(f?.severity).toBe('HIGH');
+  });
+
+  it('工期偏差 >15% → 中风险因子"工期偏差偏高"', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    mockActivityFindMany.mockResolvedValue([
+      makeActivity({ status: 'COMPLETED', duration: 12, planDuration: 10, assigneeId: 'u1' }),
+    ]);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('工期偏差'));
+    expect(f?.severity).toBe('MEDIUM');
+  });
+
+  it('依赖链 >5 → 高风险因子"依赖链过长"', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    const acts = [];
+    for (let i = 0; i < 7; i++) {
+      acts.push(makeActivity({
+        id: `act-${i}`,
+        assigneeId: 'u1',
+        dependencies: i > 0 ? JSON.stringify([{ id: `act-${i - 1}` }]) : null,
+      }));
+    }
+    mockActivityFindMany.mockResolvedValue(acts);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('依赖链'));
+    expect(f?.severity).toBe('HIGH');
+  });
+
+  it('依赖链 >3 → 中风险因子"存在较长依赖链"', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    const acts = [
+      makeActivity({ id: 'a0', assigneeId: 'u1', dependencies: null }),
+      makeActivity({ id: 'a1', assigneeId: 'u1', dependencies: JSON.stringify([{ id: 'a0' }]) }),
+      makeActivity({ id: 'a2', assigneeId: 'u1', dependencies: JSON.stringify([{ id: 'a1' }]) }),
+      makeActivity({ id: 'a3', assigneeId: 'u1', dependencies: JSON.stringify([{ id: 'a2' }]) }),
+      makeActivity({ id: 'a4', assigneeId: 'u1', dependencies: JSON.stringify([{ id: 'a3' }]) }),
+    ];
+    mockActivityFindMany.mockResolvedValue(acts);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('依赖链'));
+    expect(f?.severity).toBe('MEDIUM');
+  });
+
+  it('活动集中在单一阶段 >70% → 中风险因子', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    const acts = [
+      ...Array(4).fill(null).map((_, i) => makeActivity({ status: 'IN_PROGRESS', phase: '开发', assigneeId: 'u1', id: `ip-${i}` })),
+      makeActivity({ status: 'IN_PROGRESS', phase: '测试', assigneeId: 'u1', id: 'ip-4' }),
+    ];
+    mockActivityFindMany.mockResolvedValue(acts);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('集中在单一阶段'));
+    expect(f?.severity).toBe('MEDIUM');
+  });
+
+  it('跨项目资源冲突 >3人 → 高风险因子', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    const acts = Array(5).fill(null).map((_, i) => makeActivity({
+      status: 'IN_PROGRESS',
+      assigneeId: `user-${i}`,
+      id: `act-${i}`,
+    }));
+    mockActivityFindMany.mockResolvedValue(acts);
+    mockActivityCount.mockResolvedValue(1);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('跨项目资源冲突'));
+    expect(f?.severity).toBe('HIGH');
+  });
+
+  it('跨项目资源冲突 1-3人 → 低风险因子', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    mockActivityFindMany.mockResolvedValue([
+      makeActivity({ status: 'IN_PROGRESS', assigneeId: 'u1' }),
+    ]);
+    mockActivityCount.mockResolvedValue(1);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('跨项目资源冲突'));
+    expect(f?.severity).toBe('LOW');
+  });
+
+  it('riskScore >= 2 → MEDIUM risk level', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    mockActivityFindMany.mockResolvedValue([
+      makeActivity({ status: 'IN_PROGRESS', assigneeId: null, planEndDate: new Date('2020-01-01') }),
+    ]);
+    mockActivityCount.mockResolvedValue(0);
+    const result = await assessProjectRisk('proj-001');
+    expect(result.riskScore).toBeGreaterThanOrEqual(2);
+    expect(['MEDIUM', 'HIGH', 'CRITICAL']).toContain(result.riskLevel);
+  });
+
+  it('riskScore >= 4 → HIGH risk level', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    const past = new Date('2020-01-01');
+    mockActivityFindMany.mockResolvedValue([
+      ...Array(4).fill(null).map((_, i) => makeActivity({ status: 'IN_PROGRESS', planEndDate: past, assigneeId: `u${i}`, id: `ov-${i}` })),
+      makeActivity({ status: 'COMPLETED', assigneeId: 'u1', duration: 20, planDuration: 10, id: 'dev-1' }),
+    ]);
+    mockActivityCount.mockResolvedValue(0);
+    const result = await assessProjectRisk('proj-001');
+    expect(result.riskScore).toBeGreaterThanOrEqual(4);
+    expect(result.riskLevel).toMatch(/^(HIGH|CRITICAL)$/);
+  });
+
+  it('循环依赖不会导致无限递归', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    mockActivityFindMany.mockResolvedValue([
+      makeActivity({ id: 'a', assigneeId: 'u1', dependencies: JSON.stringify([{ id: 'b' }]) }),
+      makeActivity({ id: 'b', assigneeId: 'u1', dependencies: JSON.stringify([{ id: 'a' }]) }),
+    ]);
+    mockActivityCount.mockResolvedValue(0);
+    const result = await assessProjectRisk('proj-001');
+    expect(result.riskLevel).toBeDefined();
+    expect(typeof result.riskScore).toBe('number');
+  });
+
+  it('delay rate >30% triggers HIGH severity', async () => {
+    mockFindUnique.mockResolvedValue(makeProject({ progress: 50, startDate: null, endDate: null }));
+    const past = new Date('2020-01-01');
+    const acts = [
+      ...Array(4).fill(null).map(() => makeActivity({ status: 'IN_PROGRESS', planEndDate: past, assigneeId: 'u1' })),
+      ...Array(6).fill(null).map(() => makeActivity({ status: 'NOT_STARTED', assigneeId: 'u1' })),
+    ];
+    mockActivityFindMany.mockResolvedValue(acts);
+    mockActivityCount.mockResolvedValue(0);
+    const result = await assessProjectRisk('proj-001');
+    const f = result.riskFactors.find((r) => r.factor.includes('延期率') || r.factor.includes('任务延期'));
+    expect(f).toBeDefined();
+  });
+
   describe('RISK-002: Chinese severity normalization', () => {
     it('RISK-002 maps Chinese risk levels to English enum', () => {
       const chineseToEnum: Record<string, string> = {
@@ -271,4 +414,20 @@ describe('assessProjectRisk', () => {
       expect(validateRiskLevel('Critical')).toBe('CRITICAL');
     });
   });
+
+  it('AI-009 "Unknown" defaults to MEDIUM from validateRiskLevel', () => { expect(validateRiskLevel('Unknown')).toBe('MEDIUM'); });
+
+  it('validateRiskLevel handles empty string as MEDIUM', () => { expect(validateRiskLevel('')).toBe('MEDIUM'); });
+
+  it('validateRiskLevel handles lowercase input', () => { expect(validateRiskLevel('high')).toBe('HIGH'); });
+
+  it('validateRiskLevel handles mixed case input', () => { expect(validateRiskLevel('MedIum')).toBe('MEDIUM'); });
+
+  it('validateRiskLevel handles whitespace-padded input', () => { expect(validateRiskLevel('  HIGH  ')).toBe('MEDIUM'); });
+
+  it('validateRiskLevel handles numeric string input', () => { expect(validateRiskLevel('123')).toBe('MEDIUM'); });
+
+  it('validateRiskLevel handles lowercase input', () => { expect(validateRiskLevel('high')).toBe('HIGH'); });
+
+  it('assessRisk returns object with riskLevel for empty inputs', () => { mockFindUnique.mockResolvedValue(makeProject({ progress: 0 })); mockActivityFindMany.mockResolvedValue([]); mockActivityCount.mockResolvedValue(0); return assessProjectRisk('proj-001').then(r => { expect(r).toHaveProperty('riskLevel'); }); });
 });
