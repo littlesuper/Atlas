@@ -6744,3 +6744,32 @@ describe('request helper batch 397 matrices', () => {
     },
   );
 });
+
+describe('request helper batch 398 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new EvalError(`batch398-message-${index}`),
+    `batch398-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch398 EvalError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch398 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch398 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
