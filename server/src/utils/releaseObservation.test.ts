@@ -8956,3 +8956,41 @@ describe('release observation batch 398 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 399 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-27T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch399 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch399-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 190,
+        samples: [{ checkedAt, status, failedChecks: ['batch399'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-27T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `unshift-batch399-${index}`,
+  ] as const))(
+    'generated batch399 failedChecks unshift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: [replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.unshift('prepended');
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['prepended', replacementFailure, 'tail']);
+    },
+  );
+});

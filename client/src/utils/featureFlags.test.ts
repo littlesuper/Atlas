@@ -7806,3 +7806,38 @@ describe('feature flag helper batch 398 matrices', () => {
     },
   );
 });
+
+describe('feature flag helper batch 399 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch399.agg.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch399 AggregateError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new AggregateError([], `batch399-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch399 relay DataView own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new DataView(new Uint8Array([index]).buffer), {
+        relay: enabled,
+        ignored: new WeakMap(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ relay: enabled });
+      expect(isFeatureEnabled(flags, 'relay', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});
