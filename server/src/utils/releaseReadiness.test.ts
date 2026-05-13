@@ -11044,3 +11044,51 @@ describe('release readiness batch 405 matrices', () => {
     },
   );
 });
+
+describe('release readiness batch 406 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch406-${index}`) } },
+    }),
+    String(new AggregateError([], `batch406-${index}`)),
+  ] as const))(
+    'generated batch406 Promise health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch406-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch406-${index}`)),
+  ] as const))(
+    'generated batch406 Promise metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
