@@ -7876,3 +7876,38 @@ describe('feature flag helper batch 400 matrices', () => {
     },
   );
 });
+
+describe('feature flag helper batch 401 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch401.range.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch401 RangeError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new RangeError(`batch401-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch401 beacon Uint8Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint8Array([index]), {
+        beacon: enabled,
+        ignored: new WeakMap(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ beacon: enabled });
+      expect(isFeatureEnabled(flags, 'beacon', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});

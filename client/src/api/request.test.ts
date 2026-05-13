@@ -6831,3 +6831,32 @@ describe('request helper batch 400 matrices', () => {
     },
   );
 });
+
+describe('request helper batch 401 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch401-message-${index}`),
+    `batch401-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch401 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch401 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch401 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
