@@ -11668,3 +11668,51 @@ describe('release readiness batch 418 matrices', () => {
     },
   );
 });
+
+describe('release readiness batch 419 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new RegExp(`batch419-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new EvalError(`batch419-${index}`) } },
+    }),
+    String(new EvalError(`batch419-${index}`)),
+  ] as const))(
+    'generated batch419 RegExp health snapshot fails EvalError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new RegExp(`alert-batch419-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new EvalError(`alert-batch419-${index}`) as unknown as string }],
+    }),
+    String(new EvalError(`alert-batch419-${index}`)),
+  ] as const))(
+    'generated batch419 RegExp metrics EvalError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
