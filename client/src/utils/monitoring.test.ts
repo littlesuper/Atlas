@@ -13247,3 +13247,49 @@ describe('monitoring batch 416 matrices', () => {
     },
   );
 });
+
+describe('monitoring batch 417 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `https://batch417-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch417 copyWithin URIError dsn as valid %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '131.625');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 131.625,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch417-alt-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch417 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '131.625');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 131.625,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});
