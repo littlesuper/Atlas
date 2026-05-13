@@ -12135,3 +12135,156 @@ describe('client monitoring batch 394 matrices', () => {
     },
   );
 });
+
+describe('client monitoring batch 395 matrices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch395-tag-${index}`,
+    new SyntaxError(`batch395-${index}`),
+  ] as const))(
+    'captureAppError stringifies generated batch395 SyntaxError tag %s',
+    async (tag, value) => {
+      vi.stubEnv('VITE_SENTRY_DSN', 'https://test@sentry.io/123');
+      const mockScope = { setTag: vi.fn(), setContext: vi.fn() };
+      mockWithScope.mockImplementationOnce((cb) => cb(mockScope));
+      vi.resetModules();
+
+      const { captureAppError } = await import('./monitoring');
+      captureAppError(new Error('batch395'), { tags: { [tag]: value as unknown as string } });
+
+      expect(mockScope.setTag).toHaveBeenCalledWith(tag, String(value));
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch395-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch395 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '115.125');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 115.125,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});
+
+describe('client monitoring batch 396 matrices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch396-tag-${index}`,
+    new URIError(`batch396-${index}`),
+  ] as const))(
+    'captureAppError stringifies generated batch396 URIError tag %s',
+    async (tag, value) => {
+      vi.stubEnv('VITE_SENTRY_DSN', 'https://test@sentry.io/123');
+      const mockScope = { setTag: vi.fn(), setContext: vi.fn() };
+      mockWithScope.mockImplementationOnce((cb) => cb(mockScope));
+      vi.resetModules();
+
+      const { captureAppError } = await import('./monitoring');
+      captureAppError(new Error('batch396'), { tags: { [tag]: value as unknown as string } });
+
+      expect(mockScope.setTag).toHaveBeenCalledWith(tag, String(value));
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch396-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch396 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '115.875');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 115.875,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});
+
+describe('client monitoring batch 397 matrices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch397-tag-${index}`,
+    new ReferenceError(`batch397-${index}`),
+  ] as const))(
+    'captureAppError stringifies generated batch397 ReferenceError tag %s',
+    async (tag, value) => {
+      vi.stubEnv('VITE_SENTRY_DSN', 'https://test@sentry.io/123');
+      const mockScope = { setTag: vi.fn(), setContext: vi.fn() };
+      mockWithScope.mockImplementationOnce((cb) => cb(mockScope));
+      vi.resetModules();
+
+      const { captureAppError } = await import('./monitoring');
+      captureAppError(new Error('batch397'), { tags: { [tag]: value as unknown as string } });
+
+      expect(mockScope.setTag).toHaveBeenCalledWith(tag, String(value));
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch397-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch397 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '116.625');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 116.625,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});

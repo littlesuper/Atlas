@@ -6657,3 +6657,90 @@ describe('request helper batch 394 matrices', () => {
     },
   );
 });
+
+describe('request helper batch 395 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new SyntaxError(`batch395-message-${index}`),
+    `batch395-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch395 SyntaxError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch395 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch395 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 396 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new URIError(`batch396-message-${index}`),
+    `batch396-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch396 URIError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch396 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch396 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 397 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new ReferenceError(`batch397-message-${index}`),
+    `batch397-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch397 ReferenceError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch397 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch397 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});

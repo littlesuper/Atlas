@@ -7666,3 +7666,108 @@ describe('feature flag helper batch 394 matrices', () => {
     },
   );
 });
+
+describe('feature flag helper batch 395 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch395.syntax.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch395 SyntaxError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new SyntaxError(`batch395-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch395 signal Int16Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Int16Array([index]), {
+        signal: enabled,
+        ignored: new WeakMap(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ signal: enabled });
+      expect(isFeatureEnabled(flags, 'signal', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});
+
+describe('feature flag helper batch 396 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch396.uri.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch396 URIError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new URIError(`batch396-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch396 channel Float32Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Float32Array([index + 0.25]), {
+        channel: enabled,
+        ignored: new WeakSet(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ channel: enabled });
+      expect(isFeatureEnabled(flags, 'channel', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});
+
+describe('feature flag helper batch 397 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch397.ref.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch397 ReferenceError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new ReferenceError(`batch397-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch397 vector Uint32Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint32Array([index]), {
+        vector: enabled,
+        ignored: new WeakMap(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ vector: enabled });
+      expect(isFeatureEnabled(flags, 'vector', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});
