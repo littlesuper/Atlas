@@ -8784,3 +8784,41 @@ describe('feature flags batch 425 matrices', () => {
     },
   );
 });
+
+describe('feature flags batch 426 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index % 3 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch426 lane Uint8ClampedArray own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint8ClampedArray([index]), {
+        lane: enabled,
+        ignored: new RegExp(`batch426-${index}`),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ lane: enabled });
+      expect(isFeatureEnabled(flags, 'lane', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch426 lane Uint8ClampedArray alternate boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint8ClampedArray([index + 1]), {
+        lane: enabled,
+        extra: new RegExp(`alt-batch426-${index}`),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ lane: enabled });
+      expect(isFeatureEnabled(flags, 'lane', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'extra', false)).toBe(false);
+    },
+  );
+});
