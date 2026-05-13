@@ -9412,3 +9412,41 @@ describe('release observation batch 410 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 411 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-12-09T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch411 ReferenceError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new ReferenceError(`status-batch411-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 202,
+        samples: [{ checkedAt, status, failedChecks: ['batch411'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-12-09T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `fill-batch411-${index}`,
+  ] as const))(
+    'generated batch411 failedChecks fill after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['p', 'q', 'r'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.fill(replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, replacementFailure, replacementFailure]);
+    },
+  );
+});
