@@ -8016,3 +8016,38 @@ describe('feature flag helper batch 404 matrices', () => {
     },
   );
 });
+
+describe('feature flag helper batch 405 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch405.eval.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch405 EvalError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new EvalError(`batch405-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch405 lane Uint8ClampedArray own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint8ClampedArray([index]), {
+        lane: enabled,
+        ignored: new WeakSet(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ lane: enabled });
+      expect(isFeatureEnabled(flags, 'lane', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});
