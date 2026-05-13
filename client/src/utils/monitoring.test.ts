@@ -13104,3 +13104,54 @@ describe('client monitoring batch 413 matrices', () => {
     },
   );
 });
+
+describe('client monitoring batch 414 matrices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch414-tag-${index}`,
+    new Error(`batch414-${index}`),
+  ] as const))(
+    'captureAppError stringifies generated batch414 Error tag %s',
+    async (tag, value) => {
+      vi.stubEnv('VITE_SENTRY_DSN', 'https://test@sentry.io/123');
+      const mockScope = { setTag: vi.fn(), setContext: vi.fn() };
+      mockWithScope.mockImplementationOnce((cb) => cb(mockScope));
+      vi.resetModules();
+
+      const { captureAppError } = await import('./monitoring');
+      captureAppError(new Error('batch414'), { tags: { [tag]: value as unknown as string } });
+
+      expect(mockScope.setTag).toHaveBeenCalledWith(tag, String(value));
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch414-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch414 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '129.375');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 129.375,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});
