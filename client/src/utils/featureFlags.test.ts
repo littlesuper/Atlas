@@ -8191,3 +8191,38 @@ describe('feature flag helper batch 409 matrices', () => {
     },
   );
 });
+
+describe('feature flag helper batch 410 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch410.uri.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch410 URIError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new URIError(`batch410-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch410 channel Float32Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Float32Array([index + 0.5]), {
+        channel: enabled,
+        ignored: new WeakMap(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ channel: enabled });
+      expect(isFeatureEnabled(flags, 'channel', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});

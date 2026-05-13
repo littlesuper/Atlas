@@ -9374,3 +9374,41 @@ describe('release observation batch 409 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 410 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-12-08T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch410 URIError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new URIError(`status-batch410-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 201,
+        samples: [{ checkedAt, status, failedChecks: ['batch410'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-12-08T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `copyWithin-batch410-${index}`,
+  ] as const))(
+    'generated batch410 failedChecks copyWithin after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['x', replacementFailure, 'y'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.copyWithin(0, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['y', replacementFailure, 'y']);
+    },
+  );
+});
