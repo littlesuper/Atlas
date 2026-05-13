@@ -8740,3 +8740,1779 @@ describe('release readiness batch 357 matrices', () => {
     },
   );
 });
+
+describe('release readiness batch 358 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch358-${index}`) } },
+    }),
+    String(new AggregateError([], `batch358-${index}`)),
+  ] as const))(
+    'generated batch358 WeakMap health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch358-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch358-${index}`)),
+  ] as const))(
+    'generated batch358 WeakMap metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 359 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      checks: { database: { status: new SyntaxError(`batch359-${index}`) } },
+    }),
+    String(new SyntaxError(`batch359-${index}`)),
+  ] as const))(
+    'generated batch359 WeakSet health snapshot fails SyntaxError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      alerts: [{ id: new SyntaxError(`alert-batch359-${index}`) as unknown as string }],
+    }),
+    String(new SyntaxError(`alert-batch359-${index}`)),
+  ] as const))(
+    'generated batch359 WeakSet metrics SyntaxError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 360 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      checks: { database: { status: new URIError(`batch360-${index}`) } },
+    }),
+    String(new URIError(`batch360-${index}`)),
+  ] as const))(
+    'generated batch360 Map health snapshot fails URIError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      alerts: [{ id: new URIError(`alert-batch360-${index}`) as unknown as string }],
+    }),
+    String(new URIError(`alert-batch360-${index}`)),
+  ] as const))(
+    'generated batch360 Map metrics URIError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 361 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Set([index]), {
+      status: 'ok',
+      checks: { database: { status: new ReferenceError(`batch361-${index}`) } },
+    }),
+    String(new ReferenceError(`batch361-${index}`)),
+  ] as const))(
+    'generated batch361 Set health snapshot fails ReferenceError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Set([index]), {
+      status: 'ok',
+      alerts: [{ id: new ReferenceError(`alert-batch361-${index}`) as unknown as string }],
+    }),
+    String(new ReferenceError(`alert-batch361-${index}`)),
+  ] as const))(
+    'generated batch361 Set metrics ReferenceError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 362 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Date(`2026-10-21T00:${String(index % 50).padStart(2, '0')}:00.000Z`), {
+      status: 'ok',
+      checks: { database: { status: new TypeError(`batch362-${index}`) } },
+    }),
+    String(new TypeError(`batch362-${index}`)),
+  ] as const))(
+    'generated batch362 Date health snapshot fails TypeError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Date(`2026-10-21T01:${String(index % 50).padStart(2, '0')}:00.000Z`), {
+      status: 'ok',
+      alerts: [{ id: new TypeError(`alert-batch362-${index}`) as unknown as string }],
+    }),
+    String(new TypeError(`alert-batch362-${index}`)),
+  ] as const))(
+    'generated batch362 Date metrics TypeError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 363 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new RegExp(`batch363-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new EvalError(`batch363-${index}`) } },
+    }),
+    String(new EvalError(`batch363-${index}`)),
+  ] as const))(
+    'generated batch363 RegExp health snapshot fails EvalError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new RegExp(`alert-batch363-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new EvalError(`alert-batch363-${index}`) as unknown as string }],
+    }),
+    String(new EvalError(`alert-batch363-${index}`)),
+  ] as const))(
+    'generated batch363 RegExp metrics EvalError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 364 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch364-${index}`) } },
+    }),
+    String(new AggregateError([], `batch364-${index}`)),
+  ] as const))(
+    'generated batch364 Promise health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch364-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch364-${index}`)),
+  ] as const))(
+    'generated batch364 Promise metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 365 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      checks: { database: { status: new Error(`batch365-${index}`) } },
+    }),
+    String(new Error(`batch365-${index}`)),
+  ] as const))(
+    'generated batch365 WeakMap health snapshot fails Error database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      alerts: [{ id: new Error(`alert-batch365-${index}`) as unknown as string }],
+    }),
+    String(new Error(`alert-batch365-${index}`)),
+  ] as const))(
+    'generated batch365 WeakMap metrics Error alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 366 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      checks: { database: { status: new RangeError(`batch366-${index}`) } },
+    }),
+    String(new RangeError(`batch366-${index}`)),
+  ] as const))(
+    'generated batch366 Map health snapshot fails RangeError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      alerts: [{ id: new RangeError(`alert-batch366-${index}`) as unknown as string }],
+    }),
+    String(new RangeError(`alert-batch366-${index}`)),
+  ] as const))(
+    'generated batch366 Map metrics RangeError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 367 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      checks: { database: { status: new SyntaxError(`batch367-${index}`) } },
+    }),
+    String(new SyntaxError(`batch367-${index}`)),
+  ] as const))(
+    'generated batch367 Set health snapshot fails SyntaxError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      alerts: [{ id: new SyntaxError(`alert-batch367-${index}`) as unknown as string }],
+    }),
+    String(new SyntaxError(`alert-batch367-${index}`)),
+  ] as const))(
+    'generated batch367 Set metrics SyntaxError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 368 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      checks: { database: { status: new URIError(`batch368-${index}`) } },
+    }),
+    String(new URIError(`batch368-${index}`)),
+  ] as const))(
+    'generated batch368 WeakSet health snapshot fails URIError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      alerts: [{ id: new URIError(`alert-batch368-${index}`) as unknown as string }],
+    }),
+    String(new URIError(`alert-batch368-${index}`)),
+  ] as const))(
+    'generated batch368 WeakSet metrics URIError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 369 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Date(`2026-10-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      checks: { database: { status: new ReferenceError(`batch369-${index}`) } },
+    }),
+    String(new ReferenceError(`batch369-${index}`)),
+  ] as const))(
+    'generated batch369 Date health snapshot fails ReferenceError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Date(`2026-11-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      alerts: [{ id: new ReferenceError(`alert-batch369-${index}`) as unknown as string }],
+    }),
+    String(new ReferenceError(`alert-batch369-${index}`)),
+  ] as const))(
+    'generated batch369 Date metrics ReferenceError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 370 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new RegExp(`batch370-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new EvalError(`batch370-${index}`) } },
+    }),
+    String(new EvalError(`batch370-${index}`)),
+  ] as const))(
+    'generated batch370 RegExp health snapshot fails EvalError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new RegExp(`metric-batch370-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new EvalError(`alert-batch370-${index}`) as unknown as string }],
+    }),
+    String(new EvalError(`alert-batch370-${index}`)),
+  ] as const))(
+    'generated batch370 RegExp metrics EvalError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 371 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch371-${index}`) } },
+    }),
+    String(new AggregateError([], `batch371-${index}`)),
+  ] as const))(
+    'generated batch371 Promise health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch371-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch371-${index}`)),
+  ] as const))(
+    'generated batch371 Promise metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 372 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      checks: { database: { status: new Error(`batch372-${index}`) } },
+    }),
+    String(new Error(`batch372-${index}`)),
+  ] as const))(
+    'generated batch372 WeakMap health snapshot fails Error database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      alerts: [{ id: new Error(`alert-batch372-${index}`) as unknown as string }],
+    }),
+    String(new Error(`alert-batch372-${index}`)),
+  ] as const))(
+    'generated batch372 WeakMap metrics Error alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 373 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      checks: { database: { status: new RangeError(`batch373-${index}`) } },
+    }),
+    String(new RangeError(`batch373-${index}`)),
+  ] as const))(
+    'generated batch373 Map health snapshot fails RangeError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      alerts: [{ id: new RangeError(`alert-batch373-${index}`) as unknown as string }],
+    }),
+    String(new RangeError(`alert-batch373-${index}`)),
+  ] as const))(
+    'generated batch373 Map metrics RangeError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 374 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      checks: { database: { status: new SyntaxError(`batch374-${index}`) } },
+    }),
+    String(new SyntaxError(`batch374-${index}`)),
+  ] as const))(
+    'generated batch374 Set health snapshot fails SyntaxError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      alerts: [{ id: new SyntaxError(`alert-batch374-${index}`) as unknown as string }],
+    }),
+    String(new SyntaxError(`alert-batch374-${index}`)),
+  ] as const))(
+    'generated batch374 Set metrics SyntaxError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 375 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      checks: { database: { status: new URIError(`batch375-${index}`) } },
+    }),
+    String(new URIError(`batch375-${index}`)),
+  ] as const))(
+    'generated batch375 WeakSet health snapshot fails URIError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      alerts: [{ id: new URIError(`alert-batch375-${index}`) as unknown as string }],
+    }),
+    String(new URIError(`alert-batch375-${index}`)),
+  ] as const))(
+    'generated batch375 WeakSet metrics URIError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 376 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Date(`2026-12-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      checks: { database: { status: new ReferenceError(`batch376-${index}`) } },
+    }),
+    String(new ReferenceError(`batch376-${index}`)),
+  ] as const))(
+    'generated batch376 Date health snapshot fails ReferenceError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Date(`2027-01-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      alerts: [{ id: new ReferenceError(`alert-batch376-${index}`) as unknown as string }],
+    }),
+    String(new ReferenceError(`alert-batch376-${index}`)),
+  ] as const))(
+    'generated batch376 Date metrics ReferenceError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 377 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new RegExp(`batch377-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new EvalError(`batch377-${index}`) } },
+    }),
+    String(new EvalError(`batch377-${index}`)),
+  ] as const))(
+    'generated batch377 RegExp health snapshot fails EvalError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new RegExp(`metric-batch377-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new EvalError(`alert-batch377-${index}`) as unknown as string }],
+    }),
+    String(new EvalError(`alert-batch377-${index}`)),
+  ] as const))(
+    'generated batch377 RegExp metrics EvalError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 378 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch378-${index}`) } },
+    }),
+    String(new AggregateError([], `batch378-${index}`)),
+  ] as const))(
+    'generated batch378 Promise health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(Promise.resolve(index), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch378-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch378-${index}`)),
+  ] as const))(
+    'generated batch378 Promise metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 379 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      checks: { database: { status: new Error(`batch379-${index}`) } },
+    }),
+    String(new Error(`batch379-${index}`)),
+  ] as const))(
+    'generated batch379 WeakMap health snapshot fails Error database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      alerts: [{ id: new Error(`alert-batch379-${index}`) as unknown as string }],
+    }),
+    String(new Error(`alert-batch379-${index}`)),
+  ] as const))(
+    'generated batch379 WeakMap metrics Error alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 380 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      checks: { database: { status: new RangeError(`batch380-${index}`) } },
+    }),
+    String(new RangeError(`batch380-${index}`)),
+  ] as const))(
+    'generated batch380 Map health snapshot fails RangeError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      alerts: [{ id: new RangeError(`alert-batch380-${index}`) as unknown as string }],
+    }),
+    String(new RangeError(`alert-batch380-${index}`)),
+  ] as const))(
+    'generated batch380 Map metrics RangeError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 381 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      checks: { database: { status: new SyntaxError(`batch381-${index}`) } },
+    }),
+    String(new SyntaxError(`batch381-${index}`)),
+  ] as const))(
+    'generated batch381 Set health snapshot fails SyntaxError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      alerts: [{ id: new SyntaxError(`alert-batch381-${index}`) as unknown as string }],
+    }),
+    String(new SyntaxError(`alert-batch381-${index}`)),
+  ] as const))(
+    'generated batch381 Set metrics SyntaxError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 382 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      checks: { database: { status: new URIError(`batch382-${index}`) } },
+    }),
+    String(new URIError(`batch382-${index}`)),
+  ] as const))(
+    'generated batch382 WeakSet health snapshot fails URIError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      alerts: [{ id: new URIError(`alert-batch382-${index}`) as unknown as string }],
+    }),
+    String(new URIError(`alert-batch382-${index}`)),
+  ] as const))(
+    'generated batch382 WeakSet metrics URIError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 383 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Date(`2026-11-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      checks: { database: { status: new ReferenceError(`batch383-${index}`) } },
+    }),
+    String(new ReferenceError(`batch383-${index}`)),
+  ] as const))(
+    'generated batch383 Date health snapshot fails ReferenceError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Date(`2026-12-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      alerts: [{ id: new ReferenceError(`alert-batch383-${index}`) as unknown as string }],
+    }),
+    String(new ReferenceError(`alert-batch383-${index}`)),
+  ] as const))(
+    'generated batch383 Date metrics ReferenceError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 384 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new RegExp(`batch384-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new EvalError(`batch384-${index}`) } },
+    }),
+    String(new EvalError(`batch384-${index}`)),
+  ] as const))(
+    'generated batch384 RegExp health snapshot fails EvalError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new RegExp(`alert-batch384-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new EvalError(`alert-batch384-${index}`) as unknown as string }],
+    }),
+    String(new EvalError(`alert-batch384-${index}`)),
+  ] as const))(
+    'generated batch384 RegExp metrics EvalError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 385 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(Promise.resolve(`batch385-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch385-${index}`) } },
+    }),
+    String(new AggregateError([], `batch385-${index}`)),
+  ] as const))(
+    'generated batch385 Promise health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(Promise.resolve(`alert-batch385-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch385-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch385-${index}`)),
+  ] as const))(
+    'generated batch385 Promise metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 386 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      checks: { database: { status: new Error(`batch386-${index}`) } },
+    }),
+    String(new Error(`batch386-${index}`)),
+  ] as const))(
+    'generated batch386 WeakMap health snapshot fails Error database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      alerts: [{ id: new Error(`alert-batch386-${index}`) as unknown as string }],
+    }),
+    String(new Error(`alert-batch386-${index}`)),
+  ] as const))(
+    'generated batch386 WeakMap metrics Error alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 387 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      checks: { database: { status: new RangeError(`batch387-${index}`) } },
+    }),
+    String(new RangeError(`batch387-${index}`)),
+  ] as const))(
+    'generated batch387 Map health snapshot fails RangeError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      alerts: [{ id: new RangeError(`alert-batch387-${index}`) as unknown as string }],
+    }),
+    String(new RangeError(`alert-batch387-${index}`)),
+  ] as const))(
+    'generated batch387 Map metrics RangeError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 388 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      checks: { database: { status: new SyntaxError(`batch388-${index}`) } },
+    }),
+    String(new SyntaxError(`batch388-${index}`)),
+  ] as const))(
+    'generated batch388 Set health snapshot fails SyntaxError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Set(), {
+      status: 'ok',
+      alerts: [{ id: new SyntaxError(`alert-batch388-${index}`) as unknown as string }],
+    }),
+    String(new SyntaxError(`alert-batch388-${index}`)),
+  ] as const))(
+    'generated batch388 Set metrics SyntaxError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 389 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      checks: { database: { status: new URIError(`batch389-${index}`) } },
+    }),
+    String(new URIError(`batch389-${index}`)),
+  ] as const))(
+    'generated batch389 WeakSet health snapshot fails URIError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      alerts: [{ id: new URIError(`alert-batch389-${index}`) as unknown as string }],
+    }),
+    String(new URIError(`alert-batch389-${index}`)),
+  ] as const))(
+    'generated batch389 WeakSet metrics URIError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 390 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Date(`2026-11-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      checks: { database: { status: new ReferenceError(`batch390-${index}`) } },
+    }),
+    String(new ReferenceError(`batch390-${index}`)),
+  ] as const))(
+    'generated batch390 Date health snapshot fails ReferenceError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Date(`2026-12-${String((index % 20) + 1).padStart(2, '0')}T00:00:00.000Z`), {
+      status: 'ok',
+      alerts: [{ id: new ReferenceError(`alert-batch390-${index}`) as unknown as string }],
+    }),
+    String(new ReferenceError(`alert-batch390-${index}`)),
+  ] as const))(
+    'generated batch390 Date metrics ReferenceError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 391 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(/batch391/, {
+      status: 'ok',
+      checks: { database: { status: new EvalError(`batch391-${index}`) } },
+    }),
+    String(new EvalError(`batch391-${index}`)),
+  ] as const))(
+    'generated batch391 RegExp health snapshot fails EvalError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(/batch391-alert/, {
+      status: 'ok',
+      alerts: [{ id: new EvalError(`alert-batch391-${index}`) as unknown as string }],
+    }),
+    String(new EvalError(`alert-batch391-${index}`)),
+  ] as const))(
+    'generated batch391 RegExp metrics EvalError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 392 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(Promise.resolve(`batch392-${index}`), {
+      status: 'ok',
+      checks: { database: { status: new AggregateError([], `batch392-${index}`) } },
+    }),
+    String(new AggregateError([], `batch392-${index}`)),
+  ] as const))(
+    'generated batch392 Promise health snapshot fails AggregateError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(Promise.resolve(`alert-batch392-${index}`), {
+      status: 'ok',
+      alerts: [{ id: new AggregateError([], `alert-batch392-${index}`) as unknown as string }],
+    }),
+    String(new AggregateError([], `alert-batch392-${index}`)),
+  ] as const))(
+    'generated batch392 Promise metrics AggregateError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 393 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      checks: { database: { status: new Error(`batch393-${index}`) } },
+    }),
+    String(new Error(`batch393-${index}`)),
+  ] as const))(
+    'generated batch393 WeakMap health snapshot fails Error database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakMap(), {
+      status: 'ok',
+      alerts: [{ id: new Error(`alert-batch393-${index}`) as unknown as string }],
+    }),
+    String(new Error(`alert-batch393-${index}`)),
+  ] as const))(
+    'generated batch393 WeakMap metrics Error alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
+
+describe('release readiness batch 394 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      checks: { database: { status: new RangeError(`batch394-${index}`) } },
+    }),
+    String(new RangeError(`batch394-${index}`)),
+  ] as const))(
+    'generated batch394 Map health snapshot fails RangeError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new Map(), {
+      status: 'ok',
+      alerts: [{ id: new RangeError(`alert-batch394-${index}`) as unknown as string }],
+    }),
+    String(new RangeError(`alert-batch394-${index}`)),
+  ] as const))(
+    'generated batch394 Map metrics RangeError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});

@@ -5584,3 +5584,1076 @@ describe('request helper batch 357 matrices', () => {
     },
   );
 });
+
+describe('request helper batch 358 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch358-message-${index}`),
+    `batch358-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch358 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch358 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch358 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 359 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new SyntaxError(`batch359-message-${index}`),
+    `batch359-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch359 SyntaxError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch359 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch359 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 360 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new URIError(`batch360-message-${index}`),
+    `batch360-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch360 URIError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch360 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch360 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 361 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new ReferenceError(`batch361-message-${index}`),
+    `batch361-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch361 ReferenceError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch361 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch361 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 362 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new TypeError(`batch362-message-${index}`),
+    `batch362-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch362 TypeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch362 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch362 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 363 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new EvalError(`batch363-message-${index}`),
+    `batch363-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch363 EvalError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch363 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch363 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 364 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new AggregateError([], `batch364-message-${index}`),
+    `batch364-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch364 AggregateError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch364 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch364 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 365 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new Error(`batch365-message-${index}`),
+    `batch365-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch365 Error message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch365 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch365 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 366 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch366-message-${index}`),
+    `batch366-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch366 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch366 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch366 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 367 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new SyntaxError(`batch367-message-${index}`),
+    `batch367-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch367 SyntaxError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch367 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch367 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 368 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new URIError(`batch368-message-${index}`),
+    `batch368-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch368 URIError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch368 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch368 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 369 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new ReferenceError(`batch369-message-${index}`),
+    `batch369-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch369 ReferenceError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch369 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch369 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 370 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new EvalError(`batch370-message-${index}`),
+    `batch370-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch370 EvalError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch370 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch370 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 371 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new AggregateError([], `batch371-message-${index}`),
+    `batch371-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch371 AggregateError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch371 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch371 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 372 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new Error(`batch372-message-${index}`),
+    `batch372-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch372 Error message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch372 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch372 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 373 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch373-message-${index}`),
+    `batch373-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch373 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch373 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch373 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 374 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new SyntaxError(`batch374-message-${index}`),
+    `batch374-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch374 SyntaxError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch374 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch374 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 375 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new URIError(`batch375-message-${index}`),
+    `batch375-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch375 URIError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch375 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch375 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 376 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new ReferenceError(`batch376-message-${index}`),
+    `batch376-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch376 ReferenceError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch376 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch376 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 377 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new EvalError(`batch377-message-${index}`),
+    `batch377-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch377 EvalError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch377 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch377 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 378 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new AggregateError([], `batch378-message-${index}`),
+    `batch378-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch378 AggregateError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch378 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch378 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 379 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new Error(`batch379-message-${index}`),
+    `batch379-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch379 Error message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch379 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch379 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 380 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch380-message-${index}`),
+    `batch380-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch380 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch380 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch380 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 381 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new SyntaxError(`batch381-message-${index}`),
+    `batch381-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch381 SyntaxError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch381 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch381 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 382 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new URIError(`batch382-message-${index}`),
+    `batch382-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch382 URIError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch382 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch382 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 383 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new ReferenceError(`batch383-message-${index}`),
+    `batch383-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch383 ReferenceError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch383 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch383 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 384 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new EvalError(`batch384-message-${index}`),
+    `batch384-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch384 EvalError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch384 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch384 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 385 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new AggregateError([], `batch385-message-${index}`),
+    `batch385-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch385 AggregateError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch385 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch385 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 386 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new Error(`batch386-message-${index}`),
+    `batch386-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch386 Error message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch386 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch386 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 387 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch387-message-${index}`),
+    `batch387-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch387 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch387 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch387 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 388 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new SyntaxError(`batch388-message-${index}`),
+    `batch388-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch388 SyntaxError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch388 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch388 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 389 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new URIError(`batch389-message-${index}`),
+    `batch389-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch389 URIError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch389 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch389 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 390 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new ReferenceError(`batch390-message-${index}`),
+    `batch390-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch390 ReferenceError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch390 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch390 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 391 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new EvalError(`batch391-message-${index}`),
+    `batch391-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch391 EvalError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch391 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch391 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 392 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new AggregateError([], `batch392-message-${index}`),
+    `batch392-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch392 AggregateError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch392 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch392 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 393 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new Error(`batch393-message-${index}`),
+    `batch393-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch393 Error message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch393 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch393 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
+
+describe('request helper batch 394 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    new RangeError(`batch394-message-${index}`),
+    `batch394-error-${index}`,
+  ] as const))(
+    'getErrorMessage returns generated batch394 RangeError message before error %#',
+    async (message, errorText) => {
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch394 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch394 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});

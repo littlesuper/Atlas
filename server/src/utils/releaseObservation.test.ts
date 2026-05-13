@@ -7398,3 +7398,1409 @@ describe('release observation batch 357 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 358 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-17T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch358 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch358-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 149,
+        samples: [{ checkedAt, status, failedChecks: ['batch358'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-17T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `sort-batch358-${index}`,
+  ] as const))(
+    'generated batch358 failedChecks sort after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['zeta', replacementFailure, 'alpha'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.sort();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['alpha', replacementFailure, 'zeta']);
+    },
+  );
+});
+
+describe('release observation batch 359 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-18T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch359 SyntaxError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new SyntaxError(`status-batch359-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 150,
+        samples: [{ checkedAt, status, failedChecks: ['batch359'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-18T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `splice-batch359-${index}`,
+  ] as const))(
+    'generated batch359 failedChecks splice after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'old', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.splice(1, 1, replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 360 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-19T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch360 URIError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new URIError(`status-batch360-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 151,
+        samples: [{ checkedAt, status, failedChecks: ['batch360'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-19T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `copy-batch360-${index}`,
+  ] as const))(
+    'generated batch360 failedChecks copyWithin after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['zero', replacementFailure, 'two', 'three'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.copyWithin(2, 1, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['zero', replacementFailure, replacementFailure, 'three']);
+    },
+  );
+});
+
+describe('release observation batch 361 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-20T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch361 ReferenceError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new ReferenceError(`status-batch361-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 152,
+        samples: [{ checkedAt, status, failedChecks: ['batch361'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-20T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `fill-batch361-${index}`,
+  ] as const))(
+    'generated batch361 failedChecks fill after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'old', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.fill(replacementFailure, 1, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 362 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-21T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch362 TypeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new TypeError(`status-batch362-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 153,
+        samples: [{ checkedAt, status, failedChecks: ['batch362'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-21T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `unshift-batch362-${index}`,
+  ] as const))(
+    'generated batch362 failedChecks unshift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.unshift(replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'head', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 363 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-22T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch363 EvalError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new EvalError(`status-batch363-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 154,
+        samples: [{ checkedAt, status, failedChecks: ['batch363'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-22T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `push-batch363-${index}`,
+  ] as const))(
+    'generated batch363 failedChecks push after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.push('tail');
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 364 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-23T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch364 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch364-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 155,
+        samples: [{ checkedAt, status, failedChecks: ['batch364'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-23T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `pop-batch364-${index}`,
+  ] as const))(
+    'generated batch364 failedChecks pop after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.pop();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure]);
+    },
+  );
+});
+
+describe('release observation batch 365 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-24T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch365 Error status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new Error(`status-batch365-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 156,
+        samples: [{ checkedAt, status, failedChecks: ['batch365'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-24T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `shift-batch365-${index}`,
+  ] as const))(
+    'generated batch365 failedChecks shift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['drop', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.shift();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 366 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-25T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch366 RangeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new RangeError(`status-batch366-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 157,
+        samples: [{ checkedAt, status, failedChecks: ['batch366'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-25T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `reverse-batch366-${index}`,
+  ] as const))(
+    'generated batch366 failedChecks reverse after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.reverse();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 367 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-26T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch367 SyntaxError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new SyntaxError(`status-batch367-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 158,
+        samples: [{ checkedAt, status, failedChecks: ['batch367'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-26T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `sort-batch367-${index}`,
+  ] as const))(
+    'generated batch367 failedChecks sort after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['zeta', replacementFailure, 'alpha'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.sort();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['alpha', replacementFailure, 'zeta']);
+    },
+  );
+});
+
+describe('release observation batch 368 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-27T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch368 URIError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new URIError(`status-batch368-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 159,
+        samples: [{ checkedAt, status, failedChecks: ['batch368'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-27T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `copy-batch368-${index}`,
+  ] as const))(
+    'generated batch368 failedChecks copyWithin after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['zero', replacementFailure, 'two'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.copyWithin(0, 1);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'two', 'two']);
+    },
+  );
+});
+
+describe('release observation batch 369 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-28T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch369 ReferenceError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new ReferenceError(`status-batch369-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 160,
+        samples: [{ checkedAt, status, failedChecks: ['batch369'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-28T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `fill-batch369-${index}`,
+  ] as const))(
+    'generated batch369 failedChecks fill after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['before', replacementFailure, 'after'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.fill(replacementFailure, 0, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, replacementFailure, 'after']);
+    },
+  );
+});
+
+describe('release observation batch 370 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-29T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch370 EvalError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new EvalError(`status-batch370-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 161,
+        samples: [{ checkedAt, status, failedChecks: ['batch370'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-29T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `splice-batch370-${index}`,
+  ] as const))(
+    'generated batch370 failedChecks splice after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'old', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.splice(1, 1, replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 371 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-30T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch371 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch371-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 162,
+        samples: [{ checkedAt, status, failedChecks: ['batch371'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-30T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `unshift-batch371-${index}`,
+  ] as const))(
+    'generated batch371 failedChecks unshift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.unshift(replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'middle', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 372 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-10-31T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch372 Error status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new Error(`status-batch372-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 163,
+        samples: [{ checkedAt, status, failedChecks: ['batch372'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-10-31T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `shift-batch372-${index}`,
+  ] as const))(
+    'generated batch372 failedChecks shift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['drop', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.shift();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 373 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-01T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch373 RangeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new RangeError(`status-batch373-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 164,
+        samples: [{ checkedAt, status, failedChecks: ['batch373'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-01T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `reverse-batch373-${index}`,
+  ] as const))(
+    'generated batch373 failedChecks reverse after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.reverse();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 374 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-02T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch374 SyntaxError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new SyntaxError(`status-batch374-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 165,
+        samples: [{ checkedAt, status, failedChecks: ['batch374'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-02T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `sort-batch374-${index}`,
+  ] as const))(
+    'generated batch374 failedChecks sort after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.sort();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 375 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-03T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch375 URIError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new URIError(`status-batch375-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 166,
+        samples: [{ checkedAt, status, failedChecks: ['batch375'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-03T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `copy-batch375-${index}`,
+  ] as const))(
+    'generated batch375 failedChecks copyWithin after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['zero', replacementFailure, 'two'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.copyWithin(0, 1);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'two', 'two']);
+    },
+  );
+});
+
+describe('release observation batch 376 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-04T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch376 ReferenceError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new ReferenceError(`status-batch376-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 167,
+        samples: [{ checkedAt, status, failedChecks: ['batch376'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-04T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `fill-batch376-${index}`,
+  ] as const))(
+    'generated batch376 failedChecks fill after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['before', replacementFailure, 'after'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.fill(replacementFailure, 0, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, replacementFailure, 'after']);
+    },
+  );
+});
+
+describe('release observation batch 377 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-05T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch377 EvalError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new EvalError(`status-batch377-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 168,
+        samples: [{ checkedAt, status, failedChecks: ['batch377'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-05T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `splice-batch377-${index}`,
+  ] as const))(
+    'generated batch377 failedChecks splice after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'old', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.splice(1, 1, replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 378 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-06T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch378 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch378-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 169,
+        samples: [{ checkedAt, status, failedChecks: ['batch378'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-06T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `unshift-batch378-${index}`,
+  ] as const))(
+    'generated batch378 failedChecks unshift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.unshift(replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'middle', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 379 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-07T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch379 Error status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new Error(`status-batch379-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 170,
+        samples: [{ checkedAt, status, failedChecks: ['batch379'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-07T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `shift-batch379-${index}`,
+  ] as const))(
+    'generated batch379 failedChecks shift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['drop', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.shift();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 380 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-08T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch380 RangeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new RangeError(`status-batch380-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 171,
+        samples: [{ checkedAt, status, failedChecks: ['batch380'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-08T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `reverse-batch380-${index}`,
+  ] as const))(
+    'generated batch380 failedChecks reverse after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.reverse();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 381 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-09T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch381 SyntaxError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new SyntaxError(`status-batch381-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 172,
+        samples: [{ checkedAt, status, failedChecks: ['batch381'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-09T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `sort-batch381-${index}`,
+  ] as const))(
+    'generated batch381 failedChecks sort after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.sort();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 382 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-10T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch382 URIError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new URIError(`status-batch382-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 173,
+        samples: [{ checkedAt, status, failedChecks: ['batch382'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-10T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `copyWithin-batch382-${index}`,
+  ] as const))(
+    'generated batch382 failedChecks copyWithin after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.copyWithin(1, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', 'tail', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 383 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-11T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch383 ReferenceError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new ReferenceError(`status-batch383-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 174,
+        samples: [{ checkedAt, status, failedChecks: ['batch383'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-11T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `fill-batch383-${index}`,
+  ] as const))(
+    'generated batch383 failedChecks fill after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.fill(replacementFailure, 0, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 384 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-12T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch384 EvalError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new EvalError(`status-batch384-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 175,
+        samples: [{ checkedAt, status, failedChecks: ['batch384'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-12T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `splice-batch384-${index}`,
+  ] as const))(
+    'generated batch384 failedChecks splice after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.splice(1, 1, replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 385 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-13T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch385 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch385-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 176,
+        samples: [{ checkedAt, status, failedChecks: ['batch385'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-13T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `unshift-batch385-${index}`,
+  ] as const))(
+    'generated batch385 failedChecks unshift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.unshift(replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'middle', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 386 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-14T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch386 Error status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new Error(`status-batch386-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 177,
+        samples: [{ checkedAt, status, failedChecks: ['batch386'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-14T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `pop-batch386-${index}`,
+  ] as const))(
+    'generated batch386 failedChecks pop after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.pop();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure]);
+    },
+  );
+});
+
+describe('release observation batch 387 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-15T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch387 RangeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new RangeError(`status-batch387-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 178,
+        samples: [{ checkedAt, status, failedChecks: ['batch387'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-15T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `reverse-batch387-${index}`,
+  ] as const))(
+    'generated batch387 failedChecks reverse after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.reverse();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 388 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-16T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch388 SyntaxError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new SyntaxError(`status-batch388-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 179,
+        samples: [{ checkedAt, status, failedChecks: ['batch388'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-16T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `sort-batch388-${index}`,
+  ] as const))(
+    'generated batch388 failedChecks sort after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['tail', replacementFailure, 'head'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.sort();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 389 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-17T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch389 URIError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new URIError(`status-batch389-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 180,
+        samples: [{ checkedAt, status, failedChecks: ['batch389'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-17T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `copyWithin-batch389-${index}`,
+  ] as const))(
+    'generated batch389 failedChecks copyWithin after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.copyWithin(1, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', 'tail', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 390 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-18T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch390 ReferenceError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new ReferenceError(`status-batch390-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 181,
+        samples: [{ checkedAt, status, failedChecks: ['batch390'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-18T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `fill-batch390-${index}`,
+  ] as const))(
+    'generated batch390 failedChecks fill after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.fill(replacementFailure, 0, 2);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 391 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-19T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch391 EvalError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new EvalError(`status-batch391-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 182,
+        samples: [{ checkedAt, status, failedChecks: ['batch391'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-19T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `splice-batch391-${index}`,
+  ] as const))(
+    'generated batch391 failedChecks splice after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', 'middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.splice(1, 1, replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure, 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 392 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-20T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch392 AggregateError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new AggregateError([], `status-batch392-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 183,
+        samples: [{ checkedAt, status, failedChecks: ['batch392'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-20T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `unshift-batch392-${index}`,
+  ] as const))(
+    'generated batch392 failedChecks unshift after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['middle', 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.unshift(replacementFailure);
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual([replacementFailure, 'middle', 'tail']);
+    },
+  );
+});
+
+describe('release observation batch 393 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-21T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch393 Error status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new Error(`status-batch393-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 184,
+        samples: [{ checkedAt, status, failedChecks: ['batch393'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-21T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `pop-batch393-${index}`,
+  ] as const))(
+    'generated batch393 failedChecks pop after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.pop();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['head', replacementFailure]);
+    },
+  );
+});
+
+describe('release observation batch 394 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-11-22T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch394 RangeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new RangeError(`status-batch394-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 185,
+        samples: [{ checkedAt, status, failedChecks: ['batch394'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-11-22T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `reverse-batch394-${index}`,
+  ] as const))(
+    'generated batch394 failedChecks reverse after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['head', replacementFailure, 'tail'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.reverse();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['tail', replacementFailure, 'head']);
+    },
+  );
+});
