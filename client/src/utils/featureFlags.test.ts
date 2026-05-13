@@ -8156,3 +8156,38 @@ describe('feature flag helper batch 408 matrices', () => {
     },
   );
 });
+
+describe('feature flag helper batch 409 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `batch409.syntax.${index}`,
+    index % 2 === 0,
+  ] as const))(
+    'normalizes generated batch409 SyntaxError own boolean property %s',
+    (name, enabled) => {
+      const source = Object.assign(new SyntaxError(`batch409-${name}`), { [name]: enabled, ignored: 'true' });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ [name]: enabled });
+      expect(isFeatureEnabled(flags, name, !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', true)).toBe(true);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch409 signal Int16Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Int16Array([index]), {
+        signal: enabled,
+        ignored: new WeakSet(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ signal: enabled });
+      expect(isFeatureEnabled(flags, 'signal', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+});
