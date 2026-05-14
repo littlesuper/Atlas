@@ -7849,3 +7849,32 @@ describe('request batch 435 matrices', () => {
     },
   );
 });
+
+describe('request batch 436 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `RangeError: batch436 ${index} occurred`,
+  ] as const))(
+    'getErrorMessage extracts batch436 RangeError response data message %s',
+    async (message) => {
+      const errorText = new RangeError(`err-${message}`).toString();
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch436 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch436 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
