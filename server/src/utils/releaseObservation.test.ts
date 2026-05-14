@@ -10096,3 +10096,41 @@ describe('release observation batch 428 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 429 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-12-27T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch429 RangeError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new RangeError(`status-batch429-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 220,
+        samples: [{ checkedAt, status, failedChecks: ['batch429'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-12-27T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `reverse-batch429-${index}`,
+  ] as const))(
+    'generated batch429 failedChecks reverse after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['c', replacementFailure, 'a'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.reverse();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['a', replacementFailure, 'c']);
+    },
+  );
+});

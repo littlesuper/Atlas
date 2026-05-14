@@ -8898,3 +8898,41 @@ describe('feature flags batch 428 matrices', () => {
     },
   );
 });
+
+describe('feature flags batch 429 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index % 3 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch429 beacon Uint8Array own boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint8Array([index]), {
+        beacon: enabled,
+        ignored: new Map(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ beacon: enabled });
+      expect(isFeatureEnabled(flags, 'beacon', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch429 beacon Uint8Array alternate boolean property %#',
+    (enabled, index) => {
+      const source = Object.assign(new Uint8Array([index + 1]), {
+        beacon: enabled,
+        extra: new Map(),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ beacon: enabled });
+      expect(isFeatureEnabled(flags, 'beacon', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'extra', false)).toBe(false);
+    },
+  );
+});
