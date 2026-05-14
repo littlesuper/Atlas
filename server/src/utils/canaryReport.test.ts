@@ -12086,3 +12086,45 @@ describe('canary report batch 448 matrices', () => {
     },
   );
 });
+
+describe('canary report batch 449 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    { id: 'canary_19', status: new Error(`FAIL-${index}`) as unknown as 'FAIL', note: `batch449-${index}` },
+  ] as const))(
+    'generated batch449 Error failed stage status is not treated as failure %#',
+    (stage) => {
+      const report = buildCanaryReport({
+        version: '25.258.0',
+        targetVersion: '25.257.0',
+        startedAt: '2027-01-16T03:00:00.000Z',
+        endedAt: '2027-01-16T03:01:00.000Z',
+        stages: [stage as CanaryStageResult],
+      });
+
+      expect(report.status).toBe('COMPLETED');
+      expect(report.firstFailedStage).toBeNull();
+      expect(report.stages[0].status).toBe(stage.status);
+      expect(report.recommendation).toBe('Archive the canary report and continue normal monitoring.');
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2027-01-16T04:${String(index % 50).padStart(2, '0')}:00.000Z`,
+  ] as const))(
+    'generated batch449 twelve thousand six hundred thirty second duration rounds to two hundred eleven minutes %s',
+    (startedAt) => {
+      const endedAt = new Date(new Date(startedAt).getTime() + 12630000).toISOString();
+      const report = buildCanaryReport({
+        version: '25.258.1',
+        targetVersion: '25.257.1',
+        startedAt,
+        endedAt,
+        stages: [{ id: 'full_rollout', status: 'PASS' }],
+      });
+
+      expect(report.status).toBe('COMPLETED');
+      expect(report.durationMinutes).toBe(211);
+      expect(report.firstFailedStage).toBeNull();
+    },
+  );
+});
