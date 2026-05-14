@@ -8170,3 +8170,32 @@ describe('request batch 446 matrices', () => {
     },
   );
 });
+
+describe('request batch 447 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `EvalError: batch447 ${index} occurred`,
+  ] as const))(
+    'getErrorMessage extracts batch447 EvalError response data message %s',
+    async (message) => {
+      const errorText = new EvalError(`err-${message}`).toString();
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch447 ${index}`,
+  ] as const))(
+    'getErrorMessage gives generated batch447 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
