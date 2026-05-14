@@ -10248,3 +10248,41 @@ describe('release observation batch 432 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 433 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2026-12-31T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch433 EvalError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new EvalError(`status-batch433-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 224,
+        samples: [{ checkedAt, status, failedChecks: ['batch433'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2026-12-31T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `splice-batch433-${index}`,
+  ] as const))(
+    'generated batch433 failedChecks splice after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['c', replacementFailure, 'a'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.splice(1, 1, 'y');
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['c', 'y', 'a']);
+    },
+  );
+});
