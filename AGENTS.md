@@ -6,8 +6,8 @@ Atlas 是一套面向硬件团队的 Web 项目管理平台，使用 npm workspa
 
 ## 技术栈
 
-- **前端:** React 18 + TypeScript + Vite 7 + Arco Design + Zustand + React Router 7 + i18next
-- **后端:** Express 4 + TypeScript + Prisma 6 + Zod + Pino + SQLite(dev)/PostgreSQL(prod)
+- **前端:** React 19 + TypeScript + Vite 7 + Arco Design + Zustand + React Router 7 + i18next
+- **后端:** Express 4 + TypeScript + Prisma 7 + Zod + Pino + SQLite(dev)/PostgreSQL(prod)
 - **测试:** Vitest(单元) + Playwright(E2E, 300+ 用例) + axe-core(无障碍)
 - **工具链:** ESLint(flat config) + Prettier + Swagger/OpenAPI
 
@@ -23,11 +23,18 @@ client/src/           # 前端源码
   utils/constants.ts  # 状态/优先级/类别映射常量
 
 server/src/           # 后端源码
-  routes/             # Express 路由（18 个模块）
+  routes/             # Express 路由模块
+    activities/       # 活动（shared, crud, schedule, analysis, import）
+    auth/             # 认证（shared, session, account, wecom）
+    projects/         # 项目（shared, crud, members, archive）
+    products/         # 产品（shared, crud, actions）
+    weeklyReports/    # 周报（shared, crud, project, actions）
+    ...               # 其余单文件路由（risk, roles, users, etc.）
   middleware/         # auth, permission, validate(Zod), requestId, httpLogger, cache
   schemas/            # Zod 校验 schema（auth, users, projects）
   utils/              # 工具函数（workday, dependencyScheduler, riskEngine, logger, circuitBreaker, roleMembershipResolver 等）
   swagger.ts          # OpenAPI/Swagger 文档配置
+  db.ts               # PrismaClient 单例（含 driver adapter）
   prisma/             # schema.prisma（含 ActivityExecutor、RoleMember 等模型）、seed.ts
 
 e2e/                  # Playwright E2E 测试（55 spec，300+ 用例，含 axe-core 无障碍审计）
@@ -44,8 +51,9 @@ npm run dev:client             # 仅启动前端
 npm run build                  # 构建生产版本
 
 cd server
-npx prisma generate            # 生成 Prisma Client
+npx prisma generate            # 生成 Prisma Client（输出到 src/generated/prisma/）
 npx prisma migrate dev --name <name>  # 创建迁移
+npx prisma db push              # 快速同步 schema（开发环境，不生成迁移文件）
 npx prisma studio              # 打开数据库 GUI
 npx tsx src/prisma/seed.ts     # 初始化种子数据
 
@@ -58,7 +66,8 @@ npm run lint                   # ESLint 检查
 ## 开发规范
 
 - 前后端 100% TypeScript，类型定义集中在 `client/src/types/index.ts`
-- 后端 Prisma 自动生成类型，无需手动维护
+- 后端 Prisma 7 自动生成类型（输出到 `server/src/generated/prisma/`，已 gitignore），无需手动维护
+- 所有 PrismaClient 通过 `server/src/db.ts` 单例访问（含 `@prisma/adapter-better-sqlite3` driver adapter）
 - UI 组件使用 Arco Design (`@arco-design/web-react`)
 - 状态管理使用 Zustand（不用 Redux）
 - 路由使用 React Router v7
@@ -71,7 +80,9 @@ npm run lint                   # ESLint 检查
 - API 文档通过 Swagger UI 访问：`/api/docs`（仅非生产环境）
 - 国际化使用 i18next（`client/src/i18n/`），默认中文，预留英文翻译
 - ESLint 使用 flat config（`eslint.config.mjs`），含 TypeScript + React Hooks 规则
+- ESLint 忽略 Prisma 生成目录（`server/src/generated/**`）
 - AI API 调用受熔断器保护（`server/src/utils/circuitBreaker.ts`）
+- 前端共享工具函数使用 `client/src/utils/apiError.ts`（`getApiErrorMessage`）
 
 ## 活动角色绑定（Activity Role Binding）
 
@@ -104,10 +115,12 @@ User 模型支持两种使用场景：
 ## 数据库
 
 - Schema 位于 `server/prisma/schema.prisma`，包含 25 个模型
-- 开发环境使用 SQLite，生产环境切换为 PostgreSQL
+- Prisma CLI 配置位于 `server/prisma.config.ts`（数据源 URL 等配置）
+- 开发环境使用 SQLite（通过 `@prisma/adapter-better-sqlite3` driver adapter），生产环境切换为 PostgreSQL
 - 修改 schema 后需运行 `npx prisma migrate dev --name <描述>` 创建迁移
 - 开发环境也可用 `npx prisma db push` 快速同步 schema（不生成迁移文件）
 - 种子数据包含 17 个测试账号，每个角色一个用户，密码统一 `123456`（admin 为 `admin123`）
+- 种子数据包含示例项目（含风险评估和 4 个风险因子）
 
 ## 系统版本号
 
@@ -127,6 +140,22 @@ User 模型支持两种使用场景：
 - `PORT` - 服务端口（默认 3000）
 - `CORS_ORIGINS` - 允许的跨域来源
 - `AI_API_KEY` / `AI_API_URL` - AI 功能配置（可选）
+
+## 新设备环境搭建
+
+```bash
+git clone <repo> && cd Atlas
+npm install                    # 安装依赖（含 @types/react overrides）
+cp server/.env.example server/.env  # 复制并填写环境变量（或从旧设备复制 .env）
+cd server
+npx prisma generate            # 生成 Prisma Client（输出到 src/generated/prisma/）
+npx prisma db push             # 同步 schema 到 SQLite
+npx tsx src/prisma/seed.ts     # 初始化种子数据（可选，会创建测试账号和示例项目）
+cd ..
+npm run dev                    # 启动前后端开发服务器
+```
+
+迁移已有数据库时，直接将 `server/prisma/dev.db` 复制到新设备即可，无需 seed。
 
 ## 测试约定
 
