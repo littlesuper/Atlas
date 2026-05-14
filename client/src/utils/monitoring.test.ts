@@ -14029,3 +14029,49 @@ describe('monitoring batch 433 matrices', () => {
     },
   );
 });
+
+describe('monitoring batch 434 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `https://batch434-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch434 unshift AggregateError dsn as valid %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '144.375');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 144.375,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch434-alt-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch434 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '144.375');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 144.375,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});
