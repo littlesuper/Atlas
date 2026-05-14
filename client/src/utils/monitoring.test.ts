@@ -14811,3 +14811,49 @@ describe('monitoring batch 450 matrices', () => {
     },
   );
 });
+
+describe('monitoring batch 451 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `https://batch451-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch451 sort SyntaxError dsn as valid %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '157.125');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 157.125,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch451-alt-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch451 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '157.125');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 157.125,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});

@@ -10932,3 +10932,41 @@ describe('release observation batch 450 matrices', () => {
     },
   );
 });
+
+describe('release observation batch 451 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `2027-01-18T00:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    index,
+  ] as const))(
+    'generated batch451 SyntaxError status is retained without failure count %s',
+    (checkedAt, index) => {
+      const status = new SyntaxError(`status-batch451-${index}`) as unknown as 'NO_GO';
+      const summary = summarizeReleaseObservation({
+        windowMinutes: 242,
+        samples: [{ checkedAt, status, failedChecks: ['batch451'] }],
+      });
+
+      expect(summary.status).toBe('STABLE');
+      expect(summary.failedSamples).toBe(0);
+      expect(summary.latestStatus).toBe(status);
+      expect(summary.firstFailureAt).toBeNull();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `2027-01-18T01:${String(index % 50).padStart(2, '0')}:00.000Z`,
+    `sort-batch451-${index}`,
+  ] as const))(
+    'generated batch451 failedChecks sort after summary changes sample view only %#',
+    (checkedAt, replacementFailure) => {
+      const sample = { checkedAt, status: 'NO_GO' as const, failedChecks: ['c', replacementFailure, 'a'] };
+      const summary = summarizeReleaseObservation({ windowMinutes: 1, samples: [sample] });
+      sample.failedChecks.sort();
+
+      expect(summary.status).toBe('ATTENTION_REQUIRED');
+      expect(summary.failedSamples).toBe(1);
+      expect(summary.firstFailureAt).toBe(checkedAt);
+      expect(summary.samples[0].failedChecks).toEqual(['a', 'c', replacementFailure]);
+    },
+  );
+});
