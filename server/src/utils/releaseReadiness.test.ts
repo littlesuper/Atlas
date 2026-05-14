@@ -13252,3 +13252,51 @@ describe('release readiness batch 451 matrices', () => {
     },
   );
 });
+
+describe('release readiness batch 452 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      checks: { database: { status: new URIError(`batch452-${index}`) } },
+    }),
+    String(new URIError(`batch452-${index}`)),
+  ] as const))(
+    'generated batch452 WeakSet health snapshot fails URIError database status %#',
+    (health, databaseStatus) => {
+      const report = evaluateReleaseReadiness({
+        health,
+        metrics: { status: 'ok', alerts: [] },
+        featureFlags: { unknownFlags: [] },
+      });
+      const healthCheck = report.checks.find((check) => check.id === 'health_status')!;
+      const databaseCheck = report.checks.find((check) => check.id === 'database_health')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(healthCheck.status).toBe('PASS');
+      expect(databaseCheck.status).toBe('FAIL');
+      expect(databaseCheck.message).toBe(`Database health check is ${databaseStatus}`);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    Object.assign(new WeakSet(), {
+      status: 'ok',
+      alerts: [{ id: new URIError(`alert-batch452-${index}`) as unknown as string }],
+    }),
+    String(new URIError(`alert-batch452-${index}`)),
+  ] as const))(
+    'generated batch452 WeakSet metrics URIError alert id is reported %#',
+    (metrics, alertId) => {
+      const report = evaluateReleaseReadiness({
+        health: { status: 'ok', checks: { database: { status: 'ok' } } },
+        metrics,
+        featureFlags: { unknownFlags: [] },
+      });
+      const activeAlertCheck = report.checks.find((check) => check.id === 'active_alerts')!;
+
+      expect(report.status).toBe('NO_GO');
+      expect(activeAlertCheck.status).toBe('FAIL');
+      expect(activeAlertCheck.message).toBe(`1 active metric alert(s): ${alertId}`);
+    },
+  );
+});
