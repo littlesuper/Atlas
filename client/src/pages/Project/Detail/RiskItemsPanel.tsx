@@ -18,6 +18,7 @@ import { IconPlus, IconImport, IconEdit, IconDelete } from '@arco-design/web-rea
 import { riskItemsApi } from '../../../api';
 import { RiskItem, RiskItemLog, RiskAssessment } from '../../../types';
 import { RISK_LEVEL_MAP, RISK_ITEM_STATUS_MAP } from '../../../utils/constants';
+import { getApiErrorMessage } from '../../../utils/apiError';
 import dayjs from 'dayjs';
 
 interface Props {
@@ -29,11 +30,7 @@ interface Props {
 
 const FormItem = Form.Item;
 
-export function getApiErrorMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object' || !('response' in error)) return undefined;
-  const response = (error as { response?: { data?: { error?: unknown } } }).response;
-  return typeof response?.data?.error === 'string' ? response.data.error : undefined;
-}
+export { getApiErrorMessage };
 
 const RiskItemsPanel: React.FC<Props> = ({ projectId, latestAssessment, isArchived, projectMembers = [] }) => {
   const [items, setItems] = useState<RiskItem[]>([]);

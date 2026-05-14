@@ -208,24 +208,48 @@ test.describe.serial('P1 UI Interactions @p1', () => {
   // ────────────────────────────────────────────────
   test.describe('CHK-008: Activity check item count', () => {
     test('check items column shows fraction format', async ({ page }) => {
-      test.skip(true, 'Requires complex setup with check items');
+      await login(page, credentials.admin.username, credentials.admin.password);
 
       const project = uniqueName('CHK测试');
-      await login(page, credentials.admin.username, credentials.admin.password);
-      await createProjectViaPage(page, { name: project });
-      await searchProject(page, project);
+      const res = await page.request.post('/api/projects', {
+        data: { name: project, priority: 'HIGH', startDate: '2026-01-01', endDate: '2026-12-31' },
+      });
+      expect(res.ok()).toBeTruthy();
+      const proj = await res.json();
 
-      await page.locator('.arco-table-td').getByText(project).click();
-      await expect(page).toHaveURL(/\/projects\/.+/);
-      await page.waitForTimeout(1_000);
+      const actRes = await page.request.post('/api/activities', {
+        data: {
+          projectId: proj.id,
+          name: '检查项测试活动',
+          type: 'TASK',
+          status: 'IN_PROGRESS',
+          planStartDate: '2026-05-01',
+          planEndDate: '2026-05-15',
+        },
+      });
+      expect(actRes.ok()).toBeTruthy();
+      const activity = await actRes.json();
 
-      // TODO: Create activity with 5 check items, check 3
-      // Verify column shows "3/5" format
+      const checkRes = await page.request.post('/api/check-items/batch', {
+        data: {
+          activityId: activity.id,
+          items: [
+            { content: '检查项1', checked: true },
+            { content: '检查项2', checked: true },
+            { content: '检查项3', checked: true },
+            { content: '检查项4', checked: false },
+            { content: '检查项5', checked: false },
+          ],
+        },
+      });
+      expect(checkRes.ok()).toBeTruthy();
+
+      await page.goto(`/projects/${proj.id}`);
+      await waitForTableLoad(page);
 
       const countCell = page.getByText(/\d+\/\d+/);
-      if (await countCell.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await expect(countCell).toContainText(/\d+\/\d+/);
-      }
+      await expect(countCell).toBeVisible({ timeout: 5_000 });
+      await expect(countCell.first()).toContainText('3/5');
 
       await page.goto('/projects');
       await waitForTableLoad(page);
@@ -341,21 +365,4 @@ test.describe.serial('P1 UI Interactions @p1', () => {
     });
   });
 
-  // ────────────────────────────────────────────────
-  // SYS-003: Upload mid-disconnect friendly error
-  // ────────────────────────────────────────────────
-  test.describe('SYS-003: Upload disconnect error handling', () => {
-    test('upload shows friendly error on network failure', async ({ page }) => {
-      test.skip(true, 'Hard to test reliably in E2E - covered by unit tests');
-    });
-  });
-
-  // ────────────────────────────────────────────────
-  // THEME-004: Column preferences persistence
-  // ────────────────────────────────────────────────
-  test.describe('THEME-004: Column preferences persistence', () => {
-    test('column prefs persist across page reloads', async ({ page }) => {
-      test.skip(true, 'Already covered by useColumnPrefs.test.ts unit test');
-    });
-  });
 });

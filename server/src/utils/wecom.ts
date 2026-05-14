@@ -1,9 +1,7 @@
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 
 const WECOM_API = 'https://qyapi.weixin.qq.com/cgi-bin';
-const prisma = new PrismaClient();
-
 // 内存缓存 access_token
 let cachedToken: { token: string; expiresAt: number } | null = null;
 

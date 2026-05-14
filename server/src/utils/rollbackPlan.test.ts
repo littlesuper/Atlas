@@ -244,7 +244,7 @@ describe('rollback dry-run plan builder', () => {
       currentVersion: '1.0.0',
       targetVersion: '0.9.0',
       reason: 'test',
-      databaseStrategy: 'invalid-strategy' as any,
+      databaseStrategy: 'invalid-strategy' as unknown as RollbackDatabaseStrategy,
       generatedAt: new Date(),
     });
 

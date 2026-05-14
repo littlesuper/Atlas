@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getApiErrorMessage, paramsToObject } from './index';
+import { getApiErrorMessage } from '../../utils/apiError';
+import { paramsToObject } from './index';
 
 describe('getApiErrorMessage (Product)', () => {
   it('extracts response.data.error string', () => {
@@ -152,19 +153,19 @@ describe('paramsToObject', () => {
     expect(getApiErrorMessage({ response: { data: null } })).toBeUndefined();
   });
 
-  it('getApiErrorMessage handles undefined error', () => { expect(getApiErrorMessage(undefined as any)).toBeUndefined(); });
+  it('getApiErrorMessage handles undefined error', () => { expect(getApiErrorMessage(undefined)).toBeUndefined(); });
 
   it('getApiErrorMessage returns string from response data error', () => { expect(getApiErrorMessage({ response: { data: { error: 'custom error' } } })).toBe('custom error'); });
 
-  it('getApiErrorMessage handles string error input', () => { expect(getApiErrorMessage('string error' as any)).toBeUndefined(); });
+  it('getApiErrorMessage handles string error input', () => { expect(getApiErrorMessage('string error')).toBeUndefined(); });
 
   it('getApiErrorMessage returns error from response data', () => { expect(getApiErrorMessage({ response: { data: { error: 'custom error' } } })).toBe('custom error'); });
 
-  it('getApiErrorMessage handles undefined response', () => { expect(getApiErrorMessage({} as any)).toBeUndefined(); });
+  it('getApiErrorMessage handles undefined response', () => { expect(getApiErrorMessage({})).toBeUndefined(); });
 
-  it('getApiErrorMessage handles error object without response', () => { const result = getApiErrorMessage(new Error('network error') as any); expect(result).toBeUndefined(); });
+  it('getApiErrorMessage handles error object without response', () => { const result = getApiErrorMessage(new Error('network error')); expect(result).toBeUndefined(); });
 
-  it('getApiErrorMessage handles undefined input', () => { const result = getApiErrorMessage(undefined as any); expect(result).toBeUndefined(); });
+  it('getApiErrorMessage handles undefined input', () => { const result = getApiErrorMessage(undefined); expect(result).toBeUndefined(); });
 
   it.each(Array.from({ length: 90 }, (_, index) => [`param-${index}`, `value-${index}`] as const))(
     'paramsToObject preserves generated key %s',

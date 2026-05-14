@@ -318,7 +318,7 @@ describe('release readiness evaluator', () => {
     });
 
     expect(report.status).toBe('GO');
-    expect(report.checks.every((c: any) => c.status === 'PASS')).toBe(true);
+    expect(report.checks.every((c: { status: string }) => c.status === 'PASS')).toBe(true);
   });
 
   it('evaluateReleaseReadiness returns NO_GO when health is degraded', () => {

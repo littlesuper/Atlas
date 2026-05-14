@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDefaultWeek8ClosureGate, buildWeek8ClosureGate } from './week8ClosureGate';
+import { buildDefaultWeek8ClosureGate, buildWeek8ClosureGate, type ClosureCheckStatus } from './week8ClosureGate';
 
 describe('week 8 closure gate builder', () => {
   it('returns action required when any quality gate still needs follow-up', () => {
@@ -260,7 +260,7 @@ describe('week 8 closure gate builder', () => {
 
   it('unknown status check is not counted in ready blocked or actionRequired', () => {
     const gate = buildWeek8ClosureGate({
-      checks: [{ name: 'mystery', status: 'UNKNOWN_STATUS' as any }],
+      checks: [{ name: 'mystery', status: 'UNKNOWN_STATUS' as unknown as ClosureCheckStatus }],
       closeActions: [],
     });
 

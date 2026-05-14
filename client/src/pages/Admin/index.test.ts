@@ -145,7 +145,7 @@ describe('resolveTab additional', () => {
   });
 
   it('resolveTab returns first tab for undefined input', () => {
-    expect(resolveTab(undefined as any, ['ai', 'account'])).toBe('ai');
+    expect(resolveTab(undefined as unknown as string, ['ai', 'account'])).toBe('ai');
   });
 
   it('resolveTab returns valid tab for matching input', () => {

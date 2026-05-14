@@ -8,7 +8,7 @@ const {
   mockActivityExecutorFindMany: vi.fn(),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     userRole = { findMany: mockUserRoleFindMany };
     activityExecutor = { findMany: mockActivityExecutorFindMany };
@@ -269,9 +269,9 @@ describe('roleMembershipResolver', () => {
 
   it('resolveRoleMembers returns array for whitespace-only role', async () => { const result = await resolveRoleMembers('   '); expect(Array.isArray(result)).toBe(true); });
 
-  it('autoAssignByRole returns array for null role', async () => { const result = await autoAssignByRole(null as any); expect(Array.isArray(result)).toBe(true); });
+  it('autoAssignByRole returns array for null role', async () => { const result = await autoAssignByRole(null as unknown as string); expect(Array.isArray(result)).toBe(true); });
 
-  it('autoAssignByRole returns array for empty string role ID', async () => { const result = await autoAssignByRole('' as any); expect(Array.isArray(result)).toBe(true); });
+  it('autoAssignByRole returns array for empty string role ID', async () => { const result = await autoAssignByRole('' as unknown as string); expect(Array.isArray(result)).toBe(true); });
 });
 
 describe('roleMembershipResolver batch 173 matrices', () => {

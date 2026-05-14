@@ -461,13 +461,13 @@ describe('GanttArrows', () => {
     expect(container.querySelector('svg')).toBeTruthy();
   });
 
-  it('GanttArrows renders without crash for empty activities', () => { const activities: any[] = []; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={30} />); expect(container).toBeTruthy(); });
+  it('GanttArrows renders without crash for empty activities', () => { const activities: { id: string; startDate?: string; duration?: number; dependencies?: { id: string; type: string }[] }[] = []; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={30} />); expect(container).toBeTruthy(); });
 
   it('GanttArrows renders SVG element for activities with dependencies', () => { const activities = [{ id: 'a1', startDate: '2026-01-01', duration: 5, dependencies: [] }, { id: 'a2', startDate: '2026-01-06', duration: 3, dependencies: [{ id: 'a1', type: '0' }] }]; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={20} />); expect(container.querySelector('svg')).toBeTruthy(); });
 
   it('GanttArrows renders without crash for single activity', () => { const activities = [{ id: 'a1', startDate: '2026-01-01', duration: 5, dependencies: [] }]; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={20} />); expect(container).toBeTruthy(); });
 
-  it('GanttArrows renders without crash for empty activities', () => { const activities: any[] = []; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={20} />); expect(container).toBeTruthy(); });
+  it('GanttArrows renders without crash for empty activities', () => { const activities: { id: string; startDate?: string; duration?: number; dependencies?: { id: string; type: string }[] }[] = []; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={20} />); expect(container).toBeTruthy(); });
 
   it('GanttArrows renders with dependencies between activities', () => { const activities = [{ id: 'a1', startDate: '2026-01-01', duration: 5, dependencies: [] }, { id: 'a2', startDate: '2026-01-06', duration: 3, dependencies: [{ id: 'a1', type: '0' }] }]; const rangeStart = dayjs('2026-01-01'); const { container } = render(<GanttArrows activities={activities} rangeStart={rangeStart} dayWidth={20} />); expect(container).toBeTruthy(); });
 

@@ -149,7 +149,7 @@ describe('roleMembers schemas', () => {
   });
 
   it('createRoleMemberSchema rejects missing roleId field', () => {
-    expect(() => createRoleMemberSchema.parse({ userId: 'u1' } as any)).toThrow();
+    expect(() => createRoleMemberSchema.parse({ userId: 'u1' } as Record<string, unknown>)).toThrow();
   });
 
   it('deleteRoleMemberSchema defaults cascadeMode to keep with no input', () => {

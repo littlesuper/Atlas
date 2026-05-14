@@ -345,11 +345,11 @@ describe('monitoring', () => {
 
   it('flushMonitoring completes without error', async () => { vi.resetModules(); const { flushMonitoring } = await import('./monitoring'); await expect(flushMonitoring(100)).resolves.toBeUndefined(); });
 
-  it('captureServerError handles null error gracefully', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(null as any)).not.toThrow(); });
+  it('captureServerError handles null error gracefully', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(null as unknown)).not.toThrow(); });
 
-  it('captureServerError handles undefined error gracefully', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(undefined as any)).not.toThrow(); });
+  it('captureServerError handles undefined error gracefully', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(undefined as unknown)).not.toThrow(); });
 
-  it('captureServerError handles numeric error gracefully', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(42 as any)).not.toThrow(); });
+  it('captureServerError handles numeric error gracefully', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(42 as unknown)).not.toThrow(); });
 
   it('captureServerError handles Error object with message', async () => { vi.resetModules(); const { captureServerError } = await import('./monitoring'); expect(() => captureServerError(new Error('test error'))).not.toThrow(); });
 

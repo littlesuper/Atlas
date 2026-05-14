@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 
 type AuthRequest = Request & { user?: unknown };
 
@@ -33,7 +33,7 @@ const { mockPrisma, mockAuditLog, mockRefreshCache, mockFetchOfficial, mockGetHo
   mockIsYearKnown: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     constructor() {
       return mockPrisma as unknown as PrismaClient;

@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { assessProjectRisk } from '../utils/riskEngine';
@@ -8,10 +8,9 @@ import { buildRiskContext, trimContextForAI } from '../utils/riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from '../utils/riskPrompts';
 import { logger } from '../utils/logger';
 import { businessMetrics, recordBusinessEvent } from '../utils/businessMetrics';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 type RiskActionItem = {
   action: string;
   priority?: string;

@@ -330,7 +330,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities, criticalActivityIds = []
   // 表头区域（工具栏 + 图例 + 时间轴行）渲染辅助函数
   // scrollRef 区分「普通流」和「fixed 复制」两个 DOM 节点各自的横向滚动引用
   // isFixed 区分是否为吸顶表头：吸顶时去掉圆角，避免左上角内容从圆角缝隙透出
-  const renderHeaderBlock = (scrollRef: React.RefObject<HTMLDivElement>, isFixed = false) => (
+  const renderHeaderBlock = (scrollRef: React.RefObject<HTMLDivElement | null>, isFixed = false) => (
     <>
       {/* 工具栏 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', flexWrap: 'wrap', gap: 8 }}>
@@ -371,7 +371,7 @@ const GanttChart: React.FC<GanttProps> = ({ activities, criticalActivityIds = []
         <div style={{ width: LABEL_COL_W, minWidth: LABEL_COL_W, flexShrink: 0, height: headerHeight, borderRight: '1px solid var(--color-border-2)', display: 'flex', alignItems: 'center', paddingLeft: 12, fontWeight: 600, fontSize: 13 }}>
           活动名称
         </div>
-        <div ref={scrollRef} style={{ overflow: 'hidden', flex: 1 }}>
+        <div ref={scrollRef as React.Ref<HTMLDivElement>} style={{ overflow: 'hidden', flex: 1 }}>
           <div style={{ width: totalWidth, minWidth: '100%', background: 'var(--color-fill-1)' }}>{renderHeader()}</div>
         </div>
       </div>

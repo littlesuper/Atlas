@@ -3,11 +3,10 @@
  * 将项目全量数据组装为结构化上下文，供 AI 分析
  */
 
-import { PrismaClient, ActivityStatus } from '@prisma/client';
+import { ActivityStatus } from '../generated/prisma/client';
 import { assessProjectRisk } from './riskEngine';
 import { calculateCriticalPath } from './criticalPath';
-
-const prisma = new PrismaClient();
+import prisma from '../db';
 
 export interface RiskContext {
   project: {

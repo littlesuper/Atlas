@@ -194,7 +194,7 @@ describe('mergePhase edge cases', () => {
 
   it('buildEmptyPhaseProgress returns object with expected keys', () => { const progress = buildEmptyPhaseProgress(); expect(Object.keys(progress).length).toBeGreaterThan(0); });
 
-  it('buildEmptyPhaseProgress values are objects', () => { const progress = buildEmptyPhaseProgress(); Object.values(progress).forEach((v: any) => { expect(typeof v).toBe('object'); }); });
+  it('buildEmptyPhaseProgress values are objects', () => { const progress = buildEmptyPhaseProgress(); Object.values(progress).forEach((v: Record<string, unknown>) => { expect(typeof v).toBe('object'); }); });
 
   it('buildEmptyPhaseProgress has all expected phases', () => { const progress = buildEmptyPhaseProgress(); expect(Object.keys(progress).length).toBeGreaterThan(0); });
 });

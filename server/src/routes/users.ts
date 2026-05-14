@@ -1,14 +1,13 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, invalidateUserCache } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { auditLog, diffFields } from '../utils/auditLog';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 /**
  * @openapi
  * /users:

@@ -206,11 +206,11 @@ describe('formatIssueDetail', () => {
 
   it('computeMaxBar handles single member', () => { const members = [{ name: 'A', tasks: 10 }]; expect(typeof computeMaxBar(members)).toBe('number'); });
 
-  it('computeMaxBar handles empty members array', () => { const members: any[] = []; expect(typeof computeMaxBar(members)).toBe('number'); });
+  it('computeMaxBar handles empty members array', () => { const members: WorkloadMember[] = []; expect(typeof computeMaxBar(members)).toBe('number'); });
 
   it('computeMaxBar handles members with zero tasks', () => { const members = [{ name: 'A', tasks: 0 }]; expect(isNaN(computeMaxBar(members)) || computeMaxBar(members) >= 0).toBe(true); });
 
-  it('computeMaxBar returns 0 for empty members array', () => { const result = computeMaxBar([] as any[]); expect(typeof result).toBe('number'); });
+  it('computeMaxBar returns 0 for empty members array', () => { const result = computeMaxBar([] as WorkloadMember[]); expect(typeof result).toBe('number'); });
 
   it.each(Array.from({ length: 80 }, (_, index) => [
     index,

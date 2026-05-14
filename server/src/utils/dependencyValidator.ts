@@ -2,7 +2,7 @@
  * 循环依赖检测器
  * 使用 DFS 三色标记法（WHITE/GRAY/BLACK）检测依赖图是否成环
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma/client';
 
 enum Color {
   WHITE = 0, // 未访问

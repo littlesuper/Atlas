@@ -24,7 +24,7 @@ vi.mock('node-cron', () => ({
   default: { schedule: mocks.cronSchedule },
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     project = { findMany: mocks.prismaProjectFindMany };
     riskAssessment = {

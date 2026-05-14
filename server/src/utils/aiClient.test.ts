@@ -5,7 +5,7 @@ const { mockFindMany, mockUsageCreate } = vi.hoisted(() => ({
   mockUsageCreate: vi.fn(),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     aiConfig = { findMany: mockFindMany };
     aiUsageLog = { create: mockUsageCreate };

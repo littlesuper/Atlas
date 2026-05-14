@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 import { detectCircularDependency } from './dependencyValidator';
 
 /**

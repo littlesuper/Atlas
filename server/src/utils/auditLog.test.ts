@@ -130,7 +130,7 @@ const { mockCreate } = vi.hoisted(() => {
   return { mockCreate };
 });
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     auditLog = { create: mockCreate };
   },
@@ -340,7 +340,7 @@ describe('auditLog', () => {
 
   it('diffFields handles empty field list', () => { const result = diffFields({ a: 1 }, { a: 2 }, []); expect(result).toBeNull(); });
 
-  it('diffFields handles null before and after objects', () => { const result = diffFields({} as any, {} as any, ['a']); expect(result).toBeNull(); });
+  it('diffFields handles null before and after objects', () => { const result = diffFields({} as Record<string, unknown>, {} as Record<string, unknown>, ['a']); expect(result).toBeNull(); });
 
   it('diffFields detects changed boolean value', () => { const result = diffFields({ active: true }, { active: false }, ['active']); expect(result).not.toBeNull(); });
 

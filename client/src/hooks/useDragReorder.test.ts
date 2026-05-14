@@ -408,13 +408,13 @@ describe('useDragReorder', () => {
     expect(result.current.dragFromRef.current).toBe(2);
   });
 
-  it('handleMouseUp is callable without error', () => { const items = [{ id: '1' }, { id: '2' }]; const { result } = renderHook(() => useDragReorder(items)); act(() => { result.current.handleMouseUp({ preventDefault: () => {} } as any); }); expect(result.current).toBeDefined(); });
+  it('handleMouseUp is callable without error', () => { const items = [{ id: '1' }, { id: '2' }]; const { result } = renderHook(() => useDragReorder(items)); act(() => { result.current.handleMouseUp({ preventDefault: () => {} } as unknown as React.MouseEvent, 0); }); expect(result.current).toBeDefined(); });
 
   it('handleMouseDown is callable', () => { const items = [{ id: '1' }, { id: '2' }]; const { result } = renderHook(() => useDragReorder(items)); act(() => { result.current.handleMouseDown(mockEvt(), 0); }); expect(result.current.saving).toBe(false); });
 
   it('handleMouseMove updates dragFromRef', () => { const items = [{ id: '1' }, { id: '2' }]; const { result } = renderHook(() => useDragReorder(items)); act(() => { result.current.handleMouseDown(mockEvt(), 0); }); act(() => { result.current.handleMouseMove(mockEvt(), 1); }); expect(result.current.dragFromRef.current).toBe(0); });
 
-  it('handleMouseUp resets drag state', () => { const items = [{ id: '1' }, { id: '2' }]; const { result } = renderHook(() => useDragReorder(items)); act(() => { result.current.handleMouseDown(mockEvt(), 0); }); act(() => { result.current.handleMouseUp({ preventDefault: () => {} } as any); }); expect(result.current.saving).toBe(false); });
+  it('handleMouseUp resets drag state', () => { const items = [{ id: '1' }, { id: '2' }]; const { result } = renderHook(() => useDragReorder(items)); act(() => { result.current.handleMouseDown(mockEvt(), 0); }); act(() => { result.current.handleMouseUp({ preventDefault: () => {} } as unknown as React.MouseEvent, 1); }); expect(result.current.saving).toBe(false); });
 
   it('useDragReorder initializes with correct item count', () => { const items = [{ id: '1' }, { id: '2' }, { id: '3' }]; const { result } = renderHook(() => useDragReorder(items)); expect(result.current.saving).toBe(false); });
 

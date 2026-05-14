@@ -274,7 +274,7 @@ describe('canary rollout plan builder', () => {
 
   it('buildCanaryPlan handles 100 percentage', () => { const plan = buildCanaryPlan({ rolloutConfig: { percentage: 100, targetVersion: '1.0.0' } }); expect(plan).toBeDefined(); });
 
-  it('buildCanaryPlan handles missing rolloutConfig gracefully', () => { const plan = buildCanaryPlan({} as any); expect(plan).toBeDefined(); });
+  it('buildCanaryPlan handles missing rolloutConfig gracefully', () => { const plan = buildCanaryPlan({} as Parameters<typeof buildCanaryPlan>[0]); expect(plan).toBeDefined(); });
 
   it.each(Array.from({ length: 80 }, (_, index) => [
     `  ${index}.0.${index}  `,

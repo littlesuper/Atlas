@@ -1,7 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaBetterSqlite3({
+  url: process.env.DATABASE_URL || 'file:./dev.db',
+});
+
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('开始初始化数据库种子数据...');
@@ -1135,6 +1140,29 @@ async function main() {
   }
 
   console.log(`已创建 ${weeklyData.length} 条周报数据`);
+
+  console.log('创建示例风险评估数据...');
+  await prisma.riskAssessment.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000001' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000001',
+      projectId: sampleProject.id,
+      riskLevel: 'MEDIUM',
+      riskFactors: [
+        { name: '供应链延迟', severity: '高', impact: '可能导致量产延迟2-4周', probability: 0.6 },
+        { name: '关键物料短缺', severity: '中', impact: '影响试产进度', probability: 0.4 },
+        { name: '设计变更频繁', severity: '低', impact: '小幅影响开发节奏', probability: 0.3 },
+        { name: '测试设备不足', severity: '严重', impact: '验证周期延长', probability: 0.2 },
+      ],
+      suggestions: [
+        { suggestion: '建立备选供应商清单', priority: 'HIGH' },
+        { suggestion: '提前锁定关键物料订单', priority: 'MEDIUM' },
+      ],
+      source: 'rule_engine',
+      assessedAt: new Date(),
+    },
+  });
 
   console.log('数据库种子数据初始化完成!');
 }

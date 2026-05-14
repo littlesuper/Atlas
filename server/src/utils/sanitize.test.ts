@@ -176,7 +176,7 @@ describe('sanitizeRichText', () => {
 
   it('sanitizeRichText handles empty string input', () => { const result = sanitizeRichText(''); expect(result).toBeNull(); });
 
-  it('sanitizeRichText handles undefined input', () => { const result = sanitizeRichText(undefined as any); expect(result).toBeNull(); });
+  it('sanitizeRichText handles undefined input', () => { const result = sanitizeRichText(undefined as unknown as string); expect(result).toBeNull(); });
 
   it('sanitizeRichText strips script tags from input', () => { const result = sanitizeRichText('<p>Hello</p><script>alert(1)</script>'); expect(result).not.toContain('<script>'); });
 

@@ -11,6 +11,7 @@ export default [
       '**/.logs/**',
       '**/.pids/**',
       'server/prisma/migrations/**',
+      'server/src/generated/**',
     ],
   },
   // Server TypeScript files

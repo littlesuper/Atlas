@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '../../generated/prisma/client';
 import { Readable } from 'stream';
 import type { ParsedActivity } from '../../utils/excelActivityParser';
 
@@ -66,7 +66,7 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
   mockCanManage: vi.fn().mockReturnValue(true),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../../generated/prisma/client', () => ({
   PrismaClient: class {
     constructor() {
       return mockPrisma as unknown as PrismaClient;

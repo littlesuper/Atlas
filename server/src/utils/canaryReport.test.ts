@@ -373,7 +373,7 @@ describe('canary rollout report builder', () => {
 
   it('buildCanaryReport handles empty stages array', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [], samples: [] }); expect(report.stages).toHaveLength(0); });
 
-  it('buildCanaryReport handles null samples gracefully', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [], samples: null as any }); expect(report).toBeDefined(); });
+  it('buildCanaryReport handles null samples gracefully', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [], samples: null } as unknown as Parameters<typeof buildCanaryReport>[0]); expect(report).toBeDefined(); });
 
   it('buildCanaryReport handles single stage', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [{ name: 'stage1', percentage: 10, duration: '5m' }], samples: [] }); expect(report.stages).toHaveLength(1); });
 
@@ -381,7 +381,7 @@ describe('canary rollout report builder', () => {
 
   it('buildCanaryReport handles multiple stages', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '2.0.0', startedAt: '', endedAt: '', stages: [{ name: 's1', percentage: 10, duration: '5m' }, { name: 's2', percentage: 50, duration: '10m' }], samples: [] }); expect(report.stages).toHaveLength(2); });
 
-  it('buildCanaryReport handles null stages gracefully', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [] as any, samples: [] }); expect(report).toBeDefined(); });
+  it('buildCanaryReport handles null stages gracefully', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [], samples: [] } as unknown as Parameters<typeof buildCanaryReport>[0]); expect(report).toBeDefined(); });
 
   it('buildCanaryReport mode is CANARY_REPORT', () => { const report = buildCanaryReport({ version: '1.0.0', targetVersion: '1.0.1', startedAt: '', endedAt: '', stages: [], samples: [] }); expect(report.mode).toBe('CANARY_REPORT'); });
 

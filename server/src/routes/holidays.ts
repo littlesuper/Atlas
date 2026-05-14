@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, HolidaySource } from '@prisma/client';
+import { HolidaySource } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
 import { isAdmin } from '../middleware/permission';
 import { validate } from '../middleware/validate';
@@ -8,6 +8,7 @@ import { auditLog } from '../utils/auditLog';
 import { refreshHolidayCache } from '../utils/workday';
 import { getHolidaysForYear, isYearKnown, KNOWN_YEARS } from '../utils/holidayData';
 import { fetchOfficialHolidays, HolidayCnData } from '../services/holidaySource';
+import prisma from '../db';
 import {
   createHolidaySchema,
   updateHolidaySchema,
@@ -15,8 +16,6 @@ import {
 } from '../schemas/holidays';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 function routeParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
 }

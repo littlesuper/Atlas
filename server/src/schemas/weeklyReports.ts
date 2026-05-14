@@ -1,5 +1,25 @@
 import { z } from 'zod';
 
+const weeklyReportRiskSchema = z.object({
+  type: z.string().optional(),
+  description: z.string().optional(),
+  severity: z.string().optional(),
+});
+
+const phaseProgressItemSchema = z.object({
+  progress: z.string(),
+  risks: z.string(),
+  schedule: z.string(),
+});
+
+const reportAttachmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  uploadedAt: z.string(),
+  section: z.string(),
+});
+
 export const createWeeklyReportSchema = z.object({
   projectId: z.string().min(1, '项目ID不能为空'),
   weekStart: z.string().min(1, '周开始日期不能为空'),
@@ -10,9 +30,9 @@ export const createWeeklyReportSchema = z.object({
   riskWarning: z.string().nullable().optional(),
   changeOverview: z.string().nullable().optional(),
   demandAnalysis: z.string().nullable().optional(),
-  risks: z.any().nullable().optional(),
-  phaseProgress: z.any().nullable().optional(),
-  attachments: z.any().nullable().optional(),
+  risks: z.array(weeklyReportRiskSchema).nullable().optional(),
+  phaseProgress: z.record(z.string(), phaseProgressItemSchema).nullable().optional(),
+  attachments: z.array(reportAttachmentSchema).nullable().optional(),
 });
 
 export const updateWeeklyReportSchema = createWeeklyReportSchema.partial();

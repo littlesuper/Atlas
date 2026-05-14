@@ -1,12 +1,10 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination, isAdmin } from '../middleware/permission';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 /**
  * GET /api/notifications
  * 获取当前用户通知列表（分页 + 未读数）
@@ -42,7 +40,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
  */
 router.put('/:id/read', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const notification = await prisma.notification.findUnique({ where: { id } });
     if (!notification || notification.userId !== req.user!.id) {
       res.status(404).json({ error: '通知不存在' });
@@ -79,7 +77,7 @@ router.put('/read-all', authenticate, async (req: Request, res: Response): Promi
  */
 router.delete('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const notification = await prisma.notification.findUnique({ where: { id } });
     if (!notification || notification.userId !== req.user!.id) {
       res.status(404).json({ error: '通知不存在' });

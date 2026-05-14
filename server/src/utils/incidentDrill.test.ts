@@ -285,7 +285,7 @@ describe('incident drill plan builder', () => {
     expect(plan.scenario.id).toBe('api_5xx');
   });
 
-  it('buildIncidentDrillPlan handles unknown scenario', () => { expect(() => buildIncidentDrillPlan({ scenario: 'unknown' as any })).toThrow(); });
+  it('buildIncidentDrillPlan handles unknown scenario', () => { expect(() => buildIncidentDrillPlan({ scenario: 'unknown' as unknown as 'api_5xx' })).toThrow(); });
 
   it('buildIncidentDrillPlan handles database_degraded scenario', () => { const plan = buildIncidentDrillPlan({ scenario: 'database_degraded' }); expect(plan.scenario.id).toBe('database_degraded'); });
 

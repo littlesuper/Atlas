@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client';
 
 type MigrationAssignee = {
   id: string;
@@ -53,7 +53,7 @@ const {
   mockRawExecute: vi.fn(),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../../generated/prisma/client', () => ({
   PrismaClient: class {
     activity = {
       findMany: mockActivityFindMany,
@@ -100,7 +100,7 @@ describe('Activity Role Binding Migration', () => {
     ]);
     mockRoleMemberCreate.mockResolvedValue({ id: 'rm1' });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     // Simulate migration logic
@@ -152,7 +152,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae2' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -206,7 +206,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae3' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -243,7 +243,7 @@ describe('Activity Role Binding Migration', () => {
     ]);
     mockRoleMemberCreate.mockResolvedValue({ id: 'rm1' });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const pairs = await prisma.activityExecutor.findMany({
@@ -273,7 +273,7 @@ describe('Activity Role Binding Migration', () => {
     ]);
     mockRoleMemberCreate.mockResolvedValue({ id: 'rm1' });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const pairs = await prisma.activityExecutor.findMany({
@@ -300,7 +300,7 @@ describe('Activity Role Binding Migration', () => {
       { id: 'act-empty', name: 'Empty', createdAt: new Date(), assignees: [] },
     ]);
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -317,7 +317,7 @@ describe('Activity Role Binding Migration', () => {
   it('creates no executors for empty activities list', async () => {
     mockActivityFindMany.mockResolvedValue([]);
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -353,7 +353,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae-admin' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -386,7 +386,7 @@ describe('Activity Role Binding Migration', () => {
       { id: 'act-named', name: 'BOM 审核', createdAt: new Date(), assignees: [] },
     ]);
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -412,7 +412,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae-nr' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -460,7 +460,7 @@ describe('Activity Role Binding Migration', () => {
       executorData.push(data);
       return Promise.resolve({ id: `ae-${executorData.length}` });
     });
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -486,7 +486,7 @@ describe('Activity Role Binding Migration', () => {
     mockExecutorFindMany.mockResolvedValue([]);
     mockRoleMemberCreate.mockResolvedValue({ id: 'rm' });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const pairs = await prisma.activityExecutor.findMany({
@@ -526,7 +526,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: `ae-${executorData.length}` });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -565,7 +565,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: `ae-${executorData.length}` });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -603,7 +603,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: `ae-${executorData.length}` });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -626,7 +626,7 @@ describe('Activity Role Binding Migration', () => {
 
   it('counts existing executors via raw query before migration', async () => {
     mockRawQuery.mockResolvedValue([{ count: 5 }]);
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma & { $queryRawUnsafe: typeof mockRawQuery };
     const result = await prisma.$queryRawUnsafe('SELECT COUNT(*) as count FROM "ActivityExecutor"');
     expect(mockRawQuery).toHaveBeenCalled();
@@ -647,7 +647,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae-ts' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -679,7 +679,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae-nt' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -714,7 +714,7 @@ describe('Activity Role Binding Migration', () => {
       executorData.push(data);
       return Promise.resolve({ id: `ae-${executorData.length}` });
     });
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
     const activities = await prisma.activity.findMany({
       select: { id: true, name: true, createdAt: true, assignees: { select: { id: true, realName: true, canLogin: true, userRoles: { include: { role: true } } } } },
@@ -740,7 +740,7 @@ describe('Activity Role Binding Migration', () => {
     ]);
     mockRoleMemberCreate.mockResolvedValue({ id: 'rm1' });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const pairs = await prisma.activityExecutor.findMany({
@@ -782,7 +782,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: `ae-${executorData.length}` });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({
@@ -816,7 +816,7 @@ describe('Activity Role Binding Migration', () => {
       return Promise.resolve({ id: 'ae-keep' });
     });
 
-    const { PrismaClient: PC } = await import('@prisma/client');
+    const { PrismaClient: PC } = await import('../../generated/prisma/client');
     const prisma = new PC() as unknown as MigrationPrisma;
 
     const activities = await prisma.activity.findMany({

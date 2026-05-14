@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express, { NextFunction, Request, Response } from 'express';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 
 type AuthRequest = Request & { user?: unknown };
 
@@ -29,7 +29,7 @@ const { mockPrisma, mockIsAdmin } = vi.hoisted(() => {
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
   Prisma: { DbNull: null },
   ActivityType: { TASK: 'TASK', MILESTONE: 'MILESTONE', PHASE: 'PHASE' },

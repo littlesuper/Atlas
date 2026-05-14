@@ -6,7 +6,7 @@ const { mockFindUnique, mockActivityFindMany, mockActivityCount } = vi.hoisted((
   mockActivityCount: vi.fn(),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     project = { findUnique: mockFindUnique };
     activity = { findMany: mockActivityFindMany, count: mockActivityCount };

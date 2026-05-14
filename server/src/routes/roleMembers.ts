@@ -1,14 +1,13 @@
 import express, { Request, Response } from 'express';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { logger } from '../utils/logger';
 import { findActiveActivitiesByExecutor } from '../utils/roleMembershipResolver';
 import { auditLog } from '../utils/auditLog';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 function routeParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
 }

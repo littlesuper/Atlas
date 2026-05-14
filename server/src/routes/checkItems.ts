@@ -1,13 +1,12 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createCheckItemSchema, batchCreateCheckItemSchema, updateCheckItemSchema, reorderCheckItemSchema } from '../schemas/checkItems';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 const isPrismaErrorCode = (error: unknown, code: string): error is { code: string } =>
   typeof error === 'object' &&
   error !== null &&
@@ -20,7 +19,7 @@ const isPrismaErrorCode = (error: unknown, code: string): error is { code: strin
  */
 router.get('/activity/:activityId', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const activityId = req.params.activityId as string;
+    const activityId = req.params.activityId;
     const items = await prisma.checkItem.findMany({
       where: { activityId },
       orderBy: { sortOrder: 'asc' },
@@ -101,7 +100,7 @@ router.post('/batch', authenticate, validate({ body: batchCreateCheckItemSchema 
  */
 router.put('/:id', authenticate, validate({ body: updateCheckItemSchema }), async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const { title, checked } = req.body;
 
     const data: Prisma.CheckItemUpdateInput = {};
@@ -129,7 +128,7 @@ router.put('/:id', authenticate, validate({ body: updateCheckItemSchema }), asyn
  */
 router.delete('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     await prisma.checkItem.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {

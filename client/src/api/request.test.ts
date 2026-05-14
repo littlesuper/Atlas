@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AxiosError } from 'axios';
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const { mockCreate, mockInstance, mockPost } = vi.hoisted(() => {
   const mockReqInterceptors = { use: vi.fn() };
@@ -241,7 +241,7 @@ describe('getErrorMessage', () => {
   it('response interceptor skips Message.error when _silent flag is set', async () => {
     await import('./request');
     const onRejected = mockInstance.interceptors.response.use.mock.calls[0][1];
-    const silentConfig = { url: '/some-endpoint', headers: {}, _silent: true } as any;
+    const silentConfig = { url: '/some-endpoint', headers: {} as Record<string, string>, _silent: true } as InternalAxiosRequestConfig & { _silent?: boolean };
     const error = { config: silentConfig, response: { status: 403, data: { message: 'forbidden' } } } as AxiosError;
     await expect(onRejected(error)).rejects.toBeDefined();
     expect(mockMessageError).not.toHaveBeenCalled();
@@ -250,7 +250,7 @@ describe('getErrorMessage', () => {
   it('response interceptor handles 403 by showing error but not capturing to monitoring', async () => {
     await import('./request');
     const onRejected = mockInstance.interceptors.response.use.mock.calls[0][1];
-    const config = { url: '/data', headers: {} } as any;
+    const config = { url: '/data', headers: {} as Record<string, string> } as InternalAxiosRequestConfig;
     const error = { config, response: { status: 403, data: { message: 'forbidden' } } } as AxiosError;
     await expect(onRejected(error)).rejects.toBeDefined();
     expect(mockMessageError).toHaveBeenCalledWith('forbidden');

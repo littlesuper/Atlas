@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express, { NextFunction, Request, Response } from 'express';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '../generated/prisma/client';
 
 type ExecutorCreateInput = { source?: string };
 
@@ -47,7 +47,7 @@ const { mockPrisma, mockCanManage } = vi.hoisted(() => ({
 
 // ─── vi.mock calls ────────────────────────────────────────────────────────────
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
 	  PrismaClient: class {
 	    constructor() {
 	      return mockPrisma as unknown as PrismaClient;

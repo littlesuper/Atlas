@@ -126,10 +126,10 @@ describe('weeklyReports schemas', () => {
       projectId: 'p1',
       weekStart: 's',
       weekEnd: 'e',
-      phaseProgress: [{ phase: '设计', percent: 50 }],
-      attachments: [{ name: 'file.pdf', url: 'https://example.com/file.pdf' }],
+      phaseProgress: { design: { progress: '50%', risks: 'low', schedule: 'on time' } },
+      attachments: [{ id: 'a1', name: 'file.pdf', url: 'https://example.com/file.pdf', uploadedAt: '2026-05-14', section: 'keyProgress' }],
     });
-    expect(result.phaseProgress).toHaveLength(1);
+    expect(result.phaseProgress).toHaveProperty('design');
     expect(result.attachments).toHaveLength(1);
   });
 
@@ -143,7 +143,7 @@ describe('weeklyReports schemas', () => {
       projectId: 'p1',
       weekStart: 's',
       weekEnd: 'e',
-      risks: [{ category: 'technical', level: 'HIGH', description: 'risk desc' }],
+      risks: [{ type: 'technical', severity: 'HIGH', description: 'risk desc' }],
     });
     expect(Array.isArray(result.risks)).toBe(true);
     expect(result.risks).toHaveLength(1);

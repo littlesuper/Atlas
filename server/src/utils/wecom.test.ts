@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   axiosGet: vi.fn(),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     wecomConfig = { findFirst: mocks.findFirst };
   },

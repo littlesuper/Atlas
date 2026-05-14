@@ -171,7 +171,7 @@ describe('formatHolidayDate edge cases', () => {
 
   it('formatHolidayDate handles empty string', () => { const result = formatHolidayDate(''); expect(typeof result).toBe('string'); });
 
-  it('formatHolidayDate handles null input', () => { const result = formatHolidayDate(null as any); expect(typeof result).toBe('string'); });
+  it('formatHolidayDate handles null input', () => { const result = formatHolidayDate(null as unknown as string | dayjs.Dayjs); expect(typeof result).toBe('string'); });
 
   it('formatHolidayDate handles valid date string', () => { const result = formatHolidayDate('2026-01-01'); expect(typeof result).toBe('string'); });
 

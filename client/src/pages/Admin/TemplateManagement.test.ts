@@ -215,7 +215,7 @@ describe('remapActivityIds', () => {
   it('remapActivityIds preserves activity properties', () => {
     const acts = [{ id: 'a1', name: 'Test', duration: 5 }];
     const { activities } = remapActivityIds(acts, () => 'new-id');
-    expect((activities[0] as any).name).toBe('Test');
+    expect((activities[0] as Record<string, unknown>).name).toBe('Test');
   });
 
   it('remapActivityIds generates unique IDs for each activity', () => {

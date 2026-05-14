@@ -163,8 +163,8 @@ describe('checkItems schemas', () => {
   });
 
   it('createCheckItemSchema strips unknown fields', () => {
-    const result = createCheckItemSchema.parse({ activityId: 'a1', title: 't', extra: true } as any);
-    expect((result as any).extra).toBeUndefined();
+    const result = createCheckItemSchema.parse({ activityId: 'a1', title: 't', extra: true } as Record<string, unknown>);
+    expect((result as Record<string, unknown>).extra).toBeUndefined();
   });
 
   it('batchCreateCheckItemSchema rejects empty items array', () => {

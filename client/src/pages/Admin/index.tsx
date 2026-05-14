@@ -28,6 +28,7 @@ import MainLayout from '../../layouts/MainLayout';
 import { usersApi, rolesApi } from '../../api';
 import { useAuthStore } from '../../store/authStore';
 import { User, Role, Permission } from '../../types';
+import InlineRoleEditor from './InlineRoleEditor';
 import { USER_STATUS_MAP, PERMISSION_RESOURCE_MAP, PERMISSION_ACTION_MAP } from '../../utils/constants';
 import AiManagement from './AiManagement';
 import AuditLogTab from './AuditLog';

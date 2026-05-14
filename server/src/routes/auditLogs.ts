@@ -1,12 +1,11 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission, sanitizePagination } from '../middleware/permission';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 /**
  * GET /api/audit-logs
  * 获取审计日志列表（分页、筛选）

@@ -128,7 +128,7 @@ describe('normalizeRiskLevel', () => {
 
   it('normalizeRiskLevel handles empty string gracefully', () => { const result = normalizeRiskLevel(''); expect(result === null || typeof result === 'string').toBe(true); });
 
-  it('normalizeRiskLevel handles null input gracefully', () => { const result = normalizeRiskLevel(null as any); expect(result === null || typeof result === 'string').toBe(true); });
+  it('normalizeRiskLevel handles null input gracefully', () => { const result = normalizeRiskLevel(null as unknown as string); expect(result === null || typeof result === 'string').toBe(true); });
 
   it('normalizeRiskLevel handles HIGH input', () => { expect(normalizeRiskLevel('HIGH')).toBe('HIGH'); });
 

@@ -126,15 +126,15 @@ describe('getApiErrorMessage', () => {
 
   it('getApiErrorMessage returns undefined for missing data', () => { expect(getApiErrorMessage({ response: { data: {} } })).toBeUndefined(); });
 
-  it('getApiErrorMessage handles plain error object', () => { expect(getApiErrorMessage(new Error('test') as any)).toBeUndefined(); });
+  it('getApiErrorMessage handles plain error object', () => { expect(getApiErrorMessage(new Error('test'))).toBeUndefined(); });
 
   it('getApiErrorMessage returns error string from data', () => { expect(getApiErrorMessage({ response: { data: { error: 'not found' } } })).toBe('not found'); });
 
-  it('getApiErrorMessage handles missing data property', () => { expect(getApiErrorMessage({ response: {} } as any)).toBeUndefined(); });
+  it('getApiErrorMessage handles missing data property', () => { expect(getApiErrorMessage({ response: {} })).toBeUndefined(); });
 
-  it('getApiErrorMessage handles null response', () => { expect(getApiErrorMessage({ response: null } as any)).toBeUndefined(); });
+  it('getApiErrorMessage handles null response', () => { expect(getApiErrorMessage({ response: null })).toBeUndefined(); });
 
-  it('getApiErrorMessage handles response with data message', () => { expect(getApiErrorMessage({ response: { data: { error: 'test error' } } } as any)).toBe('test error'); });
+  it('getApiErrorMessage handles response with data message', () => { expect(getApiErrorMessage({ response: { data: { error: 'test error' } } })).toBe('test error'); });
 
   it.each(Array.from({ length: 90 }, (_, index) => `风险项错误 ${index}`))(
     'getApiErrorMessage extracts generated risk item message %s',

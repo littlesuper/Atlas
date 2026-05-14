@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
 import { isTokenBlacklisted } from '../utils/tokenBlacklist';
-
-const prisma = new PrismaClient();
+import prisma from '../db';
 
 // ============ 用户信息缓存（TTL 5 分钟） ============
 interface CachedUser {

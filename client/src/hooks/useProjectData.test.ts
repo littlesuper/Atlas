@@ -392,5 +392,5 @@ describe('useProjectData', () => {
 
   it('useProjectData handles empty projectId', () => { const { result } = renderHook(() => useProjectData({ projectId: '' })); expect(result.current.loading).toBe(false); });
 
-  it('useProjectData handles undefined projectId', () => { const { result } = renderHook(() => useProjectData({ projectId: undefined as any })); expect(result.current.loading).toBe(false); });
+  it('useProjectData handles undefined projectId', () => { const { result } = renderHook(() => useProjectData({ projectId: undefined })); expect(result.current.loading).toBe(false); });
 });

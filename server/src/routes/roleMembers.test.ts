@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 
 type AuthRequest = Request & { user?: unknown };
 type RoleMemberTx = { roleMember: { update: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> } };
@@ -44,7 +44,7 @@ const { mockPrisma } = vi.hoisted(() => {
 const mockAutoAssignByRole = vi.fn().mockResolvedValue([]);
 const mockFindActiveActivitiesByExecutor = vi.fn().mockResolvedValue([]);
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class { constructor() { return mockPrisma as unknown as PrismaClient; } },
 }));
 

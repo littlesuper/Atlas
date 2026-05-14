@@ -159,7 +159,7 @@ describe('feature flag helpers', () => {
   });
 
   it('normalizeFeatureFlags filters out null values', () => {
-    expect(normalizeFeatureFlags({ a: null as any, b: true })).toEqual({ b: true });
+    expect(normalizeFeatureFlags({ a: null, b: true })).toEqual({ b: true });
   });
 
   it('normalizeFeatureFlags handles empty object', () => {
@@ -184,7 +184,7 @@ describe('feature flag helpers', () => {
   });
 
   it('normalizeFeatureFlags handles string input returning empty', () => {
-    expect(normalizeFeatureFlags('not-an-object' as any)).toEqual({});
+    expect(normalizeFeatureFlags('not-an-object')).toEqual({});
   });
 });
 

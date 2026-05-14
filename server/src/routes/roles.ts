@@ -1,12 +1,11 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import { authenticate, invalidateAllUserCache } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 /**
  * GET /api/roles
  * 获取角色列表

@@ -38,6 +38,9 @@ server/src/logs/
 
 # Prisma migrations are source artifacts and should be committed.
 
+# Prisma generated client (Prisma 7+)
+server/src/generated/
+
 # Uploads
 server/uploads/
 

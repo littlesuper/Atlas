@@ -147,7 +147,7 @@ describe('WRX-009: HTML entity bypass', () => {
 describe('CHAOS-009: Prisma schema mismatch', () => {
   it('CHAOS-009 importing PrismaClient when not generated throws or is empty', async () => {
     try {
-      const mod = await import('@prisma/client');
+      const mod = await import('../../generated/prisma/client');
       expect(mod.PrismaClient).toBeDefined();
     } catch {
       expect(true).toBe(true);
@@ -155,8 +155,10 @@ describe('CHAOS-009: Prisma schema mismatch', () => {
   });
 
   it('CHAOS-009 npx prisma generate produces client with expected exports', async () => {
-    const { PrismaClient } = await import('@prisma/client');
-    const instance = new PrismaClient();
+    const { PrismaClient } = await import('../../generated/prisma/client');
+    const { PrismaBetterSqlite3 } = await import('@prisma/adapter-better-sqlite3');
+    const adapter = new PrismaBetterSqlite3({ url: 'file::memory:' });
+    const instance = new PrismaClient({ adapter });
     expect(instance).toBeDefined();
     expect(instance.user).toBeDefined();
     expect(instance.project).toBeDefined();

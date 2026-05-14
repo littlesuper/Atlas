@@ -1,6 +1,5 @@
-import { PrismaClient, ActivityStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { ActivityStatus } from '../generated/prisma/client';
+import prisma from '../db';
 
 /**
  * 计算项目整体进度

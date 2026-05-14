@@ -7,9 +7,7 @@
  * - 备源：内置 2025/2026 国务院公告数据（DB 未初始化或测试场景下兜底）
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../db';
 
 const FALLBACK_HOLIDAYS: Set<string> = new Set([
   // 2025

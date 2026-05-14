@@ -293,21 +293,21 @@ describe('trimContextForAI', () => {
 
   it('trimContextForAI preserves riskLevel', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'HIGH', factors: [] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx); expect(trimmed.ruleEngineMetrics.riskLevel).toBe('HIGH'); });
 
-  it('trimContextForAI handles empty activities array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: { id: 'p1', name: 'Test', status: '', priority: '', progress: 0, startDate: null, endDate: null, managerName: '', memberCount: 0, totalActivities: 0 }, criticalPathActivityIds: [], historicalTrend: [], latestWeeklyReportRisks: null, summary: { completedCount: 0, inProgressCount: 0, notStartedCount: 0, overdueCount: 0 } }; const trimmed = trimContextForAI(ctx as any); expect(trimmed).toBeDefined(); });
+  it('trimContextForAI handles empty activities array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: { id: 'p1', name: 'Test', status: '', priority: '', progress: 0, startDate: null, endDate: null, managerName: '', memberCount: 0, totalActivities: 0 }, criticalPathActivityIds: [], historicalTrend: [], latestWeeklyReportRisks: null, summary: { completedCount: 0, inProgressCount: 0, notStartedCount: 0, overdueCount: 0 } }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed).toBeDefined(); });
 
-  it('trimContextForAI handles non-empty factors', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'MEDIUM', factors: [{ name: 'f1', impact: 'high' }] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as any); expect(trimmed.ruleEngineMetrics.factors).toHaveLength(1); });
+  it('trimContextForAI handles non-empty factors', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'MEDIUM', factors: [{ name: 'f1', impact: 'high' }] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed.ruleEngineMetrics.factors).toHaveLength(1); });
 
-  it('trimContextForAI handles undefined project gracefully', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: undefined }; const trimmed = trimContextForAI(ctx as any); expect(trimmed).toBeDefined(); });
+  it('trimContextForAI handles undefined project gracefully', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: undefined }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed).toBeDefined(); });
 
-  it('trimContextForAI preserves ruleEngineMetrics', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'CRITICAL', factors: [{ name: 'f1', impact: 'high' }] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as any); expect(trimmed.ruleEngineMetrics.riskLevel).toBe('CRITICAL'); });
+  it('trimContextForAI preserves ruleEngineMetrics', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'CRITICAL', factors: [{ name: 'f1', impact: 'high' }] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed.ruleEngineMetrics.riskLevel).toBe('CRITICAL'); });
 
-  it('trimContextForAI handles empty factors array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as any); expect(trimmed.ruleEngineMetrics.factors).toHaveLength(0); });
+  it('trimContextForAI handles empty factors array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed.ruleEngineMetrics.factors).toHaveLength(0); });
 
-  it('trimContextForAI handles empty activities array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as any); expect(trimmed.activities).toHaveLength(0); });
+  it('trimContextForAI handles empty activities array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: { id: 'p1', name: 'Test' } }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed.activities).toHaveLength(0); });
 
-  it('trimContextForAI handles null project gracefully', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: null }; const trimmed = trimContextForAI(ctx as any); expect(trimmed).toBeDefined(); });
+  it('trimContextForAI handles null project gracefully', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'LOW', factors: [] }, activities: [], project: null }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed).toBeDefined(); });
 
-  it('trimContextForAI handles empty activities array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'MEDIUM', factors: [] }, activities: [], project: { id: 'p1', name: 'test' } }; const trimmed = trimContextForAI(ctx as any); expect(trimmed).toBeDefined(); });
+  it('trimContextForAI handles empty activities array', () => { const ctx = { ruleEngineMetrics: { riskLevel: 'MEDIUM', factors: [] }, activities: [], project: { id: 'p1', name: 'test' } }; const trimmed = trimContextForAI(ctx as unknown as RiskContext); expect(trimmed).toBeDefined(); });
 
   it.each(Array.from({ length: 41 }, (_, index) => index))(
     'returns same context reference for generated activity count %s',

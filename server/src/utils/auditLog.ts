@@ -1,7 +1,6 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import { Request } from 'express';
-
-const prisma = new PrismaClient();
+import prisma from '../db';
 
 export interface AuditLogParams {
   req: Request;

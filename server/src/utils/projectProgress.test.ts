@@ -5,7 +5,7 @@ const { mockFindMany, mockProjectUpdate } = vi.hoisted(() => ({
   mockProjectUpdate: vi.fn(),
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     activity = { findMany: mockFindMany };
     project = { update: mockProjectUpdate };
@@ -243,7 +243,7 @@ describe('updateProjectProgress', () => {
 
   it('calculateProjectProgress returns number for project with single activity', async () => { const progress = await calculateProjectProgress('proj-single'); expect(typeof progress).toBe('number'); });
 
-  it('calculateProjectProgress returns 0 for null project ID', async () => { const progress = await calculateProjectProgress(null as any); expect(progress).toBe(0); });
+  it('calculateProjectProgress returns 0 for null project ID', async () => { const progress = await calculateProjectProgress(null as unknown as string); expect(progress).toBe(0); });
 
   it('calculateProjectProgress returns 0 for empty string project ID', async () => { const progress = await calculateProjectProgress(''); expect(progress).toBe(0); });
 

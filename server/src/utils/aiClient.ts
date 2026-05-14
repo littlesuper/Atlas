@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { isFeatureEnabled, parseFeatureFlags } from './featureFlags';
-
-const prisma = new PrismaClient();
+import prisma from '../db';
 
 interface AiCallOptions {
   feature: string;

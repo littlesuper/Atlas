@@ -1905,7 +1905,7 @@ describe('quality progress guard builder', () => {
       content: '# Progress\n\n| Week | Progress |\n|------|----------|\n| Week 8 | 100% |\n',
       week8Progress: 100,
     };
-    const guard = buildQualityProgressGuard(input as any);
+    const guard = buildQualityProgressGuard(input as unknown as Parameters<typeof buildQualityProgressGuard>[0]);
     expect(guard).toBeDefined();
   });
 });

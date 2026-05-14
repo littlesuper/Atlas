@@ -1,12 +1,10 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/permission';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 function maskApiKey(key: string): string {
   return key ? '****' + key.slice(-4) : '';
 }

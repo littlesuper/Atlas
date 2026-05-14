@@ -121,9 +121,9 @@ describe('formatModelRevision', () => {
 
   it('formatModelRevision handles both empty strings', () => { const result = formatModelRevision('', ''); expect(typeof result).toBe('string'); });
 
-  it('formatModelRevision handles null model with valid revision', () => { const result = formatModelRevision(null as any, 'v2'); expect(typeof result).toBe('string'); });
+  it('formatModelRevision handles null model with valid revision', () => { const result = formatModelRevision(null as unknown as string, 'v2'); expect(typeof result).toBe('string'); });
 
-  it('formatModelRevision handles both null inputs', () => { const result = formatModelRevision(null as any, null as any); expect(typeof result).toBe('string'); });
+  it('formatModelRevision handles both null inputs', () => { const result = formatModelRevision(null as unknown as string, null as unknown as string); expect(typeof result).toBe('string'); });
 
   it('formatModelRevision handles valid inputs', () => { const result = formatModelRevision('ModelA', 'Rev1'); expect(typeof result).toBe('string'); });
 

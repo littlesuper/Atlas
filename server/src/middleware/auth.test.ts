@@ -14,7 +14,7 @@ vi.mock('jsonwebtoken', () => ({
   TokenExpiredError: class TokenExpiredError extends Error {},
 }));
 
-vi.mock('@prisma/client', () => ({
+vi.mock('../generated/prisma/client', () => ({
   PrismaClient: class {
     user = { findUnique: mockFindUnique };
     projectMember = { findMany: mockFindMany };

@@ -5,7 +5,6 @@ import rateLimit from 'express-rate-limit';
 // morgan replaced by pino-based httpLogger
 import path from 'path';
 import { readFileSync } from 'fs';
-import { PrismaClient } from '@prisma/client';
 
 const pkgPath = path.join(__dirname, '..', '..', 'package.json');
 const getVersion = () => {
@@ -48,6 +47,7 @@ import {
   snapshotRequestMetrics,
 } from './utils/requestMetrics';
 import { setupSwagger } from './swagger';
+import prisma from './db';
 
 // ==================== 安全校验 ====================
 
@@ -76,7 +76,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = Number(process.env.PORT) || 3000;
 const requestMetrics = createRequestMetrics({
   slowRequestThresholdMs: Number(process.env.SLOW_REQUEST_THRESHOLD_MS ?? 1000),

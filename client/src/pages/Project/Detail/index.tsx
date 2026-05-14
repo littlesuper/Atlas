@@ -29,7 +29,7 @@ import {
 } from '@arco-design/web-react/icon';
 import MainLayout from '../../../layouts/MainLayout';
 import { projectsApi, activitiesApi, featureFlagsApi } from '../../../api';
-import ColumnSettings, { ColumnDef } from './ColumnSettings';
+import ColumnSettings from './ColumnSettings';
 import { useAuthStore } from '../../../store/authStore';
 import ProjectWeeklyTab from '../../WeeklyReports/ProjectWeeklyTab';
 import GanttChart from './GanttChart';
@@ -50,7 +50,6 @@ import {
 import { isFeatureEnabled, normalizeFeatureFlags } from '../../../utils/featureFlags';
 import dayjs from 'dayjs';
 
-// Extracted hooks
 import { useUndoStack } from '../../../hooks/useUndoStack';
 import { useProjectData } from '../../../hooks/useProjectData';
 import { useColumnPrefs } from '../../../hooks/useColumnPrefs';
@@ -59,64 +58,18 @@ import { useDragReorder } from '../../../hooks/useDragReorder';
 import { useActivityColumns, COLUMN_WIDTH_MAP, PHASE_COLOR } from '../../../hooks/useActivityColumns';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
 import ResizableHeaderCell from '../../../components/ResizableHeaderCell';
+import {
+  getApiErrorMessage,
+  escapeCsvHelper,
+  getMsDateHelper,
+  ACTIVITY_COLUMN_DEFS,
+  DEFAULT_COLUMN_ORDER,
+  DEFAULT_COLUMN_VISIBLE,
+  formatDeps,
+  computeSortOrder,
+} from './helpers';
 
-export const getApiErrorMessage = (err: unknown, fallback: string): string => {
-  if (typeof err === 'object' && err !== null && 'response' in err) {
-    const response = (err as { response?: { data?: { error?: unknown } } }).response;
-    if (typeof response?.data?.error === 'string') return response.data.error;
-  }
-  return fallback;
-};
-
-export const escapeCsvHelper = (v: string) => v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
-
-export const getMsDateHelper = (m: Activity) => {
-  const d = m.planEndDate || m.planStartDate;
-  return d ? dayjs(d) : null;
-};
-
-// 活动列配置定义
-const ACTIVITY_COLUMN_DEFS: ColumnDef[] = [
-  { key: 'id', label: 'ID', removable: true },
-  { key: 'predecessor', label: '前置', removable: true },
-  { key: 'phase', label: '阶段', removable: true },
-  { key: 'name', label: '活动名称', removable: false },
-  { key: 'type', label: '类型', removable: true },
-  { key: 'status', label: '状态', removable: true },
-  { key: 'assignee', label: '负责人', removable: true },
-  { key: 'planDuration', label: '计划工期', removable: true },
-  { key: 'planDates', label: '计划时间', removable: true },
-  { key: 'actualDates', label: '实际时间', removable: true },
-  { key: 'checkItems', label: '检查项', removable: true },
-  { key: 'notes', label: '备注', removable: true },
-];
-
-export function formatDeps(
-  act: Activity,
-  seqMap: Map<string, number>,
-  depTypeMap: Record<string, string> = { '0': 'FS', '1': 'SS', '2': 'FF', '3': 'SF' },
-): string {
-  if (!act.dependencies) return '';
-  const deps = Array.isArray(act.dependencies) ? act.dependencies
-    : (() => { try { return JSON.parse(act.dependencies as unknown as string); } catch { return []; } })();
-  return deps.map((dep: { id: string; type: string; lag?: number }) => {
-    const seq = seqMap.get(dep.id);
-    const seqStr = seq ? String(seq).padStart(3, '0') : '?';
-    const typeLabel = depTypeMap[dep.type] || 'FS';
-    const lag = dep.lag ?? 0;
-    const lagStr = lag > 0 ? `+${lag}` : lag < 0 ? String(lag) : '';
-    return `${seqStr}${typeLabel}${lagStr}`;
-  }).join(', ');
-}
-
-const DEFAULT_COLUMN_ORDER = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
-const DEFAULT_COLUMN_VISIBLE = ACTIVITY_COLUMN_DEFS.map((d) => d.key);
-
-export function computeSortOrder(activities: { sortOrder: number }[], atIndex: number): number {
-  const prev = atIndex > 0 ? activities[atIndex - 1].sortOrder : 0;
-  const next = atIndex < activities.length ? activities[atIndex].sortOrder : prev + 20;
-  return Math.floor((prev + next) / 2);
-}
+export { getApiErrorMessage, escapeCsvHelper, getMsDateHelper, formatDeps, computeSortOrder };
 
 const ProjectDetail: React.FC = () => {
   const { id, snapshotId } = useParams<{ id: string; snapshotId?: string }>();
@@ -401,7 +354,7 @@ const ProjectDetail: React.FC = () => {
     const headers = ['ID', '前置依赖', '阶段', '活动名称', '类型', '状态', '负责人', '计划工期', '计划开始', '计划结束', '实际开始', '实际结束', '备注'];
     const rows = activities.map((a, i) => [
       String(i + 1).padStart(3, '0'),
-      formatDeps(a),
+      formatDeps(a, activitySeqMapLocal),
       a.phase || '',
       a.name,
       typeMap[a.type] || a.type,

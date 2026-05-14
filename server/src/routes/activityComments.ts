@@ -1,19 +1,17 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination, isAdmin } from '../middleware/permission';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-
 /**
  * GET /api/activity-comments/activity/:activityId
  * 获取活动评论列表（分页）
  */
 router.get('/activity/:activityId', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const activityId = req.params.activityId as string;
+    const activityId = req.params.activityId;
     const { page, pageSize } = req.query;
     const { pageNum, pageSizeNum } = sanitizePagination(page, pageSize);
     const skip = (pageNum - 1) * pageSizeNum;
@@ -80,7 +78,7 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
  */
 router.delete('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const comment = await prisma.activityComment.findUnique({ where: { id } });
     if (!comment) {
       res.status(404).json({ error: '评论不存在' });

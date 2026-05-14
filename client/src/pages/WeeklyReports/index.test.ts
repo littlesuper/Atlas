@@ -184,7 +184,7 @@ describe('groupReportsByWeek', () => {
       { id: '1', weekStart: '2026-05-05', weekEnd: '2026-05-11', projectId: 'p1' },
       { id: '2', weekStart: '2026-05-05', weekEnd: '2026-05-11', projectId: 'p2' },
     ];
-    const groups = groupReportsByWeek(reports as any[]);
+    const groups = groupReportsByWeek(reports as unknown as WeeklyReport[]);
     expect(groups).toHaveLength(1);
     expect(groups[0].reports).toHaveLength(2);
   });
@@ -227,7 +227,7 @@ describe('groupReportsByWeek', () => {
       { id: '2', weekStart: '2026-01-05', weekEnd: '2026-01-11' },
       { id: '3', weekStart: '2026-01-12', weekEnd: '2026-01-18' },
     ];
-    const result = groupReportsByWeek(reports as any);
+    const result = groupReportsByWeek(reports as unknown as WeeklyReport[]);
     expect(result.length).toBeGreaterThan(0);
   });
 
@@ -238,7 +238,7 @@ describe('groupReportsByWeek', () => {
 
   it('groupReportsByWeek handles single report', () => {
     const reports = [{ id: '1', weekStart: '2026-01-05', weekEnd: '2026-01-11' }];
-    const result = groupReportsByWeek(reports as any);
+    const result = groupReportsByWeek(reports as unknown as WeeklyReport[]);
     expect(result).toHaveLength(1);
   });
 

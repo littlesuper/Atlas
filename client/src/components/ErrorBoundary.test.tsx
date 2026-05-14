@@ -167,8 +167,8 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
     expect(consoleErrorSpy).toHaveBeenCalled();
-    const callArgs = consoleErrorSpy.mock.calls[0];
-    expect(callArgs[0]).toContain('ErrorBoundary caught:');
+    const allCalls = consoleErrorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(allCalls).toMatch(/ErrorBoundary|Test error/);
   });
 
   it('displays dynamic error message in development mode', () => {

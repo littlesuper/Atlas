@@ -1,13 +1,13 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
 import { sanitizePagination } from '../middleware/permission';
 import { validate } from '../middleware/validate';
 import { createRiskItemSchema, updateRiskItemSchema, riskItemCommentSchema } from '../schemas/riskItems';
 import { logger } from '../utils/logger';
+import prisma from '../db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 type RiskActionItem = {
   action: string;

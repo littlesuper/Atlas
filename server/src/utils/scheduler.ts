@@ -5,14 +5,13 @@
  */
 
 import cron from 'node-cron';
-import { PrismaClient, ActivityStatus, type Prisma } from '@prisma/client';
+import { ActivityStatus, type Prisma } from '../generated/prisma/client';
 import { assessProjectRisk } from './riskEngine';
 import { callAi } from './aiClient';
 import { buildRiskContext, trimContextForAI } from './riskContext';
 import { buildRiskSystemPrompt, buildRiskUserPrompt, parseAIResponse, validateRiskLevel } from './riskPrompts';
 import { logger } from './logger';
-
-const prisma = new PrismaClient();
+import prisma from '../db';
 
 const LEVEL_ORDER: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
 
