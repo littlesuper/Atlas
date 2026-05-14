@@ -14305,3 +14305,49 @@ describe('monitoring batch 439 matrices', () => {
     },
   );
 });
+
+describe('monitoring batch 440 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `https://batch440-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch440 splice EvalError dsn as valid %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '148.875');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 148.875,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `https://batch440-alt-${index}@sentry.io/${index}`,
+  ] as const))(
+    'initMonitoring treats generated batch440 fractional sample rate as finite %s',
+    async (dsn) => {
+      vi.stubEnv('VITE_SENTRY_DSN', dsn);
+      vi.stubEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', '148.875');
+      vi.resetModules();
+
+      const { initMonitoring } = await import('./monitoring');
+      initMonitoring();
+
+      expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
+        dsn,
+        tracesSampleRate: 148.875,
+      }));
+
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    },
+  );
+});
