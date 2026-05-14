@@ -9354,3 +9354,45 @@ describe('feature flags batch 440 matrices', () => {
     },
   );
 });
+
+describe('feature flags batch 441 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    index % 3 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch441 relay DataView own boolean property %#',
+    (enabled, index) => {
+      const buffer = new ArrayBuffer(4);
+      new DataView(buffer).setUint32(0, index);
+      const source = Object.assign(new DataView(buffer), {
+        relay: enabled,
+        ignored: Promise.resolve('ignored'),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ relay: enabled });
+      expect(isFeatureEnabled(flags, 'relay', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'ignored', false)).toBe(false);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    index % 2 === 0,
+    index,
+  ] as const))(
+    'normalizes generated batch441 relay DataView alternate boolean property %#',
+    (enabled, index) => {
+      const buffer = new ArrayBuffer(4);
+      new DataView(buffer).setUint32(0, index);
+      const source = Object.assign(new DataView(buffer), {
+        relay: enabled,
+        extra: Promise.resolve('extra'),
+      });
+      const flags = normalizeFeatureFlags(source);
+
+      expect(flags).toEqual({ relay: enabled });
+      expect(isFeatureEnabled(flags, 'relay', !enabled)).toBe(enabled);
+      expect(isFeatureEnabled(flags, 'extra', false)).toBe(false);
+    },
+  );
+});

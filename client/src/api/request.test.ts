@@ -7994,3 +7994,34 @@ describe('request batch 440 matrices', () => {
     },
   );
 });
+
+describe('request batch 441 matrices', () => {
+  it.each(Array.from({ length: 80 }, (_, index) => [
+    `AggregateError: batch441 ${index} occurred`,
+    index,
+  ] as const))(
+    'getErrorMessage extracts batch441 AggregateError response data message %s',
+    async (message, index) => {
+      const errorText = new AggregateError([`err-${index}`], `err-${message}`).toString();
+      const { getErrorMessage } = await import('./request');
+      const error = {
+        response: { data: { message, error: errorText } },
+        message: 'plain',
+      } as unknown as AxiosError;
+
+      expect(getErrorMessage(error)).toBe(message);
+    },
+  );
+
+  it.each(Array.from({ length: 60 }, (_, index) => [
+    `timeout Network Error batch441 ${index}`,
+    index,
+  ] as const))(
+    'getErrorMessage gives generated batch441 timeout before network error %s',
+    async (message) => {
+      const { getErrorMessage } = await import('./request');
+
+      expect(getErrorMessage({ message } as AxiosError)).toBe('请求超时，请稍后重试');
+    },
+  );
+});
