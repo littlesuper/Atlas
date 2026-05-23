@@ -109,11 +109,17 @@ ENVEOF
 
   sleep 3
   if curl -sf http://localhost:${PORT:-3000}/api/health > /dev/null; then
+    # 记录初始部署的引用，poll-update 据此判断是否需要更新
+    local INIT_REF
+    INIT_REF=$(git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --short HEAD)
+    echo "$INIT_REF" > "$DATA_DIR/.last-deployed-tag"
+
     echo ""
     log "============================================"
     log "✅ 部署成功！"
     log "访问地址: http://$(hostname -I | awk '{print $1}'):${PORT:-3000}"
     log "默认账号: admin / admin123"
+    log "当前版本: ${INIT_REF}"
     log "============================================"
     echo ""
     warn "⚠️  请立即登录后修改 admin 默认密码！"
@@ -164,12 +170,31 @@ SVCEOF
 }
 
 # ─── 更新部署 ────────────────────────────────────────
+# 用法：
+#   update              ← 跟随 main 分支最新提交
+#   update <tag|sha>    ← 切换到指定 tag / commit / branch（典型场景：发布 + 回滚）
 update() {
+  local TARGET="${1:-}"
+
   # 更新前自动备份
   backup
 
   log "拉取最新代码..."
-  git pull origin main
+  git fetch --tags --prune origin
+
+  if [ -n "$TARGET" ]; then
+    log "切换到 ${TARGET}"
+    # -f 强制丢弃对已跟踪文件的本地改动；未跟踪文件（uploads/、data/）保留
+    git -c advice.detachedHead=false checkout -f "$TARGET"
+    # 如果 TARGET 是分支名，还要再 reset 一下追上 remote
+    if git show-ref --verify --quiet "refs/heads/${TARGET}"; then
+      git reset --hard "origin/${TARGET}" 2>/dev/null || true
+    fi
+  else
+    log "切换到 main 最新"
+    git checkout -f main
+    git reset --hard origin/main
+  fi
 
   log "安装依赖..."
   npm ci --production=false
@@ -190,10 +215,46 @@ update() {
   sleep 3
   if curl -sf http://localhost:${PORT:-3000}/api/health > /dev/null; then
     VERSION=$(curl -sf http://localhost:${PORT:-3000}/api/health | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "?")
-    log "✅ 更新完成！版本: v${VERSION}"
+    # 记录当前部署的引用，poll-update 据此判断是否需要更新
+    local CURRENT_REF
+    CURRENT_REF=$(git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --short HEAD)
+    echo "$CURRENT_REF" > "$DATA_DIR/.last-deployed-tag"
+    log "✅ 更新完成！版本: v${VERSION}（部署引用 ${CURRENT_REF}）"
   else
     err "启动失败，查看日志: ./deploy.sh logs"
   fi
+}
+
+# ─── 轮询部署（cron 调用）───────────────────────────
+# 检查 gitea 是否有新的 v* tag，有则切过去重新部署。
+# - 每分钟跑一次；没新 tag 时静默退出
+# - flock 防并发；上一轮还在跑就跳过
+# - 只看 v* tag，不跟 main 分支动态——避免 commit hook 自增的 z 误触发上线
+poll_update() {
+  local TAG_PATTERN="${TAG_PATTERN:-v*}"
+
+  # 防并发锁（fd 200，脚本退出自动释放）
+  exec 200>"$DATA_DIR/.poll.lock"
+  if ! flock -n 200; then
+    return 0
+  fi
+
+  # 静默 fetch，失败时记一行到 stderr（让 cron 邮件 / 日志能看到）
+  if ! git -C "$APP_DIR" fetch --tags --prune --quiet origin 2>/dev/null; then
+    echo "[$(date '+%F %T')] poll-update: git fetch failed" >&2
+    return 1
+  fi
+
+  # 找最新 tag（按 semver 排序）
+  local LATEST_TAG LAST_DEPLOYED
+  LATEST_TAG=$(git -C "$APP_DIR" tag -l "$TAG_PATTERN" --sort=-v:refname | head -1)
+  [ -z "$LATEST_TAG" ] && return 0
+
+  LAST_DEPLOYED=$(cat "$DATA_DIR/.last-deployed-tag" 2>/dev/null || echo "")
+  [ "$LATEST_TAG" = "$LAST_DEPLOYED" ] && return 0
+
+  log "检测到新发布 ${LATEST_TAG}（上次部署 ${LAST_DEPLOYED:-无}），开始更新"
+  update "$LATEST_TAG"
 }
 
 # ─── 启动/停止/重启 ────────────────────────────────────
@@ -297,28 +358,34 @@ restore() {
 
 # ─── 入口 ────────────────────────────────────────────
 case "${1:-}" in
-  setup)   setup ;;
-  update)  update ;;
-  start)   start ;;
-  stop)    stop ;;
-  restart) restart ;;
-  status)  status ;;
-  logs)    logs ;;
-  backup)  backup ;;
-  restore) restore "$@" ;;
+  setup)        setup ;;
+  update)       shift; update "$@" ;;
+  poll-update)  poll_update ;;
+  start)        start ;;
+  stop)         stop ;;
+  restart)      restart ;;
+  status)       status ;;
+  logs)         logs ;;
+  backup)       backup ;;
+  restore)      restore "$@" ;;
   *)
     echo "Atlas 部署工具"
     echo ""
     echo "用法: ./deploy.sh <命令>"
     echo ""
-    echo "  setup    首次部署（安装依赖 + 构建 + 初始化）"
-    echo "  update   更新（自动备份 + 拉代码 + 重建 + 重启）"
-    echo "  start    启动服务"
-    echo "  stop     停止服务"
-    echo "  restart  重启服务"
-    echo "  status   查看状态"
-    echo "  logs     查看日志（Ctrl+C 退出）"
-    echo "  backup   备份数据库"
-    echo "  restore  恢复数据库"
+    echo "  setup            首次部署（安装依赖 + 构建 + 初始化）"
+    echo "  update [<ref>]   更新（自动备份 + 拉代码 + 重建 + 重启）"
+    echo "                   不带参数 = 跟 main；带参 = 切到指定 tag/sha/branch"
+    echo "                   例: ./deploy.sh update v1.2.0    （部署 v1.2.0）"
+    echo "                       ./deploy.sh update v1.1.0    （回滚到 v1.1.0）"
+    echo "  poll-update      自动部署轮询：检查 gitea 有无新的 v* tag，有则部署"
+    echo "                   （由 /etc/cron.d/atlas-poll-deploy 每分钟调用，无新 tag 时静默退出）"
+    echo "  start            启动服务"
+    echo "  stop             停止服务"
+    echo "  restart          重启服务"
+    echo "  status           查看状态"
+    echo "  logs             查看日志（Ctrl+C 退出）"
+    echo "  backup           备份数据库"
+    echo "  restore          恢复数据库"
     ;;
 esac

@@ -44,6 +44,12 @@ ALLOW_PORT_3000="${ALLOW_PORT_3000:-1}"    # 没有 Nginx 时建议保持 1
 ENABLE_BACKUP_CRON="${ENABLE_BACKUP_CRON:-1}"
 BACKUP_CRON_TIME="${BACKUP_CRON_TIME:-0 2 * * *}"
 
+# 自动部署轮询：每分钟检查 gitea 是否有新的 v* tag，有则自动 update
+# 仅看 tag，不跟 main commit；推 commit 不上线，打 tag 才上线
+ENABLE_POLL_CRON="${ENABLE_POLL_CRON:-1}"
+POLL_CRON_TIME="${POLL_CRON_TIME:-* * * * *}"
+TAG_PATTERN="${TAG_PATTERN:-v*}"
+
 ENABLE_SWAP="${ENABLE_SWAP:-1}"
 SWAPSIZE="${SWAPSIZE:-2G}"
 # ─────────────────────────────────────────────────────────────
@@ -173,6 +179,17 @@ clone_repo() {
         # 抹掉 URL 里的凭据，避免后续 git pull 时密码留在 .git/config
         sudo -u "$RUN_USER" git -C "$INSTALL_DIR" remote set-url origin "$GIT_REPO"
     fi
+
+    # 首次部署：如果仓库已有 v* tag，切换到最新的（按 semver 排序）
+    # 这样生产服务器从一开始就跑在"打过 tag 的发布快照"上
+    local latest_tag
+    latest_tag=$(sudo -u "$RUN_USER" git -C "$INSTALL_DIR" tag -l "$TAG_PATTERN" --sort=-v:refname | head -1)
+    if [ -n "$latest_tag" ]; then
+        log "  发现已有发布 tag，切换到最新: ${latest_tag}"
+        sudo -u "$RUN_USER" git -C "$INSTALL_DIR" -c advice.detachedHead=false checkout -f "$latest_tag"
+    else
+        log "  仓库还没有 ${TAG_PATTERN} tag，本次按 ${GIT_BRANCH} 部署；之后打 tag 才会触发自动上线"
+    fi
 }
 
 # ─── 调用 deploy.sh setup ─────────────────────────────────────
@@ -215,6 +232,26 @@ ${BACKUP_CRON_TIME} ${RUN_USER} cd ${INSTALL_DIR} && ./deploy.sh backup >> ${INS
 EOF
     chmod 644 "$cronfile"
     log "  已写入 ${cronfile}"
+}
+
+# ─── 自动部署 poll cron ──────────────────────────────────────
+# 每分钟检查 gitea 是否有新的 v* tag。新 tag → 自动 checkout + update + 重启。
+# 推 commit 不上线，打 tag 才上线（生产 = 发布快照）。
+setup_poll_cron() {
+    [ "$ENABLE_POLL_CRON" = "1" ] || { log "── 跳过自动部署 poll cron ──"; return; }
+    log "── 自动部署 poll cron (${POLL_CRON_TIME}) ──"
+    local cronfile="/etc/cron.d/atlas-poll-deploy"
+    cat > "$cronfile" <<EOF
+# Atlas 自动部署：每分钟检查 gitea 是否有新的 ${TAG_PATTERN} tag
+# 由 provision-prod.sh 创建；逻辑见 deploy.sh poll_update()
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+TAG_PATTERN=${TAG_PATTERN}
+${POLL_CRON_TIME} ${RUN_USER} cd ${INSTALL_DIR} && ./deploy.sh poll-update >> ${INSTALL_DIR}/.logs/poll.log 2>&1
+EOF
+    chmod 644 "$cronfile"
+    log "  已写入 ${cronfile}"
+    log "  日志: ${INSTALL_DIR}/.logs/poll.log（仅新发布触发部署时才有内容）"
 }
 
 # ─── 可选：Nginx + HTTPS ──────────────────────────────────────
@@ -283,6 +320,7 @@ clone_repo
 run_app_setup
 setup_firewall
 setup_backup_cron
+setup_poll_cron
 setup_nginx_https
 verify
 
@@ -299,4 +337,13 @@ log "默认账号: admin / admin123  ←  立刻登录后修改！"
 log "代码目录: ${INSTALL_DIR}（属主 ${RUN_USER}）"
 log "运维命令: sudo -u ${RUN_USER} bash -lc 'cd ${INSTALL_DIR} && ./deploy.sh {status|logs|update|backup|restore}'"
 log "数据备份: 每天 ${BACKUP_CRON_TIME}，保留 30 天，存于 ${INSTALL_DIR}/backups/"
+if [ "$ENABLE_POLL_CRON" = "1" ]; then
+    log ""
+    log "🔁 自动部署已启用（每分钟检查 ${TAG_PATTERN} tag）"
+    log "   发布流程: 本地 git tag v1.2.0 && git push origin v1.2.0"
+    log "   生产服务器 1 分钟内自动 checkout v1.2.0 → 重建 → 重启"
+    log "   推 commit 不上线，打 tag 才上线"
+    log "   poll 日志: ${INSTALL_DIR}/.logs/poll.log"
+    log "   手动部署/回滚: sudo -u ${RUN_USER} bash -lc 'cd ${INSTALL_DIR} && ./deploy.sh update v1.1.0'"
+fi
 log "════════════════════════════════════════"
