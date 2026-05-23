@@ -10,7 +10,7 @@
 #   GIT_USERNAME=xxx GIT_PASSWORD=xxx sudo bash /root/provision-prod.sh
 #
 #   # 方式 B：从 gitea 直接拉
-#   curl -fsSL http://10.168.232.219/gitadmin/atlas/raw/branch/main/scripts/provision-prod.sh -o /tmp/p.sh
+#   curl -fsSL https://git.awer.cc/gitadmin/atlas/raw/branch/main/scripts/provision-prod.sh -o /tmp/p.sh
 #   GIT_USERNAME=xxx GIT_PASSWORD=xxx sudo bash /tmp/p.sh
 #
 # 本脚本职责（与 deploy.sh 的分工）：
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 # ─── 可调参数（环境变量覆盖）────────────────────────────────────
-GIT_REPO="${GIT_REPO:-http://10.168.232.219/gitadmin/atlas.git}"
+GIT_REPO="${GIT_REPO:-https://git.awer.cc/gitadmin/atlas.git}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 # Gitea 认证：用于 clone + 后续 cron poll 的 fetch
 # 建议在 gitea 用户设置 → Applications → 生成一个只读 Personal Access Token
