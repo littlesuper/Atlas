@@ -27,8 +27,12 @@ set -euo pipefail
 # ─── 可调参数（环境变量覆盖）────────────────────────────────────
 GIT_REPO="${GIT_REPO:-http://10.168.232.219/gitadmin/atlas.git}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
+# Gitea 认证：用于 clone + 后续 cron poll 的 fetch
+# 建议在 gitea 用户设置 → Applications → 生成一个只读 Personal Access Token
+#（不要直接用账号密码——token 可单独吊销，且可限定 scope）
 GIT_USERNAME="${GIT_USERNAME:-}"          # gitea 用户名（仓库私有时必填）
-GIT_PASSWORD="${GIT_PASSWORD:-}"          # gitea 密码/token（同上）
+GIT_PASSWORD="${GIT_PASSWORD:-}"          # gitea token（推荐）或密码
+# 凭据会写到 /home/${RUN_USER}/.git-credentials（mode 600），git fetch 自动使用
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/atlas}"  # 代码与数据所在目录
 RUN_USER="${RUN_USER:-atlas}"             # 应用运行账号（不存在则创建）
@@ -155,6 +159,42 @@ EOF
     install -d -m 755 -o "$RUN_USER" -g "$RUN_USER" "$INSTALL_DIR"
 }
 
+# ─── Git 凭据（让 cron 的 git fetch 能跑）────────────────────
+# 用 git credential store helper，把凭据写到 ~/.git-credentials（mode 600）
+# 这样 clone / fetch / pull 都能自动鉴权，且 .git/config 里不留凭据
+setup_git_credentials() {
+    if [ -z "$GIT_USERNAME" ] || [ -z "$GIT_PASSWORD" ]; then
+        warn "── 跳过 git 凭据配置（GIT_USERNAME/GIT_PASSWORD 未提供）──"
+        warn "  如果 gitea 仓库是私有的，cron 的 git fetch 会失败"
+        warn "  建议：gitea 用户设置 → Applications → 生成只读 token，重跑本脚本"
+        return
+    fi
+    log "── 配置 git 凭据（${GIT_USERNAME} → ${GIT_REPO%/*}）──"
+
+    # 从 GIT_REPO 提取 scheme://host[:port]，写入 credentials 文件
+    local cred_scope
+    cred_scope=$(echo "$GIT_REPO" | sed -E 's|^(https?://[^/]+).*|\1|')
+
+    # URL-encode 用户名和 token（防止特殊字符）
+    local enc_user enc_pass
+    enc_user=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$GIT_USERNAME")
+    enc_pass=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$GIT_PASSWORD")
+    local cred_with_auth="${cred_scope/:\/\//://${enc_user}:${enc_pass}@}"
+
+    local home_dir
+    home_dir=$(getent passwd "$RUN_USER" | cut -d: -f6)
+    local cred_file="${home_dir}/.git-credentials"
+
+    # 写凭据（仅 atlas 用户可读）
+    install -m 600 -o "$RUN_USER" -g "$RUN_USER" /dev/null "$cred_file"
+    echo "$cred_with_auth" > "$cred_file"
+    chown "$RUN_USER:$RUN_USER" "$cred_file"
+
+    # 配置 helper
+    sudo -u "$RUN_USER" git config --global credential.helper store
+    log "  写入 ${cred_file}（仅 ${RUN_USER} 可读）"
+}
+
 # ─── 拉取代码 ─────────────────────────────────────────────────
 clone_repo() {
     log "── 拉取代码 ${GIT_REPO}@${GIT_BRANCH} ──"
@@ -168,16 +208,8 @@ clone_repo() {
         if [ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
             err "${INSTALL_DIR} 非空但不是 git 仓库，请清理后重试"
         fi
-        local repo="$GIT_REPO"
-        if [ -n "$GIT_USERNAME" ] && [ -n "$GIT_PASSWORD" ]; then
-            local enc_user enc_pass
-            enc_user=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$GIT_USERNAME")
-            enc_pass=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$GIT_PASSWORD")
-            repo="${GIT_REPO/:\/\//://${enc_user}:${enc_pass}@}"
-        fi
-        sudo -u "$RUN_USER" git clone --branch "$GIT_BRANCH" "$repo" "$INSTALL_DIR"
-        # 抹掉 URL 里的凭据，避免后续 git pull 时密码留在 .git/config
-        sudo -u "$RUN_USER" git -C "$INSTALL_DIR" remote set-url origin "$GIT_REPO"
+        # 凭据由 credential.helper store 自动提供，URL 里不带 user:pass
+        sudo -u "$RUN_USER" git clone --branch "$GIT_BRANCH" "$GIT_REPO" "$INSTALL_DIR"
     fi
 
     # 首次部署：如果仓库已有 v* tag，切换到最新的（按 semver 排序）
@@ -316,6 +348,7 @@ preflight
 setup_swap
 install_system_deps
 setup_user_and_dir
+setup_git_credentials
 clone_repo
 run_app_setup
 setup_firewall
