@@ -3,6 +3,7 @@
 > ⚠️ **本文档已过时。** 当前生产部署使用 `deploy.sh`（systemd + tsx + SQLite），不再使用 PostgreSQL + PM2 方案。
 > 请参考以下文档：
 > - **部署脚本:** `deploy.sh`（执行 `./deploy.sh setup` 即可一键部署）
+> - **发布流程:** `docs/release.md`（生产只部署 `v*` tag）
 > - **部署验证:** `docs/qa/prod-deploy-validation.md`
 > - **验证报告:** `docs/qa/reports/prod-deploy-20260428.md`
 

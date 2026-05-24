@@ -73,7 +73,7 @@ ENVEOF
 
   # 6. 构建
   log "生成 Prisma Client..."
-  cd server && npx prisma generate && cd ..
+  cd server && DATABASE_URL="file:${DATA_DIR}/atlas.db" npx prisma generate && cd ..
 
   log "构建前端..."
   npm run build --workspace=client
@@ -200,7 +200,7 @@ update() {
   npm ci --production=false
 
   log "构建..."
-  cd server && npx prisma generate && cd ..
+  cd server && DATABASE_URL="file:${DATA_DIR}/atlas.db" npx prisma generate && cd ..
   npm run build --workspace=client
   # 后端使用 tsx 运行时，无需预编译
 

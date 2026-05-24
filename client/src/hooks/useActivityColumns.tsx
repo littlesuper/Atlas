@@ -23,6 +23,7 @@ import {
   PHASE_OPTIONS,
 } from '../utils/constants';
 import { calcWorkdays, addWorkdays } from '../utils/workday';
+import { getSelectOptionValue } from '../utils/selectFilter';
 import dayjs from 'dayjs';
 import { activitiesApi, roleMembersApi } from '../api';
 
@@ -523,7 +524,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
               showSearch
               placeholder="选择角色"
               filterOption={(input, option) => {
-                const key = option?.props?.value as string;
+                const key = getSelectOptionValue(option) as string;
                 const role = roles.find((r) => r.id === key);
                 if (!role) return false;
                 return role.name.toLowerCase().includes(input.toLowerCase());

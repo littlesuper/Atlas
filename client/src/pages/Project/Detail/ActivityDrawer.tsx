@@ -24,6 +24,7 @@ import {
   PHASE_OPTIONS,
 } from '../../../utils/constants';
 import { calcWorkdays, addWorkdays, subtractWorkdays } from '../../../utils/workday';
+import { selectOptionIncludesInput } from '../../../utils/selectFilter';
 import { rolesApi, roleMembersApi } from '../../../api';
 import ActivityComments from './ActivityComments';
 import CheckItems from './CheckItems';
@@ -325,9 +326,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
               placeholder="选择角色"
               allowClear
               showSearch
-              filterOption={(input, option) =>
-                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={selectOptionIncludesInput}
               onChange={handleRoleChange}
             >
               {roleOptions.map(r => (
@@ -336,9 +335,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
             </Select>
           </Form.Item>
           <Form.Item label="执行人" field="executorIds">
-            <Select mode="multiple" placeholder={roleUserIds !== null ? '已按角色筛选' : '请选择角色后自动填入'} allowClear showSearch filterOption={(input, option) =>
-              (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-            }>
+            <Select mode="multiple" placeholder={roleUserIds !== null ? '已按角色筛选' : '请选择角色后自动填入'} allowClear showSearch filterOption={selectOptionIncludesInput}>
               {(roleUserIds !== null ? users.filter(u => roleUserIds.includes(u.id)) : users).map((u) => (
                 <Select.Option key={u.id} value={u.id}>
                   {u.realName}{!u.canLogin ? ' (仅联系人)' : ''}
@@ -379,9 +376,7 @@ const ActivityDrawer: React.FC<ActivityDrawerProps> = ({
                     next[idx] = { ...next[idx], id: v || '' };
                     setFormDeps(next);
                   }}
-                  filterOption={(input, option) =>
-                    (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-                  }
+                  filterOption={selectOptionIncludesInput}
                 >
                   {activities
                     .filter((a) =>

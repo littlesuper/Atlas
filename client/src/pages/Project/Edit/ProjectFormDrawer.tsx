@@ -17,6 +17,7 @@ import { IconSave, IconUser } from '@arco-design/web-react/icon';
 import dayjs from 'dayjs';
 import { projectsApi, usersApi, templatesApi } from '../../../api';
 import { Project, User, ProjectTemplate } from '../../../types';
+import { selectOptionIncludesInput } from '../../../utils/selectFilter';
 import {
   STATUS_MAP,
   PRIORITY_MAP,
@@ -391,11 +392,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
                   <Select
                     placeholder="选择项目经理"
                     showSearch
-                    filterOption={(input, option) =>
-                      ((option?.props?.children as string) || '')
-                        .toLowerCase()
-                        .includes(input.toLowerCase())
-                    }
+                    filterOption={selectOptionIncludesInput}
                     onChange={(v) => {
                       handleManagerChange(v);
                       if (v) {
@@ -451,11 +448,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
                     showSearch
                     style={{ width: '100%' }}
                     maxTagCount={2}
-                    filterOption={(input, option) =>
-                      ((option?.props?.children as string) || '')
-                        .toLowerCase()
-                        .includes(input.toLowerCase())
-                    }
+                    filterOption={selectOptionIncludesInput}
                   >
                     {availableUsers('COLLABORATOR').map((u) => (
                       <Select.Option key={u.id} value={u.id}>
@@ -514,11 +507,7 @@ const ProjectFormDrawer: React.FC<ProjectFormDrawerProps> = ({
                         showSearch
                         style={{ width: '100%' }}
                         maxTagCount={2}
-                        filterOption={(input, option) =>
-                          ((option?.props?.children as string) || '')
-                            .toLowerCase()
-                            .includes(input.toLowerCase())
-                        }
+                        filterOption={selectOptionIncludesInput}
                       >
                         {availableUsers(roleKey).map((u) => (
                           <Select.Option key={u.id} value={u.id}>

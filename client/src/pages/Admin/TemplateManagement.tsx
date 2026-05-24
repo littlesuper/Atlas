@@ -24,6 +24,7 @@ import MainLayout from '../../layouts/MainLayout';
 import { templatesApi, rolesApi } from '../../api';
 import { ProjectTemplate, TemplateActivity, ActivityType } from '../../types';
 import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS, DEPENDENCY_TYPE_MAP } from '../../utils/constants';
+import { selectOptionIncludesInput } from '../../utils/selectFilter';
 import dayjs from 'dayjs';
 
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
@@ -541,9 +542,7 @@ const TemplateManagement: React.FC = () => {
           style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
           onChange={(v) => updateActivity(record.id, 'roleId', v || null)}
           showSearch
-          filterOption={(input, option) =>
-            (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-          }
+          filterOption={selectOptionIncludesInput}
         >
           {roleOptions.map(r => (
             <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>

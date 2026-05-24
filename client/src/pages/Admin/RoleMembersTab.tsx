@@ -16,6 +16,7 @@ import {
 } from '@arco-design/web-react/icon';
 import { roleMembersApi, usersApi, rolesApi } from '../../api';
 import { RoleMember, User, Role } from '../../types';
+import { selectOptionIncludesInput } from '../../utils/selectFilter';
 
 const { Text } = Typography;
 
@@ -199,9 +200,7 @@ const RoleMembersTab: React.FC = () => {
           value={selectedUserIds}
           onChange={setSelectedUserIds}
           showSearch
-          filterOption={(input, option) =>
-            (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-          }
+          filterOption={selectOptionIncludesInput}
         >
           {users
             .filter(u => u.status === 'ACTIVE')

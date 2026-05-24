@@ -127,7 +127,7 @@ install_system_deps() {
     log "── 系统依赖 ──"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq curl git ca-certificates gnupg sqlite3 ufw cron python3
+    apt-get install -y -qq curl git ca-certificates gnupg sqlite3 ufw cron python3 build-essential
 
     if ! have node || [ "$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')" -lt "$NODE_MAJOR" ]; then
         log "  安装 Node.js ${NODE_MAJOR}"

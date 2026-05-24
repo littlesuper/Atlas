@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import { activitiesApi, projectsApi } from '../../api';
 import { Project, WorkloadResponse, WorkloadMember, WorkloadIssue } from '../../types';
+import { selectOptionIncludesInput } from '../../utils/selectFilter';
 
 const OVERLOAD_THRESHOLD = 5;
 
@@ -162,9 +163,7 @@ const WorkloadPage: React.FC = () => {
               value={selectedProject}
               onChange={(v) => setSelectedProject(v || undefined)}
               showSearch
-              filterOption={(input, option) =>
-                (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={selectOptionIncludesInput}
             >
               {projects.map((p) => (
                 <Select.Option key={p.id} value={p.id}>

@@ -16,6 +16,7 @@ import {
 } from '@arco-design/web-react';
 import { activitiesApi } from '../../../api';
 import { Activity, ResourceConflict, WhatIfResult, AiScheduleSuggestion } from '../../../types';
+import { selectOptionIncludesInput } from '../../../utils/selectFilter';
 import dayjs from 'dayjs';
 
 export const getDateColorHelper = (original: string | null, newDate: string | null) => {
@@ -256,9 +257,7 @@ const SchedulingTools: React.FC<SchedulingToolsProps> = ({ projectId, activities
             showSearch
             value={whatIfActivityId || undefined}
             onChange={(v) => setWhatIfActivityId(v || '')}
-            filterOption={(input, option) =>
-              (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-            }
+            filterOption={selectOptionIncludesInput}
           >
             {activeActivities.map((a) => (
               <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>

@@ -48,6 +48,7 @@ import {
   PHASE_OPTIONS,
 } from '../../../utils/constants';
 import { isFeatureEnabled, normalizeFeatureFlags } from '../../../utils/featureFlags';
+import { selectOptionIncludesInput } from '../../../utils/selectFilter';
 import dayjs from 'dayjs';
 
 import { useUndoStack } from '../../../hooks/useUndoStack';
@@ -1076,9 +1077,7 @@ const ProjectDetail: React.FC = () => {
                     onChange={(v: string[]) => { if (v && v.length > 0) handleBatchAssigneeUpdate(v); }}
                     value={undefined}
                     showSearch
-                    filterOption={(input, option) =>
-                      (option?.props?.children as string)?.toLowerCase().includes(input.toLowerCase())
-                    }
+                    filterOption={selectOptionIncludesInput}
                   >
                     {users.map((u) => (
                       <Select.Option key={u.id} value={u.id}>{u.realName}</Select.Option>
