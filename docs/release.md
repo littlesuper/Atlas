@@ -82,3 +82,12 @@ sudo -u atlas bash -lc 'cd /opt/atlas && ./deploy.sh restore backups/atlas_YYYYM
 - 不要复用已经推送过的 tag；如果需要重新发布，创建新的版本号。
 - Gitea 凭据建议使用只读 Personal Access Token，供生产服务器 `git fetch --tags` 使用。
 - 如果轮询没有触发，优先检查 `/etc/cron.d/atlas-poll-deploy`、`.logs/poll.log`、Gitea 凭据和 tag 名称是否符合 `v*`。
+
+## 发布记录
+
+| 版本 | 日期 | 说明 |
+| --- | --- | --- |
+| `v1.1.22` | 2026-05-24 | 验证 tag-based 自动部署链路（commit → tag → 生产 cron poll → update） |
+| `v1.1.21` | 2026-05-24 | 打通 tag 触发的生产发布流程 |
+| `v1.1.14` | — | 历史版本 |
+
