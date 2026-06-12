@@ -4,7 +4,7 @@ Atlas 生产环境只部署 `v*` tag。推送普通 commit、更新 `main`、或
 
 ## 发布规则
 
-- Gitea 地址：`https://git.awer.cc/gitadmin/atlas.git`
+- Gitea 地址：`https://git-lan.awer.cc/PGY/PMS.git`（内网 LAN 入口，TLS 证书需在客户端跳过验证）
 - 生产站点：`w.awer.cc`
 - 自动部署来源：Gitea tag
 - 自动部署匹配：仅 `v*`，例如 `v1.1.21`、`v1.2.0`

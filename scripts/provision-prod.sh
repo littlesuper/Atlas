@@ -10,7 +10,8 @@
 #   GIT_USERNAME=xxx GIT_PASSWORD=xxx sudo bash /root/provision-prod.sh
 #
 #   # 方式 B：从 gitea 直接拉
-#   curl -fsSL https://git.awer.cc/gitadmin/atlas/raw/branch/main/scripts/provision-prod.sh -o /tmp/p.sh
+#   curl -fsSLk https://git-lan.awer.cc/PGY/PMS/raw/branch/main/scripts/provision-prod.sh -o /tmp/p.sh
+#   （curl 的 -k 跳过 TLS 验证；git-lan 内网证书目前没覆盖此子域名）
 #   GIT_USERNAME=xxx GIT_PASSWORD=xxx sudo bash /tmp/p.sh
 #
 # 本脚本职责（与 deploy.sh 的分工）：
@@ -25,7 +26,7 @@
 set -euo pipefail
 
 # ─── 可调参数（环境变量覆盖）────────────────────────────────────
-GIT_REPO="${GIT_REPO:-https://git.awer.cc/gitadmin/atlas.git}"
+GIT_REPO="${GIT_REPO:-https://git-lan.awer.cc/PGY/PMS.git}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 # Gitea 认证：用于 clone + 后续 cron poll 的 fetch
 # 建议在 gitea 用户设置 → Applications → 生成一个只读 Personal Access Token
@@ -33,6 +34,9 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 GIT_USERNAME="${GIT_USERNAME:-}"          # gitea 用户名（仓库私有时必填）
 GIT_PASSWORD="${GIT_PASSWORD:-}"          # gitea token（推荐）或密码
 # 凭据会写到 /home/${RUN_USER}/.git-credentials（mode 600），git fetch 自动使用
+# TLS 验证：=0 表示给 GIT_REPO 的 host 关闭证书校验（仅对该 host 生效）
+# git-lan.awer.cc 当前证书没覆盖此子域名，所以默认关掉；公网仓库可设为 1
+GIT_SSL_VERIFY="${GIT_SSL_VERIFY:-0}"
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/atlas}"  # 代码与数据所在目录
 RUN_USER="${RUN_USER:-atlas}"             # 应用运行账号（不存在则创建）
@@ -162,18 +166,25 @@ EOF
 # ─── Git 凭据（让 cron 的 git fetch 能跑）────────────────────
 # 用 git credential store helper，把凭据写到 ~/.git-credentials（mode 600）
 # 这样 clone / fetch / pull 都能自动鉴权，且 .git/config 里不留凭据
+# 同时按需关掉 TLS 验证（仅针对 GIT_REPO 那个 host）
 setup_git_credentials() {
+    # 从 GIT_REPO 提取 scheme://host[:port]
+    local cred_scope
+    cred_scope=$(echo "$GIT_REPO" | sed -E 's|^(https?://[^/]+).*|\1|')
+
+    # 按需关闭 TLS 验证（host-scoped，不影响其他 https 仓库）
+    if [ "$GIT_SSL_VERIFY" = "0" ]; then
+        log "  关闭 TLS 验证: ${cred_scope}"
+        sudo -u "$RUN_USER" git config --global "http.${cred_scope}/.sslVerify" false
+    fi
+
     if [ -z "$GIT_USERNAME" ] || [ -z "$GIT_PASSWORD" ]; then
-        warn "── 跳过 git 凭据配置（GIT_USERNAME/GIT_PASSWORD 未提供）──"
+        warn "── 跳过 git 凭据写入（GIT_USERNAME/GIT_PASSWORD 未提供）──"
         warn "  如果 gitea 仓库是私有的，cron 的 git fetch 会失败"
         warn "  建议：gitea 用户设置 → Applications → 生成只读 token，重跑本脚本"
         return
     fi
-    log "── 配置 git 凭据（${GIT_USERNAME} → ${GIT_REPO%/*}）──"
-
-    # 从 GIT_REPO 提取 scheme://host[:port]，写入 credentials 文件
-    local cred_scope
-    cred_scope=$(echo "$GIT_REPO" | sed -E 's|^(https?://[^/]+).*|\1|')
+    log "── 配置 git 凭据（${GIT_USERNAME} → ${cred_scope}）──"
 
     # URL-encode 用户名和 token（防止特殊字符）
     local enc_user enc_pass
