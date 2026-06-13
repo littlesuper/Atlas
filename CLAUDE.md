@@ -159,7 +159,9 @@ User 模型支持两种使用场景：
 ## 新设备环境搭建
 
 ```bash
-git clone <repo> && cd Atlas
+# 内网 LAN 入口的 TLS 证书暂未覆盖 git-lan.awer.cc 这个子域名，先按 host 关掉验证
+git config --global http.https://git-lan.awer.cc.sslVerify false
+git clone https://git-lan.awer.cc/PGY/PMS.git Atlas && cd Atlas
 npm install                    # 安装依赖（含 @types/react overrides）
 cp server/.env.example server/.env  # 复制并填写环境变量（或从旧设备复制 .env）
 cd server
@@ -171,6 +173,20 @@ npm run dev                    # 启动前后端开发服务器
 ```
 
 迁移已有数据库时，直接将 `server/prisma/dev.db` 复制到新设备即可，无需 seed。
+
+## 生产部署
+
+- **代码源**：`https://git-lan.awer.cc/PGY/PMS.git`（内网 LAN 入口，需 host-scoped `sslVerify=false`）
+- **生产站点**：`w.awer.cc`
+- **生产数据库**：SQLite（`/opt/atlas/data/atlas.db`）。`DEPLOYMENT.md` 顶部已声明该文档过时，里面的 PostgreSQL + PM2 方案不再使用
+- **首次裸机部署**：`scripts/provision-prod.sh`（root 执行，幂等）——系统依赖 + Node 20 + 专用 `atlas` 账号 + UFW + 备份 cron + 自动部署 poll cron + 可选 Nginx/HTTPS
+- **应用运维脚本**：`./deploy.sh {setup|update [<ref>]|poll-update|backup|restore|status|logs}`，systemd 服务名 `atlas`，运行账号 `atlas`
+- **发版机制**：**仅 `v*` tag 触发自动部署**。推 commit、推 main、推非 `v*` tag 都不会上线
+  - 发布：`git push pms main && git tag v1.2.0 && git push pms v1.2.0`
+  - 生产 cron（`/etc/cron.d/atlas-poll-deploy`，每分钟一次）发现新 tag → `./deploy.sh update v1.2.0`：备份 → checkout tag → `npm ci` → 重建 → `prisma db push` → `systemctl restart atlas` → 健康检查
+  - 当前部署的 tag 记在 `/opt/atlas/data/.last-deployed-tag`
+- **回滚**：`sudo -u atlas bash -lc 'cd /opt/atlas && ./deploy.sh update v1.1.0'`
+- **完整发布/回滚/排障流程**：见 `docs/release.md`
 
 ## 测试约定
 
