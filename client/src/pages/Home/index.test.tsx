@@ -13,11 +13,9 @@ vi.mock('../../api', () => ({
   riskApi: { getDashboard: mockGetDashboard, getInsights: mockGetInsights },
 }));
 
-// 隔离对话组件（其自身测试已覆盖）：只验证首页装配
-vi.mock('../../components/AssistantConversation', () => ({
-  default: ({ projectId }: { projectId: string | null }) => (
-    <div data-testid="hero-conversation">hero:{String(projectId)}</div>
-  ),
+// 隔离 hero 输入（其自身测试已覆盖）：只验证首页装配
+vi.mock('../../components/AssistantHeroInput', () => ({
+  default: () => <div data-testid="hero-input" />,
 }));
 
 // MainLayout 依赖 store/路由，简化为透传
@@ -49,39 +47,36 @@ beforeEach(() => {
 });
 
 describe('Home (AI 首页)', () => {
-  it('renders the hero AI conversation with null project context', () => {
+  it('always renders the hero input', () => {
     renderHome();
-    expect(screen.getByText('用一句话使用系统')).toBeInTheDocument();
-    expect(screen.getByTestId('hero-conversation')).toHaveTextContent('hero:null');
+    expect(screen.getByTestId('hero-input')).toBeInTheDocument();
   });
 
-  it('shows risk distribution, AI concerns, high-risk projects and action items', async () => {
+  it('shows the risk section when there are risk points', async () => {
     renderHome();
-    // 等唯一文本出现（项目甲在卡片与行动项里都出现，不能用它做唯一断言）
-    await waitFor(() => expect(screen.getByText('关键路径有阻塞风险')).toBeInTheDocument());
-    // distribution section (中风险 只出现在分布标签里，无同名 Tag)
-    expect(screen.getByText('中风险')).toBeInTheDocument();
-    // AI concerns
-    expect(screen.getByText('项目甲关键路径阻塞')).toBeInTheDocument();
-    // high-risk project card with AI insight (CRITICAL shown, LOW filtered out)
+    await waitFor(() => expect(screen.getByText('项目风险点（AI 分析）')).toBeInTheDocument());
     expect(screen.getByText('关键路径有阻塞风险')).toBeInTheDocument();
-    expect(screen.queryByText('项目乙')).not.toBeInTheDocument();
-    // action item
+    expect(screen.getByText('项目甲关键路径阻塞')).toBeInTheDocument();
     expect(screen.getByText('尽快补齐固件联调资源')).toBeInTheDocument();
   });
 
-  it('shows empty state when no high-risk projects', async () => {
+  it('hides the risk section entirely when there are no risk points', async () => {
     mockGetDashboard.mockResolvedValueOnce({
-      data: { ...dashboard, projects: [dashboard.projects[1]] }, // only LOW
+      data: { ...dashboard, projects: [dashboard.projects[1]], topActionItems: [] }, // 仅 LOW，无行动项
     });
+    mockGetInsights.mockResolvedValueOnce({ data: { ...insights, topConcerns: [] } });
     renderHome();
-    await waitFor(() => expect(screen.getByText('暂无高风险项目')).toBeInTheDocument());
+    // hero 始终在；等渲染稳定后断言风险区缺席
+    expect(screen.getByTestId('hero-input')).toBeInTheDocument();
+    await waitFor(() => expect(mockGetDashboard).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText('项目风险点（AI 分析）')).not.toBeInTheDocument());
   });
 
-  it('still renders hero when risk data fails to load', async () => {
+  it('shows only the hero when risk data fails to load', async () => {
     mockGetDashboard.mockRejectedValueOnce(new Error('network'));
     renderHome();
-    await waitFor(() => expect(screen.getByText('暂无风险分析数据')).toBeInTheDocument());
-    expect(screen.getByTestId('hero-conversation')).toBeInTheDocument();
+    await waitFor(() => expect(mockGetDashboard).toHaveBeenCalled());
+    expect(screen.getByTestId('hero-input')).toBeInTheDocument();
+    expect(screen.queryByText('项目风险点（AI 分析）')).not.toBeInTheDocument();
   });
 });
