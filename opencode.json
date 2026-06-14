@@ -4,7 +4,7 @@
     "qa": {
       "description": "GLM QA：找 bug、写失败测试、开 qa-bug PR，不改源码",
       "mode": "primary",
-      "model": "zai/glm-5.1",
+      "model": "zai-coding-plan/glm-5.2",
       "prompt": "{file:./docs/qa/GLM-QA-GUIDE.md}",
       "temperature": 0.2,
       "permission": {

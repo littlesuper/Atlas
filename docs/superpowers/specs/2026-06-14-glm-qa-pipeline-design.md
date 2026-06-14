@@ -62,8 +62,8 @@ Atlas 已有成熟测试体系（Vitest 单测 client 56 + server 136、Playwrig
 ## 5. 接入架构：opencode + GLM
 
 - 安装 opencode：`npm i -g opencode-ai`
-- **接入 GLM**：opencode **内置 Z.AI provider**，无需自配 provider——`opencode auth login` 选 Z.AI / Zhipu，粘贴 GLM Coding Plan 的 API key（存到 opencode 的 `auth.json`，不入库）。
-  - 模型用 **GLM-5.1**（2026 年 Coding Plan 最新、官方推荐；预算敏感可退 `glm-4.6`）。确切 model id（如 `zai/glm-5.1`）以 `opencode models | grep -i glm` 为准。
+- **接入 GLM**：opencode **内置 Z.AI Coding Plan provider**（providerID `zai-coding-plan`），无需自配 provider——`opencode auth login` 选 Z.AI / Zhipu，粘贴 GLM Coding Plan 的 API key（存到 opencode 的 `auth.json`，不入库）。
+  - 模型用 **GLM-5.2**（当前环境已配置）；opencode 引用格式 `providerID/modelID`，即 **`zai-coding-plan/glm-5.2`**。确切 id 以 `opencode models | grep -i glm` 为准。
   - OpenAI 兼容端点（仅在自配 provider 时才需要）：`https://api.z.ai/api/coding/paas/v4`。
 - 项目根放 `opencode.json`，只定义一个 **`qa` agent**：
   - `model` 指向 GLM；`prompt` = `{file:./docs/qa/GLM-QA-GUIDE.md}`（QA 角色与边界）。
@@ -82,7 +82,7 @@ Atlas 已有成熟测试体系（Vitest 单测 client 56 + server 136、Playwrig
     "qa": {
       "description": "GLM QA：找 bug、写失败测试、开 qa-bug PR，不改源码",
       "mode": "primary",
-      "model": "zai/glm-5.1",
+      "model": "zai-coding-plan/glm-5.2",
       "prompt": "{file:./docs/qa/GLM-QA-GUIDE.md}",
       "temperature": 0.2,
       "permission": {
