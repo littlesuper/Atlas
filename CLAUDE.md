@@ -153,10 +153,11 @@ npx playwright test e2e/login.spec.ts
 
 ### 前端
 
-- **共享核心** `client/src/components/AssistantConversation.tsx`：输入 → 分步时间线（意图解析〔AI〕→ 生成预览〔系统〕→ 风险判定〔系统〕→ 预览待确认 → 已应用）→ 预览 diff/风险 → 确认应用；只读提问走单独的"回答"渲染（来源徽标 + 再问一句）。`variant='hero'`（首页胶囊输入）/ `'panel'`（浮层）。
-- **全局浮层** `client/src/components/AssistantLauncher.tsx`：挂在 `layouts/MainLayout.tsx`，除首页外所有页面可唤出，感知当前路由项目作默认目标。
-- **AI 首页** `client/src/pages/Home/index.tsx`（路由 `/`）：hero 自然语言输入 + AI 分析的项目风险点。
+- **首页即聊天页** `client/src/pages/Home/index.tsx`（路由 `/`，登录后默认进入；走 `ProtectedRoute` 等待登录态恢复，刷新不掉线）：claude.ai 式全屏对话。空态展示问候 + 示例 chip + 按需风险区（`pages/Home/RiskOverview.tsx`，仅当有真实风险点——高风险项目 / 重点行动项才显示，善意提示 `topConcerns` 不计入）；开始对话后进入气泡流（用户气泡 / Markdown 回答 + 来源徽标 / 改动预览卡片 / 状态提示），消息区独立滚动并自动到底，输入框固定底部，顶部「新对话」一键清空。
+- **对话状态 + 编排**：`store/assistantChatStore.ts`（Zustand + persist，对话持久化到 localStorage、跨刷新保留）；`hooks/useAssistantChat.ts` 复用 `assistantApi.propose/apply` 做编排（每轮独立 propose、**不发送历史**，确认弹窗后才 apply）。展示组件在 `pages/Home/`：`MessageList`/`ProposalCard`/`AnswerBubble`（react-markdown + remark-gfm）/`ChatInput`/`EmptyState`/`RiskOverview`。
+- **右下角入口** `client/src/components/AssistantLauncher.tsx`（挂在 `layouts/MainLayout.tsx`）：非首页显示的浮动按钮，点击跳转到首页 `/?project=<当前项目>`（首页本身不显示）。
 - **API** `assistantApi.propose(utterance, contextProjectId?)` / `apply(proposalId)`；`/api/schedule-assistant/*` 保留为薄别名（向后兼容）。风险种类中文/颜色见 `client/src/utils/constants.ts` 的 `SCHEDULE_RISK_KIND_MAP`。
+- 注：旧 `AssistantConversation.tsx`、`AssistantHeroInput.tsx` 与独立 `/assistant` 页已移除（`/assistant` 重定向到 `/`）。设计见 `docs/specs/assistant-chat-ui/`。
 
 ### 降级与可观测
 
