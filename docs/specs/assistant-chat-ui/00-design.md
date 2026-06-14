@@ -39,7 +39,8 @@
 - `MainLayout.tsx` 的 `navGroups` 在「概览」组新增 `{ key: '/assistant', label: 'AI 助手', path: '/assistant', icon: Bot }`（与浮层同图标），用既有 `canUseAssistant` 权限门控。
 - `AssistantLauncher.tsx` 由「点开内嵌浮层」改为「点击跳转」：`navigate('/assistant?project=<routeProjectId>')`，把当前路由项目作为上下文（query 参数 `?project=<id>`，空则不带）。仍按现状在非首页显示。
 - 首页（`pages/Home/index.tsx`）改为 claude.ai 式极简落地：**默认只显示对话输入框**（hero）。提交时把首条用户消息经 `setPendingFirstUtterance(text)` 写入 store 并 `navigate('/assistant')`，聊天页挂载时若有 pending 则自动发送一次。
-- 首页风险区**按需显示**：仅当存在风险点（`highRiskProjects.length > 0 || topConcerns.length > 0 || topActionItems.length > 0`）时，才在输入框下方渲染「项目风险点（AI 分析）」整块；无风险点时首页只剩输入框，不显示风险分布等其他内容。为保持极简，加载期间不显示骨架占位，数据返回后再按需出现。
+- 首页风险区**按需显示**：仅当存在**真实**风险点（`highRiskProjects.length > 0 || topActionItems.length > 0`）时，才在输入框下方渲染「项目风险点（AI 分析）」整块；无风险点时首页只剩输入框，不显示风险分布等其他内容。为保持极简，加载期间不显示骨架占位，数据返回后再按需出现。
+  - **不把 `topConcerns` 计入门槛**：后端即使无风险也会回一条「当前风险可控」之类的善意提示，若计入会导致风险区几乎总是出现（实测发现）。`topConcerns` 仅在风险区已显示时作为「AI 重点关注」内容展示。
 - 上下文项目：聊天页从 `?project=<id>` 读取作为 `propose` 的 `contextProjectId`；无则传 `null`，由 AI 从话里认目标（与现状一致）。
 
 ### 3.3 对话状态 — 新增 Zustand store `assistantChatStore.ts`
@@ -116,4 +117,4 @@ type AssistantMessage =
 5. 整页刷新后对话仍在；「新对话」清空。
 6. AI 不可用 / 没听懂 / 认不出项目 / 低置信 等状态都有对应气泡提示。
 7. `npm run lint` 0 warning；新增单测通过。
-8. 首页默认只显示对话输入框；仅当存在风险点（高风险项目 / AI 关注点 / 重点行动项任一非空）时才显示风险区，否则首页只有输入框。
+8. 首页默认只显示对话输入框；仅当存在真实风险点（高风险项目 / 重点行动项任一非空；不含善意提示 `topConcerns`）时才显示风险区，否则首页只有输入框。

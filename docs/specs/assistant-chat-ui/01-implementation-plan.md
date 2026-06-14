@@ -1448,7 +1448,8 @@ import AssistantHeroInput from '../../components/AssistantHeroInput';
 
 (c) 在 `topActionItems` 定义之后加一个「有无风险点」派生值：
 ```tsx
-  const hasRiskPoints = highRiskProjects.length > 0 || topConcerns.length > 0 || topActionItems.length > 0;
+  // 只看真实风险；topConcerns 可能是善意提示（「风险可控」），不计入门槛
+  const hasRiskPoints = highRiskProjects.length > 0 || topActionItems.length > 0;
 ```
 
 (d) 把整张「项目风险点（AI 分析）」`<Card>`（从 `{/* AI 分析出的项目风险点 */}` 注释到该 `</Card>`）整体包裹成按需渲染——仅在加载完成且有风险点时显示，去掉加载骨架与空态分支：
