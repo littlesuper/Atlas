@@ -5,6 +5,7 @@ import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // 页面组件（需要实际创建）
 const Login = React.lazy(() => import('./pages/Login'));
@@ -96,6 +97,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
+    <TooltipProvider>
     <BrowserRouter>
       <Toaster richColors position="top-center" />
       <React.Suspense
@@ -276,6 +278,7 @@ const App: React.FC = () => {
         </Routes>
       </React.Suspense>
     </BrowserRouter>
+    </TooltipProvider>
     </ErrorBoundary>
   );
 };
