@@ -77,7 +77,7 @@ describe('Login handleSubmit 逻辑', () => {
     vi.clearAllMocks();
   });
 
-  it('登录成功后跳转到 /projects', async () => {
+  it('登录成功后跳转到首页', async () => {
     mockLogin.mockResolvedValue(undefined);
     render(
       <MemoryRouter>
@@ -95,7 +95,7 @@ describe('Login handleSubmit 逻辑', () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('admin', 'password123');
-      expect(mockNavigate).toHaveBeenCalledWith('/projects', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });
 
@@ -341,7 +341,7 @@ describe('Login handleSubmit 逻辑', () => {
     fireEvent.click(screen.getByText('登录'));
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('testuser', 'password123');
-      expect(mockNavigate).toHaveBeenCalledWith('/projects', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });
 
