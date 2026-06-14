@@ -46,7 +46,7 @@ const Login: React.FC = () => {
     setLoading(true);
     try {
       await login(values.username, values.password);
-      navigate('/projects', { replace: true });
+      navigate('/', { replace: true });
     } catch {
       // 错误提示由 axios 拦截器处理
     } finally {
@@ -54,7 +54,7 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleWecomSuccess = () => navigate('/projects', { replace: true });
+  const handleWecomSuccess = () => navigate('/', { replace: true });
 
   return (
     <div className="login-container bg-muted/30 flex min-h-svh items-center justify-center p-6">
