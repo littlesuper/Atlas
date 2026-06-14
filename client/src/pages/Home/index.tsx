@@ -71,7 +71,7 @@ const Home: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="mx-auto max-w-[1080px] px-4">
+      <div className="mx-auto max-w-[1080px]">
         {/* Hero：AI 自然语言入口 */}
         <Card className="mt-6 mb-6 p-6">
           <div className="mb-2 text-center">

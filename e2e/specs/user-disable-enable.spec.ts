@@ -2,7 +2,6 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName } from '../fixtures/test-data';
 import {
   clickNavItem,
-  clickTab,
   expectMessage,
   waitForTableLoad,
   waitForPageLoad,
@@ -12,9 +11,8 @@ test.describe.serial('User Disable Enable Lifecycle @p1', () => {
   const userName = '测试禁启用_' + Date.now();
 
   async function goToUserTab(page: import('@playwright/test').Page) {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
     await page.getByText('用户管理', { exact: true }).click();
     await page.waitForTimeout(500);

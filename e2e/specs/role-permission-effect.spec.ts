@@ -2,7 +2,6 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName, credentials } from '../fixtures/test-data';
 import {
   clickNavItem,
-  clickTab,
   expectMessage,
   waitForTableLoad,
   waitForPageLoad,
@@ -17,9 +16,8 @@ test.describe.serial('Role Permission Effect @p1', () => {
   let createdRoleId: string | null = null;
 
   async function goToRoleTab(page: import('@playwright/test').Page) {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
     await page.getByText('角色管理', { exact: true }).click();
     await page.waitForTimeout(500);
@@ -27,9 +25,8 @@ test.describe.serial('Role Permission Effect @p1', () => {
   }
 
   async function goToUserTab(page: import('@playwright/test').Page) {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
     await page.getByText('用户管理', { exact: true }).click();
     await page.waitForTimeout(500);

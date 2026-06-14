@@ -40,7 +40,7 @@ describe('Login 页面渲染', () => {
         <Login />
       </MemoryRouter>,
     );
-    expect(screen.getByText('硬件管理系统')).toBeInTheDocument();
+    expect(screen.getByText('硬件项目管理')).toBeInTheDocument();
   });
 
   it('显示用户名和密码输入框', () => {
@@ -148,7 +148,7 @@ describe('Login handleSubmit 逻辑', () => {
         <Login />
       </MemoryRouter>,
     );
-    expect(screen.getByText('硬件管理系统')).toBeInTheDocument();
+    expect(screen.getByText('硬件项目管理')).toBeInTheDocument();
   });
 
   it('显示密码登录和企业微信 Tab', () => {

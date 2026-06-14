@@ -53,8 +53,8 @@ test.describe.serial('Permission Access Control @p0', () => {
 
     // Non-admin might see 403 or redirect, or a permission warning
     // The behavior depends on role permissions
-    // '系统管理' 现出现在侧边栏 nav 与顶栏标题两处（shadcn 风格），用 .first() 避免 strict-mode 多匹配
-    const hasAccess = await page.getByText('系统管理').first().isVisible({ timeout: 5_000 }).catch(() => false);
+    // 顶栏页面标题已移除；'AI管理' 现仅出现在侧边栏 nav（以及 admin 页内的 Tab），.first() 为防御性避免 strict-mode 多匹配
+    const hasAccess = await page.getByText('AI管理').first().isVisible({ timeout: 5_000 }).catch(() => false);
     const hasForbidden = await page.getByText(/无权限|403|权限不足/).isVisible({ timeout: 3_000 }).catch(() => false);
 
     // One of the two should be true - either they have access or they're blocked

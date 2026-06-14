@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import {
   clickNavItem,
-  clickTab,
   waitForTableLoad,
   waitForPageLoad,
 } from '../helpers/arco';
@@ -9,18 +8,16 @@ import {
 test.describe.serial('Audit Log View and Filter @p1', () => {
 
   test('navigate to audit log tab', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
 
     await page.waitForTimeout(1_000);
     await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('audit log table has expected columns', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
     const table = page.locator('table').first();
@@ -36,9 +33,8 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
   });
 
   test('audit log shows recent login entries', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
     const table = page.locator('table').first();
@@ -50,9 +46,8 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
   });
 
   test('filter audit log by action type', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
     const filterSelect = page.locator('[role="combobox"]').filter({
@@ -73,9 +68,8 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
   });
 
   test('filter audit log by user', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
     const userFilter = page.locator('[role="combobox"]').filter({
@@ -99,9 +93,8 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
   });
 
   test('date range filter on audit log', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
     const dateRangePicker = page.locator('.arco-picker-range').first();

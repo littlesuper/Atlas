@@ -422,14 +422,15 @@ const AdminPage: React.FC = () => {
     <MainLayout>
       <TooltipProvider>
         <Card className="p-4">
+          {visibleTabs.length === 0 && (
+            <div className="text-muted-foreground flex min-h-[40vh] flex-col items-center justify-center gap-2">
+              <div className="text-base font-medium">权限不足</div>
+              <div className="text-sm">您没有系统管理的访问权限</div>
+            </div>
+          )}
+          {/* 一级分区已平铺到左侧边栏（/admin?tab=*）；此处不再显示顶部 Tab 条，
+              内容仍由 URL ?tab= 驱动的 mainTab 控制。账号管理内的二级 Tab 保留。 */}
           <Tabs value={mainTab} onValueChange={setMainTab}>
-            <TabsList>
-              {hasPermission('system', 'ai') && <TabsTrigger value="ai">AI管理</TabsTrigger>}
-              {hasPermission('system', 'account') && <TabsTrigger value="account">账号管理</TabsTrigger>}
-              {hasPermission('system', 'account') && <TabsTrigger value="holidays">节假日</TabsTrigger>}
-              {hasPermission('system', 'audit_log') && <TabsTrigger value="audit">操作日志</TabsTrigger>}
-            </TabsList>
-
             {hasPermission('system', 'ai') && (
               <TabsContent value="ai" className="mt-4">
                 <AiManagement />

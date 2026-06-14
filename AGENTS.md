@@ -197,7 +197,7 @@ User 模型支持两种使用场景：
 - **z（提交版本）**：自动递增，每次 git commit 通过 `post-commit` Hook 自动 +1；当 x 或 y 变化时 z 重置为 1
 
 健康检查接口 `/api/health` 每次请求实时读取 `package.json` 返回 `version`（格式 `x.y.z`）
-前端右上角版本号通过 `/api/health` 动态获取，刷新页面即可看到最新版本
+前端右上角与登录页版本号通过 `/api/health` 动态获取，刷新页面即可看到最新版本
 
 ## 环境变量
 

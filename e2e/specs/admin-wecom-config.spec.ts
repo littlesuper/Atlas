@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import {
   clickNavItem,
-  clickTab,
   waitForPageLoad,
   waitForTableLoad,
 } from '../helpers/arco';
@@ -9,10 +8,8 @@ import {
 test.describe.serial('Admin WeCom Config @p2', () => {
 
   test('navigate to admin page and find wecom config tab', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
 
     const wecomTab = page.getByText('企微配置', { exact: false });
@@ -27,9 +24,8 @@ test.describe.serial('Admin WeCom Config @p2', () => {
   });
 
   test('wecom config form has expected fields', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
 
     const wecomTab = page.getByText('企微配置', { exact: false });
@@ -55,9 +51,8 @@ test.describe.serial('Admin WeCom Config @p2', () => {
   });
 
   test('wecom config save button is present', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
 
     const wecomTab = page.getByText('企微配置', { exact: false });

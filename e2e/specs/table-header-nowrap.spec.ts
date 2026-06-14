@@ -119,7 +119,7 @@ test.describe('Table header no-wrap check @p2', () => {
 
   test('admin page headers do not wrap', async ({ authedPage: page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.locator('.nav-item').filter({ hasText: '系统管理' }).click();
+    await page.locator('.nav-item').filter({ hasText: 'AI管理' }).click();
     await page.waitForTimeout(1_000);
     await waitForTableLoad(page);
     await assertNoHeaderWrap(page, 'admin');

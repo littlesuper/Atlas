@@ -7,7 +7,10 @@ import {
   FileText,
   Users,
   Package,
-  Settings,
+  Sparkles,
+  UserCog,
+  CalendarDays,
+  ScrollText,
   ChevronsUpDown,
   LogOut,
   Sun,
@@ -40,7 +43,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +70,11 @@ interface NavItemDef {
   permission?: { resource: string; action: string };
 }
 
+interface NavGroupDef {
+  label: string;
+  items: NavItemDef[];
+}
+
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,24 +87,53 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     fetch('/api/health').then((r) => r.json()).then((d) => setAppVersion(d.version || '')).catch(() => {});
   }, []);
 
-  const menuItems: NavItemDef[] = [
-    { key: '/', label: '首页', path: '/', icon: Home },
-    { key: '/projects', label: '项目管理', path: '/projects', icon: FolderKanban },
-    { key: '/risk-dashboard', label: '风险总览', path: '/risk-dashboard', icon: ShieldAlert },
-    { key: '/weekly-reports', label: '项目周报', path: '/weekly-reports', icon: FileText },
-    { key: '/workload', label: '项目资源', path: '/workload', icon: Users },
-    { key: '/products', label: '产品管理', path: '/products', icon: Package },
-    { key: '/admin', label: '系统管理', path: '/admin', icon: Settings, permission: { resource: 'user', action: 'read' } },
+  const navGroups: NavGroupDef[] = [
+    {
+      label: '概览',
+      items: [{ key: '/', label: '首页', path: '/', icon: Home }],
+    },
+    {
+      label: '项目',
+      items: [
+        { key: '/projects', label: '项目管理', path: '/projects', icon: FolderKanban },
+        { key: '/weekly-reports', label: '项目周报', path: '/weekly-reports', icon: FileText },
+        { key: '/risk-dashboard', label: '风险总览', path: '/risk-dashboard', icon: ShieldAlert },
+        { key: '/workload', label: '项目资源', path: '/workload', icon: Users },
+      ],
+    },
+    {
+      label: '产品',
+      items: [{ key: '/products', label: '产品管理', path: '/products', icon: Package }],
+    },
+    {
+      // 系统设置的一级菜单直接平铺到侧边栏（替代原「系统管理」单项），各项跳到 /admin?tab=*
+      label: '系统',
+      items: [
+        { key: '/admin?tab=ai', label: 'AI管理', path: '/admin?tab=ai', icon: Sparkles, permission: { resource: 'system', action: 'ai' } },
+        { key: '/admin?tab=account', label: '账号管理', path: '/admin?tab=account', icon: UserCog, permission: { resource: 'system', action: 'account' } },
+        { key: '/admin?tab=holidays', label: '节假日', path: '/admin?tab=holidays', icon: CalendarDays, permission: { resource: 'system', action: 'account' } },
+        { key: '/admin?tab=audit', label: '操作日志', path: '/admin?tab=audit', icon: ScrollText, permission: { resource: 'system', action: 'audit_log' } },
+      ],
+    },
   ];
 
-  const visibleMenuItems = menuItems.filter((item) =>
-    item.permission ? hasPermission(item.permission.resource, item.permission.action) : true
-  );
-  const isActive = (path: string) =>
-    path === '/' ? location.pathname === '/' : location.pathname === path || location.pathname.startsWith(path + '/');
-  const platformItems = visibleMenuItems.filter((i) => i.key !== '/admin');
-  const systemItems = visibleMenuItems.filter((i) => i.key === '/admin');
-  const activeTitle = visibleMenuItems.find((i) => isActive(i.path))?.label ?? '';
+  const currentTab = new URLSearchParams(location.search).get('tab');
+  // 含 ?tab= 的项（系统设置子项）按 pathname + tab 精确匹配；其余按路径前缀匹配
+  const isActive = (item: NavItemDef) => {
+    const [itemPath, itemQuery] = item.path.split('?');
+    if (itemQuery) {
+      const itemTab = new URLSearchParams(itemQuery).get('tab');
+      return location.pathname === itemPath && currentTab === itemTab;
+    }
+    if (itemPath === '/') return location.pathname === '/';
+    return location.pathname === itemPath || location.pathname.startsWith(itemPath + '/');
+  };
+  const hasItemPermission = (item: NavItemDef) =>
+    item.permission ? hasPermission(item.permission.resource, item.permission.action) : true;
+  // 过滤掉无可见项的分组（无任何 system:* 权限时「系统」整组隐藏）
+  const visibleGroups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter(hasItemPermission) }))
+    .filter((group) => group.items.length > 0);
 
   const projectMatch = location.pathname.match(/^\/projects\/([^/]+)/);
   const routeProjectId = projectMatch && projectMatch[1] !== 'new' ? projectMatch[1] : null;
@@ -111,7 +147,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <SidebarMenuItem key={item.key}>
           <SidebarMenuButton
             className="nav-item"
-            isActive={isActive(item.path)}
+            isActive={isActive(item)}
             tooltip={item.label}
             onClick={() => navigate(item.path)}
           >
@@ -128,17 +164,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                onClick={() => navigate('/')}
-                className="data-[slot=sidebar-menu-button]:!p-1.5"
-              >
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
-                  <img src="/logo.png" alt="贝锐科技" className="size-6 object-contain" />
+              <SidebarMenuButton size="lg" onClick={() => navigate('/')} className="gap-1.5">
+                {/* shrink-0：收起时按钮被压成 32px 图标槽，没有它 flex 会把图标挤成长方形 → 变形 */}
+                <div className="flex aspect-square size-8 shrink-0 items-center justify-center">
+                  <img src="/logo.png" alt="贝锐科技" className="size-8 object-contain" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Atlas</span>
-                  <span className="text-muted-foreground truncate text-xs">贝锐科技</span>
+                <div className="grid flex-1 text-left text-lg leading-tight">
+                  <span className="truncate font-medium">硬件项目管理</span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -146,20 +178,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>平台</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>{renderItems(platformItems)}</SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          {systemItems.length > 0 && (
-            <SidebarGroup>
-              <SidebarGroupLabel>系统</SidebarGroupLabel>
+          {visibleGroups.map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>{renderItems(systemItems)}</SidebarMenu>
+                <SidebarMenu>{renderItems(group.items)}</SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-          )}
+          ))}
         </SidebarContent>
 
         <SidebarFooter>
@@ -200,8 +226,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       <SidebarInset>
         <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
-          {activeTitle && <h1 className="text-base font-medium">{activeTitle}</h1>}
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell />
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="切换主题">

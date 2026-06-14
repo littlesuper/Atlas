@@ -11,7 +11,7 @@ test.describe.serial('Full Navigation Coverage @p1', () => {
     await expect(page.getByText('产品管理').first()).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText('项目资源').first()).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText('项目周报').first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('系统管理').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('AI管理').first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('navigate to each major section and verify URL', async ({ authedPage: page }) => {
@@ -44,7 +44,7 @@ test.describe.serial('Full Navigation Coverage @p1', () => {
   });
 
   test('admin page shows all sub-tabs', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await waitForPageLoad(page);
 
     await expect(page.getByText('AI管理').first()).toBeVisible({ timeout: 5_000 });

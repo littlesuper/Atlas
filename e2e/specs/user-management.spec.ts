@@ -2,7 +2,6 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName } from '../fixtures/test-data';
 import {
   clickNavItem,
-  clickTab,
   expectMessage,
   confirmModal,
   waitForTableLoad,
@@ -24,9 +23,8 @@ test.describe.serial('User Management @p1', () => {
   const contactUserName = '测试联系人_' + Date.now();
 
   async function goToUserTab(page: import('@playwright/test').Page) {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
     await page.getByText('用户管理', { exact: true }).click();
     await page.waitForTimeout(500);

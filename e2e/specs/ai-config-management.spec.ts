@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import {
   clickNavItem,
-  clickTab,
   waitForTableLoad,
   waitForPageLoad,
 } from '../helpers/arco';
@@ -9,18 +8,16 @@ import {
 test.describe.serial('AI Config Management @p1', () => {
 
   test('navigate to AI config tab', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await waitForPageLoad(page);
-    await clickTab(page, 'AI管理');
 
     await page.waitForTimeout(1_000);
     await expect(page.getByText('API 配置')).toBeVisible({ timeout: 5_000 });
   });
 
   test('view token usage statistics', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await waitForPageLoad(page);
-    await clickTab(page, 'AI管理');
     await page.waitForTimeout(1_000);
 
     const statsSection = page.getByText('Token 使用统计');
@@ -32,9 +29,8 @@ test.describe.serial('AI Config Management @p1', () => {
   });
 
   test('create AI config drawer opens with correct fields', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await waitForPageLoad(page);
-    await clickTab(page, 'AI管理');
     await page.waitForTimeout(1_000);
 
     const createBtn = page.getByRole('button', { name: /新建配置/ });
@@ -75,9 +71,8 @@ test.describe.serial('AI Config Management @p1', () => {
   });
 
   test('empty state or config list displays', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await waitForPageLoad(page);
-    await clickTab(page, 'AI管理');
     await page.waitForTimeout(1_000);
 
     const hasConfig = await page.getByText(/暂无AI配置/).isVisible({ timeout: 3_000 }).catch(() => false);
