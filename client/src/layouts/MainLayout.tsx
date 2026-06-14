@@ -11,6 +11,7 @@ import {
   UserCog,
   CalendarDays,
   ScrollText,
+  Bot,
   ChevronsUpDown,
   LogOut,
   Sun,
@@ -90,7 +91,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navGroups: NavGroupDef[] = [
     {
       label: '概览',
-      items: [{ key: '/', label: '首页', path: '/', icon: Home }],
+      items: [
+        { key: '/', label: '首页', path: '/', icon: Home },
+        { key: '/assistant', label: 'AI 助手', path: '/assistant', icon: Bot, permission: { resource: 'activity', action: 'update' } },
+      ],
     },
     {
       label: '项目',
@@ -225,10 +229,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       <SidebarInset>
         <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
+          <SidebarTrigger className="-ml-1" size="icon-lg" />
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell />
-            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="切换主题">
+            <Button variant="ghost" size="icon-lg" onClick={toggleTheme} aria-label="切换主题">
               {theme === 'light' ? <Moon /> : <Sun />}
             </Button>
           </div>
@@ -252,7 +256,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       </AlertDialog>
 
       {/* 全局 AI 助手浮层；首页已有 hero 输入 */}
-      {canUseAssistant && location.pathname !== '/' && <AssistantLauncher projectId={routeProjectId} />}
+      {canUseAssistant && location.pathname !== '/' && location.pathname !== '/assistant' && (
+        <AssistantLauncher projectId={routeProjectId} />
+      )}
     </SidebarProvider>
   );
 };
