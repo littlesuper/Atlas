@@ -7,6 +7,8 @@
 | 文件 | 用途 |
 |------|------|
 | `README.md` | 本文件。环境/命令/执行流程 |
+| `GLM-QA-GUIDE.md` | **GLM-QA 闭环**操作手册：找 bug → 写失败测试 → 交 Claude 修源码（见 §8） |
+| `bugs/_TEMPLATE.md` | bug 报告模板（`qa-bug` PR 的 body 来源） |
 | `test-plan.md` | **完整测试用例**（380+ 条，16 个模块） |
 | `prod-deploy-validation.md` | 生产部署验证用例（42 条） |
 | `reports/run-20260428.md` | 测试执行报告（最新） |
@@ -106,6 +108,7 @@ npm run test:e2e:reuse -- --grep @smoke
 3. **第三遍：跑全量 + 修复**
    - 跑 P0 全量并修复，直至全绿
    - 然后跑 P1，最后 P2/P3
+   - ⚠️ **源码 bug 不在此自行修改**：若失败根因是产品源码缺陷（而非测试本身脆弱/过时），改走 **GLM-QA 闭环**——写一个复现的失败测试 + 开 `qa-bug` PR 交 Claude 修（见 §8 与 `GLM-QA-GUIDE.md`）。opencode/GLM 在此只修测试侧问题（过时断言、选择器、mock 等）。
 
 ## 4. 用例 ID 命名约定
 
@@ -155,3 +158,12 @@ npm run test:e2e:reuse -- --grep @smoke
 - `dev.db` 在测试间共享，破坏性用例（DELETE/批量）后建议恢复 seed
 - AI 相关用例未配置 `AI_API_KEY` 时会熔断 → 用例需 mock 或跳过
 - 企微 OAuth 用例需 mock 上游（`server/src/routes/auth.ts` 中 wecom API）
+
+## 8. GLM-QA 闭环：源码 bug → Claude 修
+
+与上面「补覆盖」流程互补的另一条线：**GLM 找产品 bug，但不自己改源码**。
+
+- **谁修源码**：源码 bug 一律交 **Claude Code**；GLM/opencode 不碰 `client/src/**`、`server/src/**`（opencode `permission.edit` 已硬拦截，见根目录 `opencode.json`）。
+- **交接契约**：GLM 写一个**当前会失败**的测试复现 bug，开 draft PR 打 `qa-bug` 标签（CI 红）；Claude 在同分支改源码修绿（不动测试）；GLM 复测确认绿后 `gh pr ready`。
+- **怎么做**：详见 `GLM-QA-GUIDE.md`（GLM 的操作手册，也是 opencode `qa` agent 的 system prompt）。
+- **为什么这样**：源于「LLM 只在边缘、必须有确定性证据」的安全模型——没有真红的测试不算 bug，没有真绿不算修好，CI 当裁判。完整设计见 `docs/superpowers/specs/2026-06-14-glm-qa-pipeline-design.md`。
