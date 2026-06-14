@@ -1,0 +1,31 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "qa": {
+      "description": "GLM QA：找 bug、写失败测试、开 qa-bug PR，不改源码",
+      "mode": "primary",
+      "model": "zai/glm-5.1",
+      "prompt": "{file:./docs/qa/GLM-QA-GUIDE.md}",
+      "temperature": 0.2,
+      "permission": {
+        "edit": {
+          "*": "allow",
+          "client/src/**": "deny",
+          "server/src/**": "deny",
+          "**/*.test.ts": "allow",
+          "**/*.test.tsx": "allow",
+          "e2e/**": "allow",
+          "docs/qa/**": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "git *": "allow",
+          "gh *": "allow",
+          "npm test*": "allow",
+          "npx vitest*": "allow",
+          "npx playwright*": "allow"
+        }
+      }
+    }
+  }
+}
