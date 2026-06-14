@@ -41,7 +41,7 @@ test.describe.serial('Product Management @p1', () => {
     await waitForTableLoad(page);
 
     const row = page.locator('tbody tr').filter({ hasText: productName });
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('button[aria-label*="删除"]').click();
 
     await confirmModal(page);
     await expectMessage(page, '产品删除成功');

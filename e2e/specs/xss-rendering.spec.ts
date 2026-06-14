@@ -114,7 +114,7 @@ test.describe.serial('XSS Rendering Verification @smoke', () => {
     await page.goto(`/projects/${projectId}`);
     await waitForTableLoad(page);
 
-    const editIcon = page.locator('tbody tbody tr').first().locator('[aria-label*="编辑"]').first();
+    const editIcon = page.locator('tbody tr').first().locator('[aria-label*="编辑"]').first();
     await editIcon.click();
     await expect(page.getByText('编辑活动')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(1_000);
@@ -133,7 +133,7 @@ test.describe.serial('XSS Rendering Verification @smoke', () => {
     await searchProject(page, projectName);
 
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();

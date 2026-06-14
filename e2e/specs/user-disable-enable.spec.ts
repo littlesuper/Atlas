@@ -177,7 +177,7 @@ test.describe.serial('User Disable Enable Lifecycle @p1', () => {
 
     const row = page.locator('tbody tr').filter({ hasText: userName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await row.locator('button[class*="danger"]').click();
+      await row.locator('button[aria-label*="删除"]').click();
       await page.waitForTimeout(500);
       const confirmBtn = page.locator('[data-slot="dialog-footer"] .arco-btn-primary');
       if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {

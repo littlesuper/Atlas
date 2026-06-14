@@ -174,7 +174,7 @@ test.describe.serial('Product Advanced Features @p1', () => {
     for (let i = 0; i < count; i++) {
       const row = page.locator('tbody tr').filter({ hasText: updatedProductName }).first();
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await row.locator('button[class*="danger"]').click();
+        await row.locator('button[aria-label*="删除"]').click();
         await confirmModal(page);
         await page.waitForTimeout(1_000);
         await waitForTableLoad(page);

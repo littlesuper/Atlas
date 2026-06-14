@@ -189,7 +189,7 @@ test.describe.serial('User Management @p1', () => {
     // Delete first user
     const row1 = page.locator('tbody tr').filter({ hasText: loginUserName });
     if (await row1.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await row1.locator('button[class*="danger"]').click();
+      await row1.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await page.waitForTimeout(1_000);
     }
@@ -197,7 +197,7 @@ test.describe.serial('User Management @p1', () => {
     // Delete second user
     const row2 = page.locator('tbody tr').filter({ hasText: contactUserName });
     if (await row2.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await row2.locator('button[class*="danger"]').click();
+      await row2.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await page.waitForTimeout(1_000);
     }

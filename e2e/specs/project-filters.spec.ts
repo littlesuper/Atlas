@@ -25,21 +25,21 @@ test.describe('Project List Filters @p1', () => {
   test('clicking product line tag toggles filter', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 
-    const totalRows = await page.locator('tbody tbody tr').count();
+    const totalRows = await page.locator('tbody tr').count();
 
     // Uncheck 向日葵 (should keep at least 蒲公英)
     const sunflowerTag = page.locator('[data-slot="badge"]').filter({ hasText: '向日葵' });
     await sunflowerTag.click();
     await waitForTableLoad(page);
 
-    const filteredRows = await page.locator('tbody tbody tr').count();
+    const filteredRows = await page.locator('tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // Re-check 向日葵
     await sunflowerTag.click();
     await waitForTableLoad(page);
 
-    const restoredRows = await page.locator('tbody tbody tr').count();
+    const restoredRows = await page.locator('tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 

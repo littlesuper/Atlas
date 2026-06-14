@@ -35,10 +35,10 @@ test.describe('Detail page refactor smoke test @p2', () => {
     await navigateToFirstProject(page);
 
     // Wait for activity table to load (compact-table has scroll.y → tbody exists)
-    await page.waitForSelector('.compact-table table', { timeout: 15000 });
+    await page.waitForSelector('.compact-table', { timeout: 15000 });
 
     // Check key column headers exist
-    const headers = page.locator('.compact-table table thead th');
+    const headers = page.locator('.compact-table thead th');
     const headerTexts = await headers.allTextContents();
     const joinedHeaders = headerTexts.join(' ');
 
@@ -52,10 +52,10 @@ test.describe('Detail page refactor smoke test @p2', () => {
     await navigateToFirstProject(page);
 
     // Wait for activity table rows
-    await page.waitForSelector('.compact-table table tbody tr', { timeout: 15000 });
+    await page.waitForSelector('.compact-table tbody tr', { timeout: 15000 });
 
     // Find and click edit icon on first activity row
-    const editIcon = page.locator('.compact-table table tbody tr').first().locator('[class*="icon-edit"]').first();
+    const editIcon = page.locator('.compact-table tbody tr').first().locator('[class*="icon-edit"]').first();
     if (await editIcon.isVisible()) {
       await editIcon.click();
 

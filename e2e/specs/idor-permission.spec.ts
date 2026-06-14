@@ -124,7 +124,7 @@ test.describe.serial('IDOR & Cross-Project Permission @smoke', () => {
       await searchProject(page, name);
 
       const row = page.locator('tbody tr').filter({ hasText: name }).first();
-      const delBtn = row.locator('button[class*="danger"]').first();
+      const delBtn = row.locator('button[aria-label*="删除"]').first();
       if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await delBtn.click();
         await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();

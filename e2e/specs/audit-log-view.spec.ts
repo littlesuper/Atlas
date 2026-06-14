@@ -44,7 +44,7 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
     const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10_000 });
 
-    const rows = table.locator('tbody tbody tr');
+    const rows = table.locator('tbody tr');
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(0);
   });

@@ -96,7 +96,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await page.reload();
     await waitForTableLoad(page);
 
-    const durCell = page.locator('tbody tbody tr').first().locator('td').filter({ hasText: /^5$/ });
+    const durCell = page.locator('tbody tr').first().locator('td').filter({ hasText: /^5$/ });
     if (await durCell.count() > 0) {
       await durCell.first().click();
       await page.waitForTimeout(300);
@@ -106,7 +106,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
@@ -143,13 +143,13 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await waitForTableLoad(page);
     await page.waitForTimeout(500);
 
-    const dragHandles = page.locator('tbody tbody tr .drag-handle');
+    const dragHandles = page.locator('tbody tr .drag-handle');
     const handleCount = await dragHandles.count();
     expect(handleCount).toBeGreaterThanOrEqual(3);
 
     if (handleCount >= 2) {
       const firstHandle = dragHandles.first();
-      const thirdRow = page.locator('tbody tbody tr').nth(2);
+      const thirdRow = page.locator('tbody tr').nth(2);
       const box = await thirdRow.boundingBox();
       if (box) {
         await firstHandle.dispatchEvent('mousedown');
@@ -170,7 +170,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
@@ -213,7 +213,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await page.reload();
     await waitForTableLoad(page);
 
-    const editIcon = page.locator('tbody tbody tr').first().locator('[aria-label*="编辑"]').first();
+    const editIcon = page.locator('tbody tr').first().locator('[aria-label*="编辑"]').first();
     await editIcon.click();
     await expect(page.getByText('编辑活动')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(1_000);
@@ -233,7 +233,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
@@ -269,7 +269,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await waitForTableLoad(page);
     await page.waitForTimeout(500);
 
-    const deleteIcon = page.locator('tbody tbody tr').first().locator('[aria-label*="删除"]').first();
+    const deleteIcon = page.locator('tbody tr').first().locator('[aria-label*="删除"]').first();
     if (await deleteIcon.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await deleteIcon.click();
       await page.waitForTimeout(500);
@@ -285,7 +285,7 @@ test.describe.serial('Frontend Interaction Details @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();

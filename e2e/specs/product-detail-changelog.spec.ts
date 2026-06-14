@@ -130,7 +130,7 @@ test.describe.serial('Product Detail Changelog @p2', () => {
 
     const productRow = page.locator('tbody tr').filter({ hasText: updatedName });
     if (await productRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await productRow.locator('button[class*="danger"]').click();
+      await productRow.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await page.waitForTimeout(1_000);
     }
@@ -140,7 +140,7 @@ test.describe.serial('Product Detail Changelog @p2', () => {
     await searchProject(page, projectName);
     const projectRow = page.locator('tbody tr').filter({ hasText: projectName });
     if (await projectRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await projectRow.locator('button[class*="danger"]').click();
+      await projectRow.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await expectMessage(page, '项目删除成功');
     }

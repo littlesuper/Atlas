@@ -132,7 +132,7 @@ test.describe.serial('Activity Inline Editing @p1', () => {
   test('inline edit activity type', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').first();
+    const row = page.locator('tbody tr').first();
     const typeCell = row.locator('td').filter({ hasText: /任务|里程碑/ });
 
     if (await typeCell.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -210,7 +210,7 @@ test.describe.serial('Activity Inline Editing @p1', () => {
     await searchProject(page, projectName);
 
     const row = page.locator('tbody tr').filter({ hasText: projectName });
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('button[aria-label*="删除"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');
   });

@@ -58,7 +58,7 @@ test.describe.serial('Activity Management @smoke', () => {
     await searchProject(page, projectName);
 
     const row = page.locator('tbody tr').filter({ hasText: projectName });
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('button[aria-label*="删除"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');
   });

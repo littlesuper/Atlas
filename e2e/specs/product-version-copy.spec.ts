@@ -128,7 +128,7 @@ test.describe.serial('Product Version Copy @p1', () => {
 
     let row = page.locator('tbody tr').filter({ hasText: productName }).first();
     while (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await row.locator('button[class*="danger"]').click();
+      await row.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await page.waitForTimeout(1_000);
       await waitForTableLoad(page);
@@ -140,7 +140,7 @@ test.describe.serial('Product Version Copy @p1', () => {
     await searchProject(page, projectName);
     const projectRow = page.locator('tbody tr').filter({ hasText: projectName });
     if (await projectRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await projectRow.locator('button[class*="danger"]').click();
+      await projectRow.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await expectMessage(page, '项目删除成功');
     }

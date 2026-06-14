@@ -159,7 +159,7 @@ test.describe.serial('Product Comparison @p1', () => {
       const row = page.locator('tbody tr').filter({ hasText: name });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
         // Find delete button (icon)
-        const deleteBtn = row.locator('button[class*="danger"]').first();
+        const deleteBtn = row.locator('button[aria-label*="删除"]').first();
         if (await deleteBtn.isVisible()) {
           await deleteBtn.click();
           await confirmModal(page);

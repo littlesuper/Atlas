@@ -67,7 +67,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await goToProject(page);
 
     // Each row should have a drag handle (typically an icon in the first column)
-    const rows = page.locator('tbody tbody tr');
+    const rows = page.locator('tbody tr');
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThanOrEqual(3);
 
@@ -92,7 +92,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await goToProject(page);
 
     // Get the initial order of activities
-    const rows = page.locator('tbody tbody tr');
+    const rows = page.locator('tbody tr');
     const initialCount = await rows.count();
     expect(initialCount).toBeGreaterThanOrEqual(3);
 
@@ -160,7 +160,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
 
     const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await row.locator('button[class*="danger"]').click();
+      await row.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await expectMessage(page, '项目删除成功');
     }

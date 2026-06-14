@@ -89,7 +89,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
   test('inline edit plan start date via date picker', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // 点击「计划开始」列的单元格（显示为 "-"），触发 AutoOpenDatePicker
@@ -127,7 +127,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
   test('inline edit plan duration updates end date', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // 点击「计划工期」列
@@ -159,7 +159,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
   test('date cells display correct format', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // 日期列使用 YY年MM月DD日 格式 或 "-"
@@ -184,7 +184,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
     await searchProject(page, projectName);
 
     const row = page.locator('tbody tr').filter({ hasText: projectName });
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('button[aria-label*="删除"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');
   });
