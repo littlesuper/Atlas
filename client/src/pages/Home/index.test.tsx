@@ -29,11 +29,8 @@ vi.mock('./MessageList', () => ({
   default: ({ messages }: { messages: AssistantMessage[] }) => <div data-testid="message-list">{messages.length}</div>,
 }));
 vi.mock('./ChatInput', () => ({
-  default: ({ onSend, onNewChat }: { onSend: () => void; onNewChat: () => void }) => (
-    <div>
-      <button data-testid="chat-send" onClick={onSend}>send</button>
-      <button data-testid="chat-new" onClick={onNewChat}>new</button>
-    </div>
+  default: ({ onSend }: { onSend: () => void }) => (
+    <button data-testid="chat-send" onClick={onSend}>send</button>
   ),
 }));
 
@@ -47,19 +44,28 @@ beforeEach(() => {
 });
 
 describe('Home (AI 聊天首页)', () => {
-  it('空态显示问候/示例与按需风险区', () => {
+  it('空态显示问候/示例与按需风险区,无「新对话」按钮', () => {
     renderAt('/');
     expect(screen.getByTestId('empty-pick')).toBeInTheDocument();
     expect(screen.getByTestId('risk-overview')).toBeInTheDocument();
     expect(screen.queryByTestId('message-list')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '新对话' })).not.toBeInTheDocument();
   });
 
-  it('有对话时显示消息流,隐藏空态与风险区', () => {
+  it('有对话时显示消息流与顶部「新对话」按钮,隐藏空态与风险区', () => {
     h.messages = [{ id: '1', role: 'user', text: '你好' }];
     renderAt('/');
     expect(screen.getByTestId('message-list')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '新对话' })).toBeInTheDocument();
     expect(screen.queryByTestId('empty-pick')).not.toBeInTheDocument();
     expect(screen.queryByTestId('risk-overview')).not.toBeInTheDocument();
+  });
+
+  it('点顶部「新对话」调用 reset', () => {
+    h.messages = [{ id: '1', role: 'user', text: '你好' }];
+    renderAt('/');
+    fireEvent.click(screen.getByRole('button', { name: '新对话' }));
+    expect(h.reset).toHaveBeenCalled();
   });
 
   it('发送时带上 ?project= 上下文', () => {
@@ -72,11 +78,5 @@ describe('Home (AI 聊天首页)', () => {
     renderAt('/');
     fireEvent.click(screen.getByTestId('empty-pick'));
     expect(h.send).toHaveBeenCalledWith('问一句', null);
-  });
-
-  it('新对话调用 reset', () => {
-    renderAt('/');
-    fireEvent.click(screen.getByTestId('chat-new'));
-    expect(h.reset).toHaveBeenCalled();
   });
 });
