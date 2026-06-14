@@ -2,13 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, TriangleAlert } from 'lucide-react';
 import MainLayout from '../../layouts/MainLayout';
-import AssistantConversation from '../../components/AssistantConversation';
+import AssistantHeroInput from '../../components/AssistantHeroInput';
 import { riskApi } from '../../api';
 import { RiskDashboardData, RiskDashboardInsights } from '../../types';
 import { RISK_LEVEL_MAP } from '../../utils/constants';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const DISTRIBUTION: Array<{ key: keyof RiskDashboardData['riskDistribution']; label: string; num: string }> = [
@@ -68,6 +67,7 @@ const Home: React.FC = () => {
   );
   const topConcerns = insights?.topConcerns ?? [];
   const topActionItems = dashboard?.topActionItems ?? [];
+  const hasRiskPoints = highRiskProjects.length > 0 || topConcerns.length > 0 || topActionItems.length > 0;
 
   return (
     <MainLayout>
@@ -84,57 +84,44 @@ const Home: React.FC = () => {
             </p>
           </div>
           <div className="mx-auto mt-3 max-w-[720px]">
-            <AssistantConversation projectId={null} variant="hero" />
+            <AssistantHeroInput />
           </div>
         </Card>
 
-        {/* AI 分析出的项目风险点 */}
-        <Card className="mb-8 p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <TriangleAlert className="size-[18px] text-amber-500" />
-            <h3 className="text-base font-semibold">项目风险点（AI 分析）</h3>
-          </div>
-
-          {loading ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16" />
-                ))}
-              </div>
-              <Skeleton className="h-32 w-full" />
+        {/* AI 分析出的项目风险点：默认不显示，仅当有风险点时才出现 */}
+        {!loading && dashboard && hasRiskPoints && (
+          <Card className="mb-8 p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <TriangleAlert className="size-[18px] text-amber-500" />
+              <h3 className="text-base font-semibold">项目风险点（AI 分析）</h3>
             </div>
-          ) : !dashboard ? (
-            <div className="text-muted-foreground py-10 text-center text-sm">暂无风险分析数据</div>
-          ) : (
-            <>
-              {/* 风险等级分布 */}
-              <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {DISTRIBUTION.map((d) => (
-                  <Card key={d.key} className="p-3 text-center shadow-none">
-                    <div className={cn('text-2xl font-bold', d.num)}>{dashboard.riskDistribution[d.key] ?? 0}</div>
-                    <div className="text-muted-foreground mt-0.5 text-xs">{d.label}</div>
-                  </Card>
-                ))}
+
+            {/* 风险等级分布 */}
+            <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {DISTRIBUTION.map((d) => (
+                <Card key={d.key} className="p-3 text-center shadow-none">
+                  <div className={cn('text-2xl font-bold', d.num)}>{dashboard.riskDistribution[d.key] ?? 0}</div>
+                  <div className="text-muted-foreground mt-0.5 text-xs">{d.label}</div>
+                </Card>
+              ))}
+            </div>
+
+            {/* AI 关注点 */}
+            {topConcerns.length > 0 && (
+              <div className="mb-5">
+                <div className="text-sm font-semibold">AI 重点关注</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {topConcerns.map((c, i) => (
+                    <li key={i} className="text-muted-foreground text-sm">{c}</li>
+                  ))}
+                </ul>
               </div>
+            )}
 
-              {/* AI 关注点 */}
-              {topConcerns.length > 0 && (
-                <div className="mb-5">
-                  <div className="text-sm font-semibold">AI 重点关注</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {topConcerns.map((c, i) => (
-                      <li key={i} className="text-muted-foreground text-sm">{c}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* 高风险项目 */}
-              <div className="text-sm font-semibold">高风险项目</div>
-              {highRiskProjects.length === 0 ? (
-                <div className="text-muted-foreground py-6 text-center text-sm">暂无高风险项目</div>
-              ) : (
+            {/* 高风险项目 */}
+            {highRiskProjects.length > 0 && (
+              <>
+                <div className="text-sm font-semibold">高风险项目</div>
                 <div className="mt-2 mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {highRiskProjects.slice(0, 6).map((p) => {
                     const meta = RISK_LEVEL_MAP[p.riskLevel as keyof typeof RISK_LEVEL_MAP];
@@ -150,39 +137,37 @@ const Home: React.FC = () => {
                             {meta?.label || p.riskLevel}
                           </Badge>
                         </div>
-                        {p.aiInsights && (
-                          <p className="text-muted-foreground mt-2 line-clamp-2 text-xs">{p.aiInsights}</p>
-                        )}
+                        {p.aiInsights && <p className="text-muted-foreground mt-2 line-clamp-2 text-xs">{p.aiInsights}</p>}
                       </Card>
                     );
                   })}
                 </div>
-              )}
+              </>
+            )}
 
-              {/* 重点行动项 */}
-              {topActionItems.length > 0 && (
-                <div>
-                  <div className="text-sm font-semibold">重点行动项</div>
-                  <div className="mt-2">
-                    {topActionItems.slice(0, 8).map((item, i) => (
-                      <div
-                        key={i}
-                        className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 border-b py-1.5 last:border-b-0"
-                        onClick={() => navigate(`/projects/${item.projectId}`)}
-                      >
-                        <Badge variant="outline" className={cn('shrink-0', PRIORITY_BADGE[item.priority] || '')}>
-                          {item.priority}
-                        </Badge>
-                        <span className="text-[13px]">{item.action}</span>
-                        <span className="text-muted-foreground ml-auto text-xs">{item.projectName}</span>
-                      </div>
-                    ))}
-                  </div>
+            {/* 重点行动项 */}
+            {topActionItems.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold">重点行动项</div>
+                <div className="mt-2">
+                  {topActionItems.slice(0, 8).map((item, i) => (
+                    <div
+                      key={i}
+                      className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 border-b py-1.5 last:border-b-0"
+                      onClick={() => navigate(`/projects/${item.projectId}`)}
+                    >
+                      <Badge variant="outline" className={cn('shrink-0', PRIORITY_BADGE[item.priority] || '')}>
+                        {item.priority}
+                      </Badge>
+                      <span className="text-[13px]">{item.action}</span>
+                      <span className="text-muted-foreground ml-auto text-xs">{item.projectName}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </>
-          )}
-        </Card>
+              </div>
+            )}
+          </Card>
+        )}
       </div>
     </MainLayout>
   );
