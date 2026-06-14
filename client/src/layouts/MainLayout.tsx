@@ -234,7 +234,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        <div className="page-content">{children}</div>
+        {/* 首页是全屏聊天：去掉 page-content 的 24px padding 并固定为视口高度，
+            否则 padding + 子页 h-full 叠加会把底部输入框顶出可视区 */}
+        <div
+          className="page-content"
+          style={location.pathname === '/' ? { padding: 0, height: 'calc(100vh - 56px)', minHeight: 0 } : undefined}
+        >
+          {children}
+        </div>
       </SidebarInset>
 
       {/* 退出确认 */}
