@@ -67,7 +67,9 @@ const Home: React.FC = () => {
   );
   const topConcerns = insights?.topConcerns ?? [];
   const topActionItems = dashboard?.topActionItems ?? [];
-  const hasRiskPoints = highRiskProjects.length > 0 || topConcerns.length > 0 || topActionItems.length > 0;
+  // 「有风险点」只看真实风险（高风险项目 / 重点行动项）；topConcerns 可能是
+  // 「当前风险可控」之类的善意提示，不应触发风险区显示（否则首页几乎总会出现）
+  const hasRiskPoints = highRiskProjects.length > 0 || topActionItems.length > 0;
 
   return (
     <MainLayout>

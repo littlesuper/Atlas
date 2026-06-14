@@ -60,11 +60,12 @@ describe('Home (AI 首页)', () => {
     expect(screen.getByText('尽快补齐固件联调资源')).toBeInTheDocument();
   });
 
-  it('hides the risk section entirely when there are no risk points', async () => {
+  it('hides the risk section when only a benign concern exists (no real risk points)', async () => {
     mockGetDashboard.mockResolvedValueOnce({
       data: { ...dashboard, projects: [dashboard.projects[1]], topActionItems: [] }, // 仅 LOW，无行动项
     });
-    mockGetInsights.mockResolvedValueOnce({ data: { ...insights, topConcerns: [] } });
+    // 善意提示（非真实风险）不应触发风险区：topConcerns 非空但无高风险项目/行动项
+    mockGetInsights.mockResolvedValueOnce({ data: { ...insights, topConcerns: ['当前所有项目风险等级在可控范围内'] } });
     renderHome();
     // hero 始终在；等渲染稳定后断言风险区缺席
     expect(screen.getByTestId('hero-input')).toBeInTheDocument();
