@@ -72,7 +72,7 @@ test.describe('Layout & Navigation @p1', () => {
     await expect(headerRow).toBeVisible();
 
     // Should have body rows
-    const bodyRows = table.locator('tbody tbody tr, tbody tbody tr');
+    const bodyRows = table.locator('tbody tr, tbody tr');
     const rowCount = await bodyRows.count();
     expect(rowCount).toBeGreaterThanOrEqual(0);
   });

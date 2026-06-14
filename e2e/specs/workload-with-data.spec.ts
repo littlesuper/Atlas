@@ -108,7 +108,7 @@ test.describe.serial('Workload With Project Data @p1', () => {
 
     const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await row.locator('button[class*="danger"]').click();
+      await row.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await expectMessage(page, '项目删除成功');
     }

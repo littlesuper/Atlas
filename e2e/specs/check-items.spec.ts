@@ -17,7 +17,7 @@ test.describe.serial('Check Items @p1', () => {
   }
 
   async function openActivityDrawer(page: import('@playwright/test').Page) {
-    const editIcon = page.locator('tbody tbody tr').first().locator('[aria-label*="编辑"]').first();
+    const editIcon = page.locator('tbody tr').first().locator('[aria-label*="编辑"]').first();
     await editIcon.click();
     await expect(page.getByText('编辑活动')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(500);
@@ -125,7 +125,7 @@ test.describe.serial('Check Items @p1', () => {
     await page.goto(`/projects/${projectId}`);
     await waitForTableLoad(page);
 
-    const checkItemsCell = page.locator('tbody tbody tr').first().locator('td').filter({ hasText: /\d\/\d/ });
+    const checkItemsCell = page.locator('tbody tr').first().locator('td').filter({ hasText: /\d\/\d/ });
     if (await checkItemsCell.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const text = await checkItemsCell.textContent();
       expect(text).toMatch(/\d\/\d/);
@@ -138,7 +138,7 @@ test.describe.serial('Check Items @p1', () => {
     await searchProject(page, projectName);
 
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();

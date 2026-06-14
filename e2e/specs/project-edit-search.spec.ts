@@ -63,7 +63,7 @@ test.describe.serial('Project Edit & Search @p1', () => {
     await waitForTableLoad(page);
 
     // Table should show empty or no matching rows
-    const rows = page.locator('tbody tbody tr');
+    const rows = page.locator('tbody tr');
     const rowCount = await rows.count();
     expect(rowCount).toBe(0);
 
@@ -77,7 +77,7 @@ test.describe.serial('Project Edit & Search @p1', () => {
   test('filter projects by status', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 
-    const totalRows = await page.locator('tbody tbody tr').count();
+    const totalRows = await page.locator('tbody tr').count();
 
     // Find status filter - look for status dropdown or tabs
     const statusSelect = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="状态"]') });
@@ -87,7 +87,7 @@ test.describe.serial('Project Edit & Search @p1', () => {
       await page.waitForTimeout(500);
       await waitForTableLoad(page);
 
-      const filteredRows = await page.locator('tbody tbody tr').count();
+      const filteredRows = await page.locator('tbody tr').count();
       expect(filteredRows).toBeLessThanOrEqual(totalRows);
     }
   });
@@ -174,7 +174,7 @@ test.describe.serial('Project Edit & Search @p1', () => {
     await waitForTableLoad(page);
 
     const row = page.locator('tbody tr').filter({ hasText: updatedName });
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('button[aria-label*="删除"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');
   });

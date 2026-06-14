@@ -38,7 +38,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   }
 
   async function getFirstActivityRow(page: import('@playwright/test').Page) {
-    return page.locator('tbody tbody tr').first();
+    return page.locator('tbody tr').first();
   }
 
   async function createProjectViaDrawer(page: import('@playwright/test').Page) {
@@ -111,7 +111,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit predecessor field', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动2' });
+    const row = page.locator('tbody tr').filter({ hasText: '测试活动2' });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     const colIdx = await getColIndex(page, '前置');
@@ -169,7 +169,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit activity name', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动1' });
+    const row = page.locator('tbody tr').filter({ hasText: '测试活动1' });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     const colIdx = await getColIndex(page, '活动名称');
@@ -313,7 +313,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit plan dates via range picker', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动2' }).first();
+    const row = page.locator('tbody tr').filter({ hasText: '测试活动2' }).first();
     if (!(await row.isVisible({ timeout: 5_000 }).catch(() => false))) return;
 
     const colIdx = await getColIndex(page, '计划时间');
@@ -352,7 +352,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit actual dates via range picker', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动2' }).first();
+    const row = page.locator('tbody tr').filter({ hasText: '测试活动2' }).first();
     if (!(await row.isVisible({ timeout: 5_000 }).catch(() => false))) return;
 
     const colIdx = await getColIndex(page, '实际时间');
@@ -474,7 +474,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     await page.waitForTimeout(500);
     await waitForTableLoad(page);
 
-    const userRows = page.locator('tbody tbody tr');
+    const userRows = page.locator('tbody tr');
     const rowCount = await userRows.count();
     if (rowCount === 0) return;
 
@@ -607,7 +607,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     await searchProject(page, projectName);
 
     const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
-    const delBtn = row.locator('button[class*="danger"], button[style*="danger"]').first();
+    const delBtn = row.locator('button[aria-label*="删除"], button[style*="danger"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
       await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();

@@ -125,7 +125,7 @@ test.describe.serial('Role Management @p1', () => {
     const row = roleTable.locator('tbody tr').filter({ hasText: updatedRoleName });
     await expect(row).toBeVisible();
 
-    await row.locator('button[class*="danger"]').click();
+    await row.locator('button[aria-label*="删除"]').click();
     await confirmModal(page);
 
     await page.waitForTimeout(1_000);

@@ -52,14 +52,14 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     const phase = tagText?.match(/^(EVT|DVT|PVT|MP)/)?.[1];
 
     // Count total rows before filtering
-    const totalRows = await page.locator('tbody tbody tr').count();
+    const totalRows = await page.locator('tbody tr').count();
 
     // Click phase tag to filter
     await phaseTags.first().click();
     await page.waitForTimeout(300);
 
     // Filtered rows should be <= total rows
-    const filteredRows = await page.locator('tbody tbody tr').count();
+    const filteredRows = await page.locator('tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // All visible phase cells should match the selected phase
@@ -71,7 +71,7 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     // Click again to clear filter
     await phaseTags.first().click();
     await page.waitForTimeout(300);
-    const restoredRows = await page.locator('tbody tbody tr').count();
+    const restoredRows = await page.locator('tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 
@@ -82,19 +82,19 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     const notStartedFilter = page.locator('span').filter({ hasText: /^未开始 \d+$/ });
     await expect(notStartedFilter).toBeVisible({ timeout: 5_000 });
 
-    const totalRows = await page.locator('tbody tbody tr').count();
+    const totalRows = await page.locator('tbody tr').count();
 
     // Click to filter
     await notStartedFilter.click();
     await page.waitForTimeout(300);
 
-    const filteredRows = await page.locator('tbody tbody tr').count();
+    const filteredRows = await page.locator('tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // Click again to clear
     await notStartedFilter.click();
     await page.waitForTimeout(300);
-    const restoredRows = await page.locator('tbody tbody tr').count();
+    const restoredRows = await page.locator('tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 
@@ -105,18 +105,18 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     const inProgressFilter = page.locator('span').filter({ hasText: /^进行中 \d+$/ });
     await expect(inProgressFilter).toBeVisible({ timeout: 5_000 });
 
-    const totalRows = await page.locator('tbody tbody tr').count();
+    const totalRows = await page.locator('tbody tr').count();
 
     await inProgressFilter.click();
     await page.waitForTimeout(300);
 
-    const filteredRows = await page.locator('tbody tbody tr').count();
+    const filteredRows = await page.locator('tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // Clear
     await inProgressFilter.click();
     await page.waitForTimeout(300);
-    const restoredRows = await page.locator('tbody tbody tr').count();
+    const restoredRows = await page.locator('tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 

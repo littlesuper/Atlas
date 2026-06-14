@@ -196,7 +196,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
 
       const row = page.locator('tbody tr').filter({ hasText: projectName });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await row.locator('button[class*="danger"]').click();
+        await row.locator('button[aria-label*="删除"]').click();
         await confirmModal(page);
         await expectMessage(page, '项目删除成功');
       }
@@ -256,7 +256,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await searchProject(page, project);
       const row = page.locator('tbody tr').filter({ hasText: project });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await row.locator('button[class*="danger"]').click();
+        await row.locator('button[aria-label*="删除"]').click();
         await confirmModal(page);
       }
     });
@@ -358,7 +358,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
 
       const row = page.locator('tbody tr').filter({ hasText: snapProject });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await row.locator('button[class*="danger"]').click();
+        await row.locator('button[aria-label*="删除"]').click();
         await confirmModal(page);
         await expectMessage(page, '项目删除成功');
       }

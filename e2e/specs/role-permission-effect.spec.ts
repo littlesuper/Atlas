@@ -170,7 +170,7 @@ test.describe.serial('Role Permission Effect @p1', () => {
     await goToUserTab(page);
     const userRow = page.locator('tbody tr').filter({ hasText: testUserName });
     if (await userRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await userRow.locator('button[class*="danger"]').click();
+      await userRow.locator('button[aria-label*="删除"]').click();
       await page.waitForTimeout(500);
       const confirmBtn = page.locator('[data-slot="dialog-footer"] .arco-btn-primary');
       if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -182,7 +182,7 @@ test.describe.serial('Role Permission Effect @p1', () => {
     await goToRoleTab(page);
     const roleRow = page.locator('tbody tr').filter({ hasText: roleName });
     if (await roleRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await roleRow.locator('button[class*="danger"]').click();
+      await roleRow.locator('button[aria-label*="删除"]').click();
       await page.waitForTimeout(500);
       const confirmBtn = page.locator('[data-slot="dialog-footer"] .arco-btn-primary');
       if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {

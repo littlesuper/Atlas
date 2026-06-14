@@ -43,7 +43,7 @@ test.describe('Audit Log @p2', () => {
     await goToAuditLog(page);
 
     const table = page.locator('table').first();
-    const rows = table.locator('tbody tbody tr');
+    const rows = table.locator('tbody tr');
     const rowCount = await rows.count();
 
     // Should have at least 1 log entry (from our login)

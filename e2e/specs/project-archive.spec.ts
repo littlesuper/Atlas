@@ -86,7 +86,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
         // Verify no edit/delete buttons for archived projects
         const row = page.locator('tbody tr').filter({ hasText: projectName });
         const editBtn = row.locator('button').filter({ hasText: /编辑/ });
-        const deleteBtn = row.locator('button[class*="danger"]');
+        const deleteBtn = row.locator('button[aria-label*="删除"]');
 
         // Edit button should not be visible for archived project
         expect(await editBtn.count()).toBe(0);
@@ -139,7 +139,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
 
     const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await row.locator('button[class*="danger"]').click();
+      await row.locator('button[aria-label*="删除"]').click();
       await confirmModal(page);
       await expectMessage(page, '项目删除成功');
     }

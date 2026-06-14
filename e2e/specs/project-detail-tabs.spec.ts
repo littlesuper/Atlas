@@ -106,7 +106,7 @@ test.describe('Project Detail Tabs @p1', () => {
 
     // Count initial rows
     await waitForTableLoad(page);
-    const initialRows = await page.locator('tbody tbody tr').count();
+    const initialRows = await page.locator('tbody tr').count();
 
     // Switch away and back
     await clickTab(page, '项目周报');
@@ -116,7 +116,7 @@ test.describe('Project Detail Tabs @p1', () => {
     await waitForTableLoad(page);
 
     // Row count should match
-    const afterRows = await page.locator('tbody tbody tr').count();
+    const afterRows = await page.locator('tbody tr').count();
     expect(afterRows).toBe(initialRows);
   });
 

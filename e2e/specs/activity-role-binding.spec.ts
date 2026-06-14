@@ -86,7 +86,7 @@ test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
 
     // Verify activity list
     await page.waitForTimeout(1500);
-    const table = page.locator('tbody tbody tr');
+    const table = page.locator('tbody tr');
     const rowCount = await table.count();
     expect(rowCount).toBeGreaterThan(0);
 
