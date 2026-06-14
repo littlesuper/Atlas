@@ -27,6 +27,10 @@ import {
   ResourceConflict,
   WhatIfResult,
   AiScheduleSuggestion,
+  ScheduleProposeResult,
+  ScheduleApplyResult,
+  AssistantProposeResult,
+  AssistantApplyResult,
   WorkloadResponse,
   RoleMember,
   RoleMemberPreview,
@@ -709,6 +713,43 @@ export const notificationsApi = {
 
   generate: () =>
     request.post<{ success: boolean; generatedCount: number }>('/notifications/generate'),
+};
+
+// ============ 对话式排期助手 API ============
+export const scheduleAssistantApi = {
+  // propose 可能返回 503（AI 不可用），交由调用方读取 error.response.status 做降级；
+  // 此处不静默吞错，但用 _silent 抑制全局 Message，由面板自行提示
+  propose: (projectId: string, utterance: string) =>
+    request.post<ScheduleProposeResult>(
+      '/schedule-assistant/propose',
+      { projectId, utterance },
+      { _silent: true } as never
+    ),
+
+  apply: (proposalId: string) =>
+    request.post<ScheduleApplyResult>(
+      '/schedule-assistant/apply',
+      { proposalId },
+      { _silent: true } as never
+    ),
+};
+
+// ============ 全系统 AI 助手框架 API ============
+export const assistantApi = {
+  // 单框对话：服务端从用户可管理的项目里让 AI 认出目标项目（contextProjectId 为当前页项目，作默认）
+  propose: (utterance: string, contextProjectId?: string | null) =>
+    request.post<AssistantProposeResult>(
+      '/assistant/propose',
+      { utterance, contextProjectId },
+      { _silent: true } as never
+    ),
+
+  apply: (proposalId: string) =>
+    request.post<AssistantApplyResult>(
+      '/assistant/apply',
+      { proposalId },
+      { _silent: true } as never
+    ),
 };
 
 // ============ AI 配置管理 API ============

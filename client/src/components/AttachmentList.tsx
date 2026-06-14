@@ -1,8 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Upload, Message, Button, Space, Progress } from '@arco-design/web-react';
-import { IconUpload, IconDelete, IconFile, IconImage, IconClose } from '@arco-design/web-react/icon';
+import { Upload, Trash2, FileText, Image as ImageIcon, X } from 'lucide-react';
 import { uploadApi } from '../api';
 import { ReportAttachment } from '../types';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface AttachmentListProps {
   attachments: ReportAttachment[];
@@ -14,12 +18,15 @@ interface AttachmentListProps {
 /** 判断 URL 是否为可预览的图片 */
 export const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(url);
 
+const ACCEPT = '.png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt';
+
 const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, section, readOnly = false }) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const dragCounter = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // 用 ref 持有最新 state，避免 handleUpload 闭包过期
   const stateRef = useRef({ attachments, onChange: onChange || (() => {}), section });
   stateRef.current = { attachments, onChange: onChange || (() => {}), section };
@@ -47,9 +54,9 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
         section: stateRef.current.section,
       };
       stateRef.current.onChange([...stateRef.current.attachments, newAttachment]);
-      Message.success('上传成功');
+      toast.success('上传成功');
     } catch {
-      Message.error('上传失败');
+      toast.error('上传失败');
     } finally {
       setUploading(false);
       setProgress(0);
@@ -104,6 +111,14 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
     }
   }, [handleUpload]);
 
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach((f) => handleUpload(f));
+    }
+    e.target.value = '';
+  }, [handleUpload]);
+
   const handleClick = (att: ReportAttachment) => {
     if (isImageUrl(att.url)) {
       setPreviewUrl(att.url);
@@ -112,40 +127,52 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
     }
   };
 
+  // 图片预览遮罩层（shadcn Dialog）
+  const previewDialog = (
+    <Dialog open={!!previewUrl} onOpenChange={(o) => !o && setPreviewUrl(null)}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-w-[92vw] items-center justify-center border-none bg-transparent p-0 shadow-none sm:max-w-[92vw]"
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="关闭预览"
+          onClick={() => setPreviewUrl(null)}
+          className="absolute top-2 right-2 z-10 size-9 rounded-full bg-white/15 text-white hover:bg-white/25 hover:text-white"
+        >
+          <X className="size-5" />
+        </Button>
+        {previewUrl && (
+          <img
+            src={previewUrl}
+            alt="预览"
+            className="max-h-[90vh] max-w-[90vw] rounded object-contain shadow-2xl"
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
   // 只读模式：仅展示附件列表（无拖拽、无上传）
   if (readOnly) {
     if (attachments.length === 0) return null;
     return (
       <>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {attachments.map((att) => (
             <div
               key={att.id}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '2px 8px',
-                background: 'var(--color-fill-1)',
-                borderRadius: 4,
-                fontSize: 13,
-                maxWidth: 260,
-              }}
+              className="bg-muted inline-flex max-w-[260px] items-center gap-1 rounded px-2 py-0.5 text-[13px]"
             >
               {isImageUrl(att.url) ? (
-                <IconImage style={{ color: 'var(--status-success)', flexShrink: 0 }} />
+                <ImageIcon className="size-3.5 shrink-0" style={{ color: 'var(--status-success)' }} />
               ) : (
-                <IconFile style={{ color: 'var(--status-info)', flexShrink: 0 }} />
+                <FileText className="size-3.5 shrink-0" style={{ color: 'var(--status-info)' }} />
               )}
               <span
                 onClick={() => handleClick(att)}
-                style={{
-                  color: 'var(--color-text-1)',
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
+                className="cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap"
                 title={att.name}
               >
                 {att.name}
@@ -154,49 +181,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
           ))}
         </div>
 
-        {/* 图片预览遮罩层 */}
-        {previewUrl && (
-          <div
-            onClick={() => setPreviewUrl(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9999,
-              background: 'rgba(0, 0, 0, 0.72)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'zoom-out',
-            }}
-          >
-            <Button
-              shape="circle"
-              size="large"
-              icon={<IconClose style={{ fontSize: 20, color: '#fff' }} />}
-              onClick={() => setPreviewUrl(null)}
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                background: 'rgba(255,255,255,0.15)',
-                border: 'none',
-              }}
-            />
-            <img
-              src={previewUrl}
-              alt="预览"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                maxWidth: '90vw',
-                maxHeight: '90vh',
-                objectFit: 'contain',
-                borderRadius: 4,
-                cursor: 'default',
-                boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-              }}
-            />
-          </div>
-        )}
+        {previewDialog}
       </>
     );
   }
@@ -204,14 +189,15 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
   return (
     <>
       <div
-        style={{
-          marginTop: 8,
-          border: dragging ? '2px dashed var(--status-info)' : '2px dashed transparent',
-          borderRadius: 6,
-          padding: dragging ? 10 : 0,
-          background: dragging ? 'var(--color-primary-light-1)' : 'transparent',
-          transition: 'all 0.2s',
-        }}
+        className={cn(
+          'mt-2 rounded-md border-2 border-dashed transition-all',
+          dragging ? 'p-2.5' : 'border-transparent p-0'
+        )}
+        style={
+          dragging
+            ? { borderColor: 'var(--status-info)', background: 'var(--muted)' }
+            : undefined
+        }
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -219,54 +205,40 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
       >
         {/* 拖拽提示 */}
         {dragging && (
-          <div style={{ textAlign: 'center', color: 'var(--status-info)', fontSize: 13, padding: '8px 0' }}>
+          <div className="py-2 text-center text-[13px]" style={{ color: 'var(--status-info)' }}>
             松开鼠标上传文件
           </div>
         )}
 
         {/* 已上传列表：多个文件同行排列 */}
         {attachments.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          <div className="mb-2 flex flex-wrap gap-1.5">
             {attachments.map((att) => (
               <div
                 key={att.id}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '2px 8px',
-                  background: 'var(--color-fill-1)',
-                  borderRadius: 4,
-                  fontSize: 13,
-                  maxWidth: 260,
-                }}
+                className="bg-muted inline-flex max-w-[260px] items-center gap-1 rounded px-2 py-0.5 text-[13px]"
               >
                 {isImageUrl(att.url) ? (
-                  <IconImage style={{ color: 'var(--status-success)', flexShrink: 0 }} />
+                  <ImageIcon className="size-3.5 shrink-0" style={{ color: 'var(--status-success)' }} />
                 ) : (
-                  <IconFile style={{ color: 'var(--status-info)', flexShrink: 0 }} />
+                  <FileText className="size-3.5 shrink-0" style={{ color: 'var(--status-info)' }} />
                 )}
                 <span
                   onClick={() => handleClick(att)}
-                  style={{
-                    color: 'var(--color-text-1)',
-                    cursor: 'pointer',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                  className="cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap"
                   title={att.name}
                 >
                   {att.name}
                 </span>
                 <Button
-                  type="text"
-                  size="mini"
-                  icon={<IconDelete />}
-                  status="danger"
-                  style={{ flexShrink: 0, marginLeft: 2 }}
+                  variant="ghost"
+                  size="icon"
+                  aria-label="删除附件"
+                  className="text-muted-foreground hover:text-destructive ml-0.5 size-5 shrink-0"
                   onClick={() => handleDelete(att)}
-                />
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
               </div>
             ))}
           </div>
@@ -274,81 +246,36 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, onChange, 
 
         {/* 上传进度 */}
         {uploading && (
-          <div style={{ marginBottom: 8 }}>
-            <Progress percent={progress} size="small" />
+          <div className="mb-2">
+            <Progress value={progress} />
           </div>
         )}
 
         {/* 上传按钮 + 提示 */}
-        <Space size={8} align="center">
-          <Upload
-            autoUpload={false}
-            showUploadList={false}
-            onChange={(_fileList, currentFile) => {
-              if (currentFile.originFile) {
-                handleUpload(currentFile.originFile);
-              }
-            }}
-            accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt"
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ACCEPT}
+            className="hidden"
+            onChange={handleInputChange}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            className="text-muted-foreground border-dashed text-xs"
+            onClick={() => fileInputRef.current?.click()}
           >
-            <Button
-              type="text"
-              size="small"
-              icon={<IconUpload />}
-              loading={uploading}
-              style={{ color: 'var(--color-text-3)', fontSize: 12 }}
-            >
-              上传附件
-            </Button>
-          </Upload>
-          <span style={{ color: 'var(--color-text-4)', fontSize: 11 }}>点击上传 / 拖拽 / 在输入框内粘贴文件</span>
-        </Space>
+            <Upload className="size-3.5" />
+            上传附件
+          </Button>
+          <span className="text-muted-foreground text-[11px]">点击上传 / 拖拽 / 在输入框内粘贴文件</span>
+        </div>
       </div>
 
-      {/* 图片预览遮罩层 */}
-      {previewUrl && (
-        <div
-          onClick={() => setPreviewUrl(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.72)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'zoom-out',
-          }}
-        >
-          {/* 关闭按钮 */}
-          <Button
-            shape="circle"
-            size="large"
-            icon={<IconClose style={{ fontSize: 20, color: '#fff' }} />}
-            onClick={() => setPreviewUrl(null)}
-            style={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-            }}
-          />
-          <img
-            src={previewUrl}
-            alt="预览"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-              borderRadius: 4,
-              cursor: 'default',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-            }}
-          />
-        </div>
-      )}
+      {previewDialog}
     </>
   );
 };

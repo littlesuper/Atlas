@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { Message } from '@arco-design/web-react';
+import { toast } from 'sonner';
 import { captureAppError } from '../utils/monitoring';
 
 // 创建axios实例
@@ -58,7 +58,7 @@ request.interceptors.response.use(
       // 如果是登录或刷新接口失败，直接抛出错误（不尝试刷新token）
       if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/wecom/login')) {
         const errorMessage = getErrorMessage(error);
-        Message.error(errorMessage);
+        toast.error(errorMessage);
         return Promise.reject(error);
       }
       if (originalRequest.url?.includes('/auth/refresh')) {
@@ -130,7 +130,7 @@ request.interceptors.response.use(
     // 其他错误处理：显示错误提示（除非请求标记了 _silent）
     if (!(originalRequest as InternalAxiosRequestConfig & { _silent?: boolean })._silent) {
       const errorMessage = getErrorMessage(error);
-      Message.error(errorMessage);
+      toast.error(errorMessage);
     }
 
     if (error.response?.status && error.response.status >= 500) {

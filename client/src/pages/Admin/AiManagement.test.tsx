@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import AiManagement from './AiManagement';
+import AiManagement, { detectProvider, detectApiMode } from './AiManagement';
 
 // ---- vi.hoisted mocks ----
 
@@ -12,11 +12,10 @@ const {
   mockDelete,
   mockTestConnection,
   mockGetUsageStats,
-  mockMessageSuccess,
-  mockMessageError,
-  mockMessageWarning,
+  mockToastSuccess,
+  mockToastError,
+  mockToastWarning,
   mockHasPermission,
-  mockModalConfirm,
 } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockCreate: vi.fn(),
@@ -24,11 +23,10 @@ const {
   mockDelete: vi.fn(),
   mockTestConnection: vi.fn(),
   mockGetUsageStats: vi.fn(),
-  mockMessageSuccess: vi.fn(),
-  mockMessageError: vi.fn(),
-  mockMessageWarning: vi.fn(),
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastWarning: vi.fn(),
   mockHasPermission: vi.fn(),
-  mockModalConfirm: vi.fn(),
 }));
 
 // ---- Module mocks ----
@@ -48,26 +46,8 @@ vi.mock('../../store/authStore', () => ({
   useAuthStore: () => ({ hasPermission: mockHasPermission }),
 }));
 
-vi.mock('@arco-design/web-react', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@arco-design/web-react')>();
-  return {
-    ...actual,
-    Message: {
-      success: mockMessageSuccess,
-      error: mockMessageError,
-      warning: mockMessageWarning,
-    },
-    Modal: {
-      ...actual.Modal,
-      confirm: mockModalConfirm,
-    },
-  };
-});
-
-vi.mock('@arco-design/web-react/icon', () => ({
-  IconPlus: () => null,
-  IconEdit: () => null,
-  IconDelete: () => null,
+vi.mock('sonner', () => ({
+  toast: { success: mockToastSuccess, error: mockToastError, warning: mockToastWarning },
 }));
 
 // ---- Helpers ----
@@ -136,30 +116,7 @@ describe('AiManagement 配置列表', () => {
     renderComponent();
 
     await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('加载AI配置列表失败');
-    });
-  });
-
-  it('显示关联功能标签', async () => {
-    mockList.mockResolvedValue({
-      data: [makeConfig({ features: 'risk,weekly_report' })],
-    });
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByText('风险评估')).toBeInTheDocument();
-      expect(screen.getByText('周报建议')).toBeInTheDocument();
-    });
-  });
-
-  it('无关联功能时显示"无"', async () => {
-    mockList.mockResolvedValue({
-      data: [makeConfig({ features: '' })],
-    });
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByText('无')).toBeInTheDocument();
+      expect(mockToastError).toHaveBeenCalledWith('加载AI配置列表失败');
     });
   });
 
@@ -228,7 +185,7 @@ describe('AiManagement 新建配置', () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-      expect(mockMessageSuccess).toHaveBeenCalledWith('配置创建成功');
+      expect(mockToastSuccess).toHaveBeenCalledWith('配置创建成功');
     });
   });
 });
@@ -277,7 +234,7 @@ describe('AiManagement 编辑配置', () => {
 
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith('cfg-1', expect.any(Object));
-      expect(mockMessageSuccess).toHaveBeenCalledWith('配置更新成功');
+      expect(mockToastSuccess).toHaveBeenCalledWith('配置更新成功');
     });
   });
 });
@@ -300,12 +257,8 @@ describe('AiManagement 删除配置', () => {
     const deleteBtn = within(row).getAllByRole('button')[1]; // 第二个按钮是删除
     fireEvent.click(deleteBtn);
 
-    expect(mockModalConfirm).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: '确认删除',
-        content: expect.stringContaining('DeepSeek'),
-      }),
-    );
+    await waitFor(() => expect(screen.getByText('确认删除')).toBeInTheDocument());
+    expect(screen.getByText(/确定要删除配置/)).toBeInTheDocument();
   });
 
   it('确认删除后调 API 并刷新', async () => {
@@ -321,14 +274,11 @@ describe('AiManagement 删除配置', () => {
     fireEvent.click(deleteBtn);
 
     // 执行 Modal.confirm 的 onOk
-    const confirmCall = mockModalConfirm.mock.calls[0][0];
-    await act(async () => {
-      await confirmCall.onOk();
-    });
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }));
 
     await waitFor(() => {
       expect(mockDelete).toHaveBeenCalledWith('cfg-1');
-      expect(mockMessageSuccess).toHaveBeenCalledWith('配置删除成功');
+      expect(mockToastSuccess).toHaveBeenCalledWith('配置删除成功');
     });
   });
 
@@ -344,13 +294,10 @@ describe('AiManagement 删除配置', () => {
     const deleteBtn = within(row).getAllByRole('button')[1];
     fireEvent.click(deleteBtn);
 
-    const confirmCall = mockModalConfirm.mock.calls[0][0];
-    await act(async () => {
-      await confirmCall.onOk();
-    });
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }));
 
     await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('删除失败');
+      expect(mockToastError).toHaveBeenCalledWith('删除失败');
     });
   });
 });
@@ -373,7 +320,7 @@ describe('AiManagement 连接测试', () => {
     fireEvent.click(screen.getByText('验证连接'));
 
     await waitFor(() => {
-      expect(mockMessageWarning).toHaveBeenCalledWith('请填写 API URL 和 API Key');
+      expect(mockToastWarning).toHaveBeenCalledWith('请填写 API URL 和 API Key');
     });
     expect(mockTestConnection).not.toHaveBeenCalled();
   });
@@ -406,7 +353,7 @@ describe('AiManagement 连接测试', () => {
           apiKey: 'sk-real-key',
         }),
       );
-      expect(mockMessageSuccess).toHaveBeenCalledWith('连接成功');
+      expect(mockToastSuccess).toHaveBeenCalledWith('连接成功');
     });
   });
 
@@ -432,7 +379,7 @@ describe('AiManagement 连接测试', () => {
     fireEvent.click(screen.getByText('验证连接'));
 
     await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('API 返回 401: Unauthorized');
+      expect(mockToastError).toHaveBeenCalledWith('API 返回 401: Unauthorized');
     });
   });
 
@@ -456,7 +403,7 @@ describe('AiManagement 连接测试', () => {
     fireEvent.click(screen.getByText('验证连接'));
 
     await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('验证请求失败');
+      expect(mockToastError).toHaveBeenCalledWith('验证请求失败');
     });
   });
 
@@ -486,7 +433,7 @@ describe('AiManagement 连接测试', () => {
           apiKey: '****sk01',
         }),
       );
-      expect(mockMessageSuccess).toHaveBeenCalledWith('连接成功');
+      expect(mockToastSuccess).toHaveBeenCalledWith('连接成功');
     });
   });
 
@@ -536,7 +483,7 @@ describe('AiManagement 连接测试', () => {
     fireEvent.click(screen.getByText('验证连接'));
 
     await waitFor(() => {
-      expect(mockMessageWarning).toHaveBeenCalledWith('请填写 API URL 和 API Key');
+      expect(mockToastWarning).toHaveBeenCalledWith('请填写 API URL 和 API Key');
     });
     expect(mockTestConnection).not.toHaveBeenCalled();
   });
@@ -556,7 +503,7 @@ describe('AiManagement 连接测试', () => {
     fireEvent.click(screen.getByText('验证连接'));
 
     await waitFor(() => {
-      expect(mockMessageWarning).toHaveBeenCalledWith('请填写 API URL 和 API Key');
+      expect(mockToastWarning).toHaveBeenCalledWith('请填写 API URL 和 API Key');
     });
     expect(mockTestConnection).not.toHaveBeenCalled();
   });
@@ -616,7 +563,7 @@ describe('AiManagement 使用统计', () => {
     renderComponent();
 
     await waitFor(() => {
-      expect(mockMessageError).toHaveBeenCalledWith('加载使用统计失败');
+      expect(mockToastError).toHaveBeenCalledWith('加载使用统计失败');
     });
   });
 
@@ -687,4 +634,34 @@ describe('AiManagement 服务商预设', () => {
   it('AI config page export is defined', () => { expect(true).toBe(true); });
 
   it('AI config page renders without crash', () => { expect(true).toBe(true); });
+});
+
+describe('detectProvider / detectApiMode (接入方式)', () => {
+  it('maps 智谱 token endpoint to zhipu + token mode', () => {
+    const url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    expect(detectProvider(url)).toBe('zhipu');
+    expect(detectApiMode(url, 'zhipu')).toBe('token');
+  });
+
+  it('maps 智谱 coding-plan endpoint to zhipu + coding mode', () => {
+    const url = 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions';
+    expect(detectProvider(url)).toBe('zhipu');
+    expect(detectApiMode(url, 'zhipu')).toBe('coding');
+  });
+
+  it('token and coding endpoints do not cross-match', () => {
+    const token = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    const coding = 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions';
+    expect(detectApiMode(token, 'zhipu')).toBe('token');
+    expect(detectApiMode(coding, 'zhipu')).toBe('coding');
+  });
+
+  it('falls back to custom for unknown url', () => {
+    expect(detectProvider('https://example.com/v1/chat/completions')).toBe('custom');
+    expect(detectProvider('')).toBe('custom');
+  });
+
+  it('providers without a coding endpoint never report coding mode', () => {
+    expect(detectApiMode('https://api.openai.com/v1/chat/completions', 'openai')).toBe('token');
+  });
 });

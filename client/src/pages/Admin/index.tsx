@@ -1,29 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Card,
-  Tabs,
-  Table,
-  Button,
-  Input,
-  Space,
-  Tag,
-  Modal,
-  Drawer,
-  Form,
-  Select,
-  Message,
-  Tooltip,
-  Checkbox,
-  Divider,
-  Switch,
-} from '@arco-design/web-react';
-import {
-  IconSearch,
-  IconPlus,
-  IconEdit,
-  IconDelete,
-} from '@arco-design/web-react/icon';
 import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Search, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import dayjs from 'dayjs';
+import { pinyin } from 'pinyin-pro';
 import MainLayout from '../../layouts/MainLayout';
 import { usersApi, rolesApi } from '../../api';
 import { useAuthStore } from '../../store/authStore';
@@ -34,30 +14,100 @@ import AiManagement from './AiManagement';
 import AuditLogTab from './AuditLog';
 import WecomManagement from './WecomManagement';
 import HolidayManagement from './HolidayManagement';
-import dayjs from 'dayjs';
-import { pinyin } from 'pinyin-pro';
+import { arcoBadgeClass } from '../../utils/badgeColor';
+import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function resolveTab(urlTab: string, visibleTabs: string[]): string {
-  return visibleTabs.includes(urlTab) ? urlTab : (visibleTabs[0] || 'ai');
+  return visibleTabs.includes(urlTab) ? urlTab : visibleTabs[0] || 'ai';
 }
 
 export function generateUsername(realName: string): string {
   return pinyin(realName, { toneType: 'none', type: 'array' }).join('');
 }
 
+const ALL = '__all__';
+
+function Field({
+  label,
+  required,
+  error,
+  extra,
+  children,
+  className,
+}: {
+  label: React.ReactNode;
+  required?: boolean;
+  error?: string;
+  extra?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('space-y-1.5', className)}>
+      <Label className="text-sm">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      {children}
+      {extra && !error && <p className="text-muted-foreground text-xs">{extra}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
+    </div>
+  );
+}
+
+interface UserForm {
+  username: string;
+  realName: string;
+  password: string;
+  wecomUserId: string;
+  roleIds: string[]; // 存角色名称
+}
+const EMPTY_USER: UserForm = { username: '', realName: '', password: '', wecomUserId: '', roleIds: [] };
+
+interface RoleForm {
+  name: string;
+  description: string;
+  permissionIds: string[];
+}
+const EMPTY_ROLE: RoleForm = { name: '', description: '', permissionIds: [] };
+
 const AdminPage: React.FC = () => {
   const { hasPermission } = useAuthStore();
-  const [userForm] = Form.useForm();
-  const [roleForm] = Form.useForm();
 
   // Tab状态（从 URL 读取，刷新后保持）
   const [searchParams, setSearchParams] = useSearchParams();
-  const setMainTab = useCallback((tab: string) => {
-    setSearchParams({ tab }, { replace: true });
-  }, [setSearchParams]);
+  const setMainTab = useCallback(
+    (tab: string) => {
+      setSearchParams({ tab }, { replace: true });
+    },
+    [setSearchParams]
+  );
   const [accountTab, setAccountTab] = useState('users');
 
-  // 计算可见 Tab 列表，自动回退到第一个有权限的 Tab
   const visibleTabs = useMemo(() => {
     const tabs: string[] = [];
     if (hasPermission('system', 'ai')) tabs.push('ai');
@@ -70,7 +120,6 @@ const AdminPage: React.FC = () => {
   const urlTab = searchParams.get('tab') || '';
   const mainTab = resolveTab(urlTab, visibleTabs);
 
-  // URL 上的 tab 不在可见列表中时，自动纠正 URL
   useEffect(() => {
     if (visibleTabs.length > 0 && urlTab !== mainTab) {
       setSearchParams({ tab: mainTab }, { replace: true });
@@ -84,9 +133,14 @@ const AdminPage: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userSearchKeyword, setUserSearchKeyword] = useState('');
   const [canLoginFilter, setCanLoginFilter] = useState<string>('');
-  // 控制表单中「允许登录」和「状态」开关
   const [formCanLogin, setFormCanLogin] = useState(true);
   const [formStatus, setFormStatus] = useState<string>('ACTIVE');
+  const [userValues, setUserValues] = useState<UserForm>(EMPTY_USER);
+  const [userErrors, setUserErrors] = useState<Record<string, string>>({});
+  const setUserField = <K extends keyof UserForm>(k: K, v: UserForm[K]) => {
+    setUserValues((p) => ({ ...p, [k]: v }));
+    setUserErrors((p) => (p[k as string] ? { ...p, [k as string]: '' } : p));
+  };
 
   // 行内编辑用户角色
   const [inlineRoleUserId, setInlineRoleUserId] = useState<string | null>(null);
@@ -99,8 +153,16 @@ const AdminPage: React.FC = () => {
   const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [roleValues, setRoleValues] = useState<RoleForm>(EMPTY_ROLE);
+  const [roleErrors, setRoleErrors] = useState<Record<string, string>>({});
+  const setRoleField = <K extends keyof RoleForm>(k: K, v: RoleForm[K]) => {
+    setRoleValues((p) => ({ ...p, [k]: v }));
+    setRoleErrors((p) => (p[k as string] ? { ...p, [k as string]: '' } : p));
+  };
 
-  // 加载用户列表
+  // 删除确认
+  const [confirm, setConfirm] = useState<{ title: string; content: string; onOk: () => void } | null>(null);
+
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
@@ -110,26 +172,24 @@ const AdminPage: React.FC = () => {
       const response = await usersApi.list(params);
       setUsers(response.data.data || []);
     } catch {
-      Message.error('加载用户列表失败');
+      toast.error('加载用户列表失败');
     } finally {
       setUsersLoading(false);
     }
   }, [canLoginFilter, userSearchKeyword]);
 
-  // 加载角色列表
   const loadRoles = useCallback(async () => {
     setRolesLoading(true);
     try {
       const response = await rolesApi.list();
       setRoles(response.data);
     } catch {
-      Message.error('加载角色列表失败');
+      toast.error('加载角色列表失败');
     } finally {
       setRolesLoading(false);
     }
   }, []);
 
-  // 加载权限列表
   const loadPermissions = useCallback(async () => {
     try {
       const response = await rolesApi.getPermissions();
@@ -152,7 +212,6 @@ const AdminPage: React.FC = () => {
     }
   }, [loadUsers, mainTab]);
 
-  // 处理搜索
   const handleUserSearch = useMemo(() => {
     let timer: NodeJS.Timeout;
     return (value: string) => {
@@ -163,62 +222,65 @@ const AdminPage: React.FC = () => {
     };
   }, []);
 
-  // 打开用户Modal
   const handleOpenUserModal = (user?: User) => {
+    setUserErrors({});
     if (user) {
       setEditingUser(user);
       setFormCanLogin(user.canLogin !== false);
       setFormStatus(user.status || 'ACTIVE');
-      userForm.setFieldsValue({
-        username: user.username,
+      setUserValues({
+        username: user.username || '',
         realName: user.realName,
-        wecomUserId: user.wecomUserId,
+        password: '',
+        wecomUserId: user.wecomUserId || '',
         roleIds: user.roles || [],
       });
     } else {
       setEditingUser(null);
       setFormCanLogin(true);
       setFormStatus('ACTIVE');
-      userForm.resetFields();
+      setUserValues(EMPTY_USER);
     }
     setUserModalVisible(true);
   };
 
-  // 提交用户表单
   const handleSubmitUser = async () => {
-    try {
-      const values = await userForm.validate();
+    const e: Record<string, string> = {};
+    if (!userValues.realName.trim()) e.realName = '请输入姓名';
+    if (userValues.username && userValues.username.length < 2) e.username = '用户名长度不能少于2位';
+    if (userValues.password && userValues.password.length < 6) e.password = '密码长度不能少于6位';
+    if (userValues.roleIds.length === 0) e.roleIds = '请选择至少一个角色';
+    setUserErrors(e);
+    if (Object.keys(e).length) return;
 
-      // 获取角色ID列表
-      const roleIds = values.roleIds?.map((roleName: string) => {
-        const role = roles.find((r) => r.name === roleName);
-        return role?.id;
-      }).filter(Boolean) || [];
+    try {
+      const roleIds =
+        userValues.roleIds
+          .map((roleName) => roles.find((r) => r.name === roleName)?.id)
+          .filter(Boolean) || [];
 
       if (editingUser) {
         const updateData: Parameters<typeof usersApi.update>[1] = {
-          realName: values.realName,
-          wecomUserId: values.wecomUserId || null,
+          realName: userValues.realName,
+          wecomUserId: userValues.wecomUserId || null,
           canLogin: formCanLogin,
           status: formStatus,
-          roleIds,
+          roleIds: roleIds as string[],
         };
-
-        if (values.password) {
-          updateData.password = values.password;
+        if (userValues.password) {
+          updateData.password = userValues.password;
         }
-
         await usersApi.update(editingUser.id, updateData);
-        Message.success('用户更新成功');
+        toast.success('用户更新成功');
       } else {
         await usersApi.create({
-          username: values.username,
-          password: values.password,
-          realName: values.realName,
+          username: userValues.username,
+          password: userValues.password,
+          realName: userValues.realName,
           canLogin: formCanLogin,
-          roleIds,
+          roleIds: roleIds as string[],
         });
-        Message.success('用户创建成功');
+        toast.success('用户创建成功');
       }
 
       setUserModalVisible(false);
@@ -228,15 +290,14 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // 删除用户
   const handleDeleteUser = (user: User) => {
-    Modal.confirm({
+    setConfirm({
       title: '确认删除',
       content: `确定要删除用户"${user.realName}"吗？此操作不可恢复。`,
       onOk: async () => {
         try {
           await usersApi.delete(user.id);
-          Message.success('删除成功');
+          toast.success('删除成功');
           loadUsers();
         } catch {
           // 错误已由请求拦截器统一提示
@@ -245,40 +306,43 @@ const AdminPage: React.FC = () => {
     });
   };
 
-  // 打开角色Modal
   const handleOpenRoleModal = (role?: Role) => {
+    setRoleErrors({});
     if (role) {
       setEditingRole(role);
-      roleForm.setFieldsValue({
+      setRoleValues({
         name: role.name,
-        description: role.description,
+        description: role.description || '',
         permissionIds: role.permissions.map((p) => p.id),
       });
     } else {
       setEditingRole(null);
-      roleForm.resetFields();
+      setRoleValues(EMPTY_ROLE);
     }
     setRoleModalVisible(true);
   };
 
-  // 提交角色表单
   const handleSubmitRole = async () => {
-    try {
-      const values = await roleForm.validate();
-      const data = {
-        name: values.name,
-        description: values.description,
-        permissionIds: values.permissionIds || [],
-      };
+    const e: Record<string, string> = {};
+    if (!roleValues.name.trim()) e.name = '请输入角色名称';
+    else if (roleValues.name.length < 2) e.name = '角色名称长度不能少于2位';
+    if (roleValues.permissionIds.length === 0) e.permissionIds = '请选择至少一个权限';
+    setRoleErrors(e);
+    if (Object.keys(e).length) return;
 
+    try {
+      const data = {
+        name: roleValues.name,
+        description: roleValues.description,
+        permissionIds: roleValues.permissionIds,
+      };
       if (editingRole) {
         await rolesApi.update(editingRole.id, data);
-        Message.success('角色更新成功');
+        toast.success('角色更新成功');
       } else {
         await rolesApi.create(data);
-        Message.success('角色创建成功');
+        toast.success('角色创建成功');
       }
-
       setRoleModalVisible(false);
       loadRoles();
     } catch (error) {
@@ -286,31 +350,28 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // 删除角色
   const handleDeleteRole = (role: Role) => {
-    Modal.confirm({
+    setConfirm({
       title: '确认删除',
       content: `确定要删除角色"${role.name}"吗？此操作不可恢复。`,
       onOk: async () => {
         try {
           await rolesApi.delete(role.id);
-          Message.success('角色删除成功');
+          toast.success('角色删除成功');
           loadRoles();
         } catch {
-          Message.error('角色删除失败');
+          toast.error('角色删除失败');
         }
       },
     });
   };
 
-  // 进入行内编辑
   const startInlineRoleEdit = (user: User) => {
     if (!hasPermission('user', 'update')) return;
     setInlineRoleUserId(user.id);
     setInlineRoleValue([...(user.roles || [])]);
   };
 
-  // 提交行内编辑
   const commitInlineRoleEdit = async (user: User) => {
     if (inlineRoleSaving) return;
     const original = [...(user.roles || [])].sort().join(',');
@@ -325,506 +386,447 @@ const AdminPage: React.FC = () => {
     setInlineRoleSaving(true);
     try {
       await usersApi.update(user.id, { roleIds });
-      Message.success('角色已更新');
+      toast.success('角色已更新');
       await loadUsers();
     } catch {
-      Message.error('角色更新失败');
+      toast.error('角色更新失败');
     } finally {
       setInlineRoleSaving(false);
       setInlineRoleUserId(null);
     }
   };
 
-  // 用户表格列配置
-  const userColumns = [
-    {
-      title: '姓名',
-      dataIndex: 'realName',
-      width: 120,
-      sorter: (a: User, b: User) => (a.realName || '').localeCompare(b.realName || ''),
-    },
-    {
-      title: '用户名',
-      dataIndex: 'username',
-      width: 150,
-      sorter: (a: User, b: User) => (a.username || '').localeCompare(b.username || ''),
-      render: (username?: string) => username || '-',
-    },
-    {
-      title: '允许登录',
-      dataIndex: 'canLogin',
-      width: 100,
-      render: (canLogin: boolean) => (
-        <Tag color={canLogin !== false ? 'green' : 'gray'}>
-          {canLogin !== false ? '是' : '否'}
-        </Tag>
-      ),
-    },
-    {
-      title: '角色',
-      dataIndex: 'roles',
-      width: 280,
-      render: (userRoles: string[], record: User) => {
-        const canEdit = hasPermission('user', 'update');
-        if (inlineRoleUserId === record.id) {
-          return (
-            <InlineRoleEditor
-              roles={roles}
-              initialValue={inlineRoleValue}
-              loading={inlineRoleSaving}
-              onChange={setInlineRoleValue}
-              onCommit={() => commitInlineRoleEdit(record)}
-            />
-          );
-        }
-        return (
-          <div
-            onClick={() => canEdit && startInlineRoleEdit(record)}
-            style={{
-              cursor: canEdit ? 'pointer' : 'default',
-              minHeight: 22,
-              padding: '2px 4px',
-              borderRadius: 4,
-              display: 'flex',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 4,
-            }}
-            title={canEdit ? '单击编辑角色' : undefined}
-          >
-            {userRoles.map((role) => (
-              <Tag key={role} color="blue">
-                {role}
-              </Tag>
-            ))}
-            {userRoles.length === 0 && (
-              <span style={{ color: 'var(--color-text-4)' }}>-</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 100,
-      sorter: (a: User, b: User) => a.status.localeCompare(b.status),
-      render: (status: string) => {
-        const config = USER_STATUS_MAP[status as keyof typeof USER_STATUS_MAP];
-        return <Tag color={config.color}>{config.label}</Tag>;
-      },
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      width: 180,
-      sorter: (a: User, b: User) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm'),
-    },
-    {
-      title: '操作',
-      width: 120,
-      fixed: 'right' as const,
-      render: (_: unknown, record: User) => (
-        <Space>
-          {hasPermission('user', 'update') && (
-            <Tooltip content="编辑">
-              <Button
-                type="text"
-                icon={<IconEdit />}
-                size="small"
-                onClick={() => handleOpenUserModal(record)}
-              />
-            </Tooltip>
-          )}
-          {hasPermission('user', 'delete') && (
-            <Tooltip content="删除">
-              <Button
-                type="text"
-                status="danger"
-                icon={<IconDelete />}
-                size="small"
-                onClick={() => handleDeleteUser(record)}
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
-    },
-  ];
-
-  // 角色表格列配置
-  const roleColumns = [
-    {
-      title: '角色名称',
-      dataIndex: 'name',
-      width: 200,
-      sorter: (a: Role, b: Role) => a.name.localeCompare(b.name),
-      render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span>,
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      width: 300,
-      render: (desc?: string) => desc || '-',
-    },
-    {
-      title: '权限列表',
-      dataIndex: 'permissions',
-      render: (permissions: Permission[]) => (
-        <Space wrap>
-          {permissions.slice(0, 5).map((perm) => (
-            <Tag key={perm.id} color="cyan">
-              {PERMISSION_RESOURCE_MAP[perm.resource] || perm.resource}:{PERMISSION_ACTION_MAP[perm.action] || perm.action}
-            </Tag>
-          ))}
-          {permissions.length > 5 && <Tag>+{permissions.length - 5}</Tag>}
-        </Space>
-      ),
-    },
-    {
-      title: '用户数',
-      width: 100,
-      sorter: (a: Role, b: Role) => {
-        const countA = users.filter((user) => user.roles.includes(a.name)).length;
-        const countB = users.filter((user) => user.roles.includes(b.name)).length;
-        return countA - countB;
-      },
-      render: (_: unknown, record: Role) => {
-        const count = users.filter((user) => user.roles.includes(record.name)).length;
-        return count;
-      },
-    },
-    {
-      title: '操作',
-      width: 120,
-      fixed: 'right' as const,
-      render: (_: unknown, record: Role) => (
-        <Space>
-          {hasPermission('role', 'update') && (
-            <Tooltip content="编辑">
-              <Button
-                type="text"
-                icon={<IconEdit />}
-                size="small"
-                onClick={() => handleOpenRoleModal(record)}
-              />
-            </Tooltip>
-          )}
-          {hasPermission('role', 'delete') && (
-            <Tooltip content="删除">
-              <Button
-                type="text"
-                status="danger"
-                icon={<IconDelete />}
-                size="small"
-                onClick={() => handleDeleteRole(record)}
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
-    },
-  ];
-
-  // 按资源分组权限
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, Permission[]> = {};
     permissions.forEach((perm) => {
-      if (!groups[perm.resource]) {
-        groups[perm.resource] = [];
-      }
+      if (!groups[perm.resource]) groups[perm.resource] = [];
       groups[perm.resource].push(perm);
     });
     return groups;
   }, [permissions]);
 
+  const togglePermission = (id: string) => {
+    setRoleValues((p) => ({
+      ...p,
+      permissionIds: p.permissionIds.includes(id)
+        ? p.permissionIds.filter((x) => x !== id)
+        : [...p.permissionIds, id],
+    }));
+    setRoleErrors((p) => (p.permissionIds ? { ...p, permissionIds: '' } : p));
+  };
+
+  const roleColCount = 5;
+  const userColCount = 7;
+
   return (
     <MainLayout>
-      <Card>
-        <Tabs activeTab={mainTab} onChange={setMainTab}>
-          {/* AI管理 */}
-          {hasPermission('system', 'ai') && (
-            <Tabs.TabPane key="ai" title="AI管理">
-              <AiManagement />
-            </Tabs.TabPane>
-          )}
+      <TooltipProvider>
+        <Card className="p-4">
+          <Tabs value={mainTab} onValueChange={setMainTab}>
+            <TabsList>
+              {hasPermission('system', 'ai') && <TabsTrigger value="ai">AI管理</TabsTrigger>}
+              {hasPermission('system', 'account') && <TabsTrigger value="account">账号管理</TabsTrigger>}
+              {hasPermission('system', 'account') && <TabsTrigger value="holidays">节假日</TabsTrigger>}
+              {hasPermission('system', 'audit_log') && <TabsTrigger value="audit">操作日志</TabsTrigger>}
+            </TabsList>
 
-          {/* 账号管理 */}
-          {hasPermission('system', 'account') && (
-            <Tabs.TabPane key="account" title="账号管理">
-                <Tabs activeTab={accountTab} onChange={setAccountTab} type="text">
+            {hasPermission('system', 'ai') && (
+              <TabsContent value="ai" className="mt-4">
+                <AiManagement />
+              </TabsContent>
+            )}
+
+            {hasPermission('system', 'account') && (
+              <TabsContent value="account" className="mt-4">
+                <Tabs value={accountTab} onValueChange={setAccountTab}>
+                  <TabsList>
+                    <TabsTrigger value="users">用户管理</TabsTrigger>
+                    <TabsTrigger value="roles">角色管理</TabsTrigger>
+                    <TabsTrigger value="wecom">企微配置</TabsTrigger>
+                  </TabsList>
+
                   {/* 用户管理 */}
-                  <Tabs.TabPane key="users" title="用户管理">
-                    <div className="toolbar">
-                      <div className="toolbar-left" />
-                      <Space>
-                        <span style={{ color: 'var(--color-text-3)', fontSize: 13 }}>共 {users.length} 个用户</span>
-                        <Select
-                          placeholder="全部"
-                          value={canLoginFilter || undefined}
-                          onChange={(value) => setCanLoginFilter(value || '')}
-                          allowClear
-                          style={{ width: 140 }}
-                        >
-                          <Select.Option value="true">允许登录</Select.Option>
-                          <Select.Option value="false">不可登录</Select.Option>
-                        </Select>
-                        <Input
-                          style={{ width: 240 }}
-                          prefix={<IconSearch />}
-                          placeholder="搜索用户..."
-                          allowClear
-                          onChange={handleUserSearch}
-                        />
-                        {hasPermission('user', 'create') && (
-                          <Button
-                            type="primary"
-                            icon={<IconPlus />}
-                            onClick={() => handleOpenUserModal()}
-                          >
-                            新建用户
-                          </Button>
-                        )}
-                      </Space>
+                  <TabsContent value="users" className="mt-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+                      <span className="text-muted-foreground text-[13px]">共 {users.length} 个用户</span>
+                      <Select value={canLoginFilter || ALL} onValueChange={(v) => setCanLoginFilter(v === ALL ? '' : v)}>
+                        <SelectTrigger className="w-36" size="sm">
+                          <SelectValue placeholder="全部" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL}>全部</SelectItem>
+                          <SelectItem value="true">允许登录</SelectItem>
+                          <SelectItem value="false">不可登录</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="relative">
+                        <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                        <Input className="w-60 pl-8" placeholder="搜索用户..." onChange={(e) => handleUserSearch(e.target.value)} />
+                      </div>
+                      {hasPermission('user', 'create') && (
+                        <Button onClick={() => handleOpenUserModal()}>
+                          <Plus className="size-4" />
+                          新建用户
+                        </Button>
+                      )}
                     </div>
 
-                    <Table
-                      columns={userColumns}
-                      data={users}
-                      loading={usersLoading}
-                      rowKey="id"
-                      pagination={{ pageSize: 20, showTotal: true }}
-                      scroll={{ x: 1400 }}
-                    />
-                  </Tabs.TabPane>
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-28">姓名</TableHead>
+                            <TableHead className="w-36">用户名</TableHead>
+                            <TableHead className="w-24">允许登录</TableHead>
+                            <TableHead className="w-72">角色</TableHead>
+                            <TableHead className="w-24">状态</TableHead>
+                            <TableHead className="w-44">创建时间</TableHead>
+                            <TableHead className="w-28 text-right">操作</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {usersLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={userColCount} className="h-24 text-center">
+                                <Loader2 className="text-muted-foreground mx-auto size-6 animate-spin" />
+                              </TableCell>
+                            </TableRow>
+                          ) : users.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={userColCount} className="text-muted-foreground h-24 text-center">
+                                暂无用户
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            users.map((record) => {
+                              const canEdit = hasPermission('user', 'update');
+                              const statusCfg = USER_STATUS_MAP[record.status as keyof typeof USER_STATUS_MAP];
+                              return (
+                                <TableRow key={record.id}>
+                                  <TableCell className="font-medium">{record.realName}</TableCell>
+                                  <TableCell>{record.username || '-'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={arcoBadgeClass(record.canLogin !== false ? 'green' : 'gray')}>
+                                      {record.canLogin !== false ? '是' : '否'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {inlineRoleUserId === record.id ? (
+                                      <InlineRoleEditor
+                                        roles={roles}
+                                        initialValue={inlineRoleValue}
+                                        loading={inlineRoleSaving}
+                                        onChange={setInlineRoleValue}
+                                        onCommit={() => commitInlineRoleEdit(record)}
+                                      />
+                                    ) : (
+                                      <div
+                                        onClick={() => canEdit && startInlineRoleEdit(record)}
+                                        className={cn('flex min-h-[22px] flex-wrap items-center gap-1 rounded px-1 py-0.5', canEdit && 'hover:bg-accent cursor-pointer')}
+                                        title={canEdit ? '单击编辑角色' : undefined}
+                                      >
+                                        {(record.roles || []).map((role) => (
+                                          <Badge key={role} variant="outline" className={arcoBadgeClass('blue')}>
+                                            {role}
+                                          </Badge>
+                                        ))}
+                                        {(record.roles || []).length === 0 && <span className="text-muted-foreground">-</span>}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {statusCfg && (
+                                      <Badge variant="outline" className={arcoBadgeClass(statusCfg.color)}>
+                                        {statusCfg.label}
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground text-xs">
+                                    {dayjs(record.createdAt).format('YYYY-MM-DD HH:mm')}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-0.5">
+                                      {hasPermission('user', 'update') && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="size-8" aria-label="编辑用户" onClick={() => handleOpenUserModal(record)}>
+                                              <Pencil className="size-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>编辑</TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {hasPermission('user', 'delete') && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除用户" onClick={() => handleDeleteUser(record)}>
+                                              <Trash2 className="size-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>删除</TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
 
                   {/* 角色管理 */}
-                  <Tabs.TabPane key="roles" title="角色管理">
-                    <div className="toolbar">
-                      <div className="toolbar-left">
-                        共 {roles.length} 个角色
-                      </div>
+                  <TabsContent value="roles" className="mt-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-muted-foreground text-sm">共 {roles.length} 个角色</span>
                       {hasPermission('role', 'create') && (
-                        <Button
-                          type="primary"
-                          icon={<IconPlus />}
-                          onClick={() => handleOpenRoleModal()}
-                        >
+                        <Button onClick={() => handleOpenRoleModal()}>
+                          <Plus className="size-4" />
                           新建角色
                         </Button>
                       )}
                     </div>
 
-                    <Table
-                      columns={roleColumns}
-                      data={roles}
-                      loading={rolesLoading}
-                      rowKey="id"
-                      pagination={false}
-                      scroll={{ x: 1000 }}
-                    />
-                  </Tabs.TabPane>
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-48">角色名称</TableHead>
+                            <TableHead className="w-72">描述</TableHead>
+                            <TableHead>权限列表</TableHead>
+                            <TableHead className="w-20">用户数</TableHead>
+                            <TableHead className="w-28 text-right">操作</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rolesLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={roleColCount} className="h-24 text-center">
+                                <Loader2 className="text-muted-foreground mx-auto size-6 animate-spin" />
+                              </TableCell>
+                            </TableRow>
+                          ) : roles.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={roleColCount} className="text-muted-foreground h-24 text-center">
+                                暂无角色
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            roles.map((record) => {
+                              const count = users.filter((u) => u.roles.includes(record.name)).length;
+                              return (
+                                <TableRow key={record.id}>
+                                  <TableCell className="font-medium">{record.name}</TableCell>
+                                  <TableCell className="text-muted-foreground">{record.description || '-'}</TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-wrap gap-1">
+                                      {record.permissions.slice(0, 5).map((perm) => (
+                                        <Badge key={perm.id} variant="outline" className={arcoBadgeClass('cyan')}>
+                                          {PERMISSION_RESOURCE_MAP[perm.resource] || perm.resource}:
+                                          {PERMISSION_ACTION_MAP[perm.action] || perm.action}
+                                        </Badge>
+                                      ))}
+                                      {record.permissions.length > 5 && (
+                                        <Badge variant="outline" className={arcoBadgeClass('default')}>
+                                          +{record.permissions.length - 5}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{count}</TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-0.5">
+                                      {hasPermission('role', 'update') && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="size-8" aria-label="编辑角色" onClick={() => handleOpenRoleModal(record)}>
+                                              <Pencil className="size-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>编辑</TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {hasPermission('role', 'delete') && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除角色" onClick={() => handleDeleteRole(record)}>
+                                              <Trash2 className="size-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>删除</TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
 
                   {/* 企微配置 */}
-                  <Tabs.TabPane key="wecom" title="企微配置">
+                  <TabsContent value="wecom" className="mt-4">
                     <WecomManagement />
-                  </Tabs.TabPane>
+                  </TabsContent>
                 </Tabs>
-          </Tabs.TabPane>
-          )}
+              </TabsContent>
+            )}
 
-          {/* 节假日 */}
-          {hasPermission('system', 'account') && (
-            <Tabs.TabPane key="holidays" title="节假日">
-              <HolidayManagement />
-            </Tabs.TabPane>
-          )}
+            {hasPermission('system', 'account') && (
+              <TabsContent value="holidays" className="mt-4">
+                <HolidayManagement />
+              </TabsContent>
+            )}
 
-          {/* 操作日志 */}
-          {hasPermission('system', 'audit_log') && (
-            <Tabs.TabPane key="audit" title="操作日志">
-              <AuditLogTab />
-            </Tabs.TabPane>
-          )}
-        </Tabs>
-      </Card>
+            {hasPermission('system', 'audit_log') && (
+              <TabsContent value="audit" className="mt-4">
+                <AuditLogTab />
+              </TabsContent>
+            )}
+          </Tabs>
+        </Card>
 
-      {/* 用户抽屉 */}
-      <Drawer
-        width={600}
-        title={editingUser ? '编辑用户' : '新建用户'}
-        visible={userModalVisible}
-        onCancel={() => setUserModalVisible(false)}
-        footer={
-          <div style={{ textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setUserModalVisible(false)}>取消</Button>
-              <Button type="primary" onClick={handleSubmitUser}>
-                {editingUser ? '保存' : '创建'}
-              </Button>
-            </Space>
-          </div>
-        }
-      >
-        <Form
-          form={userForm}
-          layout="vertical"
-          initialValues={{
-            status: 'ACTIVE',
-          }}
-        >
-          <Form.Item
-            label="姓名"
-            field="realName"
-            rules={[{ required: true, message: '请输入姓名' }]}
-          >
-            <Input
-              placeholder="请输入姓名"
-              onChange={(value) => {
-                if (!editingUser && value) {
-                  userForm.setFieldValue('username', generateUsername(value));
-                }
-              }}
-            />
-          </Form.Item>
-
-          <div style={{ display: 'flex', gap: 24 }}>
-            <Form.Item label="允许登录">
-              <Space>
-                <Switch
-                  checked={formCanLogin}
-                  onChange={setFormCanLogin}
+        {/* 用户抽屉 */}
+        <Sheet open={userModalVisible} onOpenChange={(o) => !o && setUserModalVisible(false)}>
+          <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[600px]" onInteractOutside={(e) => e.preventDefault()}>
+            <SheetHeader className="border-b px-6 py-4">
+              <SheetTitle>{editingUser ? '编辑用户' : '新建用户'}</SheetTitle>
+              <SheetDescription className="sr-only">用户账号信息</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+              <Field label="姓名" required error={userErrors.realName}>
+                <Input
+                  placeholder="请输入姓名"
+                  value={userValues.realName}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setUserField('realName', v);
+                    if (!editingUser && v) setUserField('username', generateUsername(v));
+                  }}
                 />
-                <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
-                  {formCanLogin ? '可登录' : '不可登录'}
-                </span>
-              </Space>
-            </Form.Item>
-            <Form.Item label="账号状态">
-              <Space>
-                <Switch
-                  checked={formStatus !== 'DISABLED'}
-                  onChange={(checked) => setFormStatus(checked ? 'ACTIVE' : 'DISABLED')}
-                />
-                <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
-                  {formStatus !== 'DISABLED' ? '启用' : '已禁用'}
-                </span>
-              </Space>
-            </Form.Item>
-          </div>
+              </Field>
 
-          <Form.Item
-            label="用户名"
-            field="username"
-            rules={[
-              { minLength: 2, message: '用户名长度不能少于2位' },
-            ]}
-            extra={!editingUser ? '根据姓名自动生成拼音，可手动修改' : '用户名创建后不可修改'}
-          >
-            <Input
-              placeholder="请输入用户名"
-              disabled={!!editingUser}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="密码"
-            field="password"
-            rules={[{ minLength: 6, message: '密码长度不能少于6位' }]}
-          >
-            <Input.Password placeholder="请输入密码" />
-          </Form.Item>
-
-          <Form.Item
-            label="企微UserID"
-            field="wecomUserId"
-            extra="关联企业微信账号，用于企微扫码登录"
-          >
-            <Input placeholder="请输入企微UserID（选填）" allowClear />
-          </Form.Item>
-
-          <Form.Item
-            label="角色"
-            field="roleIds"
-            rules={[{ required: true, message: '请选择至少一个角色' }]}
-          >
-            <Select
-              placeholder="请选择角色"
-              mode="multiple"
-              allowClear
-            >
-              {roles.map((role) => (
-                <Select.Option key={role.id} value={role.name}>
-                  {role.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Form>
-      </Drawer>
-
-      {/* 角色抽屉 */}
-      <Drawer
-        width={700}
-        title={editingRole ? '编辑角色' : '新建角色'}
-        visible={roleModalVisible}
-        onCancel={() => setRoleModalVisible(false)}
-        footer={
-          <div style={{ textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setRoleModalVisible(false)}>取消</Button>
-              <Button type="primary" onClick={handleSubmitRole}>
-                {editingRole ? '保存' : '创建'}
-              </Button>
-            </Space>
-          </div>
-        }
-      >
-        <Form form={roleForm} layout="vertical">
-          <Form.Item
-            label="角色名称"
-            field="name"
-            rules={[
-              { required: true, message: '请输入角色名称' },
-              { minLength: 2, message: '角色名称长度不能少于2位' },
-            ]}
-          >
-            <Input placeholder="请输入角色名称" />
-          </Form.Item>
-
-          <Form.Item label="角色描述" field="description">
-            <Input.TextArea
-              placeholder="请输入角色描述"
-              rows={3}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="权限配置"
-            field="permissionIds"
-            rules={[{ required: true, message: '请选择至少一个权限' }]}
-          >
-            <Checkbox.Group style={{ width: '100%' }}>
-              {Object.entries(groupedPermissions).map(([resource, perms]) => (
-                <div key={resource} style={{ marginBottom: 16 }}>
-                  <div className="section-title" style={{ marginBottom: 8 }}>
-                    {PERMISSION_RESOURCE_MAP[resource] || resource}
+              <div className="flex gap-6">
+                <Field label="允许登录">
+                  <div className="flex h-9 items-center gap-2">
+                    <Switch checked={formCanLogin} onCheckedChange={setFormCanLogin} />
+                    <span className="text-muted-foreground text-[13px]">{formCanLogin ? '可登录' : '不可登录'}</span>
                   </div>
-                  <Space wrap>
-                    {perms.map((perm) => (
-                      <Checkbox key={perm.id} value={perm.id}>
-                        {PERMISSION_ACTION_MAP[perm.action] || perm.action}{perm.description ? `（${perm.description}）` : ''}
-                      </Checkbox>
-                    ))}
-                  </Space>
-                  <Divider />
+                </Field>
+                <Field label="账号状态">
+                  <div className="flex h-9 items-center gap-2">
+                    <Switch checked={formStatus !== 'DISABLED'} onCheckedChange={(c) => setFormStatus(c ? 'ACTIVE' : 'DISABLED')} />
+                    <span className="text-muted-foreground text-[13px]">{formStatus !== 'DISABLED' ? '启用' : '已禁用'}</span>
+                  </div>
+                </Field>
+              </div>
+
+              <Field
+                label="用户名"
+                error={userErrors.username}
+                extra={!editingUser ? '根据姓名自动生成拼音，可手动修改' : '用户名创建后不可修改'}
+              >
+                <Input placeholder="请输入用户名" disabled={!!editingUser} value={userValues.username} onChange={(e) => setUserField('username', e.target.value)} />
+              </Field>
+
+              <Field label="密码" error={userErrors.password}>
+                <Input type="password" placeholder="请输入密码" value={userValues.password} onChange={(e) => setUserField('password', e.target.value)} />
+              </Field>
+
+              <Field label="企微UserID" extra="关联企业微信账号，用于企微扫码登录">
+                <Input placeholder="请输入企微UserID（选填）" value={userValues.wecomUserId} onChange={(e) => setUserField('wecomUserId', e.target.value)} />
+              </Field>
+
+              <Field label="角色" required error={userErrors.roleIds}>
+                <MultiSelect
+                  options={roles.map((r) => ({ value: r.name, label: r.name }))}
+                  value={userValues.roleIds}
+                  onChange={(ids) => setUserField('roleIds', ids)}
+                  placeholder="请选择角色"
+                />
+              </Field>
+            </div>
+            <SheetFooter className="flex-row justify-end gap-2 border-t px-6 py-4">
+              <Button variant="outline" onClick={() => setUserModalVisible(false)}>
+                取消
+              </Button>
+              <Button onClick={handleSubmitUser}>{editingUser ? '保存' : '创建'}</Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
+        {/* 角色抽屉 */}
+        <Sheet open={roleModalVisible} onOpenChange={(o) => !o && setRoleModalVisible(false)}>
+          <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[700px]" onInteractOutside={(e) => e.preventDefault()}>
+            <SheetHeader className="border-b px-6 py-4">
+              <SheetTitle>{editingRole ? '编辑角色' : '新建角色'}</SheetTitle>
+              <SheetDescription className="sr-only">角色与权限配置</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+              <Field label="角色名称" required error={roleErrors.name}>
+                <Input placeholder="请输入角色名称" value={roleValues.name} onChange={(e) => setRoleField('name', e.target.value)} />
+              </Field>
+
+              <Field label="角色描述">
+                <Textarea placeholder="请输入角色描述" rows={3} value={roleValues.description} onChange={(e) => setRoleField('description', e.target.value)} />
+              </Field>
+
+              <Field label="权限配置" required error={roleErrors.permissionIds}>
+                <div className="space-y-4">
+                  {Object.entries(groupedPermissions).map(([resource, perms]) => (
+                    <div key={resource} className="border-b pb-3 last:border-b-0">
+                      <div className="mb-2 text-sm font-medium">{PERMISSION_RESOURCE_MAP[resource] || resource}</div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-2">
+                        {perms.map((perm) => (
+                          <label key={perm.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                            <Checkbox checked={roleValues.permissionIds.includes(perm.id)} onCheckedChange={() => togglePermission(perm.id)} />
+                            <span>
+                              {PERMISSION_ACTION_MAP[perm.action] || perm.action}
+                              {perm.description ? `（${perm.description}）` : ''}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </Checkbox.Group>
-          </Form.Item>
-        </Form>
-      </Drawer>
+              </Field>
+            </div>
+            <SheetFooter className="flex-row justify-end gap-2 border-t px-6 py-4">
+              <Button variant="outline" onClick={() => setRoleModalVisible(false)}>
+                取消
+              </Button>
+              <Button onClick={handleSubmitRole}>{editingRole ? '保存' : '创建'}</Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
+        {/* 删除确认 */}
+        <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
+              <AlertDialogDescription>{confirm?.content}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  confirm?.onOk();
+                  setConfirm(null);
+                }}
+              >
+                确定
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TooltipProvider>
     </MainLayout>
   );
 };

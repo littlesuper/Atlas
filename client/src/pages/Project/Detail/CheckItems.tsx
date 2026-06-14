@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Checkbox,
-  Input,
-  Button,
-  Message,
-  Spin,
-  Progress,
-  Typography,
-} from '@arco-design/web-react';
-import { IconPlus, IconDelete } from '@arco-design/web-react/icon';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { checkItemsApi } from '../../../api';
 import { CheckItem } from '../../../types';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 
 export function computeCheckProgress(items: CheckItem[]): { checked: number; total: number; percent: number } {
   const checked = items.filter((i) => i.checked).length;
@@ -36,7 +33,7 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
       const res = await checkItemsApi.list(activityId);
       setItems(res.data);
     } catch {
-      Message.error('加载检查项失败');
+      toast.error('加载检查项失败');
     } finally {
       setLoading(false);
     }
@@ -54,7 +51,7 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
       setItems((prev) => [...prev, res.data]);
       setNewTitle('');
     } catch {
-      Message.error('添加失败');
+      toast.error('添加失败');
     }
   };
 
@@ -63,7 +60,7 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
       const res = await checkItemsApi.update(item.id, { checked: !item.checked });
       setItems((prev) => prev.map((i) => (i.id === item.id ? res.data : i)));
     } catch {
-      Message.error('更新失败');
+      toast.error('更新失败');
     }
   };
 
@@ -72,7 +69,7 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
       await checkItemsApi.delete(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
     } catch {
-      Message.error('删除失败');
+      toast.error('删除失败');
     }
   };
 
@@ -92,7 +89,7 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
       const res = await checkItemsApi.update(editingId, { title });
       setItems((prev) => prev.map((i) => (i.id === editingId ? res.data : i)));
     } catch {
-      Message.error('更新失败');
+      toast.error('更新失败');
     }
     setEditingId(null);
   };
@@ -103,104 +100,95 @@ const CheckItems: React.FC<CheckItemsProps> = ({ activityId }) => {
   })();
 
   return (
-    <Spin loading={loading} style={{ width: '100%' }}>
+    <div className="relative w-full">
+      {loading && (
+        <div className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center">
+          <Loader2 className="text-muted-foreground size-5 animate-spin" />
+        </div>
+      )}
       <div>
         {/* 标题行 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-2)' }}>
-            检查项
-          </span>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-muted-foreground text-[13px] font-medium">检查项</span>
           {totalCount > 0 && (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <span className="text-muted-foreground text-xs">
               {checkedCount}/{totalCount}
-            </Typography.Text>
+            </span>
           )}
         </div>
 
         {/* 进度条 */}
         {totalCount > 0 && (
           <Progress
-            percent={percent}
-            size="small"
-            style={{ marginBottom: 8 }}
-            color={percent === 100 ? 'var(--color-success-6)' : undefined}
+            value={percent}
+            className={cn('mb-2 h-1.5', percent === 100 && '[&>div]:bg-emerald-500')}
           />
         )}
 
         {/* 检查项列表 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div className="flex flex-col gap-1">
           {items.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '4px 0',
-                borderRadius: 4,
-              }}
-            >
-              <Checkbox
-                checked={item.checked}
-                onChange={() => handleToggle(item)}
-              />
+            <div key={item.id} className="flex items-center gap-2 rounded py-1">
+              <Checkbox checked={item.checked} onCheckedChange={() => handleToggle(item)} />
               {editingId === item.id ? (
                 <Input
-                  size="small"
                   value={editingTitle}
-                  onChange={setEditingTitle}
-                  onPressEnter={handleEditSave}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleEditSave();
+                  }}
                   onBlur={handleEditSave}
                   autoFocus
-                  style={{ flex: 1 }}
+                  className="h-7 flex-1 text-[13px]"
                 />
               ) : (
                 <span
                   onClick={() => handleEditStart(item)}
-                  style={{
-                    flex: 1,
-                    cursor: 'pointer',
-                    textDecoration: item.checked ? 'line-through' : 'none',
-                    color: item.checked ? 'var(--color-text-4)' : 'var(--color-text-1)',
-                    fontSize: 13,
-                    lineHeight: '22px',
-                  }}
+                  className={cn(
+                    'flex-1 cursor-pointer text-[13px] leading-[22px]',
+                    item.checked ? 'text-muted-foreground line-through' : 'text-foreground'
+                  )}
                 >
                   {item.title}
                 </span>
               )}
               <Button
-                type="text"
-                status="danger"
-                icon={<IconDelete />}
-                size="mini"
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive size-7 shrink-0 opacity-50"
+                aria-label="删除检查项"
                 onClick={() => handleDelete(item.id)}
-                style={{ opacity: 0.5, flexShrink: 0 }}
-              />
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
             </div>
           ))}
         </div>
 
         {/* 新增输入框 */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <div className="mt-2 flex gap-2">
           <Input
-            size="small"
             placeholder="添加检查项..."
             value={newTitle}
-            onChange={setNewTitle}
-            onPressEnter={handleAdd}
-            style={{ flex: 1 }}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAdd();
+            }}
+            className="h-7 flex-1 text-[13px]"
           />
           <Button
-            type="text"
-            size="small"
-            icon={<IconPlus />}
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            aria-label="添加检查项"
             onClick={handleAdd}
             disabled={!newTitle.trim()}
-          />
+          >
+            <Plus className="size-4" />
+          </Button>
         </div>
       </div>
-    </Spin>
+    </div>
   );
 };
 

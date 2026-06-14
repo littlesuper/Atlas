@@ -527,7 +527,7 @@ describe('validate middleware', () => {
     const req = mockReq({ body: { name: 'test' } });
     const res = mockRes();
 
-    const originalParse = schema.parse;
+    const _originalParse = schema.parse;
     vi.spyOn(schema, 'parse').mockImplementation(() => { throw new Error('unexpected'); });
 
     middleware(req, res, next);

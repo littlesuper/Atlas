@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Spin } from '@arco-design/web-react';
+import { Loader2 } from 'lucide-react';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
 import ErrorBoundary from './components/ErrorBoundary';
+import { Toaster } from '@/components/ui/sonner';
 
 // 页面组件（需要实际创建）
 const Login = React.lazy(() => import('./pages/Login'));
@@ -17,6 +18,7 @@ const WeeklyReportForm = React.lazy(() => import('./pages/WeeklyReports/Form'));
 const WorkloadPage = React.lazy(() => import('./pages/Workload'));
 const TemplateManagement = React.lazy(() => import('./pages/Admin/TemplateManagement'));
 const RiskDashboard = React.lazy(() => import('./pages/RiskDashboard'));
+const Home = React.lazy(() => import('./pages/Home'));
 
 // 受保护的路由组件
 interface ProtectedRouteProps {
@@ -40,7 +42,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           height: '100vh',
         }}
       >
-        <Spin size={40} />
+        <Loader2 className="text-muted-foreground size-10 animate-spin" />
       </div>
     );
   }
@@ -95,6 +97,7 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
     <BrowserRouter>
+      <Toaster richColors position="top-center" />
       <React.Suspense
         fallback={
           <div
@@ -105,7 +108,7 @@ const App: React.FC = () => {
               height: '100vh',
             }}
           >
-            <Spin size={40} />
+            <Loader2 className="text-muted-foreground size-10 animate-spin" />
           </div>
         }
       >
@@ -113,16 +116,10 @@ const App: React.FC = () => {
           {/* 登录页 */}
           <Route path="/login" element={<Login />} />
 
-          {/* 首页重定向 */}
+          {/* 首页：AI 自然语言入口 + 项目风险点 */}
           <Route
             path="/"
-            element={
-              isAuthenticated ? (
-                <Navigate to="/projects" replace />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
+            element={isAuthenticated ? <Home /> : <Navigate to="/login" replace />}
           />
 
           {/* 项目列表（首页） */}

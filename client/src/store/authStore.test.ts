@@ -8,10 +8,12 @@ vi.mock('../api', () => ({
   },
 }));
 
-vi.mock('@arco-design/web-react', () => ({
-  Message: {
+vi.mock('sonner', () => ({
+  toast: {
     success: vi.fn(),
     error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
   },
 }));
 

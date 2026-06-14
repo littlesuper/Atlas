@@ -23,18 +23,8 @@ vi.mock('../../store/authStore', () => ({
   useAuthStore: () => ({ login: mockLogin }),
 }));
 
-vi.mock('@arco-design/web-react', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@arco-design/web-react')>();
-  return {
-    ...actual,
-    Message: { success: mockMessageSuccess, error: mockMessageError },
-  };
-});
-
-// Icon SVGs are not needed in jsdom
-vi.mock('@arco-design/web-react/icon', () => ({
-  IconUser: () => null,
-  IconLock: () => null,
+vi.mock('sonner', () => ({
+  toast: { success: mockMessageSuccess, error: mockMessageError, warning: vi.fn(), info: vi.fn() },
 }));
 
 // ---- Tests ----

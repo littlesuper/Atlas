@@ -285,7 +285,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('captureAppError is called with ErrorBoundary source tag', () => {
-    const { mockCaptureAppError } = (() => {
+    const { mockCaptureAppError: _mockCaptureAppError } = (() => {
       const m = vi.hoisted(() => ({ mockCaptureAppError: vi.fn() }));
       vi.mock('../../utils/monitoring', () => ({ captureAppError: m.mockCaptureAppError }));
       return m;
@@ -303,7 +303,7 @@ describe('ErrorBoundary', () => {
       if (shouldThrow) throw new Error('Test error');
       return <div>Child content</div>;
     };
-    const { rerender } = render(
+    render(
       <ErrorBoundary>
         <ConditionalThrow />
       </ErrorBoundary>
@@ -316,7 +316,7 @@ describe('ErrorBoundary', () => {
 
   it('re-throws after reset when error persists across re-render', () => {
     const AlwaysThrow = () => { throw new Error('persistent'); };
-    const { container } = render(
+    render(
       <ErrorBoundary>
         <AlwaysThrow />
       </ErrorBoundary>

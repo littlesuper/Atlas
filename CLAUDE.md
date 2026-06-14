@@ -8,7 +8,7 @@ Atlas 是一套面向硬件团队的 Web 项目管理平台，使用 npm workspa
 
 ## 技术栈
 
-- **前端:** React 19 + TypeScript + Vite 7 + Arco Design + Zustand + React Router 7 + i18next
+- **前端:** React 19 + TypeScript + Vite 7 + shadcn/ui（Tailwind v4 + Radix）+ Zustand + React Router 7 + i18next
 - **后端:** Express 4 + TypeScript + Prisma 7 + Zod + Pino + SQLite(dev)/PostgreSQL(prod)
 - **测试:** Vitest(单元) + Playwright(E2E, 300+ 用例) + axe-core(无障碍)
 - **工具链:** ESLint(flat config) + Prettier + Swagger/OpenAPI
@@ -33,8 +33,11 @@ server/src/           # 后端源码
     weeklyReports/    # 周报（shared, crud, project, actions）
     ...               # 其余单文件路由（risk, roles, users, etc.）
   middleware/         # auth, permission, validate(Zod), requestId, httpLogger, cache
-  schemas/            # Zod 校验 schema（auth, users, projects）
-  utils/              # 工具函数（workday, dependencyScheduler, riskEngine, logger, circuitBreaker, roleMembershipResolver 等）
+  schemas/            # Zod 校验 schema（auth, users, projects, assistant, scheduleAssistant）
+  services/           # 编排层
+    assistant/        # 全系统 AI 助手框架（registry/orchestrator/proposalStore、adapters/{schedule,project,risk}、query/ 只读问答、domainClassifier、targetResolver）
+    scheduleAssistant.ts  # 排期领域 propose/apply 编排
+  utils/              # 工具函数（workday, dependencyScheduler, scheduleEngine, scheduleRisks, riskEngine, logger, circuitBreaker, roleMembershipResolver 等）
   swagger.ts          # OpenAPI/Swagger 文档配置
   db.ts               # PrismaClient 单例（含 driver adapter）
   prisma/             # schema.prisma（含 ActivityExecutor、RoleMember 等模型）、seed.ts
@@ -83,7 +86,7 @@ npx playwright test e2e/login.spec.ts
 - 前后端 100% TypeScript，类型定义集中在 `client/src/types/index.ts`
 - 后端 Prisma 7 自动生成类型（输出到 `server/src/generated/prisma/`，已 gitignore），无需手动维护
 - 所有 PrismaClient 通过 `server/src/db.ts` 单例访问（含 `@prisma/adapter-better-sqlite3` driver adapter）
-- UI 组件使用 Arco Design (`@arco-design/web-react`)
+- UI 组件使用 shadcn/ui（基于 Tailwind v4 + Radix，组件位于 `client/src/components/ui/`；含自建 `combobox`/`multi-select`/`date-range-picker`）；图标用 lucide-react，提示消息用 sonner 的 `toast`，Arco 色名经 `client/src/utils/badgeColor.ts` 的 `arcoBadgeClass` 映射到 Tailwind 徽标样式。已全量从 Arco Design 迁移完成（不再依赖 `@arco-design/*`）
 - 状态管理使用 Zustand（不用 Redux）
 - 路由使用 React Router v7
 - 日期处理使用 Day.js
@@ -110,6 +113,55 @@ npx playwright test e2e/login.spec.ts
 - 创建活动时：选择角色 → 自动填入该角色下所有 ACTIVE 用户，执行人下拉仅显示该角色用户
 - 编辑活动时：切换角色 → 执行人列表更新为新角色用户；`resetExecutorsByRole: true` 可显式重置
 - Excel 导入支持"角色"列，按角色名匹配自动填入执行人
+
+## 全系统 AI 助手（System-Wide Assistant）
+
+一个输入框覆盖全站：用户用自然语言驱动系统，AI 解析意图，**可写领域**在落库前展示改动预览（before→after diff）+ 风险，用户确认后经现有校验路径写入；**只读提问**直接给出答案。AI 自己从"用户权限可见的项目"里认出目标，无需手动选项目。框架与安全模型规格见 `docs/specs/system-wide-assistant/`，排期领域原始规格见 `docs/specs/ai-scheduling-beacon/`（含验收报告 `VERIFICATION.md`）。
+
+### 不可妥协的安全模型（每个可写领域都必须满足）
+
+源于一次 LLM 编造数据的生产事故，五条缺一不可：
+1. **LLM 只在边缘**：仅"解析意图 + 复述结果"，**绝不直接产出权威值、绝不直接写库**。
+2. **每次写入都需用户显式确认**：propose（预览）→ 用户确认 → apply，**无自动应用**。
+3. **走现有校验写入路径**：apply 复用各模块已有的 service/路由（自带 Zod + 权限 + 审计），不开旁路。
+4. **代码层护栏**（不靠 prompt 自觉）：结构化意图过 Zod（拦造假字段/非法枚举）、实体 id 对真实库白名单校验（拦造假 id）、LLM 不得填用户未陈述的值、解析不出就"没听懂"不瞎猜。
+5. **全程审计可回滚**：记录 `rawUtterance` + `resolvedIntent` + `appliedDiff`。
+
+### 助手框架（`server/src/services/assistant/`）
+
+- **适配器** `types.ts` 的 `AssistantActionAdapter`：每个可写领域一个，提供 `loadContext` / `buildIntentPrompts` / `parseIntent`（Zod + id 白名单，纯函数可离线测）/ `buildPreview`（确定性 diff + 风险）/ `fingerprint`（防并发）/ `apply`（调现有校验路由）/ 可选 `narrate`。
+- **注册表/引导** `registry.ts` + `bootstrap.ts`：集中注册 `schedule`、`project`、`risk` 三个适配器（按 domain 幂等覆盖）。**新增领域只需写 adapter 并注册，分类器/路由/前端零改动**。
+- **通用编排** `orchestrator.ts`：`runPropose` / `runApply`，复用 `proposalStore.ts` 的 `ProposalCache`（TTL 10min + 指纹 + 幂等）。**apply 只认服务端缓存意图，不信前端 diff**。
+- **领域分类** `domainClassifier.ts`：从一句话路由到 排期/项目字段/风险项/只读提问（LLM 边缘，经 `aiCircuitBreaker`）。
+- **目标定位** `targetResolver.ts`：先确定性按项目名匹配（`matchProjectByName`，命中即免一次 LLM 调用），匹配不上再 LLM 兜底。
+
+### 可写领域（已交付 Phase 1–3）
+
+- **schedule**（排期）`adapters/scheduleAdapter.ts`：日期/风险由**确定性引擎**算，LLM 碰不到真值——反幻觉最强的领域。
+  - `utils/scheduleEngine.ts`：`dryRunSchedule`（干跑算假设排期 + before/after diff）、`computeProjectScheduleCascade`（纯级联，与写入路径 `cascadeUpdateDependents` 共用同一算法，保证"干跑 = 实算"）
+  - `utils/scheduleRisks.ts`：`assessRisks` 三类确定性风险——撞里程碑(`milestone_slip`)、撞硬节点(`hard_node_breach`)、整体超期(`project_overdue`)
+  - `utils/scheduleAssistantPrompts.ts`：prompt + `parseIntentResponse`（Zod + 活动白名单兜底，拦 LLM 编造的 activityId）
+  - **硬节点** `Activity.hardConstraintDate`（可空 `DateTime`）= 计划完成不得晚于的日期，仅用于撞硬节点判定
+- **project.update**（项目字段）`adapters/projectAdapter.ts`：名称/状态/优先级/起止日的字段 diff，Zod + 枚举校验、日期区间风险、归档保护，走 `prisma.project.update`。
+- **risk**（风险项）`adapters/riskAdapter.ts`：新建风险项 / 改严重度·状态；riskItemId 对本项目风险项白名单校验，写入复用 riskItem + RiskItemLog 语义。
+
+### 只读提问（混合 Q&A，`server/src/services/assistant/query/`）
+
+`query` 伪领域（无写适配器）。`askService.ts` 的 `runAsk`：**确定性优先 → 接地兜底**，全程只读不写库。
+- **确定性**（零幻觉）：命中白名单查询（阶段工期、计划起止、风险数、超期数等）→ `queryService.ts` + `queryCompute.ts` 纯代码精确计算，前端标"系统精确计算"。
+- **接地问答**（长尾任意问题）：`contextBuilder.ts` 取**该用户权限可见**的跨项目系统数据喂给 LLM，强制"只依据数据作答、没有就说不知道、绝不编造"，前端标"据系统数据（AI 整理，可能不完整）"橙色提示。
+
+### 前端
+
+- **共享核心** `client/src/components/AssistantConversation.tsx`：输入 → 分步时间线（意图解析〔AI〕→ 生成预览〔系统〕→ 风险判定〔系统〕→ 预览待确认 → 已应用）→ 预览 diff/风险 → 确认应用；只读提问走单独的"回答"渲染（来源徽标 + 再问一句）。`variant='hero'`（首页胶囊输入）/ `'panel'`（浮层）。
+- **全局浮层** `client/src/components/AssistantLauncher.tsx`：挂在 `layouts/MainLayout.tsx`，除首页外所有页面可唤出，感知当前路由项目作默认目标。
+- **AI 首页** `client/src/pages/Home/index.tsx`（路由 `/`）：hero 自然语言输入 + AI 分析的项目风险点。
+- **API** `assistantApi.propose(utterance, contextProjectId?)` / `apply(proposalId)`；`/api/schedule-assistant/*` 保留为薄别名（向后兼容）。风险种类中文/颜色见 `client/src/utils/constants.ts` 的 `SCHEDULE_RISK_KIND_MAP`。
+
+### 降级与可观测
+
+- **降级**（AI 不可用不阻断手动操作）：意图解析/分类不可用 → 503 提示手动；叙述不可用 → 仅展示结构化 diff 仍可确认；解析不出 → "没听懂"不瞎改；低置信前端额外警示。
+- **耗时**：`utils/aiClient.ts` 的 `callAi` 按阶段（`label`：classify/target/query.parse/grounded/intent/narrate）打点 `configMs`/`llmMs`/`postMs`/`totalMs`；`/api/assistant/propose` 端到端耗时记日志（"助手 propose 总耗时"）并回填响应体 `elapsedMs`，前端在回答/预览处显示「耗时 X.X 秒」。
 
 ## 用户模型
 
@@ -190,14 +242,51 @@ npm run dev                    # 启动前后端开发服务器
 
 ## 测试约定
 
-- 单元测试与源文件同目录，命名 `<moduleName>.test.ts(x)`；跨切面测试放在 `__tests__/` 子目录（如 `server/src/routes/__tests__/performance.test.ts`）
-- 显式 `import { describe, it, expect, vi, beforeEach } from 'vitest'`，不依赖全局注入
-- `describe` 用功能名或 HTTP 端点（英文）；`it` 后端偏英文（`should return 404 when...`），前端偏中文（`未登录时返回 false`）
-- 后端路由测试：`vi.hoisted()` 定义 mock 对象 → `vi.mock()` 替换模块（Prisma、auth middleware）
-- 前端组件测试：`vi.mock()` + `importOriginal` 部分模拟（如 `react-router-dom` 的 `useNavigate`）
-- Store 测试：`useAuthStore.setState()` 直接重置；每个 `beforeEach` 必须 `vi.clearAllMocks()`
-- 前端 DOM 断言用 `@testing-library/jest-dom`（`toBeInTheDocument` 等），不引入额外断言库
-- 前端 vitest 环境为 `jsdom`，setup 文件 `client/src/test/setup.ts`（提供 `localStorage`、`matchMedia` mock）
+### 测试文件命名与位置
+
+- 测试文件与源文件同目录，命名 `<moduleName>.test.ts`（前端组件 `.test.tsx`）
+- 跨切面测试放在 `__tests__/` 子目录（如 `server/src/routes/__tests__/performance.test.ts`）
+- 专项测试可用点分后缀（如 `authStore.permission.test.ts`）
+
+### 测试框架与配置
+
+- **单元测试**：Vitest（配置 `globals: true`，但约定仍显式 import vitest API，见「导入规范」）
+- **前端环境**：`jsdom`，setup 文件 `client/src/test/setup.ts`（提供 `localStorage`、`matchMedia` mock 和 `@testing-library/jest-dom`）
+- **后端环境**：`node`，无 setup 文件
+- **E2E 测试**：Playwright（`e2e/` 目录，300+ 用例，含 axe-core 无障碍审计）
+
+### 导入规范
+
+```ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+```
+
+虽然配置了 `globals: true`，仍始终显式导入 vitest API，不依赖全局注入。
+
+### Describe / It 命名
+
+- `describe` 使用功能名或 HTTP 端点（英文）
+- `it` 行为描述：后端偏向英文（`should return 404 when...`），前端偏向中文（`未登录时返回 false`）
+- 大型路由测试文件用注释分隔线分组
+
+### Mock 模式
+
+- **后端路由测试**：`vi.hoisted()` 定义 mock 对象 → `vi.mock()` 替换模块（Prisma、auth middleware）
+- **前端组件测试**：`vi.mock()` + `importOriginal` 部分模拟（如 `react-router-dom` 的 `useNavigate`）
+- **Store 测试**：`useAuthStore.setState()` 直接重置状态
+- 每个 `beforeEach` 必须调用 `vi.clearAllMocks()`
+
+### 测试结构
+
+- 纯函数/工具类：单层 `describe('functionName', ...)`
+- HTTP 端点：按方法分组 `describe('GET /api/...', ...)` / `describe('POST /api/...', ...)`
+- 前端功能：按行为分组 `describe('hasPermission', ...)` / `describe('logout', ...)`
+- 参数化测试用 `it.each`
+
+### 断言
+
+- 使用 Vitest 内置 `expect`，不引入额外断言库
+- 前端 DOM 断言可用 `@testing-library/jest-dom` 扩展（`toBeInTheDocument` 等）
 
 ## API 路由前缀
 
@@ -220,5 +309,7 @@ npm run dev                    # 启动前后端开发服务器
 - `/api/check-items` - 活动检查项
 - `/api/risk-items` - 风险项管理
 - `/api/role-members` - 角色成员预览（查询角色下用户）
+- `/api/assistant` - 全系统 AI 助手（propose 预览 / apply 应用；可写领域 + 只读问答，AI 自动认目标项目）
+- `/api/schedule-assistant` - 排期助手（保留为 `/api/assistant` 的薄别名，向后兼容）
 - `/api/docs` - Swagger API 文档（仅开发环境）
 - `/api/docs.json` - OpenAPI JSON 规范

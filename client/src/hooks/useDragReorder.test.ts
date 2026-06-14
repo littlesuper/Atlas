@@ -6,8 +6,8 @@ const { mockMessageError, mockReorder } = vi.hoisted(() => ({
   mockReorder: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('@arco-design/web-react', () => ({
-  Message: { error: mockMessageError, success: vi.fn() },
+vi.mock('sonner', () => ({
+  toast: { error: mockMessageError, success: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock('../api', () => ({

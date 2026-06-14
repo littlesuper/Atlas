@@ -1,24 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Table,
-  Button,
-  Space,
-  Tag,
-  Modal,
-  Select,
-  Message,
-  Spin,
-  Typography,
-} from '@arco-design/web-react';
-import {
-  IconPlus,
-  IconDelete,
-} from '@arco-design/web-react/icon';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { roleMembersApi, usersApi, rolesApi } from '../../api';
 import { RoleMember, User, Role } from '../../types';
-import { selectOptionIncludesInput } from '../../utils/selectFilter';
-
-const { Text } = Typography;
+import { arcoBadgeClass } from '../../utils/badgeColor';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { MultiSelect, type SelectOption } from '@/components/ui/multi-select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const RoleMembersTab: React.FC = () => {
   const [roleMembers, setRoleMembers] = useState<RoleMember[]>([]);
@@ -40,7 +47,7 @@ const RoleMembersTab: React.FC = () => {
       setRoleMembers(membersRes.data.data || []);
       setRoles(rolesRes.data || []);
     } catch {
-      Message.error('加载角色成员失败');
+      toast.error('加载角色成员失败');
     } finally {
       setLoading(false);
     }
@@ -51,7 +58,7 @@ const RoleMembersTab: React.FC = () => {
       const res = await usersApi.list({ pageSize: 1000 });
       setUsers(res.data.data || []);
     } catch {
-      Message.error('加载用户列表失败');
+      toast.error('加载用户列表失败');
     }
   }, []);
 
@@ -80,12 +87,12 @@ const RoleMembersTab: React.FC = () => {
         roleId: addModalVisible,
         members: selectedUserIds.map((userId, idx) => ({ userId, sortOrder: idx })),
       });
-      Message.success('添加成功');
+      toast.success('添加成功');
       setAddModalVisible(null);
       setSelectedUserIds([]);
       loadData();
     } catch {
-      Message.error('添加失败');
+      toast.error('添加失败');
     }
   };
 
@@ -95,12 +102,12 @@ const RoleMembersTab: React.FC = () => {
       await roleMembersApi.delete(deleteModalVisible.id, {
         cascadeMode,
       });
-      Message.success('移除成功');
+      toast.success('移除成功');
       setDeleteModalVisible(null);
       setCascadeMode('keep');
       loadData();
     } catch {
-      Message.error('移除失败');
+      toast.error('移除失败');
     }
   };
 
@@ -113,138 +120,181 @@ const RoleMembersTab: React.FC = () => {
     );
   }, [addModalVisible, roleMembers]);
 
+  const addUserOptions: SelectOption[] = React.useMemo(
+    () =>
+      users
+        .filter(u => u.status === 'ACTIVE')
+        .filter(u => !existingUserIds.has(u.id))
+        .map(u => ({
+          value: u.id,
+          label: `${u.realName}${u.username ? ` (${u.username})` : ''}${!u.canLogin ? ' [仅联系人]' : ''}`,
+        })),
+    [users, existingUserIds]
+  );
+
   if (loading && roleMembers.length === 0) {
-    return <Spin style={{ display: 'block', margin: '40px auto' }} />;
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <div>
-      {groupedByRole.map(({ role, members }) => (
-        <div key={role.id} style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text bold style={{ fontSize: 14 }}>
-              {role.name} ({members.length} 人)
-            </Text>
-            <Space>
+    <TooltipProvider>
+      <div>
+        {groupedByRole.map(({ role, members }) => (
+          <div key={role.id} className="mb-5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-bold">
+                {role.name} ({members.length} 人)
+              </span>
               <Button
-                size="small"
-                type="text"
-                icon={<IconPlus />}
+                size="sm"
+                variant="ghost"
                 onClick={() => { setAddModalVisible(role.id); setSelectedUserIds([]); }}
               >
+                <Plus className="size-4" />
                 添加成员
               </Button>
-            </Space>
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]">排序</TableHead>
+                    <TableHead>姓名</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {members.map((record, idx) => (
+                    <TableRow key={record.id}>
+                      <TableCell>
+                        {idx === 0 ? (
+                          <Badge variant="outline" className={arcoBadgeClass('blue')}>
+                            主负责人
+                          </Badge>
+                        ) : (
+                          record.sortOrder
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span>
+                          {record.user.realName}
+                          {record.user.canLogin === false && (
+                            <Badge variant="outline" className={cn('ml-1', arcoBadgeClass('orange'))}>
+                              仅联系人
+                            </Badge>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive size-8"
+                              aria-label="移除成员"
+                              onClick={() => setDeleteModalVisible(record)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>移除成员</TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-          <Table
-            size="small"
-            border={false}
-            data={members}
-            pagination={false}
-            columns={[
-              {
-                title: '排序',
-                dataIndex: 'sortOrder',
-                width: 60,
-                render: (val: number, _: RoleMember, idx: number) => (
-                  idx === 0 ? <Tag color="blue" size="small">主负责人</Tag> : val
-                ),
-              },
-              {
-                title: '姓名',
-                dataIndex: 'user',
-                render: (user: RoleMember['user']) => (
-                  <span>
-                    {user.realName}
-                    {user.canLogin === false && (
-                      <Tag size="small" style={{ marginLeft: 4 }} color="orange">仅联系人</Tag>
-                    )}
-                  </span>
-                ),
-              },
-              {
-                title: '操作',
-                width: 60,
-                render: (_: unknown, record: RoleMember) => (
-                  <Button
-                    size="small"
-                    type="text"
-                    status="danger"
-                    icon={<IconDelete />}
-                    onClick={() => setDeleteModalVisible(record)}
-                  />
-                ),
-              },
-            ]}
-          />
-        </div>
-      ))}
+        ))}
 
-      {groupedByRole.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-3)' }}>
-          暂无角色成员配置。请先添加角色成员。
-        </div>
-      )}
+        {groupedByRole.length === 0 && (
+          <div className="text-muted-foreground py-10 text-center">
+            暂无角色成员配置。请先添加角色成员。
+          </div>
+        )}
 
-      <Modal
-        title="添加成员"
-        visible={!!addModalVisible}
-        onOk={handleAddMembers}
-        onCancel={() => setAddModalVisible(null)}
-        okButtonProps={{ disabled: selectedUserIds.length === 0 }}
-      >
-        <Select
-          mode="multiple"
-          style={{ width: '100%' }}
-          placeholder="选择要添加的用户"
-          value={selectedUserIds}
-          onChange={setSelectedUserIds}
-          showSearch
-          filterOption={selectOptionIncludesInput}
+        {/* 添加成员 */}
+        <Dialog open={!!addModalVisible} onOpenChange={(o) => !o && setAddModalVisible(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>添加成员</DialogTitle>
+            </DialogHeader>
+            <MultiSelect
+              options={addUserOptions}
+              value={selectedUserIds}
+              onChange={setSelectedUserIds}
+              placeholder="选择要添加的用户"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddModalVisible(null)}>
+                取消
+              </Button>
+              <Button onClick={handleAddMembers} disabled={selectedUserIds.length === 0}>
+                确定
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 移除成员确认 */}
+        <AlertDialog
+          open={!!deleteModalVisible}
+          onOpenChange={(o) => {
+            if (!o) {
+              setDeleteModalVisible(null);
+              setCascadeMode('keep');
+            }
+          }}
         >
-          {users
-            .filter(u => u.status === 'ACTIVE')
-            .filter(u => !existingUserIds.has(u.id))
-            .map(u => (
-              <Select.Option key={u.id} value={u.id}>
-                {u.realName}{u.username ? ` (${u.username})` : ''}{!u.canLogin ? ' [仅联系人]' : ''}
-              </Select.Option>
-            ))}
-        </Select>
-      </Modal>
-
-      <Modal
-        title={`确认从「${deleteModalVisible?.role?.name || ''}」角色移除 ${deleteModalVisible?.user?.realName || ''}?`}
-        visible={!!deleteModalVisible}
-        onOk={handleRemoveMember}
-        onCancel={() => { setDeleteModalVisible(null); setCascadeMode('keep'); }}
-        okText="确认移除"
-      >
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ marginBottom: 8 }}>是否同时从进行中的活动中移除该执行人？</p>
-          <Space direction="vertical">
-            <label>
-              <input
-                type="radio"
-                name="cascade"
-                checked={cascadeMode === 'keep'}
-                onChange={() => setCascadeMode('keep')}
-              />
-              <span style={{ marginLeft: 4 }}>仅停止以后的自动指派</span>
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="cascade"
-                checked={cascadeMode === 'removeAll'}
-                onChange={() => setCascadeMode('removeAll')}
-              />
-              <span style={{ marginLeft: 4 }}>全部移除（离职场景常用）</span>
-            </label>
-          </Space>
-        </div>
-      </Modal>
-    </div>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {`确认从「${deleteModalVisible?.role?.name || ''}」角色移除 ${deleteModalVisible?.user?.realName || ''}?`}
+              </AlertDialogTitle>
+            </AlertDialogHeader>
+            <div>
+              <p className="mb-2 text-sm">是否同时从进行中的活动中移除该执行人？</p>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="cascade"
+                    checked={cascadeMode === 'keep'}
+                    onChange={() => setCascadeMode('keep')}
+                  />
+                  <span>仅停止以后的自动指派</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="cascade"
+                    checked={cascadeMode === 'removeAll'}
+                    onChange={() => setCascadeMode('removeAll')}
+                  />
+                  <span>全部移除（离职场景常用）</span>
+                </label>
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => { setDeleteModalVisible(null); setCascadeMode('keep'); }}
+              >
+                取消
+              </AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={handleRemoveMember}>
+                确认移除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   );
 };
 

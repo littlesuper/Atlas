@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Message } from '@arco-design/web-react';
+import { toast } from 'sonner';
 import { authApi } from '../api';
 import type { ColumnDef, ColumnPrefs } from '../pages/Project/Detail/ColumnSettings';
 
@@ -66,7 +66,7 @@ export function useColumnPrefs({ columnDefs, defaultVisible, defaultOrder }: Use
     try {
       await authApi.updatePreferences({ activityColumns: prefs });
     } catch {
-      Message.error('保存列设置失败');
+      toast.error('保存列设置失败');
     }
   }, []);
 

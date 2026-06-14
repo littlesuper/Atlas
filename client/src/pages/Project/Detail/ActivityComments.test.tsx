@@ -17,14 +17,7 @@ vi.mock('../../../store/authStore', () => ({
   useAuthStore: () => ({ user: { id: 'u1', realName: 'Test User' } }),
 }));
 
-vi.mock('@arco-design/web-react', async () => {
-  const actual = await vi.importActual('@arco-design/web-react');
-  return {
-    ...actual,
-    Message: { success: vi.fn(), error: vi.fn() },
-    Modal: { confirm: vi.fn(({ onOk }: { onOk?: () => void }) => onOk && onOk()) },
-  };
-});
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import ActivityComments, { renderActionLabel, formatChangeEntries } from './ActivityComments';
 import { activityCommentsApi, auditLogsApi } from '../../../api';
@@ -105,11 +98,10 @@ describe('ActivityComments', () => {
       expect(activityCommentsApi.list).toHaveBeenCalled();
     });
 
-    // The primary button should be disabled (arco-btn-disabled class)
-    const submitBtn = document.querySelector('button.arco-btn-primary');
+    // 发送按钮在输入为空时禁用
+    const submitBtn = screen.getByLabelText('发送评论');
     expect(submitBtn).toBeTruthy();
-    expect(submitBtn!.classList.contains('arco-btn-disabled')).toBe(true);
-    expect(submitBtn!.hasAttribute('disabled')).toBe(true);
+    expect(submitBtn.hasAttribute('disabled')).toBe(true);
   });
 
   it('calls create API when submitting a comment', async () => {
@@ -136,12 +128,10 @@ describe('ActivityComments', () => {
     fireEvent.change(textarea, { target: { value: 'Test comment' } });
 
     await waitFor(() => {
-      const submitBtn = document.querySelector('button.arco-btn-primary');
-      expect(submitBtn!.classList.contains('arco-btn-disabled')).toBe(false);
+      expect(screen.getByLabelText('发送评论').hasAttribute('disabled')).toBe(false);
     });
 
-    const submitBtn = document.querySelector('button.arco-btn-primary')!;
-    fireEvent.click(submitBtn);
+    fireEvent.click(screen.getByLabelText('发送评论'));
 
     await waitFor(() => {
       expect(activityCommentsApi.create).toHaveBeenCalledWith({
@@ -158,7 +148,7 @@ describe('ActivityComments', () => {
       expect(screen.getByText('变更历史')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('变更历史'));
+    fireEvent.mouseDown(screen.getByText('变更历史'));
 
     await waitFor(() => {
       expect(auditLogsApi.list).toHaveBeenCalledWith(
@@ -187,7 +177,7 @@ describe('ActivityComments', () => {
     render(<ActivityComments activityId="act1" />);
 
     await waitFor(() => expect(screen.getByText('变更历史')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('变更历史'));
+    fireEvent.mouseDown(screen.getByText('变更历史'));
 
     await waitFor(() => {
       expect(screen.getByText('Zhang')).toBeInTheDocument();

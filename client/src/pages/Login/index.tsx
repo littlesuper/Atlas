@@ -1,22 +1,24 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Tabs } from '@arco-design/web-react';
-import { IconUser, IconLock } from '@arco-design/web-react/icon';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useAuthStore } from '../../store/authStore';
 import WecomQrLogin from '../../components/WecomQrLogin';
-import '../../styles/global.css';
 
-const FormItem = Form.Item;
-const TabPane = Tabs.TabPane;
-
-interface LoginFormData {
-  username: string;
-  password: string;
-}
+const loginSchema = z.object({
+  username: z.string().min(1, '请输入用户名').min(3, '用户名至少3个字符'),
+  password: z.string().min(1, '请输入密码').min(6, '密码至少6个字符'),
+});
+type LoginFormData = z.infer<typeof loginSchema>;
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [form] = Form.useForm<LoginFormData>();
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
 
@@ -26,94 +28,73 @@ const Login: React.FC = () => {
     return params.get('code') ? 'wecom' : 'password';
   }, []);
 
-  const handleSubmit = async (values: LoginFormData) => {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) });
+
+  const onSubmit = async (values: LoginFormData) => {
     setLoading(true);
     try {
       await login(values.username, values.password);
       navigate('/projects', { replace: true });
     } catch {
-      // 错误提示已由 axios 拦截器处理
+      // 错误提示由 axios 拦截器处理
     } finally {
       setLoading(false);
     }
   };
 
-  const handleWecomSuccess = () => {
-    navigate('/projects', { replace: true });
-  };
+  const handleWecomSuccess = () => navigate('/projects', { replace: true });
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h1 className="login-title">硬件管理系统</h1>
+    <div className="login-container bg-muted/30 flex min-h-svh items-center justify-center p-6">
+      <Card className="login-card w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-xl">硬件管理系统</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue={defaultTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="password">密码登录</TabsTrigger>
+              <TabsTrigger value="wecom">企业微信</TabsTrigger>
+            </TabsList>
 
-        <Tabs type="rounded" defaultActiveTab={defaultTab}>
-          <TabPane key="password" title="密码登录">
-            <Form
-              form={form}
-              layout="vertical"
-              onSubmit={handleSubmit}
-              autoComplete="off"
-              style={{ marginTop: 16 }}
-            >
-              <FormItem
-                label="用户名"
-                field="username"
-                rules={[
-                  { required: true, message: '请输入用户名' },
-                  { minLength: 3, message: '用户名至少3个字符' },
-                ]}
-              >
-                <Input
-                  prefix={<IconUser />}
-                  placeholder="请输入用户名"
-                  size="large"
-                  autoComplete="off"
-                />
-              </FormItem>
-
-              <FormItem
-                label="密码"
-                field="password"
-                rules={[
-                  { required: true, message: '请输入密码' },
-                  { minLength: 6, message: '密码至少6个字符' },
-                ]}
-              >
-                <Input.Password
-                  prefix={<IconLock />}
-                  placeholder="请输入密码"
-                  size="large"
-                  autoComplete="off"
-                />
-              </FormItem>
-
-              <FormItem>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  long
-                  size="large"
-                  loading={loading}
-                  style={{ marginTop: '8px' }}
-                >
+            <TabsContent value="password">
+              <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">用户名</Label>
+                  <Input id="username" placeholder="请输入用户名" autoComplete="off" {...register('username')} />
+                  {errors.username && <p className="text-destructive text-sm">{errors.username.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">密码</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="请输入密码"
+                    autoComplete="off"
+                    {...register('password')}
+                  />
+                  {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? '登录中...' : '登录'}
                 </Button>
-              </FormItem>
-            </Form>
-          </TabPane>
+              </form>
+            </TabsContent>
 
-          <TabPane key="wecom" title="企业微信">
-            <div style={{ marginTop: 16 }}>
-              <WecomQrLogin onSuccess={handleWecomSuccess} />
-            </div>
-          </TabPane>
-        </Tabs>
+            <TabsContent value="wecom">
+              <div className="mt-4">
+                <WecomQrLogin onSuccess={handleWecomSuccess} />
+              </div>
+            </TabsContent>
+          </Tabs>
 
-        <div style={{ textAlign: 'center', marginTop: '24px' }}>
-          <span className="text-meta">贝锐科技 - 硬件项目管理平台</span>
-        </div>
-      </div>
+          <p className="text-muted-foreground mt-6 text-center text-xs">贝锐科技 - 硬件项目管理平台</p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

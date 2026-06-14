@@ -1,4 +1,5 @@
 import { isFeatureEnabled, parseFeatureFlags } from './featureFlags';
+import { logger } from './logger';
 import prisma from '../db';
 
 interface AiCallOptions {
@@ -7,6 +8,8 @@ interface AiCallOptions {
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;
+  /** 仅用于耗时日志，区分同一 feature 下的不同阶段（如 classify/target/grounded）；不影响配置匹配 */
+  label?: string;
 }
 
 interface AiCallResult {
@@ -65,29 +68,45 @@ export async function callAi(options: AiCallOptions): Promise<AiCallResult | nul
     return null;
   }
 
+  const t0 = Date.now();
   const config = await getAiConfig(options.feature);
+  const tConfig = Date.now();
 
   if (!config.apiKey || !config.apiUrl) {
     return null;
   }
 
-  const response = await fetch(config.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.modelName,
-      messages: [
-        { role: 'system', content: options.systemPrompt },
-        { role: 'user', content: options.userPrompt },
-      ],
-      temperature: options.temperature ?? 0.7,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.modelName,
+        messages: [
+          { role: 'system', content: options.systemPrompt },
+          { role: 'user', content: options.userPrompt },
+        ],
+        temperature: options.temperature ?? 0.7,
+      }),
+    });
+  } catch (err) {
+    logger.warn(
+      { feature: options.feature, label: options.label, model: config.modelName, configMs: tConfig - t0, llmMs: Date.now() - tConfig },
+      'AI 调用网络失败'
+    );
+    throw err;
+  }
+  const tFetch = Date.now();
 
   if (!response.ok) {
+    logger.warn(
+      { feature: options.feature, label: options.label, model: config.modelName, status: response.status, llmMs: tFetch - tConfig },
+      'AI 调用返回非 2xx'
+    );
     throw new Error(`AI API 调用失败: ${response.status}`);
   }
 
@@ -111,6 +130,21 @@ export async function callAi(options: AiCallOptions): Promise<AiCallResult | nul
       },
     });
   }
+
+  const tEnd = Date.now();
+  // 分段耗时：configMs=读AI配置(DB)；llmMs=LLM 往返(主要嫌疑)；postMs=解析+写用量(DB)
+  logger.info(
+    {
+      feature: options.feature,
+      label: options.label,
+      model: config.modelName,
+      configMs: tConfig - t0,
+      llmMs: tFetch - tConfig,
+      postMs: tEnd - tFetch,
+      totalMs: tEnd - t0,
+    },
+    'AI 调用耗时'
+  );
 
   return {
     content: content || '',

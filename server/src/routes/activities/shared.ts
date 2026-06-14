@@ -1,6 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
 import { Prisma, ActivityStatus, ActivityType, type Priority } from '../../generated/prisma/client';
 import { resolveActivityDates, DependencyInput, PredecessorData } from '../../utils/dependencyScheduler';
+import {
+  computeProjectScheduleCascade,
+  type ActivitySnapshot,
+  type ActivitySnapshotType,
+  type ProjectSnapshot,
+} from '../../utils/scheduleEngine';
 import { autoAssignByRole } from '../../utils/roleMembershipResolver';
 import { isFeatureEnabled, parseFeatureFlags } from '../../utils/featureFlags';
 import prisma from '../../db';
@@ -129,67 +135,72 @@ export async function computeDatesFromDeps(
   return resolveActivityDates(deps, predecessors, selfDuration);
 }
 
+/**
+ * 项目级活动日期级联：当 changedActivityId 的计划日期变化后，
+ * 沿 reverse-dependencies 顺延更新所有下游活动。
+ *
+ * 实现：先把全项目活动构造成内存 snapshot，调用纯函数
+ * computeProjectScheduleCascade（与对话式排期助手的干跑共用算法），
+ * 然后在单个 transaction 里把变更批量写回，避免 N 次往返。
+ */
 export async function cascadeUpdateDependents(
   projectId: string,
   changedActivityId: string
 ): Promise<void> {
   const allActivities = await prisma.activity.findMany({
     where: { projectId },
-    select: { id: true, dependencies: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      dependencies: true,
+      planStartDate: true,
+      planEndDate: true,
+      planDuration: true,
+      hardConstraintDate: true,
+    },
   });
 
-  const reverseDeps = new Map<string, string[]>();
-  for (const a of allActivities) {
-    for (const dep of dependenciesFromJson(a.dependencies)) {
-      const list = reverseDeps.get(dep.id);
-      if (list) list.push(a.id);
-      else reverseDeps.set(dep.id, [a.id]);
-    }
-  }
+  if (allActivities.length === 0) return;
 
-  const visited = new Set<string>();
-  const queue = [changedActivityId];
+  const snapshot: ProjectSnapshot = {
+    projectId,
+    projectEndDate: null,
+    activities: allActivities.map(
+      (a): ActivitySnapshot => ({
+        id: a.id,
+        name: a.name,
+        type: a.type as ActivitySnapshotType,
+        planStartDate: a.planStartDate,
+        planEndDate: a.planEndDate,
+        planDuration: a.planDuration,
+        hardConstraintDate: a.hardConstraintDate,
+        dependencies: dependenciesFromJson(a.dependencies),
+      })
+    ),
+  };
 
-  while (queue.length > 0) {
-    const currentId = queue.shift()!;
-    if (visited.has(currentId)) continue;
-    visited.add(currentId);
+  const { snapshot: nextSnapshot, changedIds } = computeProjectScheduleCascade(
+    snapshot,
+    [changedActivityId]
+  );
 
-    const dependentIds = reverseDeps.get(currentId);
-    if (!dependentIds) continue;
+  if (changedIds.size === 0) return;
 
-    for (const depId of dependentIds) {
-      const depActivity = await prisma.activity.findUnique({
-        where: { id: depId },
-        select: { id: true, dependencies: true, planStartDate: true, planEndDate: true, planDuration: true },
-      });
-      if (!depActivity || !depActivity.dependencies) continue;
+  const nextById = new Map(nextSnapshot.activities.map((a) => [a.id, a]));
 
-      const deps = dependenciesFromJson(depActivity.dependencies);
-      const resolved = await computeDatesFromDeps(deps, depActivity.planDuration);
-
-      if (!resolved.planStartDate && !resolved.planEndDate) continue;
-
-      const startChanged = resolved.planStartDate &&
-        (!depActivity.planStartDate || resolved.planStartDate.getTime() !== depActivity.planStartDate.getTime());
-      const endChanged = resolved.planEndDate &&
-        (!depActivity.planEndDate || resolved.planEndDate.getTime() !== depActivity.planEndDate.getTime());
-
-      if (!startChanged && !endChanged) continue;
-
-      const cascadeData: Prisma.ActivityUncheckedUpdateInput = {};
-      if (resolved.planStartDate) cascadeData.planStartDate = resolved.planStartDate;
-      if (resolved.planEndDate) cascadeData.planEndDate = resolved.planEndDate;
-      if (resolved.planDuration !== undefined) cascadeData.planDuration = resolved.planDuration;
-
-      await prisma.activity.update({
-        where: { id: depId },
-        data: cascadeData,
-      });
-
-      queue.push(depId);
-    }
-  }
+  await prisma.$transaction(
+    Array.from(changedIds).map((id) => {
+      const next = nextById.get(id);
+      const data: Prisma.ActivityUncheckedUpdateInput = {};
+      if (next?.planStartDate) data.planStartDate = next.planStartDate;
+      if (next?.planEndDate) data.planEndDate = next.planEndDate;
+      if (next?.planDuration !== undefined && next?.planDuration !== null) {
+        data.planDuration = next.planDuration;
+      }
+      return prisma.activity.update({ where: { id }, data });
+    })
+  );
 }
 
 export const requireFeatureFlag = (feature: string, message: string) =>

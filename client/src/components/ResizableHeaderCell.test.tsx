@@ -475,7 +475,7 @@ describe('ResizableHeaderCell', () => {
 
   it('does not crash when onResize is undefined after initial render', () => {
     const onResize = vi.fn();
-    const { rerender } = render(
+    render(
       <table>
         <thead>
           <tr>

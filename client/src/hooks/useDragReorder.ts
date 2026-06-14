@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Message } from '@arco-design/web-react';
+import { toast } from 'sonner';
 import { activitiesApi } from '../api';
 import { Activity } from '../types';
 import { UndoItem } from './useUndoStack';
@@ -89,7 +89,7 @@ export function useDragReorder({
         },
       });
     } catch {
-      Message.error('保存排序失败');
+      toast.error('保存排序失败');
       loadActivities();
     } finally {
       setSaving(false);

@@ -7,7 +7,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
     'Segoe UI Emoji', 'Segoe UI Symbol';
   -webkit-font-smoothing: antialiased;
@@ -18,9 +18,57 @@ body {
   min-height: 100vh;
 }
 
+/* ============ shadcn-admin 主题令牌（slate 单色板）覆盖 Arco ============ */
+/* Arco 中性系全部源于 --gray-1..10（RGB 三元组），主色源于 --primary/--arcoblue。
+   这里在 :root（亮色）整体改为 Tailwind slate；语义色板（blue/green/orange/red…）保持不动，
+   故状态标签/风险色仍为彩色。深色模式见文件末尾 body[arco-theme='dark']（阶段 2 对齐）。
+   注意：Arco 把设计令牌声明在 body 上（非 :root），故覆盖必须 body 作用域才能赢过；
+   用 :not([arco-theme='dark']) 限定仅亮色，避免泄漏到深色块。 */
+body:not([arco-theme='dark']) {
+  /* 中性灰阶 → slate（驱动 text/border/fill，越大越深） */
+  --gray-1: 248, 250, 252;
+  --gray-2: 241, 245, 249;
+  --gray-3: 226, 232, 240;
+  --gray-4: 203, 213, 225;
+  --gray-5: 148, 163, 184;
+  --gray-6: 100, 116, 139;
+  --gray-7: 71, 85, 105;
+  --gray-8: 51, 65, 85;
+  --gray-9: 30, 41, 59;
+  --gray-10: 15, 23, 42;
+
+  /* 主色 → 近黑 slate 单色（shadcn 招牌）；6=主色、5=hover(略亮)、7=active(更深)、1=浅选中底 */
+  --primary-1: 241, 245, 249;
+  --primary-2: 226, 232, 240;
+  --primary-3: 203, 213, 225;
+  --primary-4: 100, 116, 139;
+  --primary-5: 51, 65, 85;
+  --primary-6: 15, 23, 42;
+  --primary-7: 2, 6, 23;
+  --primary-8: 2, 6, 23;
+  --primary-9: 1, 4, 16;
+  --primary-10: 0, 0, 0;
+  /* arcoblue 是 primary 的来源面板，一并改为 slate（防止个别直接用 arcoblue 的组件仍蓝） */
+  --arcoblue-1: 241, 245, 249;
+  --arcoblue-2: 226, 232, 240;
+  --arcoblue-3: 203, 213, 225;
+  --arcoblue-4: 100, 116, 139;
+  --arcoblue-5: 51, 65, 85;
+  --arcoblue-6: 15, 23, 42;
+  --arcoblue-7: 2, 6, 23;
+  --arcoblue-8: 2, 6, 23;
+  --arcoblue-9: 1, 4, 16;
+  --arcoblue-10: 0, 0, 0;
+
+  /* 圆角：shadcn --radius 0.625rem(10px)；small/medium/large = 6/8/10 */
+  --border-radius-small: 6px;
+  --border-radius-medium: 8px;
+  --border-radius-large: 10px;
+}
+
 /* ============ 自定义 CSS 变量 ============ */
 :root {
-  --page-bg: #f4f6f9;
+  --page-bg: #ffffff;
   --risk-low-bg: #e8ffea;
   --risk-medium-bg: #fff7e8;
   --risk-high-bg: #ffece8;
@@ -47,9 +95,9 @@ body {
   --risk-critical-color: #8e0e17;
 
   /* 分隔线 / 浅背景 */
-  --divider-color: #f2f3f5;
-  --subtle-bg: #fafafa;
-  --ai-card-bg: #f9fffe;
+  --divider-color: #f1f5f9;
+  --subtle-bg: #f8fafc;
+  --ai-card-bg: #f8fafc;
 
   /* 甘特图 */
   --gantt-not-started: #c9cdd4;
@@ -71,7 +119,7 @@ body {
 /* ============ 页面内容区背景 ============ */
 .page-content {
   background-color: var(--page-bg);
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 56px);
   padding: 24px;
 }
 
@@ -79,9 +127,9 @@ body {
 
 /* 卡片样式 */
 .arco-card {
-  border-radius: 12px;
-  border: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  border: 1px solid var(--color-border-2);
+  box-shadow: none;
 }
 
 .arco-card-header {
@@ -228,13 +276,13 @@ body {
 }
 
 .arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled) {
-  background-color: #165dff !important;
-  border-color: #165dff !important;
+  background-color: rgb(var(--primary-6)) !important;
+  border-color: rgb(var(--primary-6)) !important;
   color: #fff !important;
 }
 
 .arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled) span {
-  background-color: #165dff !important;
+  background-color: rgb(var(--primary-6)) !important;
   color: #fff !important;
 }
 
@@ -248,7 +296,7 @@ body {
 
 /* 弹窗样式 */
 .arco-modal {
-  border-radius: 16px;
+  border-radius: 12px;
 }
 
 /* 确认弹窗（simple 模式）：标题左对齐 */
@@ -350,86 +398,230 @@ body {
   color: var(--color-text-4);
 }
 
-/* ============ 登录页样式 ============ */
-.login-container {
-  min-height: 100vh;
+/* 登录页已迁移到 shadcn（Card/Tabs/Input + RHF），样式走 Tailwind；旧 .login-* 规则移除。 */
+
+/* ============ 侧边栏 + 顶栏布局（shadcn-admin 风格）============ */
+/* 全部用 Arco 语义令牌（--color-bg-1 / --color-text-* / --color-fill-2 / --color-border-2），
+   自动适配明/暗（阶段 1/2 已主题化），无需单独写深色规则。 */
+.app-sider {
+  background: var(--color-bg-1) !important;
+  border-right: 1px solid var(--color-border-2);
+  /* 固定为视口高度并吸顶，使底部用户区始终钉在视口底（shadcn 侧栏行为） */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.app-sider .arco-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sider-brand {
+  flex: 0 0 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-border-2);
+  cursor: pointer;
+  overflow: hidden;
+}
+.sider-logo-box {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--color-fill-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
   overflow: hidden;
 }
-
-.login-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #4f7cff 0%, #6c5ce7 100%);
+.sider-logo {
+  height: 22px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
-
-.login-card {
-  width: 440px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  padding: 40px;
+.sider-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  overflow: hidden;
 }
-
-.login-title {
-  text-align: center;
-  font-size: 24px;
+.sider-brand-name {
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text-1);
-  margin-bottom: 32px;
+}
+.sider-brand-sub {
+  font-size: 11px;
+  color: var(--color-text-3);
+}
+.app-sider.arco-layout-sider-collapsed .sider-brand {
+  padding: 0;
+  justify-content: center;
 }
 
-/* ============ 导航栏样式 ============ */
-.main-header {
-  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  height: 60px;
-  padding: 0 24px;
+/* 像素对齐 shadcn/ui sidebar：菜单组 p-2(8px)、菜单项 h-8(32px)/p-2(8px)/gap-2(8px)/rounded-md(6px)/
+   icon size-4(16px)、项间距 gap-1(4px)、分组标签 h-8/px-2/text-xs(12px)/font-medium。
+   悬停与激活同用 accent 底（--color-fill-2），激活仅加粗——这是 shadcn 的原生行为。 */
+.sider-nav {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.sider-group-label {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-3);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  color: var(--color-text-1);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-item:hover {
+  background: var(--color-fill-2);
+}
+.nav-item.active {
+  background: var(--color-fill-2);
+  font-weight: 500;
+}
+.nav-item .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 16px;
+  flex: 0 0 auto;
+}
+.app-sider.arco-layout-sider-collapsed .nav-item {
+  justify-content: center;
+  padding: 0;
+}
+
+/* 侧栏底部用户区（shadcn NavUser） */
+.sider-footer {
+  border-top: 1px solid var(--color-border-2);
+  padding: 8px;
+}
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nav-user:hover {
+  background: var(--color-fill-2);
+}
+.nav-user-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.nav-user-name {
+  font-size: 14px;
+  color: var(--color-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-user-sub {
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-user-chevron {
+  color: var(--color-text-3);
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+.app-sider.arco-layout-sider-collapsed .nav-user {
+  justify-content: center;
+  padding: 6px 0;
+}
+
+/* 内容区外层：覆盖 Arco 默认 overflow:auto（它会形成滚动容器、困住 sticky），
+   改为 visible，使 .app-header 的 sticky 相对页面生效，保持整页滚动模型、零结构改动。 */
+.app-main {
+  overflow: visible;
+}
+
+/* 顶栏：sticky 吸顶，随页面滚动钉在视口顶 */
+.app-header {
+  height: 56px !important;
+  line-height: normal;
+  background: var(--color-bg-1) !important;
+  border-bottom: 1px solid var(--color-border-2);
+  padding: 0 20px !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
-
-.main-header .logo {
-  height: 44px;
-  cursor: pointer;
-}
-
-.main-header .nav-menu {
+.header-left {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 12px;
 }
-
-.main-header .nav-item {
-  color: rgba(255, 255, 255, 0.8);
-  padding: 8px 16px;
-  border-radius: 6px;
+.header-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border-2);
+  flex: 0 0 auto;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-1);
+}
+.header-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 14px;
+  color: var(--color-text-2);
+  font-size: 18px;
+  transition: background 0.15s, color 0.15s;
 }
-
-.main-header .nav-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+.header-icon-btn:hover {
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
 }
-
-.main-header .nav-item.active {
-  color: #fff;
-  background: rgba(79, 124, 255, 0.3);
-}
-
 /* ============ 列宽拖拽调整 ============ */
 .column-resize-handle {
   position: absolute;
@@ -544,25 +736,6 @@ tr.row-diff-added td { background: rgba(0, 180, 42, 0.08) !important; }
 tr.row-diff-deleted td { background: rgba(245, 63, 63, 0.08) !important; }
 tr.row-diff-changed td { background: rgba(255, 165, 0, 0.08) !important; }
 
-/* ============ 主题切换按钮 ============ */
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 18px;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.theme-toggle-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-}
-
 /* ============ 暗色模式适配 ============ */
 
 /*
@@ -572,21 +745,22 @@ tr.row-diff-changed td { background: rgba(255, 165, 0, 0.08) !important; }
  */
 body[arco-theme='dark'] {
   /*
-   * ===== Arco 内置色板覆盖 =====
-   * Arco 默认暗色的主色（arcoblue-6 = 60,126,255）仍然很亮
-   * 降低饱和度，让链接/按钮/Tag 等全局组件一起变柔和
-   * 注意：Arco 用 RGB 三元组（不含 #），搭配 rgb() 使用
+   * ===== Arco 主色板 → shadcn 深色 slate（单色）=====
+   * 暗色下 Arco 把 arcoblue 当主色：1=最深…10=最浅，6=主色。
+   * 全改 slate；6 取 slate-600(#475569) 让主按钮白字达 AA 对比
+   *（shadcn 暗色那种"近白主按钮"会让 checkbox/switch 等白色内容失明，故取稳健单色）。
+   * 注意：RGB 三元组（不含 #），配 rgb() 使用。
    */
-  --arcoblue-1: 10,18,56;
-  --arcoblue-2: 15,30,90;
-  --arcoblue-3: 25,52,130;
-  --arcoblue-4: 40,80,175;
-  --arcoblue-5: 65,115,215;
-  --arcoblue-6: 100,150,235;
-  --arcoblue-7: 135,175,240;
-  --arcoblue-8: 170,200,245;
-  --arcoblue-9: 205,220,250;
-  --arcoblue-10: 235,242,255;
+  --arcoblue-1: 2,6,23;
+  --arcoblue-2: 2,6,23;
+  --arcoblue-3: 15,23,42;
+  --arcoblue-4: 30,41,59;
+  --arcoblue-5: 51,65,85;
+  --arcoblue-6: 71,85,105;
+  --arcoblue-7: 100,116,139;
+  --arcoblue-8: 148,163,184;
+  --arcoblue-9: 203,213,225;
+  --arcoblue-10: 226,232,240;
 
   /* 红色系：柔和的暗色红 */
   --red-5: 210,90,90;
@@ -603,18 +777,18 @@ body[arco-theme='dark'] {
   --green-6: 70,180,95;
   --green-7: 100,200,120;
 
-  /* 基底背景：偏暖的深灰，避免纯黑 */
-  --color-bg-1: #1e1f25;
-  --color-bg-2: #252630;
-  --color-bg-3: #2c2d3a;
-  --color-bg-4: #343544;
-  --color-bg-5: #3c3d4e;
+  /* 基底背景：shadcn 深 slate（页面最深，卡片/弹层逐级略升） */
+  --color-bg-1: #0f172a;
+  --color-bg-2: #0f172a;
+  --color-bg-3: #1e293b;
+  --color-bg-4: #1e293b;
+  --color-bg-5: #334155;
 
-  /* 文字层级：降低最亮一级，拉开层次 */
-  --color-text-1: rgba(210, 215, 225, 0.85);
-  --color-text-2: rgba(175, 182, 198, 0.68);
-  --color-text-3: rgba(140, 148, 165, 0.52);
-  --color-text-4: rgba(110, 118, 135, 0.38);
+  /* 文字层级：slate-50 / 300 / 400 / 500 */
+  --color-text-1: #f8fafc;
+  --color-text-2: #cbd5e1;
+  --color-text-3: #94a3b8;
+  --color-text-4: #64748b;
 
   /* 填充层级：使用透明叠加，与 Arco 保持一致 */
   --color-fill-1: rgba(255, 255, 255, 0.04);
@@ -622,16 +796,16 @@ body[arco-theme='dark'] {
   --color-fill-3: rgba(255, 255, 255, 0.12);
   --color-fill-4: rgba(255, 255, 255, 0.16);
 
-  /* 边框：低对比度 */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-2: rgba(255, 255, 255, 0.06);
-  --color-border-3: rgba(255, 255, 255, 0.04);
+  /* 边框：shadcn 深色用 white/10% 系 */
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border-2: rgba(255, 255, 255, 0.08);
+  --color-border-3: rgba(255, 255, 255, 0.06);
 
   /* 主色调微调 */
   --color-primary-light-1: rgba(var(--arcoblue-6), 0.12);
 
   /* 自定义变量 */
-  --page-bg: #1a1b22;
+  --page-bg: #020817;
   --risk-low-bg: rgba(70, 180, 95, 0.08);
   --risk-medium-bg: rgba(225, 150, 70, 0.08);
   --risk-high-bg: rgba(220, 115, 110, 0.08);
@@ -692,16 +866,6 @@ body[arco-theme='dark'] .arco-table-td {
   border-color: rgba(255, 255, 255, 0.04);
 }
 
-/* 登录页 */
-body[arco-theme='dark'] .login-container {
-  background: linear-gradient(135deg, #1e1f30 0%, #252035 100%);
-}
-
-body[arco-theme='dark'] .login-card {
-  background: rgba(30, 31, 40, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
-}
 
 /* 弹出层：加深背景、用细边框 */
 body[arco-theme='dark'] .arco-select-dropdown,
@@ -773,16 +937,32 @@ body[arco-theme='dark'] .arco-tabs-header-ink {
   background-color: rgb(var(--arcoblue-6));
 }
 
+/* 主按钮（shadcn 暗色招牌）：近白底 + 深字。仅覆盖按钮本身，不动 --primary 令牌，
+   故 checkbox/switch/选中标签等"主色底 + 白内容"仍正常显示。 */
+body[arco-theme='dark'] .arco-btn-primary:not(.arco-btn-disabled),
+body[arco-theme='dark'] .arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled) {
+  background-color: #e2e8f0 !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+body[arco-theme='dark'] .arco-btn-primary:not(.arco-btn-disabled):hover,
+body[arco-theme='dark'] .arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled):hover {
+  background-color: #f1f5f9 !important;
+  border-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+/* 抵消阶段 1 模态主按钮 span 的底色/白字硬编码 */
+body[arco-theme='dark'] .arco-modal-footer .arco-btn-primary:not(.arco-btn-disabled) span {
+  background-color: transparent !important;
+  color: #0f172a !important;
+}
+
 /* ============ 响应式布局 ============ */
 @media (max-width: 768px) {
   .page-content {
     padding: 16px;
   }
 
-  .login-card {
-    width: 90%;
-    padding: 24px;
-  }
 
   .toolbar {
     flex-direction: column;

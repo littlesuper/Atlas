@@ -1,29 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card,
-  Table,
-  Button,
-  Select,
-  Tag,
-  Tooltip,
-  Empty,
-  DatePicker,
-  Space,
-  Modal,
-  Message,
-  Tabs,
-} from '@arco-design/web-react';
-import {
-  IconLeft,
-  IconRight,
-  IconEdit,
-  IconSend,
-  IconDelete,
-  IconCheckCircleFill,
-  IconExclamationCircleFill,
-  IconCloseCircleFill,
-} from '@arco-design/web-react/icon';
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Send,
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+} from 'lucide-react';
+import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
+import { toast } from 'sonner';
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi } from '../../api';
 import { WeeklyReport, ReportAttachment } from '../../types';
@@ -31,25 +20,41 @@ import { useReportPermission } from '../../hooks/useReportPermission';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
 import { PRODUCT_LINE_MAP } from '../../utils/constants';
-import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek';
+import { arcoBadgeClass } from '../../utils/badgeColor';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 dayjs.extend(isoWeek);
 
-const PROGRESS_ICON: Record<string, React.ReactNode> = {
-  ON_TRACK: <IconCheckCircleFill />,
-  MINOR_ISSUE: <IconExclamationCircleFill />,
-  MAJOR_ISSUE: <IconCloseCircleFill />,
+const ALL = '__all__';
+
+const progressIcon = (status: string) => {
+  if (status === 'ON_TRACK') return <CheckCircle2 className="size-[18px] text-green-600 dark:text-green-400" />;
+  if (status === 'MINOR_ISSUE') return <AlertTriangle className="size-[18px] text-amber-600 dark:text-amber-400" />;
+  if (status === 'MAJOR_ISSUE') return <XCircle className="size-[18px] text-red-600 dark:text-red-400" />;
+  return <span className="text-muted-foreground">?</span>;
 };
 const PROGRESS_TOOLTIP: Record<string, string> = {
   ON_TRACK: '正常',
   MINOR_ISSUE: '轻度阻碍',
   MAJOR_ISSUE: '严重阻碍',
-};
-const PROGRESS_COLOR: Record<string, string> = {
-  ON_TRACK: 'var(--status-success)',
-  MINOR_ISSUE: 'var(--status-warning)',
-  MAJOR_ISSUE: 'var(--status-danger)',
 };
 
 /** 计算 ISO 周的日期范围 */
@@ -85,9 +90,17 @@ export function groupReportsByWeek(reports: WeeklyReport[]): WeekGroup[] {
       reports: groupReports,
     });
   }
-  groups.sort((a, b) => a.year !== b.year ? b.year - a.year : b.weekNumber - a.weekNumber);
+  groups.sort((a, b) => (a.year !== b.year ? b.year - a.year : b.weekNumber - a.weekNumber));
   return groups;
 }
+
+const SECTION_PLACEHOLDER: Record<string, string> = {
+  changeOverview: '<span style="color:var(--color-text-4)">-</span>',
+  demandAnalysis: '<span style="color:var(--color-text-4)">-</span>',
+  keyProgress: '<span style="color:var(--color-text-4)">暂无</span>',
+  nextWeekPlan: '<span style="color:var(--color-text-4)">暂无</span>',
+  riskWarning: '<span style="color:var(--status-success)">无</span>',
+};
 
 const WeeklyReportsSummary: React.FC = () => {
   const navigate = useNavigate();
@@ -95,11 +108,13 @@ const WeeklyReportsSummary: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<string>('submitted');
   const [currentWeek, setCurrentWeek] = useState<dayjs.Dayjs | null>(null);
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [productLine, setProductLine] = useState<string>('');
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [drafts, setDrafts] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [draftsLoading, setDraftsLoading] = useState(false);
+  const [confirm, setConfirm] = useState<{ title: string; content: string; onOk: () => Promise<void> } | null>(null);
 
   const weekStart = currentWeek?.startOf('isoWeek' as dayjs.OpUnitType);
   const weekEnd = weekStart?.add(6, 'day');
@@ -112,7 +127,6 @@ const WeeklyReportsSummary: React.FC = () => {
       if (currentWeek && year !== undefined && weekNumber !== undefined) {
         const params = productLine ? { productLine } : undefined;
         const res = await weeklyReportsApi.getByWeek(year, weekNumber, params);
-        // getByWeek 不区分 status，手动过滤掉 DRAFT
         const data = (res.data || []) as WeeklyReport[];
         setReports(data.filter((r) => r.status !== 'DRAFT'));
       } else {
@@ -151,338 +165,327 @@ const WeeklyReportsSummary: React.FC = () => {
   }, [activeTab, loadDrafts]);
 
   const handleSubmit = (report: WeeklyReport) => {
-    Modal.confirm({
+    setConfirm({
       title: '提交周报',
       content: `确定要提交第${report.weekNumber}周周报吗？提交后不可撤回。`,
       onOk: async () => {
         try {
           await weeklyReportsApi.submit(report.id);
-          Message.success('周报提交成功');
+          toast.success('周报提交成功');
           if (activeTab === 'drafts') loadDrafts();
           loadReports();
         } catch {
-          Message.error('提交失败');
+          toast.error('提交失败');
         }
       },
     });
   };
 
   const handleDelete = (report: WeeklyReport) => {
-    Modal.confirm({
+    setConfirm({
       title: '确认删除',
       content: `确定要删除第${report.weekNumber}周周报吗？`,
       onOk: async () => {
         try {
           await weeklyReportsApi.delete(report.id);
-          Message.success('删除成功');
+          toast.success('删除成功');
           if (activeTab === 'drafts') loadDrafts();
           else loadReports();
         } catch {
-          Message.error('删除失败');
+          toast.error('删除失败');
         }
       },
     });
   };
 
-  // ===== 按周次分组逻辑 =====
-  const weekGroups = useMemo<WeekGroup[]>(() => {
-    return groupReportsByWeek(reports);
-  }, [reports]);
+  const weekGroups = useMemo<WeekGroup[]>(() => groupReportsByWeek(reports), [reports]);
 
-  // ===== 已提交周报的表格列 =====
-  const submittedColumns = [
-    {
-      title: '项目名称',
-      dataIndex: 'project.name',
-      width: 210,
-      sorter: (a: WeeklyReport, b: WeeklyReport) => {
-        const nameA = a.project?.name || '';
-        const nameB = b.project?.name || '';
-        return nameA.localeCompare(nameB);
-      },
-      render: (_: unknown, record: WeeklyReport) => (
-        <a
-          style={{ color: 'rgb(var(--primary-6))', fontWeight: 500, cursor: 'pointer' }}
+  const SECTION_COLS: Array<{ key: keyof WeeklyReport; title: string; section?: string; wide?: boolean }> = [
+    { key: 'changeOverview', title: '变更概述' },
+    { key: 'demandAnalysis', title: '需求研判' },
+    { key: 'keyProgress', title: '本周重要进展', section: 'keyProgress', wide: true },
+    { key: 'nextWeekPlan', title: '下周工作计划', section: 'nextWeekPlan', wide: true },
+    { key: 'riskWarning', title: '风险预警', section: 'riskWarning' },
+  ];
+
+  const renderReportRow = (record: WeeklyReport, mode: 'submitted' | 'drafts') => (
+    <TableRow key={record.id}>
+      <TableCell className="align-top">
+        <button
+          className="text-primary cursor-pointer font-medium hover:underline"
           onClick={() => navigate(`/projects/${record.projectId}?tab=weekly`)}
         >
           {record.project?.name || '-'}
-        </a>
-      ),
-    },
-    {
-      title: '产品线',
-      width: 120,
-      render: (_: unknown, record: WeeklyReport) => {
-        const pl = record.project?.productLine || '';
-        const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP] ?? { label: pl || '-', color: 'default' };
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
-      },
-    },
-    {
-      title: '状态',
-      width: 100,
-      render: (_: unknown, record: WeeklyReport) => {
-        const icon = PROGRESS_ICON[record.progressStatus] || '?';
-        const color = PROGRESS_COLOR[record.progressStatus] || 'var(--status-not-started)';
-        const tip = PROGRESS_TOOLTIP[record.progressStatus] || record.progressStatus;
+        </button>
+      </TableCell>
+      <TableCell className="align-top">
+        {(() => {
+          const pl = record.project?.productLine || '';
+          const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP] ?? { label: pl || '-', color: 'default' };
+          return (
+            <Badge variant="outline" className={arcoBadgeClass(cfg.color)}>
+              {cfg.label}
+            </Badge>
+          );
+        })()}
+      </TableCell>
+      <TableCell className="align-top">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">{progressIcon(record.progressStatus)}</span>
+          </TooltipTrigger>
+          <TooltipContent>{PROGRESS_TOOLTIP[record.progressStatus] || record.progressStatus}</TooltipContent>
+        </Tooltip>
+      </TableCell>
+      {SECTION_COLS.map((col) => {
+        const html = (record[col.key] as string) || SECTION_PLACEHOLDER[col.key as string];
+        const sectionAtts = col.section
+          ? ((record.attachments as ReportAttachment[] | undefined) || []).filter((a) => a.section === col.section)
+          : [];
         return (
-          <Tooltip content={tip}>
-            <span style={{ color, fontSize: 18, cursor: 'default', display: 'inline-flex' }}>{icon}</span>
-          </Tooltip>
+          <TableCell key={col.key as string} className="align-top">
+            <div className="overflow-hidden">
+              <SafeHtml className="html-content text-muted-foreground text-[13px]" style={{ maxHeight: 80, overflow: 'hidden' }} html={html} />
+              {sectionAtts.length > 0 && col.section && (
+                <AttachmentList attachments={sectionAtts} section={col.section} readOnly />
+              )}
+            </div>
+          </TableCell>
         );
-      },
-    },
-    {
-      title: '变更概述',
-      width: 180,
-      render: (_: unknown, record: WeeklyReport) => (
-        <SafeHtml
-          className="html-content"
-          style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
-          html={record.changeOverview || '<span style="color:var(--color-text-4)">-</span>'}
-        />
-      ),
-    },
-    {
-      title: '需求研判',
-      width: 180,
-      render: (_: unknown, record: WeeklyReport) => (
-        <SafeHtml
-          className="html-content"
-          style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
-          html={record.demandAnalysis || '<span style="color:var(--color-text-4)">-</span>'}
-        />
-      ),
-    },
-    {
-      title: '本周重要进展',
-      render: (_: unknown, record: WeeklyReport) => {
-        const sectionAtts = ((record.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'keyProgress');
-        return (
-          <div style={{ overflow: 'hidden' }}>
-            <SafeHtml
-              className="html-content"
-              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
-              html={record.keyProgress || '<span style="color:var(--color-text-4)">暂无</span>'}
-            />
-            {sectionAtts.length > 0 && (
-              <AttachmentList attachments={sectionAtts} section="keyProgress" readOnly />
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      title: '下周工作计划',
-      render: (_: unknown, record: WeeklyReport) => {
-        const sectionAtts = ((record.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'nextWeekPlan');
-        return (
-          <div style={{ overflow: 'hidden' }}>
-            <SafeHtml
-              className="html-content"
-              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13, color: 'var(--color-text-2)' }}
-              html={record.nextWeekPlan || '<span style="color:var(--color-text-4)">暂无</span>'}
-            />
-            {sectionAtts.length > 0 && (
-              <AttachmentList attachments={sectionAtts} section="nextWeekPlan" readOnly />
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      title: '风险预警',
-      width: 200,
-      render: (_: unknown, record: WeeklyReport) => {
-        const sectionAtts = ((record.attachments as ReportAttachment[] | undefined) || []).filter(a => a.section === 'riskWarning');
-        return (
-          <div style={{ overflow: 'hidden' }}>
-            <SafeHtml
-              className="html-content"
-              style={{ maxHeight: 80, overflow: 'hidden', fontSize: 13 }}
-              html={record.riskWarning || '<span style="color:var(--status-success)">无</span>'}
-            />
-            {sectionAtts.length > 0 && (
-              <AttachmentList attachments={sectionAtts} section="riskWarning" readOnly />
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      title: '操作',
-      width: 100,
-      fixed: 'right' as const,
-      render: (_: unknown, record: WeeklyReport) => {
-        if (!canEditReport(record)) return null;
-        return (
-          <Space>
-            <Tooltip content="编辑">
-              <Button type="text" icon={<IconEdit />} size="small" aria-label="编辑周报"
-                onClick={() => navigate(`/weekly-reports/${record.id}/edit`)} />
+      })}
+      <TableCell className="align-top text-right">
+        {mode === 'submitted' ? (
+          canEditReport(record) && (
+            <div className="flex justify-end gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-8" aria-label="编辑周报" onClick={() => navigate(`/weekly-reports/${record.id}/edit`)}>
+                    <Pencil className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>编辑</TooltipContent>
+              </Tooltip>
+              {canDelete(record) && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除周报" onClick={() => handleDelete(record)}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>删除</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          )
+        ) : (
+          <div className="flex justify-end gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8" aria-label="编辑草稿" onClick={() => navigate(`/weekly-reports/${record.id}/edit`)}>
+                  <Pencil className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>编辑</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8" aria-label="提交周报" onClick={() => handleSubmit(record)}>
+                  <Send className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>提交</TooltipContent>
             </Tooltip>
             {canDelete(record) && (
-              <Tooltip content="删除">
-                <Button type="text" status="danger" icon={<IconDelete />} size="small" aria-label="删除周报"
-                  onClick={() => handleDelete(record)} />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除草稿" onClick={() => handleDelete(record)}>
+                    <Trash2 className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>删除</TooltipContent>
               </Tooltip>
             )}
-          </Space>
-        );
-      },
-    },
-  ];
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
+  );
 
-  // ===== 草稿箱表格列（复用已提交列，替换操作列） =====
-  const draftColumns = [
-    ...submittedColumns.slice(0, -1),
-    {
-      title: '操作',
-      width: 140,
-      fixed: 'right' as const,
-      render: (_: unknown, record: WeeklyReport) => (
-        <Space>
-          <Tooltip content="编辑">
-            <Button type="text" icon={<IconEdit />} size="small" aria-label="编辑草稿"
-              onClick={() => navigate(`/weekly-reports/${record.id}/edit`)} />
-          </Tooltip>
-          <Tooltip content="提交">
-            <Button type="text" icon={<IconSend />} size="small" aria-label="提交周报"
-              onClick={() => handleSubmit(record)} />
-          </Tooltip>
-          {canDelete(record) && (
-            <Tooltip content="删除">
-              <Button type="text" status="danger" icon={<IconDelete />} size="small" aria-label="删除草稿"
-                onClick={() => handleDelete(record)} />
-            </Tooltip>
-          )}
-        </Space>
-      ),
-    },
-  ];
+  const ReportTableHead = () => (
+    <TableHeader>
+      <TableRow>
+        <TableHead className="w-52">项目名称</TableHead>
+        <TableHead className="w-28">产品线</TableHead>
+        <TableHead className="w-20">状态</TableHead>
+        {SECTION_COLS.map((c) => (
+          <TableHead key={c.key as string} className={c.wide ? 'min-w-48' : 'w-44'}>
+            {c.title}
+          </TableHead>
+        ))}
+        <TableHead className="w-28 text-right">操作</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+
+  const COLSPAN = 3 + SECTION_COLS.length + 1;
 
   return (
     <MainLayout>
-      <div>
+      <TooltipProvider>
         {/* 标题和操作栏 */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, whiteSpace: 'nowrap' }}>项目周报汇总</h2>
+        <Card className="mb-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold whitespace-nowrap">项目周报汇总</h2>
 
             {activeTab === 'submitted' && (
-              <Space>
+              <div className="flex flex-wrap items-center gap-2">
                 {/* 周次选择器 */}
-                <div style={{ background: 'var(--subtle-bg)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Tooltip content="上一周">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<IconLeft />}
-                      aria-label="上一周"
-                      style={{ height: 28 }}
-                      onClick={() =>
-                        setCurrentWeek((d) => (d ? d.subtract(1, 'week') : dayjs().subtract(1, 'week')))
-                      }
-                    />
-                  </Tooltip>
-                  <DatePicker.WeekPicker
-                    value={currentWeek || undefined}
-                    onChange={(_dateStr, date) =>
-                      setCurrentWeek(
-                        date
-                          ? (date as unknown as dayjs.Dayjs).startOf('isoWeek' as dayjs.OpUnitType)
-                          : null
-                      )
-                    }
-                    style={{ width: 140 }}
-                    size="small"
-                    format="YYYY-wo"
-                    allowClear
-                    placeholder="全部周次"
-                  />
-                  <Tooltip content="下一周">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<IconRight />}
-                      aria-label="下一周"
-                      style={{ height: 28 }}
-                      onClick={() =>
-                        setCurrentWeek((d) => (d ? d.add(1, 'week') : dayjs().add(1, 'week')))
-                      }
-                    />
-                  </Tooltip>
+                <div className="bg-muted flex items-center gap-1 rounded-md p-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    aria-label="上一周"
+                    onClick={() => setCurrentWeek((d) => (d ? d.subtract(1, 'week') : dayjs().subtract(1, 'week')))}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <Popover open={weekPickerOpen} onOpenChange={setWeekPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 w-36 justify-center font-normal">
+                        {currentWeek ? `${year} 第 ${weekNumber} 周` : '全部周次'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="center">
+                      <Calendar
+                        mode="single"
+                        selected={currentWeek?.toDate()}
+                        onSelect={(d) => {
+                          setCurrentWeek(d ? dayjs(d).startOf('isoWeek' as dayjs.OpUnitType) : null);
+                          setWeekPickerOpen(false);
+                        }}
+                        autoFocus
+                      />
+                      <div className="border-t p-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setCurrentWeek(null);
+                            setWeekPickerOpen(false);
+                          }}
+                        >
+                          全部周次
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    aria-label="下一周"
+                    onClick={() => setCurrentWeek((d) => (d ? d.add(1, 'week') : dayjs().add(1, 'week')))}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
                 </div>
 
                 {currentWeek && weekStart && weekEnd && (
-                  <span style={{ color: 'var(--color-text-3)', fontSize: 13 }}>
+                  <span className="text-muted-foreground text-[13px]">
                     {weekStart.format('MM-DD')} ~ {weekEnd.format('MM-DD')}
                   </span>
                 )}
 
                 {/* 产品线筛选 */}
-                <Select
-                  style={{ width: 180 }}
-                  placeholder="全部产品线"
-                  allowClear
-                  value={productLine || undefined}
-                  onChange={(v) => setProductLine(v || '')}
-                >
-                  {Object.entries(PRODUCT_LINE_MAP).map(([k, v]) => (
-                    <Select.Option key={k} value={k}>{v.label}</Select.Option>
-                  ))}
+                <Select value={productLine || ALL} onValueChange={(v) => setProductLine(v === ALL ? '' : v)}>
+                  <SelectTrigger className="w-44" size="sm">
+                    <SelectValue placeholder="全部产品线" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>全部产品线</SelectItem>
+                    {Object.entries(PRODUCT_LINE_MAP).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
-              </Space>
+              </div>
             )}
           </div>
         </Card>
 
         {/* Tab 切换 */}
-        <Card>
-          <Tabs activeTab={activeTab} onChange={setActiveTab}>
-            <Tabs.TabPane key="submitted" title="已提交周报">
+        <Card className="p-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="submitted">已提交周报</TabsTrigger>
+              <TabsTrigger value="drafts">草稿箱</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="submitted" className="mt-4">
               {weekGroups.length === 0 && !loading ? (
-                <Empty description={currentWeek ? '该周暂无周报' : '暂无周报'} />
+                <div className="text-muted-foreground py-12 text-center text-sm">
+                  {currentWeek ? '该周暂无周报' : '暂无周报'}
+                </div>
               ) : (
                 weekGroups.map((group) => (
-                  <div key={group.key} style={{ marginBottom: 24 }}>
-                    <div style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--color-text-1)',
-                      marginBottom: 8,
-                      paddingBottom: 6,
-                      borderBottom: '1px solid var(--color-border-2)',
-                    }}>
-                      {group.label}
+                  <div key={group.key} className="mb-6">
+                    <div className="mb-2 border-b pb-1.5 text-sm font-semibold">{group.label}</div>
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table>
+                        <ReportTableHead />
+                        <TableBody>{group.reports.map((r) => renderReportRow(r, 'submitted'))}</TableBody>
+                      </Table>
                     </div>
-                    <Table
-                      columns={submittedColumns}
-                      data={group.reports}
-                      loading={loading}
-                      rowKey="id"
-                      pagination={false}
-                      scroll={{ x: 1200 }}
-                    />
                   </div>
                 ))
               )}
-            </Tabs.TabPane>
+            </TabsContent>
 
-            <Tabs.TabPane key="drafts" title="草稿箱">
-              <Table
-                columns={draftColumns}
-                data={drafts}
-                loading={draftsLoading}
-                rowKey="id"
-                pagination={{ pageSize: 20, showTotal: true }}
-                scroll={{ x: 1200 }}
-                noDataElement={<Empty description="暂无草稿" />}
-              />
-            </Tabs.TabPane>
+            <TabsContent value="drafts" className="mt-4">
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <ReportTableHead />
+                  <TableBody>
+                    {drafts.length === 0 && !draftsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={COLSPAN} className="text-muted-foreground h-24 text-center">
+                          暂无草稿
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      drafts.map((r) => renderReportRow(r, 'drafts'))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
           </Tabs>
         </Card>
-      </div>
+
+        <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
+              <AlertDialogDescription>{confirm?.content}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  confirm?.onOk();
+                  setConfirm(null);
+                }}
+              >
+                确定
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TooltipProvider>
     </MainLayout>
   );
 };

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { authApi } from '../api';
 import { User } from '../types';
-import { Message } from '@arco-design/web-react';
+import { toast } from 'sonner';
 
 interface AuthState {
   user: User | null;
@@ -39,7 +39,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         loading: false,
       });
 
-      Message.success('登录成功');
+      toast.success('登录成功');
     } catch (error) {
       set({ loading: false });
       throw error;
@@ -55,7 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: true,
       loading: false,
     });
-    Message.success('登录成功');
+    toast.success('登录成功');
   },
 
   // 退出登录
@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
     });
 
-    Message.success('已退出登录');
+    toast.success('已退出登录');
 
     // 跳转到登录页
     window.location.href = '/login';

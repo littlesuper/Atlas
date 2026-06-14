@@ -31,6 +31,8 @@ import checkItemsRoutes from './routes/checkItems';
 import holidaysRoutes from './routes/holidays';
 import roleMembersRoutes from './routes/roleMembers';
 import featureFlagsRoutes from './routes/featureFlags';
+import scheduleAssistantRoutes from './routes/scheduleAssistant';
+import assistantRoutes from './routes/assistant';
 import { evaluateMetricAlerts } from './utils/alertRules';
 import { startScheduledJobs } from './utils/scheduler';
 import { refreshHolidayCache } from './utils/workday';
@@ -274,6 +276,12 @@ app.use('/api/holidays', holidaysRoutes);
 
 // 角色成员管理路由
 app.use('/api/role-members', roleMembersRoutes);
+
+// 对话式排期 + 风险暴露（参见 docs/specs/ai-scheduling-beacon/）
+app.use('/api/schedule-assistant', scheduleAssistantRoutes);
+
+// 全系统 AI 助手通用入口（参见 docs/specs/system-wide-assistant/）
+app.use('/api/assistant', assistantRoutes);
 
 // ==================== 前端静态文件（生产环境） ====================
 
