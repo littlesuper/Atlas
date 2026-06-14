@@ -29,7 +29,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
   test('archive project via detail page', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -40,7 +40,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
       await page.waitForTimeout(300);
 
       // Modal should appear
-      const modal = page.locator('.arco-modal:visible');
+      const modal = page.locator('[data-slot="dialog-content"]:visible');
       await expect(modal).toBeVisible({ timeout: 5_000 });
 
       // Fill optional remark
@@ -84,7 +84,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
       const hasProject = await page.getByText(projectName).isVisible({ timeout: 5_000 }).catch(() => false);
       if (hasProject) {
         // Verify no edit/delete buttons for archived projects
-        const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+        const row = page.locator('tbody tr').filter({ hasText: projectName });
         const editBtn = row.locator('button').filter({ hasText: /编辑/ });
         const deleteBtn = row.locator('button[class*="danger"]');
 
@@ -108,7 +108,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
       await waitForTableLoad(page);
       await searchProject(page, projectName);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+      const row = page.locator('tbody tr').filter({ hasText: projectName });
       // Look for unarchive/restore button
       const unarchiveBtn = row.locator('button').filter({ hasText: /恢复|取消归档/ });
       if (await unarchiveBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -118,7 +118,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
         );
         await unarchiveBtn.click();
         // May have a confirmation modal
-        const modal = page.locator('.arco-modal:visible');
+        const modal = page.locator('[data-slot="dialog-content"]:visible');
         if (await modal.isVisible({ timeout: 2_000 }).catch(() => false)) {
           await confirmModal(page);
         }
@@ -137,7 +137,7 @@ test.describe.serial('Project Archive & Restore @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

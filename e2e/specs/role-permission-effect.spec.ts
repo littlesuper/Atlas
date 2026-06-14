@@ -41,13 +41,13 @@ test.describe.serial('Role Permission Effect @p1', () => {
 
     await page.getByRole('button', { name: /新建角色|创建角色/ }).click();
 
-    const drawer = page.locator('.arco-drawer').filter({ hasText: /新建|创建/ });
+    const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /新建|创建/ });
     await expect(drawer).toBeVisible({ timeout: 5_000 });
 
     await drawer.getByPlaceholder(/角色名/).fill(roleName);
 
     const permSection = drawer.locator('.arco-form-item').filter({ hasText: /权限/ });
-    const permCheckboxes = permSection.locator('.arco-checkbox');
+    const permCheckboxes = permSection.locator('[data-slot="checkbox"]');
 
     const selectAllCheckbox = permCheckboxes.first();
     const isChecked = await selectAllCheckbox.getAttribute('class');
@@ -56,7 +56,7 @@ test.describe.serial('Role Permission Effect @p1', () => {
       await page.waitForTimeout(300);
     }
 
-    const checkboxLabels = permSection.locator('.arco-checkbox');
+    const checkboxLabels = permSection.locator('[data-slot="checkbox"]');
     for (let i = 0; i < await checkboxLabels.count(); i++) {
       const label = await checkboxLabels.nth(i).textContent();
       if (label?.includes('project') && label?.includes('read')) {
@@ -69,7 +69,7 @@ test.describe.serial('Role Permission Effect @p1', () => {
       (r) => r.url().includes('/api/roles') && r.request().method() === 'POST',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: /确定|创建/ }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: /确定|创建/ }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -84,12 +84,12 @@ test.describe.serial('Role Permission Effect @p1', () => {
 
     await page.getByRole('button', { name: /新建用户/ }).click();
 
-    const drawer = page.locator('.arco-drawer').filter({ hasText: /新建用户/ });
+    const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /新建用户/ });
     await expect(drawer).toBeVisible({ timeout: 5_000 });
 
     await drawer.getByPlaceholder('请输入姓名').fill(testUserName);
 
-    const canLoginSwitch = drawer.locator('.arco-switch').first();
+    const canLoginSwitch = drawer.locator('[data-slot="switch"]').first();
     const isChecked = await canLoginSwitch.getAttribute('class');
     if (!isChecked?.includes('arco-switch-checked')) {
       await canLoginSwitch.click();
@@ -98,22 +98,22 @@ test.describe.serial('Role Permission Effect @p1', () => {
 
     await drawer.getByPlaceholder('请输入密码').fill(testPassword);
 
-    const roleSelect = drawer.locator('.arco-select').filter({ has: page.locator('[placeholder*="角色"]') });
+    const roleSelect = drawer.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="角色"]') });
     await roleSelect.click();
     await page.waitForTimeout(300);
 
-    const roleOption = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: roleName });
+    const roleOption = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: roleName });
     if (await roleOption.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await roleOption.click();
     } else {
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     }
 
     const responsePromise = page.waitForResponse(
       (r) => r.url().includes('/api/users') && r.request().method() === 'POST',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '创建' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -168,11 +168,11 @@ test.describe.serial('Role Permission Effect @p1', () => {
 
   test('cleanup: delete test user and role', async ({ authedPage: page }) => {
     await goToUserTab(page);
-    const userRow = page.locator('.arco-table-tr').filter({ hasText: testUserName });
+    const userRow = page.locator('tbody tr').filter({ hasText: testUserName });
     if (await userRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await userRow.locator('button[class*="danger"]').click();
       await page.waitForTimeout(500);
-      const confirmBtn = page.locator('.arco-modal-footer .arco-btn-primary');
+      const confirmBtn = page.locator('[data-slot="dialog-footer"] .arco-btn-primary');
       if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await confirmBtn.click();
         await page.waitForTimeout(1_000);
@@ -180,11 +180,11 @@ test.describe.serial('Role Permission Effect @p1', () => {
     }
 
     await goToRoleTab(page);
-    const roleRow = page.locator('.arco-table-tr').filter({ hasText: roleName });
+    const roleRow = page.locator('tbody tr').filter({ hasText: roleName });
     if (await roleRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await roleRow.locator('button[class*="danger"]').click();
       await page.waitForTimeout(500);
-      const confirmBtn = page.locator('.arco-modal-footer .arco-btn-primary');
+      const confirmBtn = page.locator('[data-slot="dialog-footer"] .arco-btn-primary');
       if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await confirmBtn.click();
         await page.waitForTimeout(1_000);

@@ -19,15 +19,15 @@ test.describe.serial('Workload With Project Data @p1', () => {
     await createProjectViaPage(page, { name: projectName });
 
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.waitForTimeout(300);
 
     await page.getByPlaceholder('请输入活动名称').fill(uniqueName('资源测试活动'));
@@ -38,7 +38,7 @@ test.describe.serial('Workload With Project Data @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await resp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('workload page shows project in filter dropdown', async ({ authedPage: page }) => {
@@ -52,7 +52,7 @@ test.describe.serial('Workload With Project Data @p1', () => {
     await projectFilter.click();
     await page.waitForTimeout(300);
 
-    const option = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: projectName });
+    const option = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: projectName });
     if (await option.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await option.click();
       await page.waitForTimeout(1_000);
@@ -79,7 +79,7 @@ test.describe.serial('Workload With Project Data @p1', () => {
     const memberSection = page.getByText('人员负载').first();
     await expect(memberSection).toBeVisible({ timeout: 5_000 });
 
-    const cardsOrTable = page.locator('.arco-card, .arco-table, .workload-member');
+    const cardsOrTable = page.locator('[data-slot="card"], table, .workload-member');
     const hasContent = await cardsOrTable.first().isVisible({ timeout: 5_000 }).catch(() => false);
     expect(hasContent || true).toBeTruthy();
   });
@@ -106,7 +106,7 @@ test.describe.serial('Workload With Project Data @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

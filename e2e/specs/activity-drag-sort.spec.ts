@@ -26,7 +26,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
     await waitForTableLoad(page);
@@ -37,7 +37,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await createProjectViaPage(page, { name: projectName });
     await searchProject(page, projectName);
 
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -45,9 +45,9 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     for (const name of [activity1, activity2, activity3]) {
       await openCreateActivityDrawer(page);
 
-      const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+      const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
       await phaseSelect.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
       await page.getByPlaceholder('请输入活动名称').fill(name);
 
@@ -57,7 +57,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
       );
       await clickDrawerSubmit(page, '创建');
       expect((await actResp).status()).toBeLessThan(400);
-      await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
       await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 });
     }
   });
@@ -67,12 +67,12 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await goToProject(page);
 
     // Each row should have a drag handle (typically an icon in the first column)
-    const rows = page.locator('.arco-table-body .arco-table-tr');
+    const rows = page.locator('tbody tbody tr');
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThanOrEqual(3);
 
     // Drag handles are typically icons with class containing 'drag' or 'menu'
-    const dragHandles = page.locator('.arco-table-body .arco-icon-drag-dot-vertical, .arco-table-body [class*="drag"]');
+    const dragHandles = page.locator('tbody .drag-handle, tbody [class*="drag"]');
     const handleCount = await dragHandles.count();
     expect(handleCount).toBeGreaterThanOrEqual(3);
   });
@@ -92,7 +92,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await goToProject(page);
 
     // Get the initial order of activities
-    const rows = page.locator('.arco-table-body .arco-table-tr');
+    const rows = page.locator('tbody tbody tr');
     const initialCount = await rows.count();
     expect(initialCount).toBeGreaterThanOrEqual(3);
 
@@ -100,7 +100,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     const firstRowText = await rows.first().textContent();
 
     // Get drag handles
-    const dragHandles = page.locator('.arco-table-body .arco-icon-drag-dot-vertical, [class*="drag-handle"]');
+    const dragHandles = page.locator('tbody .drag-handle, [class*="drag-handle"]');
     const handleCount = await dragHandles.count();
 
     if (handleCount >= 2) {
@@ -144,7 +144,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await goToProject(page);
 
     // Look for "+" insert buttons on each row
-    const insertBtns = page.locator('.arco-table-body .arco-icon-plus, .arco-table-body button').filter({ hasText: '+' });
+    const insertBtns = page.locator('tbody [aria-label*="新建"], tbody button').filter({ hasText: '+' });
     const count = await insertBtns.count();
 
     // Insert buttons should exist (one per row)
@@ -158,7 +158,7 @@ test.describe.serial('Activity Drag Sort @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

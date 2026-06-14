@@ -22,7 +22,7 @@ test.describe.serial('Weekly Report Submit Flow @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
 
     await clickTab(page, '项目周报');
@@ -68,7 +68,7 @@ test.describe.serial('Weekly Report Submit Flow @p1', () => {
     await page.waitForTimeout(500);
     await waitForTableLoad(page);
 
-    const tableOrEmpty = page.locator('.arco-table').first().or(page.locator('.arco-empty'));
+    const tableOrEmpty = page.locator('table').first().or(page.locator('.arco-empty'));
     await expect(tableOrEmpty).toBeVisible({ timeout: 5_000 });
   });
 
@@ -111,7 +111,7 @@ test.describe.serial('Weekly Report Submit Flow @p1', () => {
     await clickNavItem(page, '项目周报');
     await waitForPageLoad(page);
 
-    const projectSelect = page.locator('.arco-select').filter({
+    const projectSelect = page.locator('[role="combobox"]').filter({
       has: page.locator('[placeholder*="项目"]'),
     }).first();
 
@@ -119,7 +119,7 @@ test.describe.serial('Weekly Report Submit Flow @p1', () => {
       await projectSelect.click();
       await page.waitForTimeout(300);
 
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: projectName });
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: projectName });
       if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await option.click();
         await page.waitForTimeout(500);
@@ -135,7 +135,7 @@ test.describe.serial('Weekly Report Submit Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

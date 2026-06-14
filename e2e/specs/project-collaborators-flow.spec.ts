@@ -22,8 +22,8 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
-    await row.locator('.arco-table-td').getByText(projectName).first().click();
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
+    await row.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -38,8 +38,8 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
-    await row.locator('.arco-table-td').getByText(projectName).first().click();
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
+    await row.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -47,7 +47,7 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     if (await manageBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await manageBtn.click();
 
-      const modal = page.locator('.arco-modal').filter({ hasText: '管理协作者' });
+      const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '管理协作者' });
       await expect(modal).toBeVisible({ timeout: 5_000 });
 
       await expect(modal.getByText('当前协作者')).toBeVisible();
@@ -61,8 +61,8 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
-    await row.locator('.arco-table-td').getByText(projectName).first().click();
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
+    await row.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -70,7 +70,7 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     if (await manageBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await manageBtn.click();
 
-      const modal = page.locator('.arco-modal').filter({ hasText: '管理协作者' });
+      const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '管理协作者' });
       await expect(modal).toBeVisible({ timeout: 5_000 });
 
       const searchInput = modal.getByPlaceholder('搜索姓名或用户名...');
@@ -78,12 +78,12 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
         await searchInput.fill('张三');
         await page.waitForTimeout(500);
 
-        const plusIcon = modal.locator('.arco-icon-plus').first();
+        const plusIcon = modal.locator('[aria-label*="新建"]').first();
         if (await plusIcon.isVisible({ timeout: 2_000 }).catch(() => false)) {
           await plusIcon.click();
           await page.waitForTimeout(300);
 
-          await expect(modal.locator('.arco-tag').filter({ hasText: '张三' })).toBeVisible({ timeout: 3_000 });
+          await expect(modal.locator('[data-slot="badge"]').filter({ hasText: '张三' })).toBeVisible({ timeout: 3_000 });
         }
       }
 
@@ -106,8 +106,8 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
-    await row.locator('.arco-table-td').getByText(projectName).first().click();
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
+    await row.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -122,8 +122,8 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
-    await row.locator('.arco-table-td').getByText(projectName).first().click();
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
+    await row.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -131,10 +131,10 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     if (await manageBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await manageBtn.click();
 
-      const modal = page.locator('.arco-modal').filter({ hasText: '管理协作者' });
+      const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '管理协作者' });
       await expect(modal).toBeVisible({ timeout: 5_000 });
 
-      const closeIcon = modal.locator('.arco-tag .arco-icon-close').first();
+      const closeIcon = modal.locator('[data-slot="badge"] .arco-icon-close').first();
       if (await closeIcon.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await closeIcon.click();
         await page.waitForTimeout(300);
@@ -159,7 +159,7 @@ test.describe.serial('Project Collaborators Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

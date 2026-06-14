@@ -31,13 +31,13 @@ test.describe.serial('Navigation @p1', () => {
 
     // Within 账号管理, click sub-tabs
     await clickTab(page, '用户管理');
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
 
     await clickTab(page, '角色管理');
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
 
     // Click 操作日志 tab
     await clickTab(page, '操作日志');
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -26,15 +26,15 @@ test.describe.serial('Activity Import & Export @p1', () => {
     await createProjectViaPage(page, { name: projectName });
     await searchProject(page, projectName);
 
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName);
 
@@ -44,7 +44,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await actResp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
   // ──────── TC1: export button visible ────────
@@ -52,7 +52,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -62,7 +62,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
       await expect(exportBtn).toBeVisible();
     } else {
       // Click the more menu button (⋮)
-      const moreBtn = page.locator('button').filter({ has: page.locator('svg.arco-icon-more-vertical') });
+      const moreBtn = page.locator('button').filter({ has: page.locator('svg[aria-label="列设置"]') });
       if (await moreBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await moreBtn.click();
         await page.waitForTimeout(300);
@@ -77,7 +77,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -89,7 +89,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
     if (await exportBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await exportBtn.click();
     } else {
-      const moreBtn = page.locator('button').filter({ has: page.locator('svg.arco-icon-more-vertical') });
+      const moreBtn = page.locator('button').filter({ has: page.locator('svg[aria-label="列设置"]') });
       await moreBtn.click();
       await page.waitForTimeout(300);
       await page.getByText(/导出/).first().click();
@@ -117,7 +117,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -133,7 +133,7 @@ test.describe.serial('Activity Import & Export @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

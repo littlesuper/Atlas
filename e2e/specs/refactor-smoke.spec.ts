@@ -6,11 +6,11 @@ import { test, expect } from '@playwright/test';
 /** Navigate from project list to first project's detail page */
 async function navigateToFirstProject(page: any) {
   await page.goto('/projects');
-  // Wait for project list table to render (no scroll.y → no .arco-table-body wrapper)
-  await page.waitForSelector('.arco-table-container table tbody tr', { timeout: 15000 });
+  // Wait for project list table to render (no scroll.y → no tbody wrapper)
+  await page.waitForSelector('[data-slot="table-container"] table tbody tr', { timeout: 15000 });
 
   // Click first project name link
-  const firstProjectLink = page.locator('.arco-table-container table tbody tr a').first();
+  const firstProjectLink = page.locator('[data-slot="table-container"] table tbody tr a').first();
   await expect(firstProjectLink).toBeVisible({ timeout: 5000 });
   await firstProjectLink.click();
 
@@ -34,11 +34,11 @@ test.describe('Detail page refactor smoke test @p2', () => {
   test('should display activity table with correct columns', async ({ page }) => {
     await navigateToFirstProject(page);
 
-    // Wait for activity table to load (compact-table has scroll.y → .arco-table-body exists)
-    await page.waitForSelector('.compact-table .arco-table', { timeout: 15000 });
+    // Wait for activity table to load (compact-table has scroll.y → tbody exists)
+    await page.waitForSelector('.compact-table table', { timeout: 15000 });
 
     // Check key column headers exist
-    const headers = page.locator('.compact-table .arco-table thead th');
+    const headers = page.locator('.compact-table table thead th');
     const headerTexts = await headers.allTextContents();
     const joinedHeaders = headerTexts.join(' ');
 
@@ -52,10 +52,10 @@ test.describe('Detail page refactor smoke test @p2', () => {
     await navigateToFirstProject(page);
 
     // Wait for activity table rows
-    await page.waitForSelector('.compact-table .arco-table tbody tr', { timeout: 15000 });
+    await page.waitForSelector('.compact-table table tbody tr', { timeout: 15000 });
 
     // Find and click edit icon on first activity row
-    const editIcon = page.locator('.compact-table .arco-table tbody tr').first().locator('[class*="icon-edit"]').first();
+    const editIcon = page.locator('.compact-table table tbody tr').first().locator('[class*="icon-edit"]').first();
     if (await editIcon.isVisible()) {
       await editIcon.click();
 

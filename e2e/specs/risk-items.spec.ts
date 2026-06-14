@@ -26,9 +26,9 @@ test.describe.serial('Risk Items Management @p1', () => {
     await page.waitForTimeout(1_000);
 
     await openCreateActivityDrawer(page);
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.getByPlaceholder('请输入活动名称').fill(uniqueName(text.activityName));
 
     const actResp = page.waitForResponse(
@@ -37,7 +37,7 @@ test.describe.serial('Risk Items Management @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await actResp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
 
     // Navigate to risk tab and trigger assessment
     await clickTab(page, '风险评估');
@@ -88,15 +88,15 @@ test.describe.serial('Risk Items Management @p1', () => {
       await page.waitForTimeout(500);
 
       // Fill in the modal form
-      const modal = page.locator('.arco-modal');
+      const modal = page.locator('[data-slot="dialog-content"]');
       await expect(modal).toBeVisible({ timeout: 3_000 });
 
       await modal.getByPlaceholder('请输入风险项标题').fill('E2E测试风险项');
 
       // Select severity
-      const severitySelect = modal.locator('.arco-select').first();
+      const severitySelect = modal.locator('[role="combobox"]').first();
       await severitySelect.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: /高|HIGH/ }).first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: /高|HIGH/ }).first().click();
       await page.waitForTimeout(200);
 
       // Submit
@@ -139,7 +139,7 @@ test.describe.serial('Risk Items Management @p1', () => {
     await page.waitForTimeout(1_000);
 
     // Assessment card should show source tag (规则引擎 or AI)
-    const sourceTag = page.locator('.arco-tag').filter({ hasText: /规则引擎|AI 评估|定时/ });
+    const sourceTag = page.locator('[data-slot="badge"]').filter({ hasText: /规则引擎|AI 评估|定时/ });
     if (await sourceTag.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await expect(sourceTag.first()).toBeVisible();
     }
@@ -157,7 +157,7 @@ test.describe.serial('Risk Items Management @p1', () => {
     await page.waitForTimeout(1_000);
 
     // Risk level tag should be visible
-    const riskTag = page.locator('.arco-tag').filter({ hasText: /低风险|中风险|高风险|极高风险/ });
+    const riskTag = page.locator('[data-slot="badge"]').filter({ hasText: /低风险|中风险|高风险|极高风险/ });
     if (await riskTag.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await expect(riskTag.first()).toBeVisible();
     }
@@ -168,7 +168,7 @@ test.describe.serial('Risk Items Management @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

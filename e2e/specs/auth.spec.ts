@@ -29,7 +29,7 @@ test.describe.serial('Authentication @smoke', () => {
     await expect(page).toHaveURL(/\/projects/);
 
     // Click user avatar dropdown then logout
-    await page.locator('.arco-avatar').click();
+    await page.locator('[data-slot="avatar"]').click();
     await page.getByText('退出登录').click();
     // Confirm the logout modal
     await confirmModal(page);

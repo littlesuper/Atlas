@@ -26,9 +26,9 @@ test.describe.serial('Risk Dashboard @p1', () => {
     await page.waitForTimeout(1_000);
 
     await openCreateActivityDrawer(page);
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.getByPlaceholder('请输入活动名称').fill(uniqueName(text.activityName));
 
     const actResp = page.waitForResponse(
@@ -37,7 +37,7 @@ test.describe.serial('Risk Dashboard @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await actResp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
 
     // Navigate to risk tab and trigger assessment
     await clickTab(page, '风险评估');
@@ -79,7 +79,7 @@ test.describe.serial('Risk Dashboard @p1', () => {
     await waitForPageLoad(page);
 
     // Table should exist with expected headers
-    const table = page.locator('.arco-table');
+    const table = page.locator('table');
     await expect(table).toBeVisible({ timeout: 5_000 });
 
     await expect(page.getByText('项目风险矩阵')).toBeVisible();
@@ -90,7 +90,7 @@ test.describe.serial('Risk Dashboard @p1', () => {
     await waitForPageLoad(page);
 
     // If there are rows, clicking one should navigate
-    const firstRow = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const firstRow = page.locator('tbody tr').filter({ hasText: projectName }).first();
     if (await firstRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await firstRow.click();
       await expect(page).toHaveURL(/\/projects\/.+\?tab=risk/);
@@ -114,7 +114,7 @@ test.describe.serial('Risk Dashboard @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

@@ -13,7 +13,7 @@ test.describe('Risk Tag Contrast @p1', () => {
   async function goToRiskTab(page: Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     await firstProjectLink.waitFor({ state: 'visible', timeout: 10_000 });
     await firstProjectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
@@ -66,7 +66,7 @@ test.describe('Risk Tag Contrast @p1', () => {
     // Find risk level tags (中风险, 高风险, 低风险, 严重风险)
     const riskTags = await page.evaluate(() => {
       const labels = ['低风险', '中风险', '高风险', '严重风险'];
-      const tags = document.querySelectorAll('.arco-tag');
+      const tags = document.querySelectorAll('[data-slot="badge"]');
       return Array.from(tags)
         .filter(tag => labels.includes(tag.textContent?.trim() || ''))
         .map(tag => {
@@ -100,7 +100,7 @@ test.describe('Risk Tag Contrast @p1', () => {
 
     const riskTags = await page.evaluate(() => {
       const labels = ['低风险', '中风险', '高风险', '严重风险'];
-      const tags = document.querySelectorAll('.arco-tag');
+      const tags = document.querySelectorAll('[data-slot="badge"]');
       return Array.from(tags)
         .filter(tag => labels.includes(tag.textContent?.trim() || ''))
         .map(tag => {
@@ -133,7 +133,7 @@ test.describe('Risk Tag Contrast @p1', () => {
 
     const severityTags = await page.evaluate(() => {
       const labels = ['低', '中', '高', '严重'];
-      const tags = document.querySelectorAll('.arco-tag');
+      const tags = document.querySelectorAll('[data-slot="badge"]');
       return Array.from(tags)
         .filter(tag => labels.includes(tag.textContent?.trim() || ''))
         .map(tag => ({
@@ -167,7 +167,7 @@ test.describe('Risk Tag Contrast @p1', () => {
 
     const riskTags = await page.evaluate(() => {
       const labels = ['低风险', '中风险', '高风险', '严重风险'];
-      const tags = document.querySelectorAll('.arco-tag');
+      const tags = document.querySelectorAll('[data-slot="badge"]');
       return Array.from(tags)
         .filter(tag => labels.includes(tag.textContent?.trim() || ''))
         .map(tag => {

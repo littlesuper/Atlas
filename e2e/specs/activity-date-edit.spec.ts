@@ -24,7 +24,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
     await waitForTableLoad(page);
@@ -39,7 +39,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
     headerText: string,
   ) {
     // 找到所有表头单元格
-    const headers = page.locator('.arco-table-th');
+    const headers = page.locator('th');
     const headerCount = await headers.count();
     let colIndex = -1;
     for (let i = 0; i < headerCount; i++) {
@@ -50,7 +50,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
       }
     }
     if (colIndex >= 0) {
-      const cell = row.locator('.arco-table-td').nth(colIndex);
+      const cell = row.locator('td').nth(colIndex);
       await cell.scrollIntoViewIfNeeded();
       await cell.click();
       await page.waitForTimeout(500);
@@ -63,15 +63,15 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
     await createProjectViaPage(page, { name: projectName });
     await searchProject(page, projectName);
 
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName);
 
@@ -81,7 +81,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await actResp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(activityName)).toBeVisible({ timeout: 10_000 });
   });
 
@@ -89,7 +89,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
   test('inline edit plan start date via date picker', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // 点击「计划开始」列的单元格（显示为 "-"），触发 AutoOpenDatePicker
@@ -114,20 +114,20 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
         }
         // 日期设置成功后，单元格不再显示 "-"
         await page.waitForTimeout(500);
-        const cellText = await row.locator('.arco-table-td').nth(colIndex).textContent();
+        const cellText = await row.locator('td').nth(colIndex).textContent();
         expect(cellText).not.toBe('-');
       }
     }
 
     // 验证表格仍然正常渲染
-    await expect(page.locator('.arco-table')).toBeVisible();
+    await expect(page.locator('table')).toBeVisible();
   });
 
   // ──────── TC2: inline edit plan duration ────────
   test('inline edit plan duration updates end date', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // 点击「计划工期」列
@@ -152,18 +152,18 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
       }
     }
 
-    await expect(page.locator('.arco-table')).toBeVisible();
+    await expect(page.locator('table')).toBeVisible();
   });
 
   // ──────── TC3: date cells display format ────────
   test('date cells display correct format', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // 日期列使用 YY年MM月DD日 格式 或 "-"
-    const cells = row.locator('.arco-table-td');
+    const cells = row.locator('td');
     const cellCount = await cells.count();
 
     let foundDateOrDash = false;
@@ -183,7 +183,7 @@ test.describe.serial('Activity Date Inline Editing @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

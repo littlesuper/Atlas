@@ -12,16 +12,16 @@ test.describe.serial('Activity Management @smoke', () => {
     await searchProject(page, projectName);
 
     // ── Step 2: Navigate to project detail ──
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
     // ── Step 3: Add activity ──
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName);
     await page.getByPlaceholder('请输入描述').fill(text.activityDesc);
@@ -34,7 +34,7 @@ test.describe.serial('Activity Management @smoke', () => {
     const resp = await createResp;
     expect(resp.status()).toBeLessThan(400);
 
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(2_000);
 
     // If activity not visible, try reload
@@ -45,8 +45,8 @@ test.describe.serial('Activity Management @smoke', () => {
     await expect(page.getByText(activityName)).toBeVisible({ timeout: 10_000 });
 
     // ── Step 4: Delete activity ──
-    const row = page.locator('.arco-table-tr').filter({ hasText: activityName });
-    await row.locator('.arco-icon-delete').click();
+    const row = page.locator('tbody tr').filter({ hasText: activityName });
+    await row.locator('[aria-label*="删除"]').click();
 
     await confirmModal(page);
     await expectMessage(page, '已删除活动');
@@ -57,7 +57,7 @@ test.describe.serial('Activity Management @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

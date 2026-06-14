@@ -24,23 +24,23 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await waitForTableLoad(page);
 
     await page.getByRole('button', { name: '新建产品' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible();
 
     await page.getByPlaceholder('请输入产品名称').fill(productName);
     await page.getByPlaceholder('例如: RX-3000').fill('ADV-' + Date.now());
 
     // Select project
-    await page.locator('.arco-select').filter({ has: page.locator('[placeholder="请选择关联项目"]') }).click();
-    await page.locator('.arco-select-popup .arco-select-option').first().click();
+    await page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder="请选择关联项目"]') }).click();
+    await page.locator('[data-slot="select-content"] [role="option"]').first().click();
 
     const responsePromise = page.waitForResponse(
       (r) => r.url().includes('/api/products') && r.request().method() === 'POST',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '创建' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
     await expect(page.getByText(productName)).toBeVisible({ timeout: 10_000 });
   });
@@ -50,14 +50,14 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await clickNavItem(page, '产品管理');
     await waitForTableLoad(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: productName });
+    const row = page.locator('tbody tr').filter({ hasText: productName });
     await expect(row).toBeVisible();
 
     // Click edit button (second action button; first is view/IconEye, second is edit/IconEdit)
     const editBtn = row.locator('button').nth(1);
     await editBtn.click();
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
     // Verify it's the edit drawer
     await expect(drawer.getByText('编辑产品')).toBeVisible({ timeout: 5_000 });
@@ -77,7 +77,7 @@ test.describe.serial('Product Advanced Features @p1', () => {
       (r) => r.url().includes('/api/products') && r.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await drawer.locator('.arco-drawer-footer').getByRole('button', { name: '保存' }).click();
+    await drawer.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '保存' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -90,7 +90,7 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await clickNavItem(page, '产品管理');
     await waitForTableLoad(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: updatedProductName });
+    const row = page.locator('tbody tr').filter({ hasText: updatedProductName });
     await expect(row).toBeVisible();
 
     // Find copy button (usually has a copy icon)
@@ -107,7 +107,7 @@ test.describe.serial('Product Advanced Features @p1', () => {
 
       await waitForTableLoad(page);
       // Should see at least two entries with similar names
-      const copyRows = page.locator('.arco-table-tr').filter({ hasText: updatedProductName });
+      const copyRows = page.locator('tbody tr').filter({ hasText: updatedProductName });
       const count = await copyRows.count();
       expect(count).toBeGreaterThanOrEqual(1);
     }
@@ -119,28 +119,28 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await waitForTableLoad(page);
 
     await page.getByRole('button', { name: '新建产品' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible();
 
     // Select category
-    const categorySelect = page.locator('.arco-drawer .arco-select').filter({
+    const categorySelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({
       has: page.locator('[placeholder*="类别"]'),
     });
     if (await categorySelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await categorySelect.click();
       // Select "路由器" category
-      const routerOption = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: '路由器' });
+      const routerOption = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: '路由器' });
       if (await routerOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await routerOption.click();
         await page.waitForTimeout(500);
 
         // Should show category-specific spec fields
-        const specSection = page.locator('.arco-drawer').getByText(/规格|参数/);
+        const specSection = page.locator('[data-slot="sheet-content"]').getByText(/规格|参数/);
         // Category-specific template content may or may not appear
       }
     }
 
     // Close drawer without saving
-    await page.locator('.arco-drawer-close-icon').click();
+    await page.locator('[data-slot="sheet-close"]').click();
   });
 
   // ──────── TC4: view product detail ────────
@@ -148,7 +148,7 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await clickNavItem(page, '产品管理');
     await waitForTableLoad(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: updatedProductName });
+    const row = page.locator('tbody tr').filter({ hasText: updatedProductName });
     await expect(row).toBeVisible();
 
     // Click view button (first action button with IconEye)
@@ -157,7 +157,7 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await page.waitForTimeout(500);
 
     // Should show product detail drawer with title "产品详情"
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
     await expect(drawer.getByText('产品详情')).toBeVisible({ timeout: 5_000 });
     await expect(drawer.getByText(updatedProductName)).toBeVisible();
@@ -169,10 +169,10 @@ test.describe.serial('Product Advanced Features @p1', () => {
     await waitForTableLoad(page);
 
     // Delete all products matching our test name
-    const rows = page.locator('.arco-table-tr').filter({ hasText: updatedProductName });
+    const rows = page.locator('tbody tr').filter({ hasText: updatedProductName });
     const count = await rows.count();
     for (let i = 0; i < count; i++) {
-      const row = page.locator('.arco-table-tr').filter({ hasText: updatedProductName }).first();
+      const row = page.locator('tbody tr').filter({ hasText: updatedProductName }).first();
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await row.locator('button[class*="danger"]').click();
         await confirmModal(page);

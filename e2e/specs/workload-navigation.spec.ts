@@ -49,7 +49,7 @@ test.describe('Workload Page Navigation @p1', () => {
     const issuesSection = page.getByText(/需关注|问题/);
     if (await issuesSection.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Find clickable links in the issues table
-      const links = page.locator('.arco-table a, .arco-table [style*="cursor: pointer"]');
+      const links = page.locator('table a, table [style*="cursor: pointer"]');
       const linkCount = await links.count();
 
       if (linkCount > 0) {
@@ -70,12 +70,12 @@ test.describe('Workload Page Navigation @p1', () => {
     await page.goto('/workload');
     await waitForPageLoad(page);
 
-    const projectFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="项目"]') });
+    const projectFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="项目"]') });
     if (await projectFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await projectFilter.click();
       await page.waitForTimeout(300);
 
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       const optCount = await options.count();
 
       if (optCount > 0) {
@@ -93,12 +93,12 @@ test.describe('Workload Page Navigation @p1', () => {
     await page.goto('/workload');
     await waitForPageLoad(page);
 
-    const projectFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="项目"]') });
+    const projectFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="项目"]') });
     if (await projectFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Select a project first
       await projectFilter.click();
       await page.waitForTimeout(300);
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       if (await options.count() > 0) {
         await options.first().click();
         await page.waitForTimeout(500);

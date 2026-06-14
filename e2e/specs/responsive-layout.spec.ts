@@ -20,7 +20,7 @@ test.describe('Layout & Navigation @p1', () => {
     await expect(header).toBeVisible({ timeout: 5_000 });
 
     // User avatar should be visible
-    const avatar = page.locator('.arco-avatar').first();
+    const avatar = page.locator('[data-slot="avatar"]').first();
     await expect(avatar).toBeVisible({ timeout: 5_000 });
   });
 
@@ -41,7 +41,7 @@ test.describe('Layout & Navigation @p1', () => {
   test('clicking avatar shows dropdown with logout option', async ({ authedPage: page }) => {
     await waitForPageLoad(page);
 
-    await page.locator('.arco-avatar').first().click();
+    await page.locator('[data-slot="avatar"]').first().click();
     await page.waitForTimeout(300);
 
     // Dropdown should show logout option
@@ -64,15 +64,15 @@ test.describe('Layout & Navigation @p1', () => {
   test('project list table has proper structure', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 
-    const table = page.locator('.arco-table').first();
+    const table = page.locator('table').first();
     await expect(table).toBeVisible();
 
     // Should have header row
-    const headerRow = table.locator('thead .arco-table-tr, .arco-table-header .arco-table-tr').first();
+    const headerRow = table.locator('thead tbody tr, thead tbody tr').first();
     await expect(headerRow).toBeVisible();
 
     // Should have body rows
-    const bodyRows = table.locator('tbody .arco-table-tr, .arco-table-body .arco-table-tr');
+    const bodyRows = table.locator('tbody tbody tr, tbody tbody tr');
     const rowCount = await bodyRows.count();
     expect(rowCount).toBeGreaterThanOrEqual(0);
   });
@@ -93,13 +93,13 @@ test.describe('Layout & Navigation @p1', () => {
   test('table handles horizontal overflow', async ({ authedPage: page }) => {
     // Navigate to project detail (which has many columns)
     await waitForTableLoad(page);
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     if (await firstProjectLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await firstProjectLink.click();
       await expect(page).toHaveURL(/\/projects\/.+/);
       await page.waitForTimeout(1_000);
 
-      const table = page.locator('.arco-table').first();
+      const table = page.locator('table').first();
       await expect(table).toBeVisible({ timeout: 10_000 });
 
       // Table should not overflow the viewport

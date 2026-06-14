@@ -42,7 +42,7 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     await goToUserManagement(page);
 
     await page.getByRole('button', { name: /新建用户/ }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(300);
 
     // Fill real name
@@ -51,7 +51,7 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     await page.waitForTimeout(500); // Wait for pinyin generation
 
     // Username should be auto-generated from pinyin
-    const usernameInput = page.locator('.arco-drawer input').filter({ has: page.locator('[placeholder*="用户名"]') });
+    const usernameInput = page.locator('[data-slot="sheet-content"] input').filter({ has: page.locator('[placeholder*="用户名"]') });
     // In create mode, username field should have a value
     const usernameField = page.getByPlaceholder(/用户名/);
     if (await usernameField.isVisible()) {
@@ -61,7 +61,7 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     }
 
     // Enable canLogin
-    const canLoginSwitch = page.locator('.arco-drawer .arco-switch').first();
+    const canLoginSwitch = page.locator('[data-slot="sheet-content"] [data-slot="switch"]').first();
     if (await canLoginSwitch.isVisible()) {
       // Check if it's off (for default canLogin state)
       const isChecked = await canLoginSwitch.getAttribute('class');
@@ -78,11 +78,11 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     }
 
     // Select a role
-    const roleSelect = page.locator('.arco-drawer .arco-select').filter({ has: page.locator('[placeholder*="角色"]') });
+    const roleSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({ has: page.locator('[placeholder*="角色"]') });
     if (await roleSelect.isVisible()) {
       await roleSelect.click();
       await page.waitForTimeout(300);
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
       await page.waitForTimeout(200);
     }
 
@@ -92,7 +92,7 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await resp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
   // ──────── TC2: username is read-only in edit mode ────────
@@ -108,20 +108,20 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     }
 
     // Click edit on the user row
-    const row = page.locator('.arco-table-tr').filter({ hasText: userName });
+    const row = page.locator('tbody tr').filter({ hasText: userName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const editBtn = row.locator('[class*="icon-edit"], button').filter({ hasText: /编辑/ }).first();
       if (await editBtn.isVisible()) {
         await editBtn.click();
       } else {
         // Try clicking the first icon button
-        await row.locator('.arco-icon-edit').click();
+        await row.locator('[aria-label*="编辑"]').click();
       }
-      await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
       await page.waitForTimeout(300);
 
       // Username field should be disabled
-      const usernameField = page.locator('.arco-drawer').getByPlaceholder(/用户名/);
+      const usernameField = page.locator('[data-slot="sheet-content"]').getByPlaceholder(/用户名/);
       if (await usernameField.isVisible()) {
         const isDisabled = await usernameField.isDisabled();
         expect(isDisabled).toBeTruthy();
@@ -143,15 +143,15 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
       await waitForTableLoad(page);
     }
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: userName });
+    const row = page.locator('tbody tr').filter({ hasText: userName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Open edit drawer
-      await row.locator('.arco-icon-edit').first().click();
-      await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+      await row.locator('[aria-label*="编辑"]').first().click();
+      await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
       await page.waitForTimeout(300);
 
       // Toggle canLogin switch
-      const switches = page.locator('.arco-drawer .arco-switch');
+      const switches = page.locator('[data-slot="sheet-content"] [data-slot="switch"]');
       const switchCount = await switches.count();
       if (switchCount > 0) {
         const firstSwitch = switches.first();
@@ -177,17 +177,17 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
     await goToUserManagement(page);
 
     // Find canLogin filter select
-    const filterSelect = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="登录"]') });
+    const filterSelect = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="登录"]') });
     if (await filterSelect.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await filterSelect.click();
       await page.waitForTimeout(300);
 
       // Select "允许登录"
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: /允许登录/ });
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: /允许登录/ });
       if (await option.isVisible()) {
         await option.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table')).toBeVisible();
+        await expect(page.locator('table')).toBeVisible();
       }
     }
   });
@@ -203,9 +203,9 @@ test.describe.serial('User Role Assignment & Management @p1', () => {
       await waitForTableLoad(page);
     }
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: userName });
+    const row = page.locator('tbody tr').filter({ hasText: userName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const deleteBtn = row.locator('.arco-icon-delete');
+      const deleteBtn = row.locator('[aria-label*="删除"]');
       if (await deleteBtn.isVisible()) {
         await deleteBtn.click();
         await confirmModal(page);

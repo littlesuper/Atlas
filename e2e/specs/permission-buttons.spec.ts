@@ -34,7 +34,7 @@ base.describe.serial('Permission-Based Button Visibility @p1', () => {
     const isVisible = await createBtn.isVisible({ timeout: 3_000 }).catch(() => false);
 
     // We just verify the page loaded correctly with or without the button
-    await expect(page.locator('.arco-table')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 5_000 });
   });
 
   // ──────── TC3: non-admin access to admin page ────────
@@ -79,7 +79,7 @@ base.describe.serial('Permission-Based Button Visibility @p1', () => {
     await waitForTableLoad(page);
 
     // Verify table loads
-    await expect(page.locator('.arco-table')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 5_000 });
 
     // Create button depends on product:create permission
     const createBtn = page.getByRole('button', { name: /新建产品/ });

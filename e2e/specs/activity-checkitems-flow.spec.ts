@@ -19,7 +19,7 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
   }
@@ -27,9 +27,9 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
   async function createActivityHelper(page: import('@playwright/test').Page) {
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.waitForTimeout(300);
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName);
@@ -41,16 +41,16 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
     await clickDrawerSubmit(page, '创建');
     expect((await resp).status()).toBeLessThan(400);
 
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(2_000);
   }
 
   async function openActivityEditDrawer(page: import('@playwright/test').Page) {
     await navigateToProjectDetail(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: activityName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: activityName }).first();
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await row.locator('.arco-icon-edit, [class*="icon-edit"]').first().click().catch(() => {
+      await row.locator('[aria-label*="编辑"], [class*="icon-edit"]').first().click().catch(() => {
         row.locator('button').first().click();
       });
       await page.waitForTimeout(1_000);
@@ -59,8 +59,8 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
     if (await page.getByText(activityName).isVisible({ timeout: 5_000 }).catch(() => false) === false) {
       await page.reload();
       await waitForTableLoad(page);
-      const retryRow = page.locator('.arco-table-tr').filter({ hasText: activityName }).first();
-      await retryRow.locator('.arco-icon-edit, [class*="icon-edit"]').first().click().catch(() => {
+      const retryRow = page.locator('tbody tr').filter({ hasText: activityName }).first();
+      await retryRow.locator('[aria-label*="编辑"], [class*="icon-edit"]').first().click().catch(() => {
         retryRow.locator('button').first().click();
       });
       await page.waitForTimeout(1_000);
@@ -76,7 +76,7 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
   test('open activity edit drawer shows check items section', async ({ authedPage: page }) => {
     await openActivityEditDrawer(page);
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const checkItemsSection = drawer.getByText('检查项');
       if (await checkItemsSection.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -93,7 +93,7 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
   test('add check item to activity', async ({ authedPage: page }) => {
     await openActivityEditDrawer(page);
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const addInput = drawer.getByPlaceholder('添加检查项...');
       if (await addInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -117,11 +117,11 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
   test('toggle check item checkbox', async ({ authedPage: page }) => {
     await openActivityEditDrawer(page);
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const checkItemText = drawer.getByText('E2E测试检查项');
       if (await checkItemText.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        const checkbox = drawer.locator('.arco-checkbox').first();
+        const checkbox = drawer.locator('[data-slot="checkbox"]').first();
 
         const responsePromise = page.waitForResponse(
           (r) => r.url().includes('/api/check-items') && r.request().method() === 'PUT',
@@ -141,7 +141,7 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
   test('progress bar updates after toggle', async ({ authedPage: page }) => {
     await openActivityEditDrawer(page);
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const progress = drawer.locator('.arco-progress');
       if (await progress.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -158,11 +158,11 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
   test('delete check item', async ({ authedPage: page }) => {
     await openActivityEditDrawer(page);
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const checkItemText = drawer.getByText('E2E测试检查项');
       if (await checkItemText.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        const deleteBtn = drawer.locator('.arco-icon-delete').first();
+        const deleteBtn = drawer.locator('[aria-label*="删除"]').first();
 
         const responsePromise = page.waitForResponse(
           (r) => r.url().includes('/api/check-items') && r.request().method() === 'DELETE',
@@ -184,7 +184,7 @@ test.describe.serial('Activity Check Items Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

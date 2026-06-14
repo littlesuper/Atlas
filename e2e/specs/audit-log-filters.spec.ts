@@ -26,17 +26,17 @@ test.describe('Audit Log Advanced Filters @p2', () => {
   test('filter audit log by user', async ({ authedPage: page }) => {
     await goToAuditLog(page);
 
-    const userFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="用户"]') });
+    const userFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="用户"]') });
     if (await userFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await userFilter.click();
       await page.waitForTimeout(300);
 
       // Select first user option
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await option.isVisible()) {
         await option.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table').first()).toBeVisible();
+        await expect(page.locator('table').first()).toBeVisible();
       }
     }
   });
@@ -45,16 +45,16 @@ test.describe('Audit Log Advanced Filters @p2', () => {
   test('filter audit log by action type', async ({ authedPage: page }) => {
     await goToAuditLog(page);
 
-    const actionFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="操作"]') });
+    const actionFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="操作"]') });
     if (await actionFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await actionFilter.click();
       await page.waitForTimeout(300);
 
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await option.isVisible()) {
         await option.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table').first()).toBeVisible();
+        await expect(page.locator('table').first()).toBeVisible();
       }
     }
   });
@@ -83,7 +83,7 @@ test.describe('Audit Log Advanced Filters @p2', () => {
         await page.waitForTimeout(500);
 
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table').first()).toBeVisible();
+        await expect(page.locator('table').first()).toBeVisible();
       }
     }
   });
@@ -97,7 +97,7 @@ test.describe('Audit Log Advanced Filters @p2', () => {
       await searchInput.fill('login');
       await page.waitForTimeout(500);
       await waitForTableLoad(page);
-      await expect(page.locator('.arco-table').first()).toBeVisible();
+      await expect(page.locator('table').first()).toBeVisible();
     }
   });
 
@@ -105,16 +105,16 @@ test.describe('Audit Log Advanced Filters @p2', () => {
   test('filter audit log by resource type', async ({ authedPage: page }) => {
     await goToAuditLog(page);
 
-    const resourceFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="资源"]') });
+    const resourceFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="资源"]') });
     if (await resourceFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await resourceFilter.click();
       await page.waitForTimeout(300);
 
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await option.isVisible()) {
         await option.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table').first()).toBeVisible();
+        await expect(page.locator('table').first()).toBeVisible();
       }
     }
   });
@@ -124,24 +124,24 @@ test.describe('Audit Log Advanced Filters @p2', () => {
     await goToAuditLog(page);
 
     // Apply user filter
-    const userFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="用户"]') });
+    const userFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="用户"]') });
     if (await userFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await userFilter.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
       await page.waitForTimeout(300);
     }
 
     // Apply action filter
-    const actionFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="操作"]') });
+    const actionFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="操作"]') });
     if (await actionFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await actionFilter.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
       await page.waitForTimeout(300);
     }
 
     await waitForTableLoad(page);
 
     // Table should still render (may have no results)
-    await expect(page.locator('.arco-table').first()).toBeVisible();
+    await expect(page.locator('table').first()).toBeVisible();
   });
 });

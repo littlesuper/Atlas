@@ -7,7 +7,7 @@ async function expectNoSeriousA11yIssues(page: Page, label: string) {
 
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa'])
-    .exclude('.arco-table')
+    .exclude('table')
     .exclude('.arco-tabs')
     .analyze();
 
@@ -69,7 +69,7 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
 
   test('项目详情页无严重无障碍问题', async ({ page }) => {
     await page.goto('/projects');
-    await page.locator('.arco-table-container table tbody tr a').first().click();
+    await page.locator('[data-slot="table-container"] table tbody tr a').first().click();
     await page.waitForURL('**/projects/**', { timeout: 10_000 });
     await expectNoSeriousA11yIssues(page, 'Project detail page');
   });
@@ -122,10 +122,10 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
 
   test('活动创建抽屉无严重无障碍问题', async ({ page }) => {
     await page.goto('/projects');
-    await page.locator('.arco-table-container table tbody tr a').first().click();
+    await page.locator('[data-slot="table-container"] table tbody tr a').first().click();
     await page.waitForURL('**/projects/**', { timeout: 10_000 });
     await openCreateActivityDrawer(page);
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await expectNoSeriousA11yIssues(page, 'Activity create drawer');
   });
 
@@ -133,7 +133,7 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
     await page.getByRole('button', { name: '新建产品' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await expectNoSeriousA11yIssues(page, 'Product create drawer');
   });
 
@@ -141,11 +141,11 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
 
-    const productRow = page.locator('.arco-table-tr').filter({ has: page.locator('button') }).first();
+    const productRow = page.locator('tbody tr').filter({ has: page.locator('button') }).first();
     await expect(productRow).toBeVisible({ timeout: 5_000 });
     await productRow.locator('button').first().click();
 
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await expectNoSeriousA11yIssues(page, 'Product detail drawer');
   });
 
@@ -153,13 +153,13 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
 
-    const productRows = page.locator('.arco-table-tr').filter({ has: page.locator('button') });
+    const productRows = page.locator('tbody tr').filter({ has: page.locator('button') });
     await expect(productRows.nth(1)).toBeVisible({ timeout: 5_000 });
     await productRows.first().locator('td, [role="cell"]').first().click();
     await productRows.nth(1).locator('td, [role="cell"]').first().click();
 
     await page.getByRole('button', { name: /对比/ }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await expectNoSeriousA11yIssues(page, 'Product compare drawer');
   });
 
@@ -168,7 +168,7 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
     await gotoProjectRiskTab(page, projectId);
 
     await page.getByRole('button', { name: '新建' }).click();
-    await expect(page.locator('.arco-modal')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="dialog-content"]')).toBeVisible({ timeout: 5_000 });
     await expectNoSeriousA11yIssues(page, 'Risk item create modal');
   });
 
@@ -191,7 +191,7 @@ test.describe('无障碍 (Accessibility) 审计 @a11y @p1', () => {
     try {
       await gotoProjectRiskTab(page, projectId);
       await page.getByText(title).click();
-      await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
       await expectNoSeriousA11yIssues(page, 'Risk item detail drawer');
     } finally {
       await page.request.delete(`/api/risk-items/${created.id}`, {

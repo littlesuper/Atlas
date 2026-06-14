@@ -28,7 +28,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   }
 
   async function getColIndex(page: import('@playwright/test').Page, headerText: string): Promise<number> {
-    const headers = page.locator('.arco-table-th');
+    const headers = page.locator('th');
     const count = await headers.count();
     for (let i = 0; i < count; i++) {
       const txt = await headers.nth(i).textContent();
@@ -38,7 +38,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   }
 
   async function getFirstActivityRow(page: import('@playwright/test').Page) {
-    return page.locator('.arco-table-body .arco-table-tr').first();
+    return page.locator('tbody tbody tr').first();
   }
 
   async function createProjectViaDrawer(page: import('@playwright/test').Page) {
@@ -46,7 +46,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     await waitForTableLoad(page);
 
     await page.getByRole('button', { name: '新建项目' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(300);
 
     await page.getByPlaceholder('请输入项目名称').fill(projectName);
@@ -54,19 +54,19 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
 
     await pickDateRange(page);
 
-    const managerSelect = page.locator('.arco-drawer .arco-select').filter({
+    const managerSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({
       has: page.locator('[placeholder="选择项目经理"]'),
     });
     await managerSelect.click();
     await page.waitForTimeout(300);
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.waitForTimeout(200);
 
     const respPromise = page.waitForResponse(
       (r) => r.url().includes('/api/projects') && r.request().method() === 'POST',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '创建' }).click();
     const resp = await respPromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -74,7 +74,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     projectId = body.data?.id ?? body.id;
     expect(projectId).toBeTruthy();
 
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
   }
 
   test('setup: create project + 2 activities via API', async ({ authedPage: page }) => {
@@ -111,17 +111,17 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit predecessor field', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: '测试活动2' });
+    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动2' });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     const colIdx = await getColIndex(page, '前置');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(300);
 
-    const input = cell.locator('input.arco-input');
+    const input = cell.locator('input[data-slot="input"]');
     if (await input.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await input.clear();
       await input.fill('1');
@@ -145,14 +145,14 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '阶段');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(500);
 
-    const selectPopup = page.locator('.arco-select-popup:visible');
+    const selectPopup = page.locator('[data-slot="select-content"]:visible');
     if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const option = selectPopup.locator('.arco-select-option').filter({ hasText: 'EVT' }).first();
+      const option = selectPopup.locator('[role="option"]').filter({ hasText: 'EVT' }).first();
       if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
         const updateResp = page.waitForResponse(
           (r) => r.url().includes('/api/activities/') && r.request().method() === 'PUT',
@@ -169,17 +169,17 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit activity name', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: '测试活动1' });
+    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动1' });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     const colIdx = await getColIndex(page, '活动名称');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(300);
 
-    const input = cell.locator('input.arco-input');
+    const input = cell.locator('input[data-slot="input"]');
     if (await input.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await input.clear();
       await input.fill('已编辑活动名');
@@ -203,16 +203,16 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '类型');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
 
-    const tag = cell.locator('.arco-tag, [style*="cursor"]').first();
+    const tag = cell.locator('[data-slot="badge"], [style*="cursor"]').first();
     await tag.click();
     await page.waitForTimeout(500);
 
-    const selectPopup = page.locator('.arco-select-popup:visible');
+    const selectPopup = page.locator('[data-slot="select-content"]:visible');
     if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const option = selectPopup.locator('.arco-select-option').filter({ hasText: '里程碑' }).first();
+      const option = selectPopup.locator('[role="option"]').filter({ hasText: '里程碑' }).first();
       if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
         const updateResp = page.waitForResponse(
           (r) => r.url().includes('/api/activities/') && r.request().method() === 'PUT',
@@ -232,16 +232,16 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '状态');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
 
-    const tag = cell.locator('.arco-tag, [style*="cursor"]').first();
+    const tag = cell.locator('[data-slot="badge"], [style*="cursor"]').first();
     await tag.click();
     await page.waitForTimeout(500);
 
-    const selectPopup = page.locator('.arco-select-popup:visible');
+    const selectPopup = page.locator('[data-slot="select-content"]:visible');
     if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const option = selectPopup.locator('.arco-select-option').filter({ hasText: '进行中' }).first();
+      const option = selectPopup.locator('[role="option"]').filter({ hasText: '进行中' }).first();
       if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
         const updateResp = page.waitForResponse(
           (r) => r.url().includes('/api/activities/') && r.request().method() === 'PUT',
@@ -261,14 +261,14 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '负责人');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(500);
 
-    const selectPopup = page.locator('.arco-select-popup:visible');
+    const selectPopup = page.locator('[data-slot="select-content"]:visible');
     if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const option = selectPopup.locator('.arco-select-option').first();
+      const option = selectPopup.locator('[role="option"]').first();
       if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
         const updateResp = page.waitForResponse(
           (r) => r.url().includes('/api/activities/') && r.request().method() === 'PUT',
@@ -290,7 +290,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '计划工期');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(300);
@@ -313,12 +313,12 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit plan dates via range picker', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: '测试活动2' }).first();
+    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动2' }).first();
     if (!(await row.isVisible({ timeout: 5_000 }).catch(() => false))) return;
 
     const colIdx = await getColIndex(page, '计划时间');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(800);
@@ -352,12 +352,12 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
   test('inline edit actual dates via range picker', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').filter({ hasText: '测试活动2' }).first();
+    const row = page.locator('tbody tbody tr').filter({ hasText: '测试活动2' }).first();
     if (!(await row.isVisible({ timeout: 5_000 }).catch(() => false))) return;
 
     const colIdx = await getColIndex(page, '实际时间');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(800);
@@ -394,12 +394,12 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '备注');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(300);
 
-    const input = cell.locator('input.arco-input');
+    const input = cell.locator('input[data-slot="input"]');
     if (await input.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await input.clear();
       await input.fill('测试备注内容');
@@ -424,13 +424,13 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const colIdx = await getColIndex(page, '活动名称');
     if (colIdx < 0) return;
 
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     const before = await cell.textContent();
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(300);
 
-    const input = cell.locator('input.arco-input');
+    const input = cell.locator('input[data-slot="input"]');
     if (await input.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await input.clear();
       await input.fill('不应保存的文字');
@@ -448,12 +448,12 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '阶段');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(500);
 
-    const selectPopup = page.locator('.arco-select-popup:visible');
+    const selectPopup = page.locator('[data-slot="select-content"]:visible');
     if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await page.locator('header, h1, h2, .arco-layout-header').first().click({ force: true });
       await page.waitForTimeout(500);
@@ -474,13 +474,13 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     await page.waitForTimeout(500);
     await waitForTableLoad(page);
 
-    const userRows = page.locator('.arco-table-body .arco-table-tr');
+    const userRows = page.locator('tbody tbody tr');
     const rowCount = await userRows.count();
     if (rowCount === 0) return;
 
     const targetRow = userRows.nth(0);
     const roleCellIdx = await (async () => {
-      const headers = page.locator('.arco-table-th');
+      const headers = page.locator('th');
       const count = await headers.count();
       for (let i = 0; i < count; i++) {
         const txt = await headers.nth(i).textContent();
@@ -490,16 +490,16 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     })();
     if (roleCellIdx < 0) return;
 
-    const roleCell = targetRow.locator('.arco-table-td').nth(roleCellIdx);
+    const roleCell = targetRow.locator('td').nth(roleCellIdx);
     await roleCell.scrollIntoViewIfNeeded();
 
     const roleArea = roleCell.locator('[style*="cursor"]').first();
     await roleArea.click();
     await page.waitForTimeout(800);
 
-    const roleSelect = page.locator('.arco-select-popup:visible');
+    const roleSelect = page.locator('[data-slot="select-content"]:visible');
     if (await roleSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const firstOption = roleSelect.locator('.arco-select-option').first();
+      const firstOption = roleSelect.locator('[role="option"]').first();
       if (await firstOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await firstOption.click();
         await page.waitForTimeout(300);
@@ -529,7 +529,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
 
     await page.waitForTimeout(500);
 
-    const nameInput = page.locator('.arco-table-body input.arco-input').first();
+    const nameInput = page.locator('tbody input[data-slot="input"]').first();
     const hasInput = await nameInput.isVisible({ timeout: 3_000 }).catch(() => false);
     if (hasInput) {
       expect(await nameInput.inputValue()).toBe('新活动');
@@ -547,7 +547,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     const row = await getFirstActivityRow(page);
     const colIdx = await getColIndex(page, '检查项');
     if (colIdx < 0) return;
-    const cell = row.locator('.arco-table-td').nth(colIdx);
+    const cell = row.locator('td').nth(colIdx);
     await cell.scrollIntoViewIfNeeded();
     await cell.click();
     await page.waitForTimeout(300);
@@ -572,7 +572,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     await page.waitForTimeout(500);
 
     const newRow = await getFirstActivityRow(page);
-    const newCell = newRow.locator('.arco-table-td').nth(colIdx);
+    const newCell = newRow.locator('td').nth(colIdx);
     await newCell.scrollIntoViewIfNeeded();
     await newCell.click();
     await page.waitForTimeout(300);
@@ -582,7 +582,7 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
       await titleSpan.click();
       await page.waitForTimeout(300);
 
-      const editInput = page.locator('input.arco-input[value="待编辑检查项"], input.arco-input').last();
+      const editInput = page.locator('input[data-slot="input"][value="待编辑检查项"], input[data-slot="input"]').last();
       if (await editInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await editInput.clear();
         await editInput.fill('已编辑检查项');
@@ -606,11 +606,11 @@ test.describe.serial('Comprehensive Inline Editing @p2', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
     const delBtn = row.locator('button[class*="danger"], button[style*="danger"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
-      await page.locator('.arco-modal-footer .arco-btn-primary').click();
+      await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
       await expectMessage(page, '删除');
     }
   });

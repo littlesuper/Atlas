@@ -20,7 +20,7 @@ test.describe.serial('System Admin @p1', () => {
     await clickTab(page, '用户管理');
 
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText('用户管理').first()).toBeVisible();
   });
 
@@ -33,7 +33,7 @@ test.describe.serial('System Admin @p1', () => {
     await clickTab(page, '角色管理');
 
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('audit log tab: view logs', async ({ authedPage: page }) => {
@@ -42,6 +42,6 @@ test.describe.serial('System Admin @p1', () => {
 
     await clickTab(page, '操作日志');
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
   });
 });

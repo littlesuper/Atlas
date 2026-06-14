@@ -29,22 +29,22 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('setup: add activities with notes', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
     // Create activity 1
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName1);
     await page.getByPlaceholder('请输入描述').fill('活动A描述');
 
     // Fill notes field
-    const notesInput = page.locator('.arco-drawer').getByPlaceholder('请输入备注');
+    const notesInput = page.locator('[data-slot="sheet-content"]').getByPlaceholder('请输入备注');
     if (await notesInput.isVisible()) {
       await notesInput.fill(activityNotes);
     }
@@ -57,15 +57,15 @@ test.describe.serial('Project Snapshot Management @p1', () => {
       clickDrawerSubmit(page, '创建'),
     ]).then(([r]) => r);
     expect(resp1.status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(activityName1)).toBeVisible({ timeout: 10_000 });
 
     // Create activity 2
     await openCreateActivityDrawer(page);
 
-    const phaseSelect2 = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect2 = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect2.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName2);
 
@@ -77,7 +77,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
       clickDrawerSubmit(page, '创建'),
     ]).then(([r]) => r);
     expect(resp2.status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(activityName2)).toBeVisible({ timeout: 10_000 });
   });
 
@@ -85,7 +85,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC1: snapshots tab shows empty state', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -107,7 +107,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC2: create snapshot', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -118,7 +118,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
     await page.getByRole('button', { name: '创建快照' }).click();
 
     // Modal should appear
-    const modal = page.locator('.arco-modal').filter({ hasText: '创建项目快照' });
+    const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '创建项目快照' });
     await expect(modal).toBeVisible({ timeout: 5_000 });
 
     // Should show description text
@@ -147,7 +147,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC3: create snapshot with remark', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -157,7 +157,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
     // Click "创建快照"
     await page.getByRole('button', { name: '创建快照' }).click();
 
-    const modal = page.locator('.arco-modal').filter({ hasText: '创建项目快照' });
+    const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '创建项目快照' });
     await expect(modal).toBeVisible({ timeout: 5_000 });
 
     // Fill in remark
@@ -185,7 +185,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC4: view snapshot navigates to read-only page', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -205,7 +205,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC5: snapshot banner shows time and return button', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -238,7 +238,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC6: snapshot mode hides editing controls', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -260,21 +260,21 @@ test.describe.serial('Project Snapshot Management @p1', () => {
     }
 
     // Edit/delete icons in actions column should not be visible
-    const editIcons = page.locator('.arco-table-td .arco-icon-edit');
-    const deleteIcons = page.locator('.arco-table-td .arco-icon-delete');
+    const editIcons = page.locator('td [aria-label*="编辑"]');
+    const deleteIcons = page.locator('td [aria-label*="删除"]');
     await expect(editIcons).toHaveCount(0);
     await expect(deleteIcons).toHaveCount(0);
 
     // Scheduling and Snapshots tabs should be hidden
-    await expect(page.locator('.arco-tabs-tab').filter({ hasText: '排期工具' })).not.toBeVisible();
-    await expect(page.locator('.arco-tabs-tab').filter({ hasText: '项目快照' })).not.toBeVisible();
+    await expect(page.locator('[role="tab"]').filter({ hasText: '排期工具' })).not.toBeVisible();
+    await expect(page.locator('[role="tab"]').filter({ hasText: '项目快照' })).not.toBeVisible();
   });
 
   // ──────── TC7: snapshot shows activity data ────────
   test('TC7: snapshot activity list shows correct data', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -286,7 +286,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
     await page.waitForTimeout(1_500);
 
     // Activity table should be visible (activity list is the default tab in snapshot mode)
-    const table = page.locator('.arco-table');
+    const table = page.locator('table');
     await expect(table).toBeVisible({ timeout: 5_000 });
 
     // Both activities should be in the snapshot
@@ -298,7 +298,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC8: return from snapshot goes back to project snapshots tab', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -332,7 +332,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
   test('TC9: snapshot sub-tabs load correctly', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -347,7 +347,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
     await clickTab(page, '里程碑');
     await page.waitForTimeout(500);
     // Milestones tab content should render (empty or with data)
-    const milestonesContent = page.locator('.arco-tabs-content-item-active');
+    const milestonesContent = page.locator('[data-state="active"]');
     await expect(milestonesContent).toBeVisible();
 
     // Switch to gantt tab
@@ -379,7 +379,7 @@ test.describe.serial('Project Snapshot Management @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

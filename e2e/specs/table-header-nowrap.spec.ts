@@ -11,7 +11,7 @@ import { waitForTableLoad, waitForPageLoad } from '../helpers/arco';
 test.describe('Table header no-wrap check @p2', () => {
   /** 在当前页面检测所有 arco-table 的表头是否存在换行 */
   async function assertNoHeaderWrap(page: import('@playwright/test').Page, pageName: string) {
-    const tables = page.locator('.arco-table');
+    const tables = page.locator('table');
     const tableCount = await tables.count();
 
     for (let t = 0; t < tableCount; t++) {
@@ -83,7 +83,7 @@ test.describe('Table header no-wrap check @p2', () => {
     await waitForTableLoad(page);
 
     // 进入第一个项目详情（活动列表）
-    const link = page.locator('.arco-table-td a').first();
+    const link = page.locator('td a').first();
     if (await link.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await link.click();
       await expect(page).toHaveURL(/\/projects\/.+/, { timeout: 15_000 });

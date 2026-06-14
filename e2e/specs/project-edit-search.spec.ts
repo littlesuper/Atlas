@@ -63,7 +63,7 @@ test.describe.serial('Project Edit & Search @p1', () => {
     await waitForTableLoad(page);
 
     // Table should show empty or no matching rows
-    const rows = page.locator('.arco-table-body .arco-table-tr');
+    const rows = page.locator('tbody tbody tr');
     const rowCount = await rows.count();
     expect(rowCount).toBe(0);
 
@@ -77,17 +77,17 @@ test.describe.serial('Project Edit & Search @p1', () => {
   test('filter projects by status', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 
-    const totalRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const totalRows = await page.locator('tbody tbody tr').count();
 
     // Find status filter - look for status dropdown or tabs
-    const statusSelect = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="状态"]') });
+    const statusSelect = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="状态"]') });
     if (await statusSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await statusSelect.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: '进行中' }).click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: '进行中' }).click();
       await page.waitForTimeout(500);
       await waitForTableLoad(page);
 
-      const filteredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+      const filteredRows = await page.locator('tbody tbody tr').count();
       expect(filteredRows).toBeLessThanOrEqual(totalRows);
     }
   });
@@ -100,14 +100,14 @@ test.describe.serial('Project Edit & Search @p1', () => {
 
     // Verify projects loaded (stat cards show data) before searching
     await expect(
-      page.locator('.arco-table-tr').filter({ has: page.locator('.arco-table-td') }).first(),
+      page.locator('tbody tr').filter({ has: page.locator('td') }).first(),
     ).toBeVisible({ timeout: 10_000 });
 
     // Search for the project
     await searchProject(page, projectName);
 
     // Find the row with our project
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
 
     // If search returned no results, retry with page reload
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false) === false) {
@@ -122,11 +122,11 @@ test.describe.serial('Project Edit & Search @p1', () => {
     // Click edit button - opens drawer
     const editBtn = row.getByRole('button', { name: '编辑' });
     await editBtn.click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(500);
 
     // Modify name
-    const nameInput = page.locator('.arco-drawer').getByPlaceholder('请输入项目名称');
+    const nameInput = page.locator('[data-slot="sheet-content"]').getByPlaceholder('请输入项目名称');
     await nameInput.clear();
     await nameInput.fill(updatedName);
 
@@ -135,11 +135,11 @@ test.describe.serial('Project Edit & Search @p1', () => {
       (resp) => resp.url().includes('/api/projects') && resp.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '保存修改' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '保存修改' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
 
     // Clear old search and search for the updated name
@@ -173,7 +173,7 @@ test.describe.serial('Project Edit & Search @p1', () => {
     await page.waitForTimeout(500);
     await waitForTableLoad(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: updatedName });
+    const row = page.locator('tbody tr').filter({ hasText: updatedName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

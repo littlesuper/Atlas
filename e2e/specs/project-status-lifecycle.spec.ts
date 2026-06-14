@@ -16,7 +16,7 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await createProjectViaPage(page, { name: projectName });
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     await expect(row.getByText('进行中')).toBeVisible({ timeout: 5_000 });
@@ -27,17 +27,17 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.getByRole('button', { name: '编辑' }).click();
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(500);
 
-    const statusSelect = drawer.locator('.arco-select').filter({
+    const statusSelect = drawer.locator('[role="combobox"]').filter({
       has: page.locator('[class*="arco-select-view-value"]'),
     });
-    const allSelects = drawer.locator('.arco-select');
+    const allSelects = drawer.locator('[role="combobox"]');
     let statusSelectEl = allSelects.nth(1);
 
     for (let i = 0; i < await allSelects.count(); i++) {
@@ -52,11 +52,11 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await statusSelectEl.click();
     await page.waitForTimeout(300);
 
-    const holdOption = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: '已暂停' });
+    const holdOption = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: '已暂停' });
     if (await holdOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await holdOption.click();
     } else {
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       const count = await options.count();
       if (count > 1) {
         await options.nth(1).click();
@@ -69,7 +69,7 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
       (r) => r.url().includes('/api/projects') && r.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '保存修改' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '保存修改' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -82,14 +82,14 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.getByRole('button', { name: '编辑' }).click();
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(500);
 
-    const allSelects = drawer.locator('.arco-select');
+    const allSelects = drawer.locator('[role="combobox"]');
     let statusSelectEl = allSelects.nth(1);
     for (let i = 0; i < await allSelects.count(); i++) {
       const el = allSelects.nth(i);
@@ -103,11 +103,11 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await statusSelectEl.click();
     await page.waitForTimeout(300);
 
-    const completedOption = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: '已完成' });
+    const completedOption = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: '已完成' });
     if (await completedOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await completedOption.click();
     } else {
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       const count = await options.count();
       if (count > 0) {
         const lastOption = options.nth(count - 1);
@@ -121,7 +121,7 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
       (r) => r.url().includes('/api/projects') && r.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '保存修改' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '保存修改' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -133,7 +133,7 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
 
     const archiveBtn = row.locator('button').filter({ has: page.locator('svg') }).filter({
       has: page.locator('[class*="icon-storage"], [class*="IconStorage"]'),
@@ -177,10 +177,10 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await expect(row).toBeVisible({ timeout: 5_000 });
 
-    await row.locator('.arco-table-td').getByText(projectName).click();
+    await row.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/, { timeout: 10_000 });
     await page.waitForTimeout(1_000);
 
@@ -196,8 +196,8 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
-    await row.locator('.arco-table-td').getByText(projectName).click();
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
+    await row.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/, { timeout: 10_000 });
     await page.waitForTimeout(1_000);
 
@@ -218,7 +218,7 @@ test.describe.serial('Project Status Lifecycle @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

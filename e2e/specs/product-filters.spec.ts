@@ -23,7 +23,7 @@ test.describe('Product Filters & Search @p1', () => {
       await waitForTableLoad(page);
 
       // Table should have filtered results or be empty
-      await expect(page.locator('.arco-table')).toBeVisible();
+      await expect(page.locator('table')).toBeVisible();
     }
   });
 
@@ -37,7 +37,7 @@ test.describe('Product Filters & Search @p1', () => {
       await specSearch.fill('电压');
       await page.waitForTimeout(500);
       await waitForTableLoad(page);
-      await expect(page.locator('.arco-table')).toBeVisible();
+      await expect(page.locator('table')).toBeVisible();
     }
   });
 
@@ -47,17 +47,17 @@ test.describe('Product Filters & Search @p1', () => {
     await waitForTableLoad(page);
 
     // Find status filter select
-    const statusFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="状态"]') });
+    const statusFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="状态"]') });
     if (await statusFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await statusFilter.click();
       await page.waitForTimeout(300);
 
       // Select first status option
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await option.isVisible()) {
         await option.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table')).toBeVisible();
+        await expect(page.locator('table')).toBeVisible();
       }
     }
   });
@@ -67,16 +67,16 @@ test.describe('Product Filters & Search @p1', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
 
-    const categoryFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="类别"]') });
+    const categoryFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="类别"]') });
     if (await categoryFilter.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await categoryFilter.click();
       await page.waitForTimeout(300);
 
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await option.isVisible()) {
         await option.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table')).toBeVisible();
+        await expect(page.locator('table')).toBeVisible();
       }
     }
   });
@@ -93,7 +93,7 @@ test.describe('Product Filters & Search @p1', () => {
     if (cardCount > 0) {
       await statCards.first().click();
       await waitForTableLoad(page);
-      await expect(page.locator('.arco-table')).toBeVisible();
+      await expect(page.locator('table')).toBeVisible();
     }
   });
 
@@ -112,7 +112,7 @@ test.describe('Product Filters & Search @p1', () => {
       if (isDisabled && !isDisabled.includes('disabled')) {
         await nextBtn.click();
         await waitForTableLoad(page);
-        await expect(page.locator('.arco-table')).toBeVisible();
+        await expect(page.locator('table')).toBeVisible();
       }
     }
   });
