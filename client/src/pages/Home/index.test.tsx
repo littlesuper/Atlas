@@ -1,83 +1,82 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import Home from './index';
-import type { RiskDashboardData, RiskDashboardInsights } from '../../types';
+import type { ReactNode } from 'react';
+import type { AssistantMessage } from '../../types';
 
-const { mockGetDashboard, mockGetInsights } = vi.hoisted(() => ({
-  mockGetDashboard: vi.fn(),
-  mockGetInsights: vi.fn(),
+// 受控的 useAssistantChat：每个用例改 h.messages，断言 h.send/h.reset
+const h = vi.hoisted(() => ({
+  messages: [] as AssistantMessage[],
+  send: vi.fn(),
+  applyProposal: vi.fn(),
+  reset: vi.fn(),
 }));
 
-vi.mock('../../api', () => ({
-  riskApi: { getDashboard: mockGetDashboard, getInsights: mockGetInsights },
+vi.mock('../../hooks/useAssistantChat', () => ({
+  useAssistantChat: () => ({ messages: h.messages, sending: false, send: h.send, applyProposal: h.applyProposal, reset: h.reset }),
 }));
-
-// 隔离 hero 输入（其自身测试已覆盖）：只验证首页装配
-vi.mock('../../components/AssistantHeroInput', () => ({
-  default: () => <div data-testid="hero-input" />,
-}));
-
-// MainLayout 依赖 store/路由，简化为透传
 vi.mock('../../layouts/MainLayout', () => ({
-  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+// 隔离子组件（各自有独立测试）：用占位 + 暴露关键回调
+vi.mock('./EmptyState', () => ({
+  default: ({ onPick }: { onPick: (t: string) => void }) => (
+    <button data-testid="empty-pick" onClick={() => onPick('问一句')}>empty</button>
+  ),
+}));
+vi.mock('./RiskOverview', () => ({ default: () => <div data-testid="risk-overview" /> }));
+vi.mock('./MessageList', () => ({
+  default: ({ messages }: { messages: AssistantMessage[] }) => <div data-testid="message-list">{messages.length}</div>,
+}));
+vi.mock('./ChatInput', () => ({
+  default: ({ onSend, onNewChat }: { onSend: () => void; onNewChat: () => void }) => (
+    <div>
+      <button data-testid="chat-send" onClick={onSend}>send</button>
+      <button data-testid="chat-new" onClick={onNewChat}>new</button>
+    </div>
+  ),
 }));
 
-const dashboard: RiskDashboardData = {
-  projects: [
-    { projectId: 'p1', projectName: '项目甲', productLine: null, riskLevel: 'CRITICAL', assessedAt: '2026-06-01', source: 'ai', aiInsights: '关键路径有阻塞风险', trendDirection: 'WORSENING' },
-    { projectId: 'p2', projectName: '项目乙', productLine: null, riskLevel: 'LOW', assessedAt: '2026-06-01', source: 'rule_engine', aiInsights: null, trendDirection: 'STABLE' },
-  ],
-  riskDistribution: { LOW: 3, MEDIUM: 2, HIGH: 1, CRITICAL: 1 },
-  topActionItems: [{ projectId: 'p1', projectName: '项目甲', action: '尽快补齐固件联调资源', priority: 'HIGH' }],
-};
-const insights: RiskDashboardInsights = {
-  topConcerns: ['项目甲关键路径阻塞', '整体进度偏慢'],
-  improvements: [],
-  deteriorations: [],
-  generatedAt: '2026-06-01',
-};
+import Home from './index';
 
-const renderHome = () => render(<MemoryRouter><Home /></MemoryRouter>);
+const renderAt = (path = '/') => render(<MemoryRouter initialEntries={[path]}><Home /></MemoryRouter>);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetDashboard.mockResolvedValue({ data: dashboard });
-  mockGetInsights.mockResolvedValue({ data: insights });
+  h.messages = [];
 });
 
-describe('Home (AI 首页)', () => {
-  it('always renders the hero input', () => {
-    renderHome();
-    expect(screen.getByTestId('hero-input')).toBeInTheDocument();
+describe('Home (AI 聊天首页)', () => {
+  it('空态显示问候/示例与按需风险区', () => {
+    renderAt('/');
+    expect(screen.getByTestId('empty-pick')).toBeInTheDocument();
+    expect(screen.getByTestId('risk-overview')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-list')).not.toBeInTheDocument();
   });
 
-  it('shows the risk section when there are risk points', async () => {
-    renderHome();
-    await waitFor(() => expect(screen.getByText('项目风险点（AI 分析）')).toBeInTheDocument());
-    expect(screen.getByText('关键路径有阻塞风险')).toBeInTheDocument();
-    expect(screen.getByText('项目甲关键路径阻塞')).toBeInTheDocument();
-    expect(screen.getByText('尽快补齐固件联调资源')).toBeInTheDocument();
+  it('有对话时显示消息流,隐藏空态与风险区', () => {
+    h.messages = [{ id: '1', role: 'user', text: '你好' }];
+    renderAt('/');
+    expect(screen.getByTestId('message-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('empty-pick')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('risk-overview')).not.toBeInTheDocument();
   });
 
-  it('hides the risk section when only a benign concern exists (no real risk points)', async () => {
-    mockGetDashboard.mockResolvedValueOnce({
-      data: { ...dashboard, projects: [dashboard.projects[1]], topActionItems: [] }, // 仅 LOW，无行动项
-    });
-    // 善意提示（非真实风险）不应触发风险区：topConcerns 非空但无高风险项目/行动项
-    mockGetInsights.mockResolvedValueOnce({ data: { ...insights, topConcerns: ['当前所有项目风险等级在可控范围内'] } });
-    renderHome();
-    // hero 始终在；等渲染稳定后断言风险区缺席
-    expect(screen.getByTestId('hero-input')).toBeInTheDocument();
-    await waitFor(() => expect(mockGetDashboard).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByText('项目风险点（AI 分析）')).not.toBeInTheDocument());
+  it('发送时带上 ?project= 上下文', () => {
+    renderAt('/?project=p9');
+    fireEvent.click(screen.getByTestId('empty-pick'));
+    expect(h.send).toHaveBeenCalledWith('问一句', 'p9');
   });
 
-  it('shows only the hero when risk data fails to load', async () => {
-    mockGetDashboard.mockRejectedValueOnce(new Error('network'));
-    renderHome();
-    await waitFor(() => expect(mockGetDashboard).toHaveBeenCalled());
-    expect(screen.getByTestId('hero-input')).toBeInTheDocument();
-    expect(screen.queryByText('项目风险点（AI 分析）')).not.toBeInTheDocument();
+  it('无 project 参数时上下文为 null', () => {
+    renderAt('/');
+    fireEvent.click(screen.getByTestId('empty-pick'));
+    expect(h.send).toHaveBeenCalledWith('问一句', null);
+  });
+
+  it('新对话调用 reset', () => {
+    renderAt('/');
+    fireEvent.click(screen.getByTestId('chat-new'));
+    expect(h.reset).toHaveBeenCalled();
   });
 });

@@ -17,15 +17,15 @@ describe('AssistantLauncher (navigate FAB)', () => {
     expect(screen.getByLabelText('打开 AI 助手')).toBeInTheDocument();
   });
 
-  it('navigates to /assistant with project context', () => {
+  it('navigates to / with project context', () => {
     render(<AssistantLauncher projectId="p1" />);
     fireEvent.click(screen.getByLabelText('打开 AI 助手'));
-    expect(mockNavigate).toHaveBeenCalledWith('/assistant?project=p1');
+    expect(mockNavigate).toHaveBeenCalledWith('/?project=p1');
   });
 
   it('navigates without project param when projectId is null', () => {
     render(<AssistantLauncher projectId={null} />);
     fireEvent.click(screen.getByLabelText('打开 AI 助手'));
-    expect(mockNavigate).toHaveBeenCalledWith('/assistant');
+    expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 });

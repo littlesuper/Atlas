@@ -20,7 +20,6 @@ const WorkloadPage = React.lazy(() => import('./pages/Workload'));
 const TemplateManagement = React.lazy(() => import('./pages/Admin/TemplateManagement'));
 const RiskDashboard = React.lazy(() => import('./pages/RiskDashboard'));
 const Home = React.lazy(() => import('./pages/Home'));
-const Assistant = React.lazy(() => import('./pages/Assistant'));
 
 // 受保护的路由组件
 interface ProtectedRouteProps {
@@ -125,15 +124,8 @@ const App: React.FC = () => {
             element={isAuthenticated ? <Home /> : <Navigate to="/login" replace />}
           />
 
-          {/* AI 助手全屏聊天页 */}
-          <Route
-            path="/assistant"
-            element={
-              <ProtectedRoute requirePermission={{ resource: 'activity', action: 'update' }}>
-                <Assistant />
-              </ProtectedRoute>
-            }
-          />
+          {/* 旧 /assistant 已并入首页，重定向兼容旧链接 */}
+          <Route path="/assistant" element={<Navigate to="/" replace />} />
 
           {/* 项目列表（首页） */}
           <Route

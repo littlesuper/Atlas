@@ -4,15 +4,12 @@ import type { AssistantMessage, AssistantDraft } from '../types';
 
 interface AssistantChatState {
   messages: AssistantMessage[];
-  /** 首页 hero → 全屏页 的首条消息交接（不持久化） */
-  pendingUtterance: string | null;
   pushUser: (text: string) => string;
   pushAssistant: (draft: AssistantDraft) => string;
   // updateMessage 只用于就地改 proposal 卡片状态（applied/stale），故按 proposal 收窄
   // （Partial<union> 只暴露公共键 id/role，无法接受 { applied } —— 必须 Extract）
   updateMessage: (id: string, patch: Partial<Extract<AssistantMessage, { kind: 'proposal' }>>) => void;
   reset: () => void;
-  setPendingUtterance: (text: string | null) => void;
 }
 
 let seq = 0;
@@ -22,7 +19,6 @@ export const useAssistantChatStore = create<AssistantChatState>()(
   persist(
     (set) => ({
       messages: [],
-      pendingUtterance: null,
 
       pushUser: (text) => {
         const id = newId();
@@ -42,8 +38,6 @@ export const useAssistantChatStore = create<AssistantChatState>()(
         })),
 
       reset: () => set({ messages: [] }),
-
-      setPendingUtterance: (text) => set({ pendingUtterance: text }),
     }),
     {
       name: 'atlas-assistant-chat',
