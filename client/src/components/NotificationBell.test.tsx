@@ -18,13 +18,7 @@ vi.mock('../api', () => ({
   },
 }));
 
-vi.mock('@arco-design/web-react', async () => {
-  const actual = await vi.importActual('@arco-design/web-react');
-  return {
-    ...actual,
-    Message: { success: vi.fn(), error: vi.fn() },
-  };
-});
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import NotificationBell, { getNotificationRoute } from './NotificationBell';
 import { notificationsApi } from '../api';
@@ -70,9 +64,8 @@ describe('NotificationBell', () => {
 
     const { container } = renderBell();
     await waitFor(() => {
-      // Arco Badge renders a dot element when count > 0
-      const badge = container.querySelector('.arco-badge-dot, .arco-badge-number');
-      expect(badge || container.querySelector('.arco-badge')).toBeTruthy();
+      // unread > 0 渲染红点
+      expect(container.querySelector('[data-testid="notification-dot"]')).toBeTruthy();
     });
   });
 
@@ -292,15 +285,15 @@ describe('getNotificationRoute', () => {
     expect(screen.queryByText('暂无通知')).not.toBeInTheDocument();
   });
 
-  it('NotificationBell renders without crash', () => { render(<NotificationBell />); expect(document.querySelector('.arco-badge')).toBeTruthy(); });
+  it('NotificationBell renders without crash', () => { render(<NotificationBell />); expect(document.querySelector('[data-testid="notification-bell"]')).toBeTruthy(); });
 
-  it('NotificationBell renders badge element', () => { render(<NotificationBell />); expect(document.querySelector('.arco-badge')).toBeTruthy(); });
+  it('NotificationBell renders badge element', () => { render(<NotificationBell />); expect(document.querySelector('[data-testid="notification-bell"]')).toBeTruthy(); });
 
-  it('NotificationBell toggles popup on click', async () => { render(<NotificationBell />); const bellArea = document.querySelector('.arco-badge'); expect(bellArea).toBeTruthy(); });
+  it('NotificationBell toggles popup on click', async () => { render(<NotificationBell />); const bellArea = document.querySelector('[data-testid="notification-bell"]'); expect(bellArea).toBeTruthy(); });
 
   it('NotificationBell renders without throwing', () => { expect(() => render(<NotificationBell />)).not.toThrow(); });
 
-  it('NotificationBell renders badge element', () => { render(<NotificationBell />); const badge = document.querySelector('.arco-badge'); expect(badge || document.body).toBeTruthy(); });
+  it('NotificationBell renders badge element', () => { render(<NotificationBell />); const badge = document.querySelector('[data-testid="notification-bell"]'); expect(badge || document.body).toBeTruthy(); });
 
   it('NotificationBell handles multiple renders without error', () => { expect(() => { render(<NotificationBell />); render(<NotificationBell />); }).not.toThrow(); });
 

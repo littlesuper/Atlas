@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Badge, Empty, Spin, Button, Message } from '@arco-design/web-react';
-import { IconNotification, IconCheck, IconDelete } from '@arco-design/web-react/icon';
-import { notificationsApi } from '../api';
-import { Notification } from '../types';
+import { toast } from 'sonner';
+import { Bell, Check, Trash2, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { notificationsApi } from '../api';
+import { Notification } from '../types';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function getNotificationRoute(notification: { type: string; relatedId?: string | null }): string | null {
   if (!notification.relatedId) return null;
@@ -17,6 +19,14 @@ export function getNotificationRoute(notification: { type: string; relatedId?: s
   return `/projects/${notification.relatedId}`;
 }
 
+const typeIcon: Record<string, string> = {
+  ACTIVITY_DUE: '⏰',
+  MILESTONE_APPROACHING: '🎯',
+  REPORT_REMINDER: '📝',
+  RISK_ESCALATION: '🔺',
+  RISK_ALERT: '⚠️',
+};
+
 const NotificationBell: React.FC = () => {
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
@@ -24,6 +34,8 @@ const NotificationBell: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -45,8 +57,6 @@ const NotificationBell: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const portalRef = useRef<HTMLDivElement>(null);
-
   // Close panel on outside click
   useEffect(() => {
     if (!visible) return;
@@ -65,9 +75,9 @@ const NotificationBell: React.FC = () => {
       await notificationsApi.markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-      Message.success('全部已读');
+      toast.success('全部已读');
     } catch {
-      Message.error('操作失败');
+      toast.error('操作失败');
     }
   };
 
@@ -75,11 +85,11 @@ const NotificationBell: React.FC = () => {
     if (!notification.isRead) {
       try {
         await notificationsApi.markRead(notification.id);
-        setNotifications((prev) =>
-          prev.map((n) => n.id === notification.id ? { ...n, isRead: true } : n)
-        );
+        setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)));
         setUnreadCount((c) => Math.max(0, c - 1));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     setVisible(false);
@@ -93,139 +103,104 @@ const NotificationBell: React.FC = () => {
     try {
       await notificationsApi.delete(id);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
-      Message.success('已删除');
+      toast.success('已删除');
     } catch {
-      Message.error('删除失败');
+      toast.error('删除失败');
     }
   };
 
-  const typeIcon: Record<string, string> = {
-    ACTIVITY_DUE: '⏰',
-    MILESTONE_APPROACHING: '🎯',
-    REPORT_REMINDER: '📝',
-    RISK_ESCALATION: '🔺',
-    RISK_ALERT: '⚠️',
-  };
-
   // 计算面板位置（基于铃铛按钮）
-  const bellRef = useRef<HTMLDivElement>(null);
   const getPanelPos = () => {
     const el = bellRef.current;
     if (!el) return { top: 60, right: 24 };
     const rect = el.getBoundingClientRect();
     return { top: rect.bottom + 8, right: window.innerWidth - rect.right };
   };
+  const pos = getPanelPos();
 
   return (
-    <div ref={panelRef} style={{ position: 'relative' }}>
-      <Badge count={unreadCount} dot={unreadCount > 0}>
-        <div
-          ref={bellRef}
-          style={{
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'all 0.2s',
-          }}
-          onClick={() => {
-            setVisible(!visible);
-            if (!visible) load();
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        >
-          <IconNotification style={{ fontSize: 18, color: 'rgba(255,255,255,0.9)' }} />
-        </div>
-      </Badge>
+    <div ref={panelRef} className="relative">
+      <div
+        ref={bellRef}
+        role="button"
+        tabIndex={0}
+        aria-label="通知"
+        data-testid="notification-bell"
+        style={{ cursor: 'pointer' }}
+        className="text-muted-foreground hover:bg-accent hover:text-foreground relative flex items-center rounded-md p-1.5 transition-colors"
+        onClick={() => {
+          setVisible(!visible);
+          if (!visible) load();
+        }}
+      >
+        <Bell className="size-[18px]" />
+        {unreadCount > 0 && (
+          <span data-testid="notification-dot" className="absolute top-1 right-1 size-2 rounded-full bg-red-500" />
+        )}
+      </div>
 
-      {visible && createPortal(
-        <div ref={portalRef} style={{
-          position: 'fixed',
-          top: getPanelPos().top,
-          right: getPanelPos().right,
-          width: 360,
-          maxHeight: 480,
-          background: 'var(--color-bg-2)',
-          border: '1px solid var(--color-border-2)',
-          borderRadius: 8,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 9999,
-          overflow: 'hidden',
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--color-border-2)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>通知 {unreadCount > 0 && `(${unreadCount})`}</span>
-            {unreadCount > 0 && (
-              <Button size="mini" type="text" icon={<IconCheck />} onClick={handleMarkAllRead}>
-                全部已读
-              </Button>
-            )}
-          </div>
+      {visible &&
+        createPortal(
+          <div
+            ref={portalRef}
+            style={{ position: 'fixed', top: pos.top, right: pos.right, width: 360, maxHeight: 480, zIndex: 9999 }}
+            className="bg-popover text-popover-foreground overflow-hidden rounded-lg border shadow-lg"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <span className="text-sm font-semibold">通知 {unreadCount > 0 && `(${unreadCount})`}</span>
+              {unreadCount > 0 && (
+                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={handleMarkAllRead}>
+                  <Check className="size-3.5" />
+                  全部已读
+                </Button>
+              )}
+            </div>
 
-          {/* List */}
-          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-            ) : notifications.length === 0 ? (
-              <Empty description="暂无通知" style={{ padding: 40 }} />
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => handleClick(n)}
-                  style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--color-fill-2)',
-                    background: n.isRead ? 'transparent' : 'var(--color-primary-light-1)',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-fill-2)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = n.isRead ? 'transparent' : 'var(--color-primary-light-1)'; }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: n.isRead ? 400 : 600 }}>
-                        <span style={{ marginRight: 6 }}>{typeIcon[n.type] || '🔔'}</span>
+            {/* List */}
+            <div className="max-h-[400px] overflow-y-auto">
+              {loading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="text-muted-foreground size-5 animate-spin" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-muted-foreground py-10 text-center text-sm">暂无通知</div>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    onClick={() => handleClick(n)}
+                    className={cn(
+                      'hover:bg-accent flex cursor-pointer items-start justify-between gap-2 border-b px-4 py-2.5 transition-colors last:border-b-0',
+                      !n.isRead && 'bg-muted/50'
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className={cn('text-[13px]', n.isRead ? 'font-normal' : 'font-semibold')}>
+                        <span className="mr-1.5">{typeIcon[n.type] || '🔔'}</span>
                         {n.title}
                       </div>
-                      <div style={{
-                        fontSize: 12,
-                        color: 'var(--color-text-3)',
-                        marginTop: 4,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {n.content}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-4)', marginTop: 4 }}>
+                      <div className="text-muted-foreground mt-1 truncate text-xs">{n.content}</div>
+                      <div className="text-muted-foreground/70 mt-1 text-[11px]">
                         {dayjs(n.createdAt).format('MM-DD HH:mm')}
                       </div>
                     </div>
                     <Button
-                      type="text"
-                      size="mini"
-                      icon={<IconDelete />}
-                      style={{ flexShrink: 0, marginLeft: 8 }}
+                      variant="ghost"
+                      size="icon"
+                      aria-label="删除通知"
+                      className="text-muted-foreground hover:text-destructive size-7 shrink-0"
                       onClick={(e) => handleDelete(e, n.id)}
-                    />
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>,
-        document.body,
-      )}
+                ))
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

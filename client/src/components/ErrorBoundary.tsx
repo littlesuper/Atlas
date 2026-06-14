@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo } from 'react';
-import { Button, Result } from '@arco-design/web-react';
+import { TriangleAlert } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { captureAppError } from '../utils/monitoring';
 
 interface Props {
@@ -36,24 +37,22 @@ class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <Result
-            status="error"
-            title="页面出错了"
-            subTitle={
-              process.env.NODE_ENV === 'development'
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+          <TriangleAlert className="text-destructive size-12" />
+          <div>
+            <h2 className="text-xl font-semibold">页面出错了</h2>
+            <p className="text-muted-foreground mt-2 text-sm">
+              {process.env.NODE_ENV === 'development'
                 ? this.state.error?.message
-                : '请刷新页面重试，如问题持续请联系管理员'
-            }
-            extra={[
-              <Button key="retry" type="primary" onClick={this.handleReset}>
-                重试
-              </Button>,
-              <Button key="home" onClick={() => (window.location.href = '/')}>
-                返回首页
-              </Button>,
-            ]}
-          />
+                : '请刷新页面重试，如问题持续请联系管理员'}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={this.handleReset}>重试</Button>
+            <Button variant="outline" onClick={() => (window.location.href = '/')}>
+              返回首页
+            </Button>
+          </div>
         </div>
       );
     }

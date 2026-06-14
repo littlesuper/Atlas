@@ -24,8 +24,8 @@ vi.mock('../api', () => ({
   rolesApi: { list: mocks.rolesList },
 }));
 
-vi.mock('@arco-design/web-react', () => ({
-  Message: { error: mocks.messageError },
+vi.mock('sonner', () => ({
+  toast: { error: mocks.messageError, success: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
 import { useProjectData } from './useProjectData';

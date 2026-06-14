@@ -1,6 +1,10 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Button, Popover, Checkbox, Message } from '@arco-design/web-react';
-import { IconMoreVertical, IconDragDotVertical, IconRefresh } from '@arco-design/web-react/icon';
+import React, { useState } from 'react';
+import { MoreVertical, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export interface ColumnDef {
   key: string;
@@ -33,11 +37,6 @@ export function toggleColumnVisible(visible: string[], key: string, checked: boo
 const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onChange, defaultPrefs, extraActions }) => {
   const [popoverVisible, setPopoverVisible] = useState(false);
 
-  // Drag state
-  const dragIndexRef = useRef<number>(-1);
-  const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
-  const draggingRef = useRef(false);
-
   const orderedDefs = buildOrderedDefs(prefs.order, columnDefs);
 
   const handleToggle = (key: string, checked: boolean) => {
@@ -47,61 +46,18 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
 
   const handleReset = () => {
     onChange({ ...defaultPrefs });
-    Message.success('已恢复默认列配置');
+    toast.success('已恢复默认列配置');
   };
 
-  // Mouse-based drag reorder
-  const handleMouseDown = (e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    dragIndexRef.current = index;
-    draggingRef.current = true;
-    setDragOverIndex(-1);
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!draggingRef.current) return;
-      const target = (ev.target as HTMLElement).closest('[data-col-index]');
-      if (target) {
-        const targetIndex = parseInt(target.getAttribute('data-col-index') || '-1', 10);
-        if (targetIndex >= 0) {
-          setDragOverIndex(targetIndex);
-        }
-      }
-    };
-
-    const onMouseUp = () => {
-      if (draggingRef.current && dragIndexRef.current >= 0 && dragOverIndex >= 0) {
-        // We need to use the latest dragOverIndex, but since event handlers capture stale state,
-        // we use a ref-based approach
-      }
-      draggingRef.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  const handleItemMouseMove = useCallback((_e: React.MouseEvent, index: number) => {
-    if (draggingRef.current && dragIndexRef.current >= 0 && index !== dragIndexRef.current) {
-      setDragOverIndex(index);
-    }
-  }, []);
-
-  const handleItemMouseUp = useCallback((_e: React.MouseEvent, index: number) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    const fromIndex = dragIndexRef.current;
-    dragIndexRef.current = -1;
-    setDragOverIndex(-1);
-
-    if (fromIndex < 0 || fromIndex === index) return;
+  // Reorder via up/down arrows
+  const moveColumn = (fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
 
     const newOrder = [...prefs.order];
     // Only reorder among items that are in orderedDefs (have labels)
     const orderableKeys = orderedDefs.map((d) => d.key);
     const fromKey = orderableKeys[fromIndex];
-    const toKey = orderableKeys[index];
+    const toKey = orderableKeys[toIndex];
 
     const fromPos = newOrder.indexOf(fromKey);
     const toPos = newOrder.indexOf(toKey);
@@ -110,63 +66,56 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
     newOrder.splice(fromPos, 1);
     newOrder.splice(toPos, 0, fromKey);
     onChange({ ...prefs, order: newOrder });
-  }, [prefs, orderedDefs, onChange]);
+  };
 
   const content = (
-    <div style={{ width: 220 }}>
-      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-1)' }}>
-        列显示设置
-      </div>
-      <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+    <div className="w-[220px]">
+      <div className="text-foreground mb-2 text-[13px] font-medium">列显示设置</div>
+      <div className="max-h-[360px] overflow-y-auto">
         {orderedDefs.map((def, index) => {
           const isVisible = prefs.visible.includes(def.key);
-          const isDragSource = dragIndexRef.current === index && draggingRef.current;
-          const isDragTarget = dragOverIndex === index && draggingRef.current && dragIndexRef.current !== index;
-          const insertAbove = isDragTarget && dragIndexRef.current > index;
-          const insertBelow = isDragTarget && dragIndexRef.current < index;
+          const checkboxId = `col-${def.key}`;
 
           return (
-            <div
-              key={def.key}
-              data-col-index={index}
-              onMouseMove={(e) => handleItemMouseMove(e, index)}
-              onMouseUp={(e) => handleItemMouseUp(e, index)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '4px 0',
-                opacity: isDragSource ? 0.4 : 1,
-                borderTop: insertAbove ? '2px solid var(--status-info)' : '2px solid transparent',
-                borderBottom: insertBelow ? '2px solid var(--status-info)' : '2px solid transparent',
-                userSelect: 'none',
-              }}
-            >
-              <span
-                style={{ cursor: 'grab', marginRight: 6, display: 'flex', alignItems: 'center' }}
-                onMouseDown={(e) => handleMouseDown(e, index)}
-              >
-                <IconDragDotVertical style={{ color: 'var(--color-text-3)', fontSize: 16 }} />
-              </span>
+            <div key={def.key} className="flex select-none items-center gap-1.5 py-1">
+              <div className="flex flex-col">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-4"
+                  aria-label={`上移 ${def.label}`}
+                  disabled={index === 0}
+                  onClick={() => moveColumn(index, index - 1)}
+                >
+                  <ChevronUp className="size-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-4"
+                  aria-label={`下移 ${def.label}`}
+                  disabled={index === orderedDefs.length - 1}
+                  onClick={() => moveColumn(index, index + 1)}
+                >
+                  <ChevronDown className="size-3" />
+                </Button>
+              </div>
               <Checkbox
+                id={checkboxId}
                 checked={isVisible}
                 disabled={!def.removable}
-                onChange={(checked) => handleToggle(def.key, checked)}
-                style={{ flex: 1 }}
-              >
-                <span style={{ fontSize: 13 }}>{def.label}</span>
-              </Checkbox>
+                onCheckedChange={(checked) => handleToggle(def.key, checked === true)}
+              />
+              <Label htmlFor={checkboxId} className="flex-1 text-[13px] font-normal">
+                {def.label}
+              </Label>
             </div>
           );
         })}
       </div>
-      <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Button
-          size="small"
-          type="text"
-          icon={<IconRefresh />}
-          onClick={handleReset}
-          style={{ width: '100%' }}
-        >
+      <div className="mt-2 flex flex-col gap-0.5 border-t pt-2">
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleReset}>
+          <RotateCcw className="size-4" />
           恢复默认
         </Button>
         {extraActions}
@@ -175,14 +124,15 @@ const ColumnSettings: React.FC<ColumnSettingsProps> = ({ columnDefs, prefs, onCh
   );
 
   return (
-    <Popover
-      trigger="click"
-      position="br"
-      content={content}
-      popupVisible={popoverVisible}
-      onVisibleChange={setPopoverVisible}
-    >
-      <Button icon={<IconMoreVertical />} />
+    <Popover open={popoverVisible} onOpenChange={setPopoverVisible}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="size-8" aria-label="列设置">
+          <MoreVertical className="size-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-3">
+        {content}
+      </PopoverContent>
     </Popover>
   );
 };

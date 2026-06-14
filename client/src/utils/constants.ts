@@ -277,6 +277,13 @@ export const DEPENDENCY_TYPE_MAP = {
   '3': { label: 'SF', fullLabel: '开始-完成 (SF)' },
 } as const;
 
+// ============ 对话式排期助手 · 风险种类映射 ============
+export const SCHEDULE_RISK_KIND_MAP = {
+  milestone_slip: { label: '里程碑顺延', color: 'orange' },
+  hard_node_breach: { label: '撞硬节点', color: 'red' },
+  project_overdue: { label: '项目超期', color: 'red' },
+} as const;
+
 // ============ 审计操作类型映射 ============
 export const AUDIT_ACTION_MAP: Record<string, { label: string; color: string }> = {
   LOGIN: { label: '登录', color: 'cyan' },

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Message } from '@arco-design/web-react';
+import { toast } from 'sonner';
 import { activitiesApi } from '../api';
 import { Activity } from '../types';
 import { UndoItem } from './useUndoStack';
@@ -63,7 +63,7 @@ export function useInlineEdit({
         loadProject();
       },
     });
-    Message.success('更新成功');
+    toast.success('更新成功');
   }, [pushUndo, loadActivities, loadProject]);
 
   const commitInlineEdit = useCallback(async (activity: Activity, field: string) => {
@@ -75,7 +75,7 @@ export function useInlineEdit({
       setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: inlineValue } : a));
       showUndoMessage(activity.id, { [field]: original ?? undefined }, activity.name);
     } catch {
-      Message.error('更新失败');
+      toast.error('更新失败');
     }
   }, [inlineValue, setActivities, showUndoMessage]);
 
@@ -87,7 +87,7 @@ export function useInlineEdit({
       setActivities((prev) => prev.map((a) => a.id === activity.id ? { ...a, [field]: value } : a));
       showUndoMessage(activity.id, { [field]: oldValue }, activity.name);
     } catch {
-      Message.error('更新失败');
+      toast.error('更新失败');
     }
   }, [setActivities, showUndoMessage]);
 

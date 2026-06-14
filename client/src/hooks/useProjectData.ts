@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Message } from '@arco-design/web-react';
+import { toast } from 'sonner';
 import { projectsApi, activitiesApi, usersApi, rolesApi } from '../api';
 import { Project, Activity, User, Role, Product, WeeklyReport, RiskAssessment } from '../types';
 
@@ -45,7 +45,7 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
       const res = await projectsApi.get(projectId);
       setProject(res.data);
     } catch {
-      Message.error('加载项目详情失败');
+      toast.error('加载项目详情失败');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
       const flat = flatten(res.data || []).sort((a, b) => a.sortOrder - b.sortOrder);
       setActivities(flat);
     } catch {
-      Message.error('加载活动列表失败');
+      toast.error('加载活动列表失败');
     } finally {
       setActivitiesLoading(false);
     }
@@ -117,7 +117,7 @@ export function useProjectData({ projectId, snapshotId }: UseProjectDataOptions)
       setSnapshotWeeklyReports(snap.weeklyReports || []);
       setSnapshotRiskAssessments(snap.riskAssessments || []);
     } catch {
-      Message.error('加载快照数据失败');
+      toast.error('加载快照数据失败');
     } finally {
       setLoading(false);
     }

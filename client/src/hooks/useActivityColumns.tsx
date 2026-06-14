@@ -1,20 +1,22 @@
 import React, { useMemo, useCallback } from 'react';
+import type { DateRange } from 'react-day-picker';
+import { CalendarIcon, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  Input,
   Select,
-  Tag,
-  Tooltip,
-  Space,
-  InputNumber,
-  Message,
-} from '@arco-design/web-react';
-import type { ColumnProps } from '@arco-design/web-react/es/Table/interface';
-import {
-  IconEdit,
-  IconDelete,
-  IconDragDotVertical,
-  IconPlus,
-} from '@arco-design/web-react/icon';
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Activity, User, ProjectMember, Role } from '../types';
 import {
   ACTIVITY_STATUS_MAP,
@@ -22,87 +24,159 @@ import {
   DEPENDENCY_TYPE_MAP,
   PHASE_OPTIONS,
 } from '../utils/constants';
+import { arcoBadgeClass } from '../utils/badgeColor';
 import { calcWorkdays, addWorkdays } from '../utils/workday';
-import { getSelectOptionValue } from '../utils/selectFilter';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 import { activitiesApi, roleMembersApi } from '../api';
 
-// 自动展开的 Select 包装
-const AutoOpenSelect: React.FC<React.ComponentProps<typeof Select> & { onDismiss: () => void }> = ({ onDismiss, children, ...props }) => {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
-  const [popupVisible, setPopupVisible] = React.useState(true);
-  React.useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const popup = document.querySelector('.arco-select-popup');
-      if (wrapRef.current?.contains(e.target as Node)) return;
-      if (popup?.contains(e.target as Node)) return;
-      onDismiss();
-    };
-    document.addEventListener('mousedown', handler, true);
-    return () => document.removeEventListener('mousedown', handler, true);
-  }, [onDismiss]);
+// 列对象形状（替换原 Arco ColumnProps<Activity>，供父级纯 <table> 消费）
+export interface ActivityColumn {
+  key?: string;
+  dataIndex?: string;
+  title?: React.ReactNode;
+  width?: number;
+  align?: 'left' | 'center' | 'right';
+  fixed?: 'left' | 'right';
+  sorter?: unknown;
+  render?: (value: unknown, record: Activity, index: number) => React.ReactNode;
+  onHeaderCell?: () => { 'data-column-key': string };
+}
+
+// 清除值哨兵（Radix Select 不允许 value=""）
+const CLEAR_PHASE = '__clear__';
+
+// 自动展开的 Select 包装（挂载即展开，关闭即 onDismiss）
+interface AutoOpenSelectProps {
+  value?: string;
+  placeholder?: string;
+  className?: string;
+  allowClear?: boolean;
+  onDismiss: () => void;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}
+const AutoOpenSelect: React.FC<AutoOpenSelectProps> = ({
+  value,
+  placeholder,
+  className,
+  allowClear,
+  onDismiss,
+  onChange,
+  children,
+}) => {
+  const [open, setOpen] = React.useState(true);
   return (
-    <div ref={wrapRef} style={{ display: 'inline-block' }}>
-      <Select {...props} popupVisible={popupVisible} onVisibleChange={setPopupVisible}>{children}</Select>
-    </div>
+    <Select
+      open={open}
+      value={value || undefined}
+      onValueChange={(v) => onChange(v === CLEAR_PHASE ? '' : v)}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) onDismiss();
+      }}
+    >
+      <SelectTrigger size="sm" className={cn('h-7 text-xs', className)}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {allowClear && value ? (
+          <SelectItem value={CLEAR_PHASE} className="text-muted-foreground text-xs">
+            清除
+          </SelectItem>
+        ) : null}
+        {children}
+      </SelectContent>
+    </Select>
   );
 };
 
-// 自动展开的 DatePicker 包装
-import { DatePicker } from '@arco-design/web-react';
-
-const AutoOpenDatePicker: React.FC<React.ComponentProps<typeof DatePicker> & { onDismiss: () => void }> = ({ onDismiss, ...props }) => {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      const input = wrapRef.current?.querySelector('input') as HTMLElement;
-      if (input) { input.focus(); input.click(); }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
-  React.useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!document.contains(target)) return;
-      if (wrapRef.current?.contains(target)) return;
-      if (target.closest('.arco-picker-container, .arco-picker-range-container, .arco-trigger')) return;
-      onDismiss();
-    };
-    document.addEventListener('mousedown', handler, true);
-    return () => document.removeEventListener('mousedown', handler, true);
-  }, [onDismiss]);
+// 自动展开的 DatePicker 包装（单日，挂载即展开，关闭即 onDismiss）
+interface AutoOpenDatePickerProps {
+  value?: Date;
+  placeholder?: string;
+  className?: string;
+  onDismiss: () => void;
+  onSelect: (date: Date | undefined) => void;
+}
+const AutoOpenDatePicker: React.FC<AutoOpenDatePickerProps> = ({
+  value,
+  placeholder = '选择日期',
+  className,
+  onDismiss,
+  onSelect,
+}) => {
+  const [open, setOpen] = React.useState(true);
   return (
-    <div ref={wrapRef} style={{ display: 'inline-block' }}>
-      <DatePicker {...props} />
-    </div>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) onDismiss();
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn('h-7 justify-start text-left text-xs font-normal', !value && 'text-muted-foreground', className)}
+        >
+          <CalendarIcon className="mr-1 size-3.5 shrink-0" />
+          {value ? dayjs(value).format('YYYY-MM-DD') : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar mode="single" selected={value} onSelect={onSelect} autoFocus />
+      </PopoverContent>
+    </Popover>
   );
 };
 
-// 自动展开的 RangePicker 包装
-const AutoOpenRangePicker: React.FC<React.ComponentProps<typeof DatePicker.RangePicker> & { onDismiss: () => void }> = ({ onDismiss, ...props }) => {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      const input = wrapRef.current?.querySelector('input') as HTMLElement;
-      if (input) { input.focus(); input.click(); }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
-  React.useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!document.contains(target)) return;
-      if (wrapRef.current?.contains(target)) return;
-      if (target.closest('.arco-picker-container, .arco-picker-range-container, .arco-trigger')) return;
-      onDismiss();
-    };
-    document.addEventListener('mousedown', handler, true);
-    return () => document.removeEventListener('mousedown', handler, true);
-  }, [onDismiss]);
+// 自动展开的 RangePicker 包装（区间，挂载即展开，关闭即 onDismiss）
+interface AutoOpenRangePickerProps {
+  value?: DateRange;
+  placeholder?: string;
+  className?: string;
+  onDismiss: () => void;
+  onSelect: (range: DateRange | undefined) => void;
+}
+const AutoOpenRangePicker: React.FC<AutoOpenRangePickerProps> = ({
+  value,
+  placeholder = '选择起止日期',
+  className,
+  onDismiss,
+  onSelect,
+}) => {
+  const [open, setOpen] = React.useState(true);
+  const text = value?.from
+    ? value.to
+      ? `${dayjs(value.from).format('YYYY-MM-DD')} ~ ${dayjs(value.to).format('YYYY-MM-DD')}`
+      : dayjs(value.from).format('YYYY-MM-DD')
+    : '';
   return (
-    <div ref={wrapRef} style={{ display: 'inline-block' }}>
-      <DatePicker.RangePicker {...props} />
-    </div>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) onDismiss();
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn('h-7 justify-start text-left text-xs font-normal', !text && 'text-muted-foreground', className)}
+        >
+          <CalendarIcon className="mr-1 size-3.5 shrink-0" />
+          {text || placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar mode="range" selected={value} onSelect={onSelect} numberOfMonths={2} autoFocus />
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -112,20 +186,19 @@ interface InlineTextEditorProps {
   onChange: (value: string) => void;
   onCommit: () => void;
   placeholder?: string;
-  style?: React.CSSProperties;
+  className?: string;
 }
-const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ initialValue, onChange, onCommit, placeholder, style }) => {
+const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ initialValue, onChange, onCommit, placeholder, className }) => {
   const [value, setValue] = React.useState(initialValue);
   return (
     <Input
       autoFocus
-      size="small"
+      className={cn('h-7 text-xs', className)}
       value={value}
       placeholder={placeholder}
-      style={style}
-      onChange={(v) => { setValue(v); onChange(v); }}
+      onChange={(e) => { setValue(e.target.value); onChange(e.target.value); }}
       onBlur={onCommit}
-      onPressEnter={onCommit}
+      onKeyDown={(e) => { if (e.key === 'Enter') onCommit(); }}
     />
   );
 };
@@ -278,7 +351,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       loadActivities();
       showUndoMessage(activity.id, rollback, activity.name);
     } catch {
-      Message.error('更新失败');
+      toast.error('更新失败');
     }
   }, [inlineValue, setInlineEditing, showUndoMessage, loadActivities]);
 
@@ -289,7 +362,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
     if (inlineValue.trim() === oldText.trim()) return;
     const deps = parsePredecessorText(inlineValue, activity.id);
     if (deps === null) {
-      Message.error('格式错误，示例: 3FS+2, 5');
+      toast.error('格式错误，示例: 3FS+2, 5');
       return;
     }
     const oldDeps = Array.isArray(activity.dependencies)
@@ -300,7 +373,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       loadActivities();
       showUndoMessage(activity.id, { dependencies: oldDeps }, activity.name);
     } catch {
-      Message.error('更新失败');
+      toast.error('更新失败');
     }
   }, [inlineValue, setInlineEditing, getPredecessorSeq, parsePredecessorText, showUndoMessage, loadActivities]);
 
@@ -313,7 +386,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       : (() => { try { return JSON.parse(rawDeps as unknown as string) as typeof rawDeps; } catch { return []; } })();
     if (!deps || deps.length === 0) return null;
     return (
-      <div style={{ fontSize: 12 }}>
+      <div className="text-xs">
         {deps.map((dep, i) => {
           const predActivity = activities.find(a => a.id === dep.id);
           const seq = activitySeqMap.get(dep.id);
@@ -339,13 +412,13 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
   }, []);
 
   // 表格列配置
-  const columnMap = useMemo<Record<string, ColumnProps<Activity>>>(() => ({
+  const columnMap = useMemo<Record<string, ActivityColumn>>(() => ({
     id: {
       title: 'ID',
       width: columnWidths.id,
       onHeaderCell: () => ({ 'data-column-key': 'id' }),
       render: (_: unknown, record: Activity) => (
-        <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
+        <span className="text-muted-foreground font-mono">{getSeq(record)}</span>
       ),
     },
     predecessor: {
@@ -358,7 +431,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
             <InlineTextEditor
               initialValue={inlineValue}
               placeholder="如: 3FS+2, 5"
-              style={{ fontFamily: 'monospace', fontSize: 12 }}
+              className="font-mono"
               onChange={setInlineValue}
               onCommit={() => commitPredecessorEdit(record)}
             />
@@ -368,13 +441,18 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         const tooltipContent = getPredecessorTooltip(record);
         const spanEl = (
           <span
-            style={{ fontFamily: 'monospace', color: 'var(--color-text-3)', cursor: 'pointer', display: 'inline-block', minWidth: 20, minHeight: 18 }}
+            className="text-muted-foreground inline-block min-h-[18px] min-w-5 cursor-pointer font-mono"
             onClick={() => startInlineEdit(record.id, 'predecessor', text)}
           >
             {text || '-'}
           </span>
         );
-        return tooltipContent ? <Tooltip content={tooltipContent}>{spanEl}</Tooltip> : spanEl;
+        return tooltipContent ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{spanEl}</TooltipTrigger>
+            <TooltipContent side="top">{tooltipContent}</TooltipContent>
+          </Tooltip>
+        ) : spanEl;
       },
     },
     phase: {
@@ -385,8 +463,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'phase') {
           return (
             <AutoOpenSelect
-              size="small"
-              style={{ width: 80 }}
+              className="w-20"
               value={record.phase || undefined}
               allowClear
               placeholder="阶段"
@@ -394,17 +471,21 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
               onChange={(v) => commitSelectEdit(record, 'phase', v || '')}
             >
               {PHASE_OPTIONS.map((p) => (
-                <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
+                <SelectItem key={p} value={p}>
+                  <Badge variant="outline" className={cn('px-1.5 py-0 text-xs', arcoBadgeClass(PHASE_COLOR[p]))}>{p}</Badge>
+                </SelectItem>
               ))}
             </AutoOpenSelect>
           );
         }
         return (
           <span
-            style={{ cursor: canManage ? 'pointer' : 'default' }}
+            className={cn(canManage ? 'cursor-pointer' : 'cursor-default')}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'phase' })}
           >
-            {record.phase ? <Tag color={PHASE_COLOR[record.phase] || 'default'}>{record.phase}</Tag> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
+            {record.phase ? (
+              <Badge variant="outline" className={cn('px-1.5 py-0 text-xs', arcoBadgeClass(PHASE_COLOR[record.phase] || 'default'))}>{record.phase}</Badge>
+            ) : <span className="text-muted-foreground">-</span>}
           </span>
         );
       },
@@ -414,7 +495,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       width: columnWidths.name,
       dataIndex: 'name',
       onHeaderCell: () => ({ 'data-column-key': 'name' }),
-      render: (name: string, record: Activity) => {
+      render: (value: unknown, record: Activity) => {
+        const name = value as string;
         if (inlineEditing?.id === record.id && inlineEditing.field === 'name') {
           return (
             <InlineTextEditor
@@ -426,12 +508,12 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         }
         return (
           <span
-            style={{ fontWeight: 500, cursor: canManage ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 4 }}
+            className={cn('flex items-center gap-1 font-medium', canManage ? 'cursor-pointer' : 'cursor-default')}
             onClick={() => startInlineEdit(record.id, 'name', name)}
           >
             {name}
             {criticalActivityIds.includes(record.id) && (
-              <Tag size="small" color="red" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>CP</Tag>
+              <Badge variant="outline" className={cn('px-1 py-0 text-[10px] leading-4', arcoBadgeClass('red'))}>CP</Badge>
             )}
           </span>
         );
@@ -445,27 +527,28 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'type') {
           return (
             <AutoOpenSelect
-              size="small"
-              style={{ width: 90 }}
+              className="w-[90px]"
               value={record.type}
               onDismiss={() => setInlineEditing(null)}
               onChange={(v) => commitSelectEdit(record, 'type', v)}
             >
               {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Select.Option>
+                <SelectItem key={k} value={k}>
+                  <Badge variant="outline" className={cn('px-1.5 py-0 text-xs', arcoBadgeClass(v.color))}>{v.label}</Badge>
+                </SelectItem>
               ))}
             </AutoOpenSelect>
           );
         }
         const cfg = ACTIVITY_TYPE_MAP[record.type as keyof typeof ACTIVITY_TYPE_MAP] ?? { label: record.type, color: 'default' };
         return (
-          <Tag
-            color={cfg.color}
-            style={{ cursor: canManage ? 'pointer' : 'default' }}
+          <Badge
+            variant="outline"
+            className={cn('px-1.5 py-0 text-xs', arcoBadgeClass(cfg.color), canManage ? 'cursor-pointer' : 'cursor-default')}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'type' })}
           >
             {cfg.label}
-          </Tag>
+          </Badge>
         );
       },
     },
@@ -477,27 +560,26 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'status') {
           return (
             <AutoOpenSelect
-              size="small"
-              style={{ width: 100 }}
+              className="w-[100px]"
               value={record.status}
               onDismiss={() => setInlineEditing(null)}
               onChange={(v) => commitSelectEdit(record, 'status', v)}
             >
               {Object.entries(ACTIVITY_STATUS_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}>{v.label}</Select.Option>
+                <SelectItem key={k} value={k}>{v.label}</SelectItem>
               ))}
             </AutoOpenSelect>
           );
         }
         const cfg = ACTIVITY_STATUS_MAP[record.status as keyof typeof ACTIVITY_STATUS_MAP] ?? { label: record.status, color: 'default' };
         return (
-          <Tag
-            color={cfg.color}
-            style={{ cursor: canManage ? 'pointer' : 'default' }}
+          <Badge
+            variant="outline"
+            className={cn('px-1.5 py-0 text-xs', arcoBadgeClass(cfg.color), canManage ? 'cursor-pointer' : 'cursor-default')}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'status' })}
           >
             {cfg.label}
-          </Tag>
+          </Badge>
         );
       },
     },
@@ -509,27 +591,23 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'assigneeIds') {
           if (roles.length === 0) {
             return (
-              <Tooltip content="请先在角色管理中创建角色">
-                <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>无可选角色</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground text-xs">无可选角色</span>
+                </TooltipTrigger>
+                <TooltipContent side="top">请先在角色管理中创建角色</TooltipContent>
               </Tooltip>
             );
           }
 
           return (
-            <AutoOpenSelect
-              size="small"
-              style={{ width: 200 }}
+            <Combobox
+              className="h-7 w-[200px] text-xs"
+              options={roles.map((r) => ({ value: r.id, label: r.name }))}
               value={record.roleId || undefined}
               allowClear
-              showSearch
               placeholder="选择角色"
-              filterOption={(input, option) => {
-                const key = getSelectOptionValue(option) as string;
-                const role = roles.find((r) => r.id === key);
-                if (!role) return false;
-                return role.name.toLowerCase().includes(input.toLowerCase());
-              }}
-              onDismiss={() => setInlineEditing(null)}
+              searchPlaceholder="搜索角色…"
               onChange={async (roleId: string | undefined) => {
                 setInlineEditing(null);
                 const oldIds = record.executors?.map((e) => e.userId) ?? [];
@@ -542,7 +620,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
                     loadActivities();
                     showUndoMessage(record.id, { roleId: oldRoleId, executorIds: oldIds }, record.name);
                   } catch {
-                    Message.error('更新失败');
+                    toast.error('更新失败');
                   }
                 } else {
                   try {
@@ -550,17 +628,11 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
                     loadActivities();
                     showUndoMessage(record.id, { roleId: oldRoleId, executorIds: oldIds }, record.name);
                   } catch {
-                    Message.error('更新失败');
+                    toast.error('更新失败');
                   }
                 }
               }}
-            >
-              {roles.map((r) => (
-                <Select.Option key={r.id} value={r.id}>
-                  <Tag size="small" style={{ marginRight: 6 }}>{r.name}</Tag>
-                </Select.Option>
-              ))}
-            </AutoOpenSelect>
+            />
           );
         }
         const names = record.executors?.map((e) => e.user?.realName).filter(Boolean).join(', ') || '-';
@@ -568,14 +640,14 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         const isEmpty = !record.executors || record.executors.length === 0;
         return (
           <span
-            style={{ cursor: canManage ? 'pointer' : 'default' }}
+            className={cn('inline-flex items-center gap-1', canManage ? 'cursor-pointer' : 'cursor-default')}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: 'assigneeIds' })}
           >
             {isEmpty ? (
-              <span style={{ color: 'rgb(var(--danger-6))' }}>⚠️ 未配置</span>
+              <span className="text-destructive">⚠️ 未配置</span>
             ) : (
               <>
-                {roleName && <Tag size="small" style={{ marginRight: 4 }}>{roleName}</Tag>}
+                {roleName && <Badge variant="outline" className={cn('px-1.5 py-0 text-xs', arcoBadgeClass('default'))}>{roleName}</Badge>}
                 {names}
               </>
             )}
@@ -590,17 +662,16 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       render: (_: unknown, record: Activity) => {
         if (inlineEditing?.id === record.id && inlineEditing.field === 'planDuration') {
           return (
-            <InputNumber
+            <Input
               autoFocus
-              size="small"
-              style={{ width: 60 }}
+              type="number"
               min={1}
-              precision={0}
-              suffix="天"
-              value={inlineValue ? parseInt(inlineValue, 10) : undefined}
-              onChange={(v) => setInlineValue(v != null ? String(v) : '')}
+              step={1}
+              className="h-7 w-[60px] text-xs"
+              value={inlineValue}
+              onChange={(e) => setInlineValue(e.target.value)}
               onBlur={() => commitPlanDurationEdit(record)}
-              onKeyDown={(e) => { if ((e as unknown as React.KeyboardEvent).key === 'Enter') commitPlanDurationEdit(record); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitPlanDurationEdit(record); }}
             />
           );
         }
@@ -609,10 +680,10 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
           : record.planDuration;
         return (
           <span
-            style={{ cursor: canManage ? 'pointer' : 'default' }}
+            className={cn(canManage ? 'cursor-pointer' : 'cursor-default')}
             onClick={() => startInlineEdit(record.id, 'planDuration', days != null ? String(days) : '')}
           >
-            {days != null ? <>{days}<span style={{ fontSize: 12, color: 'var(--color-text-3)', paddingLeft: 2 }}>天</span></> : <span style={{ color: 'var(--color-text-4)' }}>-</span>}
+            {days != null ? <>{days}<span className="text-muted-foreground pl-0.5 text-xs">天</span></> : <span className="text-muted-foreground">-</span>}
           </span>
         );
       },
@@ -627,16 +698,14 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         if (inlineEditing?.id === record.id && inlineEditing.field === "planDates") {
           return (
             <AutoOpenRangePicker
-              size="small"
-              style={{ width: 240 }}
-              format="YYYY-MM-DD"
-              value={record.planStartDate && record.planEndDate ? [dayjs(record.planStartDate), dayjs(record.planEndDate)] : undefined}
+              className="w-[240px]"
+              value={record.planStartDate && record.planEndDate ? { from: dayjs(record.planStartDate).toDate(), to: dayjs(record.planEndDate).toDate() } : undefined}
               onDismiss={() => setInlineEditing(null)}
-              onChange={(dateStr) => {
-                setInlineEditing(null);
-                if (dateStr && dateStr[0] && dateStr[1]) {
-                  const startVal = dateStr[0] as string;
-                  const endVal = dateStr[1] as string;
+              onSelect={(range) => {
+                if (range && range.from && range.to) {
+                  setInlineEditing(null);
+                  const startVal = dayjs(range.from).format("YYYY-MM-DD");
+                  const endVal = dayjs(range.to).format("YYYY-MM-DD");
                   const duration = calcWorkdays(dayjs(startVal), dayjs(endVal));
                   const payload: Record<string, unknown> = { planStartDate: startVal, planEndDate: endVal, planDuration: duration };
                   const rollback: Record<string, unknown> = {
@@ -647,7 +716,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
                   activitiesApi.update(record.id, payload).then(() => {
                     loadActivities();
                     showUndoMessage(record.id, rollback, record.name);
-                  }).catch(() => Message.error("更新失败"));
+                  }).catch(() => toast.error("更新失败"));
                 }
               }}
             />
@@ -656,13 +725,13 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         const hasAnyDate = record.planStartDate || record.planEndDate;
         return (
           <span
-            style={{
-              whiteSpace: "nowrap",
-              color: isOverdue ? "rgb(var(--danger-6))" : undefined,
-              cursor: !hasDeps && canManage ? "pointer" : "default",
-            }}
+            className={cn(
+              "whitespace-nowrap",
+              isOverdue && "text-destructive",
+              !hasDeps && canManage ? "cursor-pointer" : "cursor-default",
+            )}
             onClick={() => {
-              if (hasDeps) { Message.info("已设置前置依赖，计划时间由系统自动计算"); return; }
+              if (hasDeps) { toast.info("已设置前置依赖，计划时间由系统自动计算"); return; }
               if (canManage) setInlineEditing({ id: record.id, field: "planDates" });
             }}
           >
@@ -679,16 +748,14 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         if (inlineEditing?.id === record.id && inlineEditing.field === "actualDates") {
           return (
             <AutoOpenRangePicker
-              size="small"
-              style={{ width: 240 }}
-              format="YYYY-MM-DD"
-              value={record.startDate && record.endDate ? [dayjs(record.startDate), dayjs(record.endDate)] : undefined}
+              className="w-[240px]"
+              value={record.startDate && record.endDate ? { from: dayjs(record.startDate).toDate(), to: dayjs(record.endDate).toDate() } : undefined}
               onDismiss={() => setInlineEditing(null)}
-              onChange={(dateStr) => {
-                setInlineEditing(null);
-                if (dateStr && dateStr[0] && dateStr[1]) {
-                  const startVal = dateStr[0] as string;
-                  const endVal = dateStr[1] as string;
+              onSelect={(range) => {
+                if (range && range.from && range.to) {
+                  setInlineEditing(null);
+                  const startVal = dayjs(range.from).format("YYYY-MM-DD");
+                  const endVal = dayjs(range.to).format("YYYY-MM-DD");
                   const dur = calcWorkdays(dayjs(startVal), dayjs(endVal));
                   const payload: Record<string, unknown> = { startDate: startVal, endDate: endVal, duration: dur };
                   const rollback: Record<string, unknown> = {
@@ -699,7 +766,7 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
                   activitiesApi.update(record.id, payload).then(() => {
                     loadActivities();
                     showUndoMessage(record.id, rollback, record.name);
-                  }).catch(() => Message.error("更新失败"));
+                  }).catch(() => toast.error("更新失败"));
                 }
               }}
             />
@@ -712,17 +779,17 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
         const hasAnyDate = record.startDate || record.endDate;
         return (
           <span
-            style={{
-              whiteSpace: "nowrap",
-              color: hasColor ? "rgb(var(--danger-6))" : undefined,
-              cursor: canManage ? "pointer" : "default",
-            }}
+            className={cn(
+              "whitespace-nowrap",
+              hasColor && "text-destructive",
+              canManage ? "cursor-pointer" : "cursor-default",
+            )}
             onClick={() => canManage && setInlineEditing({ id: record.id, field: "actualDates" })}
           >
             {hasAnyDate ? (
               <>
                 {dateFmt(record.startDate)} ~ {dateFmt(record.endDate)}
-                {days != null && <span style={{ fontSize: 12, color: "var(--color-text-3)", marginLeft: 4 }}>{days}天</span>}
+                {days != null && <span className="text-muted-foreground ml-1 text-xs">{days}天</span>}
               </>
             ) : "-"}
           </span>
@@ -736,15 +803,18 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       onHeaderCell: () => ({ 'data-column-key': 'checkItems' }),
       render: (_: unknown, record: Activity) => {
         const items = record.checkItems;
-        if (!items || items.length === 0) return <span style={{ color: 'var(--color-text-4)' }}>-</span>;
+        if (!items || items.length === 0) return <span className="text-muted-foreground">-</span>;
         const checked = items.filter((i) => i.checked).length;
         const total = items.length;
         const allDone = checked === total;
         return (
-          <Tooltip content={`${checked}/${total} 已完成`}>
-            <span style={{ fontSize: 12, color: allDone ? 'rgb(var(--green-6))' : 'var(--color-text-2)' }}>
-              {allDone ? '\u2705 ' : ''}{checked}/{total}
-            </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={cn('text-xs', allDone ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')}>
+                {allDone ? '✅ ' : ''}{checked}/{total}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">{`${checked}/${total} 已完成`}</TooltipContent>
           </Tooltip>
         );
       },
@@ -754,7 +824,8 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
       dataIndex: 'notes',
       width: columnWidths.notes,
       onHeaderCell: () => ({ 'data-column-key': 'notes' }),
-      render: (notes: string | null, record: Activity) => {
+      render: (value: unknown, record: Activity) => {
+        const notes = value as string | null;
         if (inlineEditing?.id === record.id && inlineEditing.field === 'notes') {
           return (
             <InlineTextEditor
@@ -765,21 +836,20 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
           );
         }
         return (
-          <Tooltip content={notes || ''}>
-            <span
-              style={{
-                cursor: canManage ? 'pointer' : 'default',
-                maxWidth: '100%',
-                display: 'inline-block',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                color: notes ? undefined : 'var(--color-text-4)',
-              }}
-              onClick={() => startInlineEdit(record.id, 'notes', notes || '')}
-            >
-              {notes || '-'}
-            </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className={cn(
+                  'inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap',
+                  canManage ? 'cursor-pointer' : 'cursor-default',
+                  !notes && 'text-muted-foreground',
+                )}
+                onClick={() => startInlineEdit(record.id, 'notes', notes || '')}
+              >
+                {notes || '-'}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">{notes || ''}</TooltipContent>
           </Tooltip>
         );
       },
@@ -793,84 +863,92 @@ export function useActivityColumns(opts: UseActivityColumnsOptions) {
   ]);
 
   // 根据偏好生成最终列数组
-  const activityColumns = useMemo(() => {
+  const activityColumns = useMemo<ActivityColumn[]>(() => {
     // 批量选择列
-    const checkCol = canManage ? {
+    const checkCol: ActivityColumn | null = canManage ? {
       title: (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={activities.length > 0 && selectedIds.size === activities.length}
-          onChange={(e) => {
-            if (e.target.checked) {
+          onCheckedChange={(checked) => {
+            if (checked) {
               setSelectedIds(new Set(activities.map(a => a.id)));
             } else {
               setSelectedIds(new Set());
             }
           }}
-          style={{ cursor: 'pointer' }}
+          aria-label="全选"
         />
       ),
       width: 36,
       align: 'center' as const,
       render: (_: unknown, record: Activity) => (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selectedIds.has(record.id)}
-          onChange={(e) => {
+          onCheckedChange={(checked) => {
             const next = new Set(selectedIds);
-            if (e.target.checked) next.add(record.id);
+            if (checked) next.add(record.id);
             else next.delete(record.id);
             setSelectedIds(next);
           }}
-          style={{ cursor: 'pointer' }}
+          aria-label={`选择 ${record.name}`}
         />
       ),
     } : null;
 
-    const dragCol = {
+    const dragCol: ActivityColumn = {
       title: '',
       dataIndex: 'id',
       width: 50,
       render: (_: unknown, _record: Activity, index: number) => (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
+        <div className="flex items-center justify-center gap-0">
           {canManage && (
-            <div
-              className="drag-handle"
+            <span
+              className="drag-handle text-muted-foreground cursor-grab"
               onMouseDown={(e: React.MouseEvent) => handleMouseDown(e, index)}
             >
-              <IconDragDotVertical />
-            </div>
+              <GripVertical className="size-4" />
+            </span>
           )}
           {canCreate && (
-            <div
-              className="row-insert-trigger"
+            <span
+              className="row-insert-trigger text-muted-foreground cursor-pointer"
               onClick={() => handleInsertActivity(index + 1)}
               title="在下方插入活动"
             >
-              <IconPlus />
-            </div>
+              <Plus className="size-4" />
+            </span>
           )}
         </div>
       ),
     };
 
-    const actionsCol = {
+    const actionsCol: ActivityColumn = {
       title: '操作',
       width: 100,
       fixed: 'right' as const,
       render: (_: unknown, record: Activity) => (
-        <Space size={4}>
+        <div className="flex items-center gap-1">
           {canManage && (
-            <Tooltip content="编辑">
-              <IconEdit style={{ cursor: 'pointer', color: 'rgb(var(--primary-6))' }} onClick={() => handleOpenDrawer(record)} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-primary size-7" aria-label="编辑" onClick={() => handleOpenDrawer(record)}>
+                  <Pencil className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">编辑</TooltipContent>
             </Tooltip>
           )}
           {!isArchived && canManage && (
-            <Tooltip content="删除">
-              <IconDelete style={{ cursor: 'pointer', color: 'rgb(var(--danger-6))' }} onClick={() => handleDeleteActivity(record)} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-destructive size-7" aria-label="删除" onClick={() => handleDeleteActivity(record)}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">删除</TooltipContent>
             </Tooltip>
           )}
-        </Space>
+        </div>
       ),
     };
 

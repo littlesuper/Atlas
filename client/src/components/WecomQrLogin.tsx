@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Spin, Message } from '@arco-design/web-react';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { authApi } from '../api';
 import { useAuthStore } from '../store/authStore';
 
@@ -22,7 +23,6 @@ const WecomQrLogin: React.FC<WecomQrLoginProps> = ({ onSuccess }) => {
 
     setCodeProcessing(true);
 
-    // 清除 URL 中的 code/state 参数
     const url = new URL(window.location.href);
     url.searchParams.delete('code');
     url.searchParams.delete('state');
@@ -34,7 +34,7 @@ const WecomQrLogin: React.FC<WecomQrLoginProps> = ({ onSuccess }) => {
         loginWithWecom(res.data);
         onSuccess();
       } catch {
-        Message.error('企业微信登录失败，请重试');
+        toast.error('企业微信登录失败，请重试');
         setCodeProcessing(false);
       }
     })();
@@ -79,29 +79,23 @@ const WecomQrLogin: React.FC<WecomQrLoginProps> = ({ onSuccess }) => {
 
   if (codeProcessing) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px 0' }}>
-        <Spin size={32} />
-        <div style={{ marginTop: 16, color: 'var(--color-text-3)' }}>企业微信登录中...</div>
+      <div className="py-10 text-center">
+        <Loader2 className="text-muted-foreground mx-auto size-8 animate-spin" />
+        <div className="text-muted-foreground mt-4">企业微信登录中...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ textAlign: 'center' }}>
+    <div className="text-center">
       {loading && (
-        <div style={{ padding: '40px 0' }}>
-          <Spin size={32} />
-          <div style={{ marginTop: 16, color: 'var(--color-text-3)' }}>加载中...</div>
+        <div className="py-10">
+          <Loader2 className="text-muted-foreground mx-auto size-8 animate-spin" />
+          <div className="text-muted-foreground mt-4">加载中...</div>
         </div>
       )}
-      {error && (
-        <div style={{ padding: '40px 0', color: 'var(--color-text-3)' }}>{error}</div>
-      )}
-      <div
-        id="wecom-qr-container"
-        ref={containerRef}
-        style={{ display: loading || error ? 'none' : 'block' }}
-      />
+      {error && <div className="text-muted-foreground py-10">{error}</div>}
+      <div id="wecom-qr-container" ref={containerRef} style={{ display: loading || error ? 'none' : 'block' }} />
     </div>
   );
 };

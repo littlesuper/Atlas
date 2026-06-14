@@ -358,7 +358,7 @@ describe('alert rules', () => {
   });
 
   it('returns no alerts for all-zero metrics', () => {
-    const { evaluateAlertRules } = import('./alertRules') || {};
+    const { evaluateAlertRules: _evaluateAlertRules } = import('./alertRules') || {};
   });
 
   it('evaluateMetricAlerts returns empty array for no alerts', () => {

@@ -282,6 +282,103 @@ export interface AiScheduleSuggestion {
   summary: string;
 }
 
+// ============ 对话式排期助手类型（AI scheduling beacon） ============
+
+export type ScheduleOperation =
+  | { type: 'shift_activity'; activityId: string; deltaDays: number }
+  | { type: 'set_planned'; activityId: string; field: 'start' | 'end'; date: string }
+  | { type: 'set_duration'; activityId: string; durationDays: number }
+  | { type: 'add_dependency'; activityId: string; dependsOnId: string; depType?: string; lag?: number }
+  | { type: 'remove_dependency'; activityId: string; dependsOnId: string };
+
+export interface ScheduleChangeIntent {
+  projectId: string;
+  operations: ScheduleOperation[];
+  confidence: 'high' | 'low';
+  unresolved: string[];
+}
+
+export interface ScheduleActivityDiff {
+  activityId: string;
+  name: string;
+  before: { start: string | null; end: string | null };
+  after: { start: string | null; end: string | null };
+  changed: boolean;
+}
+
+export interface ScheduleDiff {
+  items: ScheduleActivityDiff[];
+}
+
+export type ScheduleRiskKind = 'milestone_slip' | 'hard_node_breach' | 'project_overdue';
+
+export type ScheduleRiskFinding =
+  | { kind: 'milestone_slip'; activityId: string; name: string; before: string | null; after: string | null }
+  | { kind: 'hard_node_breach'; activityId: string; name: string; deadline: string; projected: string }
+  | { kind: 'project_overdue'; projectDeadline: string; projectedEnd: string };
+
+export interface ScheduleProposeResult {
+  proposalId: string | null;
+  noOp: boolean;
+  intent: ScheduleChangeIntent | null;
+  diff: ScheduleDiff;
+  risks: ScheduleRiskFinding[];
+  narrative: string;
+  parseConfidence: 'high' | 'low';
+  unresolved: string[];
+}
+
+export interface ScheduleApplyResult {
+  ok: true;
+  appliedDiff: ScheduleDiff;
+  risks: ScheduleRiskFinding[];
+}
+
+// ============ 全系统 AI 助手框架（通用） ============
+
+export interface AssistantDiffRow {
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+}
+
+export interface AssistantRiskRow {
+  kind: string;
+  severity: 'info' | 'warning' | 'danger';
+  text: string;
+}
+
+export interface AssistantPreview {
+  rows: AssistantDiffRow[];
+  risks: AssistantRiskRow[];
+  confidence?: 'high' | 'low';
+}
+
+export interface AssistantProposeResult {
+  proposalId: string | null;
+  noOp: boolean;
+  /** true 表示 AI 认不出目标项目，需用户在话里点明（仍按 noOp 展示叙述） */
+  needTarget?: boolean;
+  /** 'answer' 表示这是只读问答的回答（非改动提议） */
+  mode?: 'answer';
+  /** 只读问答的答案文本（mode==='answer' 时有值） */
+  answer?: string;
+  /** 答案来源：deterministic=代码精确计算（零幻觉）；grounded=AI 据系统数据整理 */
+  basis?: 'deterministic' | 'grounded';
+  domain?: string;
+  /** 服务端端到端耗时（毫秒），用于界面显示「耗时 X.X 秒」 */
+  elapsedMs?: number;
+  preview: AssistantPreview;
+  narrative: string;
+}
+
+export interface AssistantApplyResult {
+  ok: true;
+  appliedDiff: { rows: AssistantDiffRow[] };
+  risks: AssistantRiskRow[];
+}
+
 // ============ 产品相关类型 ============
 
 export interface ProductImage {

@@ -48,8 +48,8 @@ const { mockMessageError, mockCaptureAppError } = vi.hoisted(() => ({
   mockCaptureAppError: vi.fn(),
 }));
 
-vi.mock('@arco-design/web-react', () => ({
-  Message: { error: mockMessageError, success: vi.fn() },
+vi.mock('sonner', () => ({
+  toast: { error: mockMessageError, success: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock('../utils/monitoring', () => ({

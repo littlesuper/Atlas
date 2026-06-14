@@ -1,37 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Card,
-  Button,
-  Space,
-  Input,
-  DatePicker,
-  Message,
-  Spin,
-  Radio,
-  Collapse,
-} from '@arco-design/web-react';
-import {
-  IconLeft,
-  IconSave,
-  IconSend,
-  IconBulb,
-  IconCheckCircleFill,
-  IconExclamationCircleFill,
-  IconCloseCircleFill,
-} from '@arco-design/web-react/icon';
+import { toast } from 'sonner';
+import { ChevronLeft, Save, Send, Lightbulb, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
+import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import MainLayout from '../../layouts/MainLayout';
 import { weeklyReportsApi, projectsApi, uploadApi } from '../../api';
 import { Project, ReportAttachment, WeeklyReport } from '../../types';
 import RichTextEditor, { RichTextEditorRef } from '../../components/RichTextEditor';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
-import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek';
+import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 dayjs.extend(isoWeek);
-
-const { TextArea } = Input;
 
 const PHASES = ['EVT', 'DVT', 'PVT', 'MP'];
 
@@ -60,10 +47,10 @@ export function buildEmptyPhaseProgress(): Record<string, PhaseData> {
   };
 }
 
-const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: React.ReactNode; color: string }> = [
-  { value: 'ON_TRACK', label: <><IconCheckCircleFill style={{ marginRight: 4 }} /> 正常</>, color: 'var(--status-success)' },
-  { value: 'MINOR_ISSUE', label: <><IconExclamationCircleFill style={{ marginRight: 4 }} /> 轻度阻碍</>, color: 'var(--status-warning)' },
-  { value: 'MAJOR_ISSUE', label: <><IconCloseCircleFill style={{ marginRight: 4 }} /> 严重阻碍</>, color: 'var(--status-danger)' },
+const PROGRESS_OPTIONS: Array<{ value: ProgressStatus; label: string; Icon: typeof CheckCircle2; cls: string }> = [
+  { value: 'ON_TRACK', label: '正常', Icon: CheckCircle2, cls: 'text-green-600 dark:text-green-400' },
+  { value: 'MINOR_ISSUE', label: '轻度阻碍', Icon: AlertTriangle, cls: 'text-amber-600 dark:text-amber-400' },
+  { value: 'MAJOR_ISSUE', label: '严重阻碍', Icon: XCircle, cls: 'text-red-600 dark:text-red-400' },
 ];
 
 /** 上周参考折叠区 */
@@ -74,39 +61,25 @@ const PrevReferenceBlock: React.FC<{
   const hasContent = items.some((item) => item.html);
   if (!hasContent) return null;
   return (
-    <Collapse defaultActiveKey={['ref']} bordered={false} style={{ marginBottom: 8 }}>
-      <Collapse.Item
-        header={
-          <span style={{ fontSize: 12, color: 'var(--color-text-4)' }}>
-            上周参考（第 {weekNumber} 周）
-          </span>
-        }
-        name="ref"
-      >
-        <div style={{
-          background: 'var(--color-fill-1)',
-          borderRadius: 4,
-          padding: '8px 12px',
-        }}>
-          {items.map((item, idx) => (
-            item.html ? (
-              <div key={idx} style={{ marginBottom: idx < items.length - 1 ? 8 : 0 }}>
-                <div style={{ fontSize: 11, color: 'var(--color-text-4)', marginBottom: 2, fontWeight: 500 }}>
-                  {item.label}
-                </div>
-                <SafeHtml
-                  className="html-content"
-                  style={{ fontSize: 12, color: 'var(--color-text-4)', lineHeight: 1.6 }}
-                  html={item.html}
-                />
-              </div>
-            ) : null
-          ))}
-        </div>
-      </Collapse.Item>
-    </Collapse>
+    <details open className="mb-2">
+      <summary className="text-muted-foreground cursor-pointer text-xs">上周参考（第 {weekNumber} 周）</summary>
+      <div className="bg-muted/50 mt-1 rounded px-3 py-2">
+        {items.map((item, idx) =>
+          item.html ? (
+            <div key={idx} className={idx < items.length - 1 ? 'mb-2' : ''}>
+              <div className="text-muted-foreground mb-0.5 text-[11px] font-medium">{item.label}</div>
+              <SafeHtml className="html-content text-muted-foreground text-xs leading-relaxed" html={item.html} />
+            </div>
+          ) : null
+        )}
+      </div>
+    </details>
   );
 };
+
+const SectionLabel: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <span className={cn('font-medium', className)}>{children}</span>
+);
 
 const WeeklyReportForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -119,6 +92,7 @@ const WeeklyReportForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [weekOpen, setWeekOpen] = useState(false);
 
   // 基本数据
   const [project, setProject] = useState<Project | null>(null);
@@ -167,36 +141,48 @@ const WeeklyReportForm: React.FC = () => {
   useEffect(() => {
     if (isEdit && id) {
       setLoading(true);
-      weeklyReportsApi.get(id).then((res) => {
-        const r = res.data;
-        setProjectId(r.projectId);
-        setWeekDate(dayjs(r.weekStart));
-        setProgressStatus(r.progressStatus as ProgressStatus);
-        setChangeOverview(r.changeOverview || '');
-        setDemandAnalysis(r.demandAnalysis || '');
-        setKeyProgress(r.keyProgress || '');
-        setNextWeekPlan(r.nextWeekPlan || '');
-        setRiskWarning(r.riskWarning || '');
-        if (r.attachments) {
-          setAttachments(r.attachments as ReportAttachment[]);
-        }
-        if (r.phaseProgress) {
-          setPhaseProgress({
-            EVT: mergePhase(r.phaseProgress.EVT),
-            DVT: mergePhase(r.phaseProgress.DVT),
-            PVT: mergePhase(r.phaseProgress.PVT),
-            MP: mergePhase(r.phaseProgress.MP),
-          });
-        }
-        // Load project info
-        projectsApi.get(r.projectId).then((pr) => setProject(pr.data)).catch(() => { Message.warning('加载项目信息失败'); });
-        setLoading(false);
-      }).catch(() => {
-        Message.error('加载周报失败');
-        setLoading(false);
-      });
+      weeklyReportsApi
+        .get(id)
+        .then((res) => {
+          const r = res.data;
+          setProjectId(r.projectId);
+          setWeekDate(dayjs(r.weekStart));
+          setProgressStatus(r.progressStatus as ProgressStatus);
+          setChangeOverview(r.changeOverview || '');
+          setDemandAnalysis(r.demandAnalysis || '');
+          setKeyProgress(r.keyProgress || '');
+          setNextWeekPlan(r.nextWeekPlan || '');
+          setRiskWarning(r.riskWarning || '');
+          if (r.attachments) {
+            setAttachments(r.attachments as ReportAttachment[]);
+          }
+          if (r.phaseProgress) {
+            setPhaseProgress({
+              EVT: mergePhase(r.phaseProgress.EVT),
+              DVT: mergePhase(r.phaseProgress.DVT),
+              PVT: mergePhase(r.phaseProgress.PVT),
+              MP: mergePhase(r.phaseProgress.MP),
+            });
+          }
+          projectsApi
+            .get(r.projectId)
+            .then((pr) => setProject(pr.data))
+            .catch(() => {
+              toast.warning('加载项目信息失败');
+            });
+          setLoading(false);
+        })
+        .catch(() => {
+          toast.error('加载周报失败');
+          setLoading(false);
+        });
     } else if (projectId) {
-      projectsApi.get(projectId).then((res) => setProject(res.data)).catch(() => { Message.warning('加载项目信息失败'); });
+      projectsApi
+        .get(projectId)
+        .then((res) => setProject(res.data))
+        .catch(() => {
+          toast.warning('加载项目信息失败');
+        });
     }
   }, [id, isEdit, projectId]);
 
@@ -208,7 +194,8 @@ const WeeklyReportForm: React.FC = () => {
     }
     const curYear = weekDate.isoWeekYear();
     const curWeek = weekDate.isoWeek();
-    weeklyReportsApi.getPreviousReport(projectId, curYear, curWeek)
+    weeklyReportsApi
+      .getPreviousReport(projectId, curYear, curWeek)
       .then((res) => setPrevReport(res.data))
       .catch(() => setPrevReport(null));
   }, [isEdit, projectId, weekDate]);
@@ -228,56 +215,63 @@ const WeeklyReportForm: React.FC = () => {
   });
 
   const handleSaveDraft = async () => {
-    if (!projectId) { Message.error('请先选择项目'); return; }
+    if (!projectId) {
+      toast.error('请先选择项目');
+      return;
+    }
     setSaving(true);
     try {
       if (isEdit && id) {
         await weeklyReportsApi.update(id, buildData());
         clearDraft();
-        Message.success('保存成功');
+        toast.success('保存成功');
       } else {
         const res = await weeklyReportsApi.create({ ...buildData(), projectId });
         clearDraft();
-        Message.success('创建成功');
+        toast.success('创建成功');
         navigate(`/weekly-reports/${res.data.id}/edit`, { replace: true });
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
-      Message.error(err?.response?.data?.error || '保存失败');
+      toast.error(err?.response?.data?.error || '保存失败');
     } finally {
       setSaving(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!projectId) { Message.error('请先选择项目'); return; }
+    if (!projectId) {
+      toast.error('请先选择项目');
+      return;
+    }
     setSaving(true);
     try {
       let reportId = id;
       if (isEdit && id) {
-        // 编辑模式：先保存再提交
         await weeklyReportsApi.update(id, buildData());
       } else {
-        // 新建模式：先创建再提交
         const res = await weeklyReportsApi.create({ ...buildData(), projectId });
         reportId = res.data.id;
       }
       await weeklyReportsApi.submit(reportId!);
       clearDraft();
-      Message.success('周报提交成功');
+      toast.success('周报提交成功');
       goBack();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
-      Message.error(err?.response?.data?.error || '提交失败');
+      toast.error(err?.response?.data?.error || '提交失败');
     } finally {
       setSaving(false);
     }
   };
 
   const handleAiSuggestions = async () => {
-    if (!projectId) { Message.error('请先选择项目'); return; }
+    if (!projectId) {
+      toast.error('请先选择项目');
+      return;
+    }
     setAiLoading(true);
-    const hideLoading = Message.loading({ content: '正在进行 AI 分析...', duration: 0 });
+    const loadingId = toast.loading('正在进行 AI 分析...');
     try {
       const res = await weeklyReportsApi.getAiSuggestions(
         projectId,
@@ -285,11 +279,11 @@ const WeeklyReportForm: React.FC = () => {
         weekEnd.format('YYYY-MM-DD')
       );
       setAiSuggestions(res.data);
-      Message.success('AI 建议已生成');
+      toast.success('AI 建议已生成');
     } catch {
-      Message.error('获取 AI 建议失败');
+      toast.error('获取 AI 建议失败');
     } finally {
-      hideLoading();
+      toast.dismiss(loadingId);
       setAiLoading(false);
     }
   };
@@ -298,7 +292,7 @@ const WeeklyReportForm: React.FC = () => {
   const adoptAiSuggestion = (
     field: 'keyProgress' | 'nextWeekPlan' | 'riskWarning',
     html: string,
-    ref: React.RefObject<RichTextEditorRef | null>,
+    ref: React.RefObject<RichTextEditorRef | null>
   ) => {
     const setters = { keyProgress: setKeyProgress, nextWeekPlan: setNextWeekPlan, riskWarning: setRiskWarning };
     setters[field](html);
@@ -317,7 +311,6 @@ const WeeklyReportForm: React.FC = () => {
   const lastSavedRef = useRef('');
 
   useEffect(() => {
-    // 页面加载时恢复草稿
     if (!isEdit) {
       const saved = localStorage.getItem(draftKey);
       if (saved) {
@@ -327,8 +320,10 @@ const WeeklyReportForm: React.FC = () => {
           if (draft.nextWeekPlan && !nextWeekPlan) setNextWeekPlan(draft.nextWeekPlan);
           if (draft.riskWarning && !riskWarning) setRiskWarning(draft.riskWarning);
           if (draft.progressStatus) setProgressStatus(draft.progressStatus);
-          Message.info('已恢复上次编辑的草稿');
-        } catch { /* ignore */ }
+          toast.info('已恢复上次编辑的草稿');
+        } catch {
+          /* ignore */
+        }
       }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -344,7 +339,6 @@ const WeeklyReportForm: React.FC = () => {
     return () => clearInterval(timer);
   }, [keyProgress, nextWeekPlan, riskWarning, progressStatus, draftKey]);
 
-  // 保存/提交成功后清除本地草稿
   const clearDraft = () => localStorage.removeItem(draftKey);
 
   // 附件按 section 分组处理
@@ -366,9 +360,9 @@ const WeeklyReportForm: React.FC = () => {
           section,
         };
         setAttachments((prev) => [...prev, newAtt]);
-        Message.success(`附件「${res.data.name}」上传成功`);
+        toast.success(`附件「${res.data.name}」上传成功`);
       } catch {
-        Message.error(`附件「${file.name}」上传失败`);
+        toast.error(`附件「${file.name}」上传失败`);
       }
     }
   };
@@ -376,84 +370,100 @@ const WeeklyReportForm: React.FC = () => {
   if (loading) {
     return (
       <MainLayout>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
-          <Spin size={40} />
+        <div className="flex justify-center py-20">
+          <Loader2 className="text-muted-foreground size-9 animate-spin" />
         </div>
       </MainLayout>
     );
   }
 
+  const AiCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <Card className="max-h-[300px] overflow-y-auto p-3">
+      <div className="mb-2 text-sm font-medium">💡 AI 建议</div>
+      {children}
+    </Card>
+  );
+
   return (
     <MainLayout>
       <div>
         {/* 头部 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Button icon={<IconLeft />} onClick={goBack}>返回</Button>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
-              {isEdit ? '编辑周报' : '创建周报'}
-            </h2>
-            {project && (
-              <span style={{ color: 'var(--color-text-3)', fontSize: 14 }}>— {project.name}</span>
-            )}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={goBack}>
+              <ChevronLeft className="size-4" />
+              返回
+            </Button>
+            <h2 className="text-lg font-semibold">{isEdit ? '编辑周报' : '创建周报'}</h2>
+            {project && <span className="text-muted-foreground text-sm">— {project.name}</span>}
           </div>
-          <Button
-            type="outline"
-            icon={<IconBulb />}
-            loading={aiLoading}
-            onClick={handleAiSuggestions}
-            style={{ borderStyle: 'dashed' }}
-          >
+          <Button variant="outline" className="border-dashed" disabled={aiLoading} onClick={handleAiSuggestions}>
+            {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Lightbulb className="size-4" />}
             AI 智能分析
           </Button>
         </div>
 
         {/* 周次 + 进展状态 */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 500, fontSize: 14 }}>周次</span>
-              <DatePicker.WeekPicker
-                value={weekDate}
-                onChange={(_dateStr, date) =>
-                  date && setWeekDate(
-                    (date as unknown as dayjs.Dayjs).startOf('isoWeek' as dayjs.OpUnitType)
-                  )
-                }
-                style={{ width: 200 }}
-                format="YYYY-wo"
-              />
-              <span style={{ color: 'var(--color-text-3)', fontSize: 13 }}>
+        <Card className="mb-4 p-4">
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">周次</span>
+              <Popover open={weekOpen} onOpenChange={setWeekOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-48 justify-start font-normal">
+                    {weekDate.isoWeekYear()} 第 {weekDate.isoWeek()} 周
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={weekDate.toDate()}
+                    onSelect={(d) => {
+                      if (d) setWeekDate(dayjs(d).startOf('isoWeek' as dayjs.OpUnitType));
+                      setWeekOpen(false);
+                    }}
+                    autoFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <span className="text-muted-foreground text-[13px]">
                 {weekStart.format('MM-DD')} ~ {weekEnd.format('MM-DD')}
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 500, fontSize: 14 }}>项目状态</span>
-              <Radio.Group
-                value={progressStatus}
-                onChange={(v) => setProgressStatus(v as ProgressStatus)}
-                type="button"
-              >
-                {PROGRESS_OPTIONS.map((opt) => (
-                  <Radio key={opt.value} value={opt.value}>
-                    <span style={{ color: progressStatus === opt.value ? opt.color : undefined }}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">项目状态</span>
+              <div className="bg-muted inline-flex rounded-md p-0.5">
+                {PROGRESS_OPTIONS.map((opt) => {
+                  const active = progressStatus === opt.value;
+                  const Icon = opt.Icon;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setProgressStatus(opt.value)}
+                      className={cn(
+                        'flex items-center gap-1 rounded px-3 py-1 text-sm transition-colors',
+                        active ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Icon className={cn('size-4', opt.cls)} />
                       {opt.label}
-                    </span>
-                  </Radio>
-                ))}
-              </Radio.Group>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </Card>
 
         {/* 变更信息与需求研判 */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>变更信息与需求研判</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <Card className="mb-4 p-4">
+          <div className="mb-3 text-[15px] font-semibold">变更信息与需求研判</div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ fontWeight: 500 }}>变更信息概述</span>
+              <div className="mb-2">
+                <SectionLabel>变更信息概述</SectionLabel>
               </div>
               <RichTextEditor
                 value={changeOverview}
@@ -463,8 +473,8 @@ const WeeklyReportForm: React.FC = () => {
               />
             </div>
             <div>
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ fontWeight: 500 }}>需求确认与研判</span>
+              <div className="mb-2">
+                <SectionLabel>需求确认与研判</SectionLabel>
               </div>
               <RichTextEditor
                 value={demandAnalysis}
@@ -477,222 +487,221 @@ const WeeklyReportForm: React.FC = () => {
         </Card>
 
         {/* 进展与计划 */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>进展与计划</div>
+        <Card className="mb-4 p-4">
+          <div className="mb-3 text-[15px] font-semibold">进展与计划</div>
 
-            {/* 本周重要进展 */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 500 }}>本周重要进展</span>
-                {aiSuggestions?.keyProgress && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
-                    <Button size="mini" type="primary"
-                      onClick={() => adoptAiSuggestion('keyProgress', aiSuggestions.keyProgress || '', keyProgressRef)}>
-                      采用
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {prevReport && (
-                <PrevReferenceBlock
-                  weekNumber={prevReport.weekNumber}
-                  items={[
-                    { label: '上周计划', html: prevReport.nextWeekPlan },
-                    { label: '上周进展', html: prevReport.keyProgress },
-                  ]}
-                />
-              )}
-              <div style={{ display: 'grid', gridTemplateColumns: aiSuggestions?.keyProgress ? '1fr 400px' : '1fr', gap: 12, alignItems: 'stretch' }}>
-                <div>
-                  <RichTextEditor
-                    ref={keyProgressRef}
-                    value={keyProgress}
-                    onChange={setKeyProgress}
-                    placeholder="请输入本周重要进展..."
-                    minHeight={150}
-                    onPasteFiles={(files) => handlePasteFiles(files, 'keyProgress')}
-                  />
-                  <AttachmentList
-                    attachments={getAttachmentsForSection('keyProgress')}
-                    onChange={(atts) => updateAttachmentsForSection('keyProgress', atts)}
-                    section="keyProgress"
-                  />
+          {/* 本周重要进展 */}
+          <div className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel>本周重要进展</SectionLabel>
+              {aiSuggestions?.keyProgress && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs">AI 建议：</span>
+                  <Button size="sm" className="h-6 px-2 text-xs" onClick={() => adoptAiSuggestion('keyProgress', aiSuggestions.keyProgress || '', keyProgressRef)}>
+                    采用
+                  </Button>
                 </div>
-                {aiSuggestions?.keyProgress && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: 'var(--ai-card-bg)', maxHeight: 300, overflowY: 'auto' }}>
-                    <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.keyProgress} />
-                  </Card>
-                )}
-              </div>
+              )}
             </div>
-
-            {/* 下周工作计划 */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 500 }}>下周工作计划</span>
-                {aiSuggestions?.nextWeekPlan && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
-                    <Button size="mini" type="primary"
-                      onClick={() => adoptAiSuggestion('nextWeekPlan', aiSuggestions.nextWeekPlan || '', nextWeekPlanRef)}>
-                      采用
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {prevReport && (
-                <PrevReferenceBlock
-                  weekNumber={prevReport.weekNumber}
-                  items={[
-                    { label: '上周计划', html: prevReport.nextWeekPlan },
-                  ]}
+            {prevReport && (
+              <PrevReferenceBlock
+                weekNumber={prevReport.weekNumber}
+                items={[
+                  { label: '上周计划', html: prevReport.nextWeekPlan },
+                  { label: '上周进展', html: prevReport.keyProgress },
+                ]}
+              />
+            )}
+            <div className={cn('grid gap-3', aiSuggestions?.keyProgress ? 'grid-cols-1 lg:grid-cols-[1fr_400px]' : 'grid-cols-1')}>
+              <div>
+                <RichTextEditor
+                  ref={keyProgressRef}
+                  value={keyProgress}
+                  onChange={setKeyProgress}
+                  placeholder="请输入本周重要进展..."
+                  minHeight={150}
+                  onPasteFiles={(files) => handlePasteFiles(files, 'keyProgress')}
                 />
-              )}
-              <div style={{ display: 'grid', gridTemplateColumns: aiSuggestions?.nextWeekPlan ? '1fr 400px' : '1fr', gap: 12, alignItems: 'stretch' }}>
-                <div>
-                  <RichTextEditor
-                    ref={nextWeekPlanRef}
-                    value={nextWeekPlan}
-                    onChange={setNextWeekPlan}
-                    placeholder="请输入下周工作计划..."
-                    minHeight={150}
-                    onPasteFiles={(files) => handlePasteFiles(files, 'nextWeekPlan')}
-                  />
-                  <AttachmentList
-                    attachments={getAttachmentsForSection('nextWeekPlan')}
-                    onChange={(atts) => updateAttachmentsForSection('nextWeekPlan', atts)}
-                    section="nextWeekPlan"
-                  />
-                </div>
-                {aiSuggestions?.nextWeekPlan && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: 'var(--ai-card-bg)', maxHeight: 300, overflowY: 'auto' }}>
-                    <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.nextWeekPlan} />
-                  </Card>
-                )}
+                <AttachmentList
+                  attachments={getAttachmentsForSection('keyProgress')}
+                  onChange={(atts) => updateAttachmentsForSection('keyProgress', atts)}
+                  section="keyProgress"
+                />
               </div>
+              {aiSuggestions?.keyProgress && (
+                <AiCard>
+                  <SafeHtml className="html-content text-[13px]" html={aiSuggestions.keyProgress} />
+                </AiCard>
+              )}
             </div>
+          </div>
 
-            {/* 风险预警 */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 500, color: 'var(--status-danger)' }}>风险预警</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {projectId && (
-                    <Button size="mini" type="outline"
-                      onClick={async () => {
-                        try {
-                          const res = await weeklyReportsApi.getRiskPrefill(projectId);
-                          if (res.data.riskWarning) {
-                            setRiskWarning(res.data.riskWarning);
-                            riskWarningRef.current?.setHtml(res.data.riskWarning);
-                            Message.success('已导入风险评估内容');
-                          } else {
-                            Message.info('暂无风险评估数据可导入');
-                          }
-                        } catch { Message.error('导入失败'); }
-                      }}>
-                      从风险评估导入
-                    </Button>
-                  )}
-                  {aiSuggestions?.riskWarning !== undefined && (
-                    <>
-                      <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>AI 建议：</span>
-                      <Button size="mini" type="primary"
-                        onClick={() => adoptAiSuggestion('riskWarning', aiSuggestions.riskWarning || '', riskWarningRef)}>
-                        采用
-                      </Button>
-                    </>
-                  )}
+          {/* 下周工作计划 */}
+          <div className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel>下周工作计划</SectionLabel>
+              {aiSuggestions?.nextWeekPlan && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs">AI 建议：</span>
+                  <Button size="sm" className="h-6 px-2 text-xs" onClick={() => adoptAiSuggestion('nextWeekPlan', aiSuggestions.nextWeekPlan || '', nextWeekPlanRef)}>
+                    采用
+                  </Button>
                 </div>
-              </div>
-              {prevReport && (
-                <PrevReferenceBlock
-                  weekNumber={prevReport.weekNumber}
-                  items={[
-                    { label: '上周风险', html: prevReport.riskWarning },
-                  ]}
-                />
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: aiSuggestions?.riskWarning !== undefined ? '1fr 400px' : '1fr', gap: 12, alignItems: 'stretch' }}>
-                <div>
-                  <RichTextEditor
-                    ref={riskWarningRef}
-                    value={riskWarning}
-                    onChange={setRiskWarning}
-                    placeholder="请输入风险预警（选填）..."
-                    minHeight={120}
-                    onPasteFiles={(files) => handlePasteFiles(files, 'riskWarning')}
-                  />
-                  <AttachmentList
-                    attachments={getAttachmentsForSection('riskWarning')}
-                    onChange={(atts) => updateAttachmentsForSection('riskWarning', atts)}
-                    section="riskWarning"
-                  />
-                </div>
+            </div>
+            {prevReport && (
+              <PrevReferenceBlock weekNumber={prevReport.weekNumber} items={[{ label: '上周计划', html: prevReport.nextWeekPlan }]} />
+            )}
+            <div className={cn('grid gap-3', aiSuggestions?.nextWeekPlan ? 'grid-cols-1 lg:grid-cols-[1fr_400px]' : 'grid-cols-1')}>
+              <div>
+                <RichTextEditor
+                  ref={nextWeekPlanRef}
+                  value={nextWeekPlan}
+                  onChange={setNextWeekPlan}
+                  placeholder="请输入下周工作计划..."
+                  minHeight={150}
+                  onPasteFiles={(files) => handlePasteFiles(files, 'nextWeekPlan')}
+                />
+                <AttachmentList
+                  attachments={getAttachmentsForSection('nextWeekPlan')}
+                  onChange={(atts) => updateAttachmentsForSection('nextWeekPlan', atts)}
+                  section="nextWeekPlan"
+                />
+              </div>
+              {aiSuggestions?.nextWeekPlan && (
+                <AiCard>
+                  <SafeHtml className="html-content text-[13px]" html={aiSuggestions.nextWeekPlan} />
+                </AiCard>
+              )}
+            </div>
+          </div>
+
+          {/* 风险预警 */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel className="text-red-600 dark:text-red-400">风险预警</SectionLabel>
+              <div className="flex items-center gap-2">
+                {projectId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs"
+                    onClick={async () => {
+                      try {
+                        const res = await weeklyReportsApi.getRiskPrefill(projectId);
+                        if (res.data.riskWarning) {
+                          setRiskWarning(res.data.riskWarning);
+                          riskWarningRef.current?.setHtml(res.data.riskWarning);
+                          toast.success('已导入风险评估内容');
+                        } else {
+                          toast.info('暂无风险评估数据可导入');
+                        }
+                      } catch {
+                        toast.error('导入失败');
+                      }
+                    }}
+                  >
+                    从风险评估导入
+                  </Button>
+                )}
                 {aiSuggestions?.riskWarning !== undefined && (
-                  <Card size="small" title={<span>💡 AI 建议</span>} style={{ background: 'var(--ai-card-bg)', maxHeight: 300, overflowY: 'auto' }}>
-                    {aiSuggestions.riskWarning ? (
-                      <SafeHtml className="html-content" style={{ fontSize: 13 }} html={aiSuggestions.riskWarning} />
-                    ) : (
-                      <span style={{ color: 'var(--status-success)', fontSize: 13 }}>✓ 未发现明显风险</span>
-                    )}
-                  </Card>
+                  <>
+                    <span className="text-muted-foreground text-xs">AI 建议：</span>
+                    <Button size="sm" className="h-6 px-2 text-xs" onClick={() => adoptAiSuggestion('riskWarning', aiSuggestions.riskWarning || '', riskWarningRef)}>
+                      采用
+                    </Button>
+                  </>
                 )}
               </div>
+            </div>
+            {prevReport && (
+              <PrevReferenceBlock weekNumber={prevReport.weekNumber} items={[{ label: '上周风险', html: prevReport.riskWarning }]} />
+            )}
+            <div className={cn('grid gap-3', aiSuggestions?.riskWarning !== undefined ? 'grid-cols-1 lg:grid-cols-[1fr_400px]' : 'grid-cols-1')}>
+              <div>
+                <RichTextEditor
+                  ref={riskWarningRef}
+                  value={riskWarning}
+                  onChange={setRiskWarning}
+                  placeholder="请输入风险预警（选填）..."
+                  minHeight={120}
+                  onPasteFiles={(files) => handlePasteFiles(files, 'riskWarning')}
+                />
+                <AttachmentList
+                  attachments={getAttachmentsForSection('riskWarning')}
+                  onChange={(atts) => updateAttachmentsForSection('riskWarning', atts)}
+                  section="riskWarning"
+                />
+              </div>
+              {aiSuggestions?.riskWarning !== undefined && (
+                <AiCard>
+                  {aiSuggestions.riskWarning ? (
+                    <SafeHtml className="html-content text-[13px]" html={aiSuggestions.riskWarning} />
+                  ) : (
+                    <span className="text-[13px] text-green-600 dark:text-green-400">✓ 未发现明显风险</span>
+                  )}
+                </AiCard>
+              )}
             </div>
           </div>
         </Card>
 
         {/* 阶段进展 */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>阶段进展</div>
-          <Collapse>
+        <Card className="mb-4 p-4">
+          <div className="mb-3 text-[15px] font-semibold">阶段进展</div>
+          <div className="divide-y rounded-md border">
             {PHASES.map((phase) => (
-              <Collapse.Item
-                key={phase}
-                header={phase}
-                name={phase}
-              >
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <details key={phase} className="group">
+                <summary className="hover:bg-accent flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-medium">
+                  {phase}
+                  <ChevronLeft className="size-4 -rotate-90 transition-transform group-open:rotate-[-90deg] group-open:-scale-y-100" />
+                </summary>
+                <div className="space-y-3 px-3 pb-3">
                   <div>
-                    <div style={{ marginBottom: 4, fontSize: 13, fontWeight: 500 }}>工程周期</div>
+                    <div className="mb-1 text-[13px] font-medium">工程周期</div>
                     <Input
                       value={phaseProgress[phase]?.schedule || ''}
-                      onChange={(v) => updatePhase(phase, 'schedule', v)}
+                      onChange={(e) => updatePhase(phase, 'schedule', e.target.value)}
                       placeholder="如：2026-02-10 ~ 2026-02-28"
                     />
                   </div>
                   <div>
-                    <div style={{ marginBottom: 4, fontSize: 13, fontWeight: 500 }}>进展描述</div>
-                    <TextArea
+                    <div className="mb-1 text-[13px] font-medium">进展描述</div>
+                    <Textarea
                       value={phaseProgress[phase]?.progress || ''}
-                      onChange={(v) => updatePhase(phase, 'progress', v)}
+                      onChange={(e) => updatePhase(phase, 'progress', e.target.value)}
                       placeholder="请输入进展描述..."
                       rows={3}
                     />
                   </div>
                   <div>
-                    <div style={{ marginBottom: 4, fontSize: 13, fontWeight: 500 }}>风险管理</div>
-                    <TextArea
+                    <div className="mb-1 text-[13px] font-medium">风险管理</div>
+                    <Textarea
                       value={phaseProgress[phase]?.risks || ''}
-                      onChange={(v) => updatePhase(phase, 'risks', v)}
+                      onChange={(e) => updatePhase(phase, 'risks', e.target.value)}
                       placeholder="请输入风险管理内容..."
                       rows={3}
                     />
                   </div>
-                </Space>
-              </Collapse.Item>
+                </div>
+              </details>
             ))}
-          </Collapse>
+          </div>
         </Card>
 
         {/* 底部操作栏 */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingBottom: 24 }}>
-          <Button onClick={goBack}>取消</Button>
-          <Button icon={<IconSave />} onClick={handleSaveDraft} loading={saving}>保存草稿</Button>
-          <Button type="primary" icon={<IconSend />} onClick={handleSubmit} loading={saving}>提交周报</Button>
+        <div className="flex justify-end gap-3 pb-6">
+          <Button variant="outline" onClick={goBack}>
+            取消
+          </Button>
+          <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
+            <Save className="size-4" />
+            保存草稿
+          </Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            <Send className="size-4" />
+            提交周报
+          </Button>
         </div>
       </div>
     </MainLayout>

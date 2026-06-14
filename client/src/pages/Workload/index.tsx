@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Select, Message, Table, Tag, Empty, Tooltip, Spin } from '@arco-design/web-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Check } from 'lucide-react';
 import MainLayout from '../../layouts/MainLayout';
 import { activitiesApi, projectsApi } from '../../api';
 import { Project, WorkloadResponse, WorkloadMember, WorkloadIssue } from '../../types';
-import { selectOptionIncludesInput } from '../../utils/selectFilter';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const OVERLOAD_THRESHOLD = 5;
 
 export const computeMaxBar = (members: WorkloadMember[]): number =>
-  Math.max(1, ...members.map(m => m.inProgress + m.notStarted + m.overdue));
+  Math.max(1, ...members.map((m) => m.inProgress + m.notStarted + m.overdue));
 
-export const isMemberOverloaded = (m: WorkloadMember): boolean =>
-  m.inProgress >= OVERLOAD_THRESHOLD;
+export const isMemberOverloaded = (m: WorkloadMember): boolean => m.inProgress >= OVERLOAD_THRESHOLD;
 
 export const computeBarWidth = (member: WorkloadMember, maxBar: number): number => {
   const total = member.inProgress + member.notStarted + member.overdue;
@@ -28,6 +33,8 @@ export function formatIssueDetail(record: WorkloadIssue): { text: string; color:
   return { text: `${start} ~ ${end}`, color: 'var(--color-text-2)' };
 }
 
+const ALL = '__all__';
+
 const WorkloadPage: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<WorkloadResponse | null>(null);
@@ -36,9 +43,7 @@ const WorkloadPage: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    projectsApi.list({ pageSize: 100 }).then((res) => {
-      setProjects(res.data.data || []);
-    }).catch(() => {});
+    projectsApi.list({ pageSize: 100 }).then((res) => setProjects(res.data.data || [])).catch(() => {});
   }, []);
 
   const loadWorkload = useCallback(async () => {
@@ -49,7 +54,7 @@ const WorkloadPage: React.FC = () => {
       const res = await activitiesApi.getWorkload(params);
       setData(res.data || null);
     } catch {
-      Message.error('加载资源负载失败');
+      toast.error('加载资源负载失败');
     } finally {
       setLoading(false);
     }
@@ -62,215 +67,174 @@ const WorkloadPage: React.FC = () => {
   const summary = data?.summary;
   const members = data?.members || [];
   const issues = data?.issues || [];
+  const maxBar = computeMaxBar(members);
 
-  // Find max bar value for scaling
-  const maxBar = Math.max(1, ...members.map(m => m.inProgress + m.notStarted + m.overdue));
-
-  const issueColumns = [
-    {
-      title: '类型',
-      dataIndex: 'type',
-      width: 120,
-      render: (type: string) => (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-            background: type === 'overdue' ? 'var(--status-danger)' : 'var(--status-warning)',
-          }} />
-          {type === 'overdue' ? '逾期' : '无人负责'}
-        </span>
-      ),
-    },
-    {
-      title: '活动名称',
-      dataIndex: 'activityName',
-      render: (name: string, record: WorkloadIssue) => (
-        <a
-          style={{ color: 'var(--color-text-1)', cursor: 'pointer' }}
-          onClick={() => navigate(`/projects/${record.projectId}`)}
-        >
-          {name}
-        </a>
-      ),
-    },
-    {
-      title: '所属项目',
-      dataIndex: 'projectName',
-      width: 180,
-      render: (name: string, record: WorkloadIssue) => (
-        <a
-          style={{ color: 'rgb(var(--primary-6))', cursor: 'pointer' }}
-          onClick={() => navigate(`/projects/${record.projectId}`)}
-        >
-          {name}
-        </a>
-      ),
-    },
-    {
-      title: '负责人',
-      dataIndex: 'assigneeNames',
-      width: 120,
-      render: (names: string[]) => names.length > 0 ? names.join('、') : <span style={{ color: 'var(--color-text-2)' }}>-</span>,
-    },
-    {
-      title: '详情',
-      dataIndex: 'type',
-      width: 190,
-      render: (_: string, record: WorkloadIssue) => {
-        if (record.type === 'overdue') {
-          return <span style={{ color: 'var(--status-danger)', fontWeight: 500 }}>逾期 {record.overdueDays} 天</span>;
-        }
-        const start = record.planStartDate ? new Date(record.planStartDate).toLocaleDateString('zh-CN') : '-';
-        const end = record.planEndDate ? new Date(record.planEndDate).toLocaleDateString('zh-CN') : '-';
-        return <span style={{ color: 'var(--color-text-2)' }}>{start} ~ {end}</span>;
-      },
-    },
+  const summaryCards = [
+    { label: '逾期任务', value: summary?.totalOverdue, cls: 'text-red-600 dark:text-red-400' },
+    { label: '无人负责', value: summary?.totalUnassigned, cls: 'text-amber-600 dark:text-amber-400' },
+    { label: '超载人员', value: summary?.overloadedCount, cls: 'text-red-700 dark:text-red-500' },
   ];
 
   return (
     <MainLayout>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* A. Summary stat cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          <Card style={{ height: 88 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8 }}>逾期任务</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--status-danger)' }}>{summary?.totalOverdue ?? '-'}</div>
-            </div>
-          </Card>
-          <Card style={{ height: 88 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8 }}>无人负责</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--risk-medium-color)' }}>{summary?.totalUnassigned ?? '-'}</div>
-            </div>
-          </Card>
-          <Card style={{ height: 88 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-2)', marginBottom: 8 }}>超载人员</div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--status-danger-dark)' }}>{summary?.overloadedCount ?? '-'}</div>
-            </div>
-          </Card>
-        </div>
-
-        {/* B. Member workload bar chart */}
-        <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ margin: 0 }}>人员负载</h3>
-            <Select
-              style={{ width: 240 }}
-              placeholder="筛选项目"
-              allowClear
-              value={selectedProject}
-              onChange={(v) => setSelectedProject(v || undefined)}
-              showSearch
-              filterOption={selectOptionIncludesInput}
-            >
-              {projects.map((p) => (
-                <Select.Option key={p.id} value={p.id}>
-                  {p.name}
-                </Select.Option>
-              ))}
-            </Select>
+      <TooltipProvider>
+        <div className="flex flex-col gap-4">
+          {/* A. 汇总卡片 */}
+          <div className="grid grid-cols-3 gap-4">
+            {summaryCards.map((c) => (
+              <Card key={c.label} className="p-4">
+                <div className="text-muted-foreground text-xs">{c.label}</div>
+                <div className={`mt-1 text-2xl font-semibold ${c.cls}`}>{c.value ?? '-'}</div>
+              </Card>
+            ))}
           </div>
 
-          <Spin loading={loading} style={{ display: 'block' }}>
-            {members.length === 0 ? (
-              <Empty description="暂无数据" />
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {members.map((m: WorkloadMember) => {
-                  const isOverloaded = m.inProgress >= OVERLOAD_THRESHOLD;
-                  const total = m.inProgress + m.notStarted + m.overdue;
-                  const barWidth = total > 0 ? (total / maxBar) * 100 : 0;
+          {/* B. 人员负载 */}
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-medium">人员负载</h3>
+              <Select
+                value={selectedProject ?? ALL}
+                onValueChange={(v) => setSelectedProject(v === ALL ? undefined : v)}
+              >
+                <SelectTrigger className="w-60">
+                  <SelectValue placeholder="筛选项目" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>全部项目</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-9 w-full" />
+                ))}
+              </div>
+            ) : members.length === 0 ? (
+              <div className="text-muted-foreground py-8 text-center text-sm">暂无数据</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {members.map((m) => {
+                  const overloaded = isMemberOverloaded(m);
+                  const total = m.inProgress + m.notStarted + m.overdue;
+                  const barWidth = computeBarWidth(m, maxBar);
                   return (
                     <div
                       key={m.userId}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '8px 12px',
-                        borderRadius: 6,
-                        background: isOverloaded ? 'rgba(245, 63, 63, 0.06)' : undefined,
-                      }}
+                      className={`flex items-center gap-3 rounded-md px-3 py-2 ${overloaded ? 'bg-red-50 dark:bg-red-500/10' : ''}`}
                     >
-                      {/* Name */}
-                      <div style={{ width: 80, fontWeight: 600, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {m.realName}
-                      </div>
-
-                      {/* Stacked bar */}
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 20, background: 'var(--color-fill-2)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div className="w-20 shrink-0 truncate font-medium">{m.realName}</div>
+                      <div className="flex flex-1 items-center gap-2">
+                        <div className="bg-muted h-5 flex-1 overflow-hidden rounded">
                           {total > 0 && (
-                            <div style={{ display: 'flex', height: '100%', width: `${barWidth}%`, transition: 'width 0.3s' }}>
+                            <div className="flex h-full" style={{ width: `${barWidth}%`, transition: 'width 0.3s' }}>
                               {m.inProgress > 0 && (
-                                <Tooltip content={`进行中: ${m.inProgress}`}>
-                                  <div style={{
-                                    flex: m.inProgress,
-                                    background: 'var(--status-in-progress)',
-                                    minWidth: 2,
-                                  }} />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div style={{ flex: m.inProgress, background: 'var(--status-in-progress)', minWidth: 2 }} />
+                                  </TooltipTrigger>
+                                  <TooltipContent>进行中: {m.inProgress}</TooltipContent>
                                 </Tooltip>
                               )}
                               {m.notStarted > 0 && (
-                                <Tooltip content={`未开始: ${m.notStarted}`}>
-                                  <div style={{
-                                    flex: m.notStarted,
-                                    background: 'var(--status-not-started)',
-                                    minWidth: 2,
-                                  }} />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div style={{ flex: m.notStarted, background: 'var(--status-not-started)', minWidth: 2 }} />
+                                  </TooltipTrigger>
+                                  <TooltipContent>未开始: {m.notStarted}</TooltipContent>
                                 </Tooltip>
                               )}
                               {m.overdue > 0 && (
-                                <Tooltip content={`逾期: ${m.overdue}`}>
-                                  <div style={{
-                                    flex: m.overdue,
-                                    background: 'var(--status-danger)',
-                                    minWidth: 2,
-                                  }} />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div style={{ flex: m.overdue, background: 'var(--status-danger)', minWidth: 2 }} />
+                                  </TooltipTrigger>
+                                  <TooltipContent>逾期: {m.overdue}</TooltipContent>
                                 </Tooltip>
                               )}
                             </div>
                           )}
                         </div>
                       </div>
-
-                      {/* Labels */}
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-2)', whiteSpace: 'nowrap' }}>
+                      <div className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs whitespace-nowrap">
                         <span>{m.inProgress}进行中</span>
-                        {m.overdue > 0 && <span style={{ color: 'var(--risk-high-color)' }}>{m.overdue}逾期</span>}
-                        {isOverloaded && <Tag size="small" color="red">超载</Tag>}
+                        {m.overdue > 0 && <span className="text-red-600 dark:text-red-400">{m.overdue}逾期</span>}
+                        {overloaded && (
+                          <Badge variant="outline" className="border-transparent bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">
+                            超载
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </Spin>
-        </Card>
+          </Card>
 
-        {/* C. Issues table */}
-        <Card>
-          <h3 style={{ margin: '0 0 16px 0' }}>需关注</h3>
-          {issues.length === 0 && !loading ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-2)' }}>
-              <span style={{ color: 'var(--risk-low-color)', fontSize: 16, marginRight: 6 }}>&#10003;</span>
-              暂无需关注事项
-            </div>
-          ) : (
-            <Table
-              columns={issueColumns}
-              data={issues}
-              loading={loading}
-              rowKey={(record) => `${record.type}-${record.activityId}`}
-              pagination={false}
-              scroll={{ x: 700 }}
-            />
-          )}
-        </Card>
-      </div>
+          {/* C. 需关注 */}
+          <Card className="p-5">
+            <h3 className="mb-4 text-base font-medium">需关注</h3>
+            {issues.length === 0 && !loading ? (
+              <div className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm">
+                <Check className="size-4 text-green-600" />
+                暂无需关注事项
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-28">类型</TableHead>
+                    <TableHead>活动名称</TableHead>
+                    <TableHead className="w-44">所属项目</TableHead>
+                    <TableHead className="w-28">负责人</TableHead>
+                    <TableHead className="w-48">详情</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {issues.map((record: WorkloadIssue) => {
+                    const detail = formatIssueDetail(record);
+                    return (
+                      <TableRow key={`${record.type}-${record.activityId}`}>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5">
+                            <span
+                              className="inline-block size-2 rounded-full"
+                              style={{ background: record.type === 'overdue' ? 'var(--status-danger)' : 'var(--status-warning)' }}
+                            />
+                            {record.type === 'overdue' ? '逾期' : '无人负责'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <button className="hover:text-primary cursor-pointer hover:underline" onClick={() => navigate(`/projects/${record.projectId}`)}>
+                            {record.activityName}
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <button className="text-primary cursor-pointer hover:underline" onClick={() => navigate(`/projects/${record.projectId}`)}>
+                            {record.projectName}
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          {record.assigneeNames.length > 0 ? record.assigneeNames.join('、') : <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                        <TableCell style={{ color: detail.color, fontWeight: detail.fontWeight }}>{detail.text}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </div>
+      </TooltipProvider>
     </MainLayout>
   );
 };

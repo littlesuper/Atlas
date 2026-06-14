@@ -1,36 +1,39 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  Table,
-  Button,
-  Space,
-  Modal,
-  Form,
-  Input,
-  Select,
-  Message,
-  Tooltip,
-  InputNumber,
-  Tag,
-} from '@arco-design/web-react';
-import {
-  IconPlus,
-  IconEdit,
-  IconDelete,
-  IconCopy,
-  IconDragDotVertical,
-  IconLeft,
-} from '@arco-design/web-react/icon';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, Copy, ChevronLeft, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import MainLayout from '../../layouts/MainLayout';
 import { templatesApi, rolesApi } from '../../api';
 import { ProjectTemplate, TemplateActivity, ActivityType } from '../../types';
 import { ACTIVITY_TYPE_MAP, PHASE_OPTIONS, DEPENDENCY_TYPE_MAP } from '../../utils/constants';
-import { selectOptionIncludesInput } from '../../utils/selectFilter';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
+import { arcoBadgeClass } from '../../utils/badgeColor';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const PHASE_COLOR: Record<string, string> = { EVT: 'blue', DVT: 'green', PVT: 'purple', MP: 'orange' };
 const LABEL_TO_TYPE = Object.fromEntries(
   Object.entries(DEPENDENCY_TYPE_MAP).map(([k, v]) => [v.label, k])
 );
+
+const PHASE_NONE = '__none__';
 
 let _idCounter = 0;
 const genId = (): string =>
@@ -94,8 +97,16 @@ export function remapActivityIds(
   return { activities: remapped, idMap };
 }
 
+interface ConfirmState {
+  title: string;
+  content: string;
+  onOk: () => void | Promise<void>;
+}
+
 const TemplateManagement: React.FC = () => {
-  const [form] = Form.useForm();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'list' | 'edit'>('list');
@@ -103,13 +114,7 @@ const TemplateManagement: React.FC = () => {
   const [activities, setActivities] = useState<TemplateActivity[]>([]);
   const [saving, setSaving] = useState(false);
   const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
-
-  // 拖拽排序状态
-  const dragIndexRef = useRef(-1);
-  const isDraggingRef = useRef(false);
-  const dragFromRef = useRef(-1);
-  const dragOverRef = useRef(-1);
-  const [, forceRender] = useState(0);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
   const loadTemplates = useCallback(async () => {
     setLoading(true);
@@ -117,7 +122,7 @@ const TemplateManagement: React.FC = () => {
       const res = await templatesApi.list();
       setTemplates(res.data);
     } catch {
-      Message.error('加载模板列表失败');
+      toast.error('加载模板列表失败');
     } finally {
       setLoading(false);
     }
@@ -136,18 +141,19 @@ const TemplateManagement: React.FC = () => {
         const res = await templatesApi.get(tpl.id);
         const full = res.data;
         setEditing(full);
-        form.setFieldsValue({
-          name: full.name,
-          description: full.description || '',
-        });
+        setName(full.name);
+        setDescription(full.description || '');
+        setErrors({});
         setActivities(full.activities || []);
       } catch {
-        Message.error('加载模板详情失败');
+        toast.error('加载模板详情失败');
         return;
       }
     } else {
       setEditing(null);
-      form.resetFields();
+      setName('');
+      setDescription('');
+      setErrors({});
       setActivities([]);
     }
     setMode('edit');
@@ -156,21 +162,23 @@ const TemplateManagement: React.FC = () => {
   const handleBack = () => {
     setMode('list');
     setEditing(null);
-    form.resetFields();
+    setName('');
+    setDescription('');
+    setErrors({});
     setActivities([]);
   };
 
   const handleDelete = (tpl: ProjectTemplate) => {
-    Modal.confirm({
+    setConfirm({
       title: '确认删除',
       content: `确定要删除模板"${tpl.name}"吗？此操作不可恢复。`,
       onOk: async () => {
         try {
           await templatesApi.delete(tpl.id);
-          Message.success('模板删除成功');
+          toast.success('模板删除成功');
           loadTemplates();
         } catch {
-          Message.error('模板删除失败');
+          toast.error('模板删除失败');
         }
       },
     });
@@ -187,21 +195,25 @@ const TemplateManagement: React.FC = () => {
         description: full.description || undefined,
         activities: remapped,
       });
-      Message.success('模板复制成功');
+      toast.success('模板复制成功');
       loadTemplates();
     } catch {
-      Message.error('模板复制失败');
+      toast.error('模板复制失败');
     }
   };
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validate();
+      const e: Record<string, string> = {};
+      if (!name.trim()) e.name = '请输入模板名称';
+      setErrors(e);
+      if (Object.keys(e).length) return;
+
       setSaving(true);
 
       const data = {
-        name: values.name,
-        description: values.description || undefined,
+        name: name,
+        description: description || undefined,
         activities: activities.map((a, idx) => ({
           id: a.id,
           name: a.name,
@@ -217,10 +229,10 @@ const TemplateManagement: React.FC = () => {
 
       if (editing) {
         await templatesApi.update(editing.id, data);
-        Message.success('模板更新成功');
+        toast.success('模板更新成功');
       } else {
         await templatesApi.create(data);
-        Message.success('模板创建成功');
+        toast.success('模板创建成功');
       }
 
       setMode('list');
@@ -316,387 +328,378 @@ const TemplateManagement: React.FC = () => {
     return parsePredecessorTextHelper(text, selfId, seqToIdMap);
   }, [seqToIdMap]);
 
-  // ---- 拖拽排序 ----
+  // ---- 排序（上移/下移） ----
 
-  const handleMouseDown = React.useCallback((e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    dragIndexRef.current = index;
-  }, []);
-
-  const handleMouseMove = (e: React.MouseEvent, index: number) => {
-    if (dragIndexRef.current === -1) return;
-    e.preventDefault();
-    let needRender = false;
-    if (!isDraggingRef.current) {
-      isDraggingRef.current = true;
-      dragFromRef.current = dragIndexRef.current;
-      document.body.style.cursor = 'grabbing';
-      document.body.style.userSelect = 'none';
-      needRender = true;
-    }
-    if (dragOverRef.current !== index) {
-      dragOverRef.current = index;
-      needRender = true;
-    }
-    if (needRender) forceRender((n) => n + 1);
-  };
-
-  const resetDragState = () => {
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    isDraggingRef.current = false;
-    dragFromRef.current = -1;
-    dragOverRef.current = -1;
-    dragIndexRef.current = -1;
-    forceRender((n) => n + 1);
-  };
-
-  const handleMouseUp = (e: React.MouseEvent, targetIndex: number) => {
-    e.preventDefault();
-    if (!isDraggingRef.current) {
-      dragIndexRef.current = -1;
-      return;
-    }
-    const fromIndex = dragIndexRef.current;
-    resetDragState();
-
+  const moveActivity = React.useCallback((fromIndex: number, targetIndex: number) => {
     if (fromIndex === -1 || fromIndex === targetIndex) return;
-
     setActivities((prev) => {
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
       const newList = [...prev];
       const [removed] = newList.splice(fromIndex, 1);
       newList.splice(targetIndex, 0, removed);
       return newList.map((a, i) => ({ ...a, sortOrder: i }));
     });
-  };
-
-  // 全局 mouseup 兜底
-  useEffect(() => {
-    const cleanup = () => {
-      if (isDraggingRef.current) resetDragState();
-    };
-    window.addEventListener('mouseup', cleanup);
-    return () => window.removeEventListener('mouseup', cleanup);
   }, []);
-
-  // Template list columns
-  const columns = [
-    {
-      title: '模板名称',
-      dataIndex: 'name',
-      width: 200,
-      render: (name: string, record: ProjectTemplate) => (
-        <span
-          style={{ fontWeight: 500, color: 'var(--color-text-1)', cursor: 'pointer' }}
-          onClick={() => handleOpen(record)}
-        >
-          {name}
-        </span>
-      ),
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      render: (desc?: string) => desc || '-',
-    },
-    {
-      title: '活动数',
-      dataIndex: '_count',
-      width: 90,
-      render: (c?: { activities: number }) => c?.activities ?? 0,
-    },
-    {
-      title: '更新时间',
-      dataIndex: 'updatedAt',
-      width: 170,
-      sorter: (a: ProjectTemplate, b: ProjectTemplate) =>
-        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-      render: (d: string) => dayjs(d).format('YYYY-MM-DD HH:mm'),
-    },
-    {
-      title: '操作',
-      width: 150,
-      fixed: 'right' as const,
-      render: (_: unknown, record: ProjectTemplate) => (
-        <Space>
-          <Tooltip content="编辑">
-            <Button
-              type="text"
-              icon={<IconEdit />}
-              size="small"
-              onClick={() => handleOpen(record)}
-            />
-          </Tooltip>
-          <Tooltip content="复制">
-            <Button
-              type="text"
-              icon={<IconCopy />}
-              size="small"
-              onClick={() => handleDuplicate(record)}
-            />
-          </Tooltip>
-          <Tooltip content="删除">
-            <Button
-              type="text"
-              status="danger"
-              icon={<IconDelete />}
-              size="small"
-              onClick={() => handleDelete(record)}
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
-
-  const activityColumns = React.useMemo(() => [
-    {
-      title: '',
-      width: 44,
-      render: (_: unknown, _record: TemplateActivity, index: number) => (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
-          <div
-            className="drag-handle"
-            onMouseDown={(e: React.MouseEvent) => handleMouseDown(e, index)}
-          >
-            <IconDragDotVertical />
-          </div>
-          <div
-            className="row-insert-trigger"
-            onClick={() => insertActivity(index + 1)}
-            title="在下方插入活动"
-          >
-            <IconPlus />
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'ID',
-      width: 66,
-      render: (_: unknown, record: TemplateActivity) => (
-        <span style={{ fontFamily: 'monospace', color: 'var(--color-text-3)' }}>{getSeq(record)}</span>
-      ),
-    },
-    {
-      title: '活动名称',
-      dataIndex: 'name',
-      width: 220,
-      render: (_: string, record: TemplateActivity) => (
-        <Input
-          key={record.id + '-name'}
-          defaultValue={record.name}
-          placeholder="活动名称"
-          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
-          onBlur={(e) => {
-            const v = (e.target as HTMLInputElement).value;
-            if (v !== record.name) updateActivity(record.id, 'name', v);
-          }}
-        />
-      ),
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      width: 100,
-      render: (_: string, record: TemplateActivity) => (
-        <Select
-          value={record.type}
-          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
-          onChange={(v) => updateActivity(record.id, 'type', v)}
-        >
-          {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
-            <Select.Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Select.Option>
-          ))}
-        </Select>
-      ),
-    },
-    {
-      title: '阶段',
-      dataIndex: 'phase',
-      width: 110,
-      render: (_: string | null, record: TemplateActivity) => (
-        <Select
-          value={record.phase || undefined}
-          allowClear
-          placeholder="阶段"
-          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
-          onChange={(v) => updateActivity(record.id, 'phase', v || null)}
-        >
-          {PHASE_OPTIONS.map((p) => (
-            <Select.Option key={p} value={p}><Tag color={PHASE_COLOR[p]}>{p}</Tag></Select.Option>
-          ))}
-        </Select>
-      ),
-    },
-    {
-      title: '角色',
-      dataIndex: 'roleId',
-      width: 120,
-      render: (_: string | null, record: TemplateActivity) => (
-        <Select
-          key={record.id + '-role'}
-          value={record.roleId || undefined}
-          allowClear
-          placeholder="角色"
-          style={{ background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
-          onChange={(v) => updateActivity(record.id, 'roleId', v || null)}
-          showSearch
-          filterOption={selectOptionIncludesInput}
-        >
-          {roleOptions.map(r => (
-            <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>
-          ))}
-        </Select>
-      ),
-    },
-    {
-      title: '工期',
-      dataIndex: 'planDuration',
-      width: 100,
-      render: (_: number | null, record: TemplateActivity) => (
-        <InputNumber
-          key={record.id + '-dur'}
-          style={{ width: '100%', background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
-          min={1}
-          precision={0}
-          suffix="天"
-          defaultValue={record.planDuration ?? undefined}
-          onBlur={(v) => updateActivity(record.id, 'planDuration', v != null && Number(v) > 0 ? Number(v) : null)}
-        />
-      ),
-    },
-    {
-      title: '前置',
-      dataIndex: 'dependencies',
-      width: 150,
-      render: (_: TemplateActivity['dependencies'], record: TemplateActivity) => (
-        <Input
-          key={record.id + '-deps'}
-          defaultValue={getPredecessorSeq(record)}
-          placeholder="如: 3FS+2, 5"
-          style={{ fontFamily: 'monospace', fontSize: 12, background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }}
-          onBlur={(e) => {
-            const v = (e.target as HTMLInputElement).value;
-            updateActivity(record.id, 'dependencies', parsePredecessorText(v, record.id));
-          }}
-        />
-      ),
-    },
-    {
-      title: '操作',
-      width: 64,
-      render: (_: unknown, record: TemplateActivity) => (
-        <Tooltip content="删除">
-          <Button
-            type="text"
-            status="danger"
-            icon={<IconDelete />}
-            size="mini"
-            onClick={() => removeActivity(record.id)}
-          />
-        </Tooltip>
-      ),
-    },
-  ], [updateActivity, removeActivity, insertActivity, handleMouseDown, roleOptions, getSeq, getPredecessorSeq, parsePredecessorText]);
-
-  if (mode === 'edit') {
-    return (
-      <MainLayout>
-        <div className="toolbar">
-          <div className="toolbar-left" style={{ display: 'flex', alignItems: 'center' }}>
-            <Button type="text" icon={<IconLeft />} onClick={handleBack} style={{ marginRight: 8, color: 'var(--color-text-2)' }}>
-              返回
-            </Button>
-            <span style={{ fontWeight: 500, fontSize: 15, color: 'var(--color-text-1)' }}>
-              {editing ? `编辑模板 - ${editing.name}` : '新建模板'}
-            </span>
-          </div>
-          <Button type="primary" loading={saving} onClick={handleSubmit}>
-            {editing ? '保存' : '创建'}
-          </Button>
-        </div>
-
-        <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
-          <Form.Item
-            label="模板名称"
-            field="name"
-            rules={[{ required: true, message: '请输入模板名称' }]}
-          >
-            <Input placeholder="如：标准路由器项目模板" style={{ width: 280, background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }} />
-          </Form.Item>
-
-          <Form.Item label="描述" field="description">
-            <Input placeholder="模板描述（选填）" style={{ width: 360, background: 'var(--color-fill-1)', borderColor: 'var(--color-border-2)' }} />
-          </Form.Item>
-        </Form>
-
-        <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 500, fontSize: 13, color: 'var(--color-text-2)' }}>活动列表（{activities.length}）</span>
-          <Button type="outline" size="small" icon={<IconPlus />} onClick={addActivity}>
-            添加活动
-          </Button>
-        </div>
-
-        <Table
-          columns={activityColumns}
-          data={activities}
-          rowKey="id"
-          pagination={false}
-          noDataElement={
-            <div style={{ padding: '24px 0', color: 'var(--color-text-3)' }}>
-              暂无活动，点击上方"添加活动"开始构建模板
-            </div>
-          }
-          components={{
-            body: {
-              row: ({ children, record: _record, index, ...rest }: { children: React.ReactNode; record: TemplateActivity; index: number; [key: string]: unknown }) => {
-                const isSource = dragFromRef.current === index;
-                const isTarget = dragOverRef.current === index && dragOverRef.current !== dragFromRef.current;
-                const insertAbove = isTarget && dragFromRef.current > index;
-                const insertBelow = isTarget && dragFromRef.current < index;
-                const cls = [
-                  typeof rest.className === 'string' ? rest.className : '',
-                  isSource ? 'drag-source' : '',
-                  insertAbove ? 'drag-insert-above' : '',
-                  insertBelow ? 'drag-insert-below' : '',
-                ].filter(Boolean).join(' ');
-                return (
-                  <tr
-                    {...rest}
-                    className={cls}
-                    onMouseMove={(e) => handleMouseMove(e, index)}
-                    onMouseUp={(e) => handleMouseUp(e, index)}
-                  >
-                    {children}
-                  </tr>
-                );
-              },
-            },
-          }}
-        />
-      </MainLayout>
-    );
-  }
 
   return (
     <MainLayout>
-      <div className="toolbar">
-        <div className="toolbar-left">
-          共 {templates.length} 个模板
-        </div>
-        <Button type="primary" icon={<IconPlus />} onClick={() => handleOpen()}>
-          新建模板
-        </Button>
-      </div>
+      <TooltipProvider>
+        {mode === 'edit' ? (
+          <Sheet open onOpenChange={(o) => !o && handleBack()}>
+            <SheetContent
+              side="right"
+              onInteractOutside={(e) => e.preventDefault()}
+              className="flex w-full flex-col gap-0 p-0 sm:max-w-[760px]"
+            >
+              <SheetHeader className="border-b px-6 py-4">
+                <SheetTitle>{editing ? `编辑模板 - ${editing.name}` : '新建模板'}</SheetTitle>
+              </SheetHeader>
 
-      <Table
-        columns={columns}
-        data={templates}
-        loading={loading}
-        rowKey="id"
-        pagination={false}
-      />
+              <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">
+                      模板名称<span className="text-destructive ml-0.5">*</span>
+                    </Label>
+                    <Input
+                      placeholder="如：标准路由器项目模板"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        setErrors((p) => (p.name ? { ...p, name: '' } : p));
+                      }}
+                    />
+                    {errors.name && <p className="text-destructive text-xs">{errors.name}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">描述</Label>
+                    <Input
+                      placeholder="模板描述（选填）"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm font-medium">活动列表（{activities.length}）</span>
+                  <Button variant="outline" size="sm" onClick={addActivity}>
+                    <Plus className="size-4" />
+                    添加活动
+                  </Button>
+                </div>
+
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-24" />
+                        <TableHead className="w-16">ID</TableHead>
+                        <TableHead className="w-52">活动名称</TableHead>
+                        <TableHead className="w-28">类型</TableHead>
+                        <TableHead className="w-28">阶段</TableHead>
+                        <TableHead className="w-32">角色</TableHead>
+                        <TableHead className="w-28">工期</TableHead>
+                        <TableHead className="w-40">前置</TableHead>
+                        <TableHead className="w-16">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activities.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-muted-foreground h-24 text-center">
+                            暂无活动，点击上方"添加活动"开始构建模板
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        activities.map((record, index) => (
+                          <TableRow key={record.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-0.5">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-7"
+                                      aria-label="上移"
+                                      disabled={index === 0}
+                                      onClick={() => moveActivity(index, index - 1)}
+                                    >
+                                      <ChevronUp className="size-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>上移</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-7"
+                                      aria-label="下移"
+                                      disabled={index === activities.length - 1}
+                                      onClick={() => moveActivity(index, index + 1)}
+                                    >
+                                      <ChevronDown className="size-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>下移</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-7"
+                                      aria-label="在下方插入活动"
+                                      onClick={() => insertActivity(index + 1)}
+                                    >
+                                      <Plus className="size-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>在下方插入活动</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-muted-foreground font-mono">{getSeq(record)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                key={record.id + '-name'}
+                                defaultValue={record.name}
+                                placeholder="活动名称"
+                                onBlur={(e) => {
+                                  const v = e.target.value;
+                                  if (v !== record.name) updateActivity(record.id, 'name', v);
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={record.type}
+                                onValueChange={(v) => updateActivity(record.id, 'type', v)}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(ACTIVITY_TYPE_MAP).map(([k, v]) => (
+                                    <SelectItem key={k} value={k}>
+                                      <Badge variant="outline" className={arcoBadgeClass(v.color)}>{v.label}</Badge>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={record.phase || PHASE_NONE}
+                                onValueChange={(v) => updateActivity(record.id, 'phase', v === PHASE_NONE ? null : v)}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="阶段" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={PHASE_NONE}>
+                                    <span className="text-muted-foreground">无</span>
+                                  </SelectItem>
+                                  {PHASE_OPTIONS.map((p) => (
+                                    <SelectItem key={p} value={p}>
+                                      <Badge variant="outline" className={arcoBadgeClass(PHASE_COLOR[p])}>{p}</Badge>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Combobox
+                                key={record.id + '-role'}
+                                options={roleOptions.map((r) => ({ value: r.id, label: r.name }))}
+                                value={record.roleId || undefined}
+                                onChange={(v) => updateActivity(record.id, 'roleId', v || null)}
+                                placeholder="角色"
+                                searchPlaceholder="搜索角色…"
+                                allowClear
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="relative">
+                                <Input
+                                  key={record.id + '-dur'}
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  className="pr-8"
+                                  defaultValue={record.planDuration ?? undefined}
+                                  onBlur={(e) => {
+                                    const v = e.target.value;
+                                    updateActivity(record.id, 'planDuration', v !== '' && Number(v) > 0 ? Number(v) : null);
+                                  }}
+                                />
+                                <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs">天</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                key={record.id + '-deps'}
+                                defaultValue={getPredecessorSeq(record)}
+                                placeholder="如: 3FS+2, 5"
+                                className="font-mono text-xs"
+                                onBlur={(e) => {
+                                  const v = e.target.value;
+                                  updateActivity(record.id, 'dependencies', parsePredecessorText(v, record.id));
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-muted-foreground hover:text-destructive size-7"
+                                    aria-label="删除"
+                                    onClick={() => removeActivity(record.id)}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>删除</TooltipContent>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <SheetFooter className="flex-row justify-between gap-2 border-t px-6 py-4">
+                <Button variant="ghost" onClick={handleBack}>
+                  <ChevronLeft className="size-4" />
+                  返回
+                </Button>
+                <Button onClick={handleSubmit} disabled={saving}>
+                  {saving && <Loader2 className="size-4 animate-spin" />}
+                  {editing ? '保存' : '创建'}
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        ) : null}
+
+        <Card className="p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-muted-foreground text-sm">共 {templates.length} 个模板</span>
+            <Button onClick={() => handleOpen()}>
+              <Plus className="size-4" />
+              新建模板
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-52">模板名称</TableHead>
+                  <TableHead>描述</TableHead>
+                  <TableHead className="w-24">活动数</TableHead>
+                  <TableHead className="w-44">更新时间</TableHead>
+                  <TableHead className="w-40 text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center">
+                      <Loader2 className="text-muted-foreground mx-auto size-6 animate-spin" />
+                    </TableCell>
+                  </TableRow>
+                ) : templates.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-muted-foreground h-32 text-center">
+                      暂无数据
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  templates.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>
+                        <span
+                          className="text-primary cursor-pointer font-medium"
+                          onClick={() => handleOpen(record)}
+                        >
+                          {record.name}
+                        </span>
+                      </TableCell>
+                      <TableCell>{record.description || '-'}</TableCell>
+                      <TableCell>{record._count?.activities ?? 0}</TableCell>
+                      <TableCell>{dayjs(record.updatedAt).format('YYYY-MM-DD HH:mm')}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-0.5">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8" aria-label="编辑" onClick={() => handleOpen(record)}>
+                                <Pencil className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>编辑</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8" aria-label="复制" onClick={() => handleDuplicate(record)}>
+                                <Copy className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>复制</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:text-destructive size-8"
+                                aria-label="删除"
+                                onClick={() => handleDelete(record)}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>删除</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+
+        <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
+              <AlertDialogDescription>{confirm?.content}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  await confirm?.onOk();
+                  setConfirm(null);
+                }}
+              >
+                确定
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TooltipProvider>
     </MainLayout>
   );
 };

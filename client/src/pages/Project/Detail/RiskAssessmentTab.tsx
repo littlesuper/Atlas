@@ -1,25 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Button,
-  Card,
-  Tag,
-  Space,
-  Empty,
-  Message,
-  Spin,
-  Pagination,
-  Modal,
-} from '@arco-design/web-react';
-import {
-  IconThunderbolt,
-  IconDelete,
-  IconArrowRise,
-  IconArrowFall,
-  IconMinus,
-  IconBulb,
-  IconUser,
-  IconExclamationCircle,
-} from '@arco-design/web-react/icon';
+import { Zap, Trash2, TrendingUp, TrendingDown, Minus, Lightbulb, User, CircleAlert, Loader2 } from 'lucide-react';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
@@ -29,9 +9,25 @@ import {
   MarkAreaComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { toast } from 'sonner';
 import { riskApi } from '../../../api';
 import { RiskAssessment, RiskComparison } from '../../../types';
 import { RISK_LEVEL_MAP } from '../../../utils/constants';
+import { arcoBadgeClass } from '../../../utils/badgeColor';
+import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import RiskItemsPanel from './RiskItemsPanel';
 import dayjs from 'dayjs';
 
@@ -91,6 +87,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
   const [assessing, setAssessing] = useState(false);
   const [trendData, setTrendData] = useState<RiskAssessment[]>([]);
   const [comparison, setComparison] = useState<RiskComparison | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const loadPage = useCallback(async (p: number) => {
     setLoading(true);
@@ -105,7 +102,7 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
         setTotal(data.total || 0);
       }
     } catch {
-      Message.error('加载风险评估历史失败');
+      toast.error('加载风险评估历史失败');
     } finally {
       setLoading(false);
     }
@@ -147,28 +144,29 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
   }, [loadComparison, loadPage, loadTrend, snapshotData]);
 
   const handleDelete = (assessmentId: string) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: '确定要删除该评估记录吗？此操作不可恢复。',
-      onOk: async () => {
-        try {
-          await riskApi.delete(assessmentId);
-          Message.success('已删除');
-          loadPage(page);
-          loadTrend();
-          loadComparison();
-        } catch {
-          Message.error('删除失败');
-        }
-      },
-    });
+    setDeleteTarget(assessmentId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await riskApi.delete(deleteTarget);
+      toast.success('已删除');
+      loadPage(page);
+      loadTrend();
+      loadComparison();
+    } catch {
+      toast.error('删除失败');
+    } finally {
+      setDeleteTarget(null);
+    }
   };
 
   const handleAssess = async () => {
     setAssessing(true);
     try {
       await riskApi.assess(projectId);
-      Message.success('风险评估完成');
+      toast.success('风险评估完成');
       await Promise.all([loadPage(page), loadTrend(), loadComparison()]);
     } catch {
       // axios 拦截器已显示后端错误信息
@@ -180,24 +178,26 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
   const latest = assessments[0];
   const history = assessments.slice(1);
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   if (loading) {
-    return <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>;
+    return (
+      <div className="flex justify-center p-10">
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
+      </div>
+    );
   }
 
   return (
     <div>
       {/* 操作栏 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: 'var(--color-text-3)' }}>
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-muted-foreground text-[13px]">
           {assessments.length > 0 ? `共 ${total} 次评估记录` : ''}
         </span>
         {!isArchived && (
-          <Button
-            type="primary"
-            icon={<IconThunderbolt />}
-            loading={assessing}
-            onClick={handleAssess}
-          >
+          <Button onClick={handleAssess} disabled={assessing}>
+            {assessing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
             发起评估
           </Button>
         )}
@@ -215,30 +215,41 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
           <RiskCard assessment={latest} isLatest projectId={projectId} />
           {/* 历史记录 */}
           {history.length > 0 && (
-            <div style={{ marginTop: 24 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: 'var(--color-text-2)' }}>历史记录</div>
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <div className="mt-6">
+              <div className="text-foreground/80 mb-3 text-sm font-medium">历史记录</div>
+              <div className="flex w-full flex-col gap-3">
                 {history.map((a) => (
                   <RiskCard key={a.id} assessment={a} onDelete={isArchived ? undefined : () => handleDelete(a.id)} />
                 ))}
-              </Space>
+              </div>
               {total > pageSize && (
-                <div style={{ marginTop: 16, textAlign: 'center' }}>
-                  <Pagination
-                    current={page}
-                    pageSize={pageSize}
-                    total={total}
-                    onChange={(p) => { setPage(p); loadPage(p); }}
-                    showTotal
-                    size="small"
-                  />
+                <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+                  <span className="text-muted-foreground">
+                    第 {page} / {totalPages} 页
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => { const p = page - 1; setPage(p); loadPage(p); }}
+                  >
+                    上一页
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => { const p = page + 1; setPage(p); loadPage(p); }}
+                  >
+                    下一页
+                  </Button>
                 </div>
               )}
             </div>
           )}
         </div>
       ) : (
-        <Empty description="暂无评估记录，点击「发起评估」开始" />
+        <div className="text-muted-foreground py-10 text-center text-sm">暂无评估记录，点击「发起评估」开始</div>
       )}
 
       {/* 风险项管理面板 */}
@@ -249,6 +260,20 @@ const RiskAssessmentTab: React.FC<Props> = ({ projectId, isArchived, snapshotDat
           isArchived={isArchived}
         />
       )}
+
+      {/* 删除确认 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除该评估记录吗？此操作不可恢复。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>确定</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -261,31 +286,31 @@ const RiskComparisonCard: React.FC<{ comparison: RiskComparison }> = ({ comparis
   if (levelChange === 'UNCHANGED' && newRisks.length === 0 && resolvedRisks.length === 0) return null;
 
   return (
-    <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
-      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>
+    <Card className="mb-4 px-4 py-3">
+      <div className="text-foreground/80 mb-2 text-sm font-medium">
         风险变化
       </div>
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div className="flex flex-wrap items-center gap-4">
         {levelChange !== 'UNCHANGED' && (
-          <Tag
-            color={levelChange === 'IMPROVED' ? 'green' : 'red'}
-            style={{ fontSize: 13 }}
+          <Badge
+            variant="outline"
+            className={cn('text-[13px]', arcoBadgeClass(levelChange === 'IMPROVED' ? 'green' : 'red'))}
           >
             {levelChange === 'IMPROVED' ? '风险等级下降' : '风险等级上升'}
             {comparison.previous && comparison.current && (
-              <span style={{ marginLeft: 4 }}>
+              <span className="ml-1">
                 {comparison.previous.riskLevel} → {comparison.current.riskLevel}
               </span>
             )}
-          </Tag>
+          </Badge>
         )}
         {resolvedRisks.length > 0 && (
-          <span style={{ fontSize: 12, color: 'var(--color-success-6)' }}>
+          <span className="text-xs text-green-600 dark:text-green-400">
             已改善：{resolvedRisks.join('、')}
           </span>
         )}
         {newRisks.length > 0 && (
-          <span style={{ fontSize: 12, color: 'var(--color-danger-6)' }}>
+          <span className="text-xs text-red-600 dark:text-red-400">
             新增风险：{newRisks.join('、')}
           </span>
         )}
@@ -381,8 +406,8 @@ const RiskTrendChart: React.FC<{ data: RiskAssessment[] }> = ({ data }) => {
   }, [data]);
 
   return (
-    <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
-      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>
+    <Card className="mb-4 px-4 py-3">
+      <div className="text-foreground/80 mb-2 text-sm font-medium">
         风险趋势
       </div>
       <ReactEChartsCore
@@ -416,63 +441,58 @@ const RiskCard: React.FC<{
 
   const normalizedLevel = normalizeRiskLevel(assessment.riskLevel);
   const cfg = RISK_LEVEL_CONFIG[normalizedLevel] || { color: 'var(--color-text-3)', bgVar: 'var(--color-fill-1)' };
+  const levelColorName = RISK_LEVEL_MAP[normalizedLevel as keyof typeof RISK_LEVEL_MAP]?.color;
   const sourceInfo = SOURCE_LABEL[assessment.source || 'rule_engine'] || SOURCE_LABEL.rule_engine;
   const hasAIEnhanced = (assessment.source === 'ai' || assessment.source === 'scheduled_ai') && assessment.aiEnhancedData;
 
   return (
     <Card
-      style={{
-        width: '100%',
-        borderLeft: isLatest ? `4px solid ${cfg.color}` : undefined,
-      }}
-      bodyStyle={{ padding: isLatest ? '20px 24px' : '16px 20px' }}
+      className={cn('w-full', isLatest ? 'px-6 py-5' : 'px-5 py-4')}
+      style={{ borderLeft: isLatest ? `4px solid ${cfg.color}` : undefined }}
     >
       {/* 头部：风险等级 + 来源 + 时间 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isLatest ? 16 : 12 }}>
-        <Space size={12}>
+      <div className={cn('flex items-center justify-between', isLatest ? 'mb-4' : 'mb-3')}>
+        <div className="flex items-center gap-3">
           {isLatest && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-1)' }}>最新评估</span>
+            <span className="text-foreground text-[13px] font-semibold">最新评估</span>
           )}
-          <Tag
-            style={{
-              background: cfg.bgVar,
-              color: cfg.color,
-              border: `1px solid ${cfg.color}`,
-              fontWeight: 600,
-              fontSize: isLatest ? 14 : 12,
-              padding: isLatest ? '2px 12px' : '1px 8px',
-            }}
+          <Badge
+            variant="outline"
+            className={cn(
+              'font-semibold',
+              isLatest ? 'px-3 py-0.5 text-sm' : 'px-2 py-px text-xs',
+              arcoBadgeClass(levelColorName)
+            )}
           >
             {RISK_LEVEL_MAP[normalizedLevel as keyof typeof RISK_LEVEL_MAP]?.label ?? assessment.riskLevel}
-          </Tag>
-          <Tag color={sourceInfo.color} size="small">
+          </Badge>
+          <Badge variant="outline" className={cn('text-xs', arcoBadgeClass(sourceInfo.color))}>
             {sourceInfo.text}
-          </Tag>
-        </Space>
-        <Space size={8}>
-          <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-xs">
             {dayjs(assessment.assessedAt).format('YYYY-MM-DD HH:mm')}
           </span>
           {onDelete && (
-            <Button type="text" size="mini" status="danger" icon={<IconDelete />} onClick={onDelete} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive size-7"
+              aria-label="删除"
+              onClick={onDelete}
+            >
+              <Trash2 className="size-4" />
+            </Button>
           )}
-        </Space>
+        </div>
       </div>
 
       {/* AI 洞察总结 */}
       {isLatest && assessment.aiInsights && (
-        <div style={{
-          padding: '12px 16px',
-          marginBottom: 16,
-          background: 'var(--color-primary-light-1)',
-          borderLeft: '4px solid var(--color-primary-6)',
-          borderRadius: '0 6px 6px 0',
-          fontSize: 13,
-          lineHeight: 1.7,
-          color: 'var(--color-text-1)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 500 }}>
-            <IconBulb style={{ color: 'var(--color-primary-6)' }} />
+        <div className="border-l-primary bg-primary/5 text-foreground mb-4 rounded-r-md border-l-4 px-4 py-3 text-[13px] leading-relaxed">
+          <div className="mb-1 flex items-center gap-1.5 font-medium">
+            <Lightbulb className="text-primary size-4" />
             AI 洞察
           </div>
           {assessment.aiInsights}
@@ -481,31 +501,27 @@ const RiskCard: React.FC<{
 
       {/* 风险因素 */}
       {assessment.riskFactors && assessment.riskFactors.length > 0 && (
-        <div style={{ marginBottom: isLatest ? 16 : 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>风险因素</div>
-          <Space direction="vertical" size={6} style={{ width: '100%' }}>
+        <div className={cn(isLatest ? 'mb-4' : 'mb-3')}>
+          <div className="text-foreground/80 mb-2 text-[13px] font-medium">风险因素</div>
+          <div className="flex w-full flex-col gap-1.5">
             {assessment.riskFactors.map((f, i) => (
               <div
                 key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
-                  padding: '8px 12px',
-                  background: 'var(--color-fill-1)',
-                  borderRadius: 6,
-                }}
+                className="bg-muted/50 flex items-start gap-2 rounded-md px-3 py-2"
               >
-                <Tag size="small" color={SEVERITY_COLOR[normalizeRiskLevel(f.severity)] || 'default'} style={{ flexShrink: 0 }}>
+                <Badge
+                  variant="outline"
+                  className={cn('shrink-0 text-xs', arcoBadgeClass(SEVERITY_COLOR[normalizeRiskLevel(f.severity)] || 'default'))}
+                >
                   {RISK_LEVEL_MAP[normalizeRiskLevel(f.severity) as keyof typeof RISK_LEVEL_MAP]?.label?.replace('风险', '') ?? f.severity}
-                </Tag>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{f.factor}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>{f.description}</div>
+                </Badge>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium">{f.factor}</div>
+                  <div className="text-muted-foreground mt-0.5 text-xs">{f.description}</div>
                   {f.triggeredActivities && f.triggeredActivities.length > 0 && (
                     <>
                       <div
-                        style={{ fontSize: 12, color: 'var(--color-primary-6)', cursor: 'pointer', marginTop: 4, userSelect: 'none' }}
+                        className="text-primary mt-1 cursor-pointer text-xs select-none"
                         onClick={() => toggleFactor(i)}
                       >
                         {expandedFactors[i]
@@ -513,22 +529,16 @@ const RiskCard: React.FC<{
                           : `查看 ${f.triggeredActivities.length} 个任务 ▸`}
                       </div>
                       {expandedFactors[i] && (
-                        <div style={{ marginTop: 6, paddingLeft: 4 }}>
+                        <div className="mt-1.5 pl-1">
                           {f.triggeredActivities.map((ta) => (
                             <div
                               key={ta.id}
-                              style={{
-                                fontSize: 12,
-                                color: 'var(--color-text-2)',
-                                lineHeight: 1.8,
-                                display: 'flex',
-                                gap: 8,
-                              }}
+                              className="text-foreground/80 flex gap-2 text-xs leading-[1.8]"
                             >
-                              <span style={{ color: 'var(--color-text-1)' }}>·</span>
+                              <span className="text-foreground">·</span>
                               <span>{ta.name}</span>
                               {ta.detail && (
-                                <span style={{ color: 'var(--color-text-3)', flexShrink: 0 }}>{ta.detail}</span>
+                                <span className="text-muted-foreground shrink-0">{ta.detail}</span>
                               )}
                             </div>
                           ))}
@@ -539,17 +549,17 @@ const RiskCard: React.FC<{
                 </div>
               </div>
             ))}
-          </Space>
+          </div>
         </div>
       )}
 
       {/* 改进建议 */}
       {assessment.suggestions && assessment.suggestions.length > 0 && (
-        <div style={{ marginBottom: hasAIEnhanced && isLatest ? 16 : 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: 'var(--color-text-2)' }}>改进建议</div>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
+        <div className={cn(hasAIEnhanced && isLatest ? 'mb-4' : '')}>
+          <div className="text-foreground/80 mb-2 text-[13px] font-medium">改进建议</div>
+          <ul className="m-0 list-disc pl-[18px]">
             {assessment.suggestions.map((s, i) => (
-              <li key={i} style={{ fontSize: 13, color: 'var(--color-text-2)', lineHeight: 1.8 }}>{s}</li>
+              <li key={i} className="text-foreground/80 text-[13px] leading-[1.8]">{s}</li>
             ))}
           </ul>
         </div>
@@ -559,13 +569,13 @@ const RiskCard: React.FC<{
       {hasAIEnhanced && isLatest && (
         <div>
           <div
-            style={{ fontSize: 13, color: 'var(--color-primary-6)', cursor: 'pointer', userSelect: 'none', marginTop: 8 }}
+            className="text-primary mt-2 cursor-pointer text-[13px] select-none"
             onClick={() => setShowAIDetail(!showAIDetail)}
           >
             {showAIDetail ? 'AI 深度分析 ▾' : 'AI 深度分析 ▸'}
           </div>
           {showAIDetail && (
-            <div style={{ marginTop: 12 }}>
+            <div className="mt-3">
               <AIEnhancedSection data={assessment.aiEnhancedData!} />
             </div>
           )}
@@ -581,10 +591,10 @@ const AIEnhancedSection: React.FC<{
   data: NonNullable<RiskAssessment['aiEnhancedData']>;
 }> = ({ data }) => {
   const trendIcon = data.trendPrediction?.startsWith('IMPROVING')
-    ? <IconArrowFall style={{ color: 'var(--color-success-6)' }} />
+    ? <TrendingDown className="size-4 text-green-600 dark:text-green-400" />
     : data.trendPrediction?.startsWith('WORSENING')
-    ? <IconArrowRise style={{ color: 'var(--color-danger-6)' }} />
-    : <IconMinus style={{ color: 'var(--color-text-3)' }} />;
+    ? <TrendingUp className="size-4 text-red-600 dark:text-red-400" />
+    : <Minus className="text-muted-foreground size-4" />;
 
   const trendText = data.trendPrediction?.replace(/^(IMPROVING|STABLE|WORSENING)\s*-?\s*/, '') || '';
   const trendLabel = data.trendPrediction?.startsWith('IMPROVING')
@@ -594,48 +604,44 @@ const AIEnhancedSection: React.FC<{
     : '趋势稳定';
 
   return (
-    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+    <div className="flex w-full flex-col gap-3">
       {/* Trend prediction */}
       {data.trendPrediction && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--color-fill-1)', borderRadius: 6 }}>
+        <div className="bg-muted/50 flex items-center gap-2 rounded-md px-3 py-2">
           {trendIcon}
-          <span style={{ fontWeight: 500, fontSize: 13 }}>{trendLabel}</span>
-          {trendText && <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{trendText}</span>}
+          <span className="text-[13px] font-medium">{trendLabel}</span>
+          {trendText && <span className="text-muted-foreground text-xs">{trendText}</span>}
         </div>
       )}
 
       {/* Critical path analysis */}
       {data.criticalPathAnalysis && (
-        <div style={{ padding: '8px 12px', background: 'var(--color-fill-1)', borderRadius: 6 }}>
-          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 4 }}>关键路径分析</div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-2)', lineHeight: 1.7 }}>{data.criticalPathAnalysis}</div>
+        <div className="bg-muted/50 rounded-md px-3 py-2">
+          <div className="mb-1 text-[13px] font-medium">关键路径分析</div>
+          <div className="text-foreground/80 text-xs leading-relaxed">{data.criticalPathAnalysis}</div>
         </div>
       )}
 
       {/* Action items */}
       {data.actionItems && data.actionItems.length > 0 && (
         <div>
-          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8 }}>
-            <IconExclamationCircle style={{ marginRight: 4 }} />
+          <div className="mb-2 flex items-center text-[13px] font-medium">
+            <CircleAlert className="mr-1 size-4" />
             行动项
           </div>
-          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <div className="flex w-full flex-col gap-1">
             {data.actionItems.map((item, i) => (
-              <div key={i} style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 8,
-                padding: '6px 12px',
-                background: 'var(--color-fill-1)',
-                borderRadius: 6,
-              }}>
-                <Tag size="small" color={
-                  item.priority === 'HIGH' ? 'red' : item.priority === 'MEDIUM' ? 'orange' : 'green'
-                } style={{ flexShrink: 0 }}>{item.priority}</Tag>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13 }}>{item.action}</div>
+              <div key={i} className="bg-muted/50 flex items-start gap-2 rounded-md px-3 py-1.5">
+                <Badge
+                  variant="outline"
+                  className={cn('shrink-0 text-xs', arcoBadgeClass(item.priority === 'HIGH' ? 'red' : item.priority === 'MEDIUM' ? 'orange' : 'green'))}
+                >
+                  {item.priority}
+                </Badge>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px]">{item.action}</div>
                   {(item.assignee || item.deadline) && (
-                    <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>
+                    <div className="text-muted-foreground mt-0.5 text-xs">
                       {item.assignee && <span>负责人: {item.assignee}</span>}
                       {item.assignee && item.deadline && <span> · </span>}
                       {item.deadline && <span>期限: {item.deadline}</span>}
@@ -644,33 +650,29 @@ const AIEnhancedSection: React.FC<{
                 </div>
               </div>
             ))}
-          </Space>
+          </div>
         </div>
       )}
 
       {/* Resource bottlenecks */}
       {data.resourceBottlenecks && data.resourceBottlenecks.length > 0 && (
         <div>
-          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8 }}>
-            <IconUser style={{ marginRight: 4 }} />
+          <div className="mb-2 flex items-center text-[13px] font-medium">
+            <User className="mr-1 size-4" />
             资源瓶颈
           </div>
-          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <div className="flex w-full flex-col gap-1">
             {data.resourceBottlenecks.map((rb, i) => (
-              <div key={i} style={{
-                padding: '6px 12px',
-                background: 'var(--color-fill-1)',
-                borderRadius: 6,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{rb.person}</div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 2 }}>{rb.issue}</div>
-                <div style={{ fontSize: 12, color: 'var(--color-success-6)', marginTop: 2 }}>建议: {rb.suggestion}</div>
+              <div key={i} className="bg-muted/50 rounded-md px-3 py-1.5">
+                <div className="text-[13px] font-medium">{rb.person}</div>
+                <div className="text-muted-foreground mt-0.5 text-xs">{rb.issue}</div>
+                <div className="mt-0.5 text-xs text-green-600 dark:text-green-400">建议: {rb.suggestion}</div>
               </div>
             ))}
-          </Space>
+          </div>
         </div>
       )}
-    </Space>
+    </div>
   );
 };
 

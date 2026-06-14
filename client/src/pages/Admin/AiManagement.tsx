@@ -1,116 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  Form,
-  Input,
-  Button,
-  Message,
-  Table,
-  Statistic,
-  Grid,
-  Tag,
-  Modal,
-  Drawer,
-  Space,
-  Select,
-} from '@arco-design/web-react';
-import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-react/icon';
+import { toast } from 'sonner';
+import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { aiConfigApi } from '../../api';
 import { AiConfig, AiUsageStats } from '../../types';
 import { useAuthStore } from '../../store/authStore';
+import { arcoBadgeClass } from '../../utils/badgeColor';
+import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-const { Row, Col } = Grid;
-
+// AI 配置不再按功能关联（已定义为全站通用）；此映射仅用于"用量统计"里展示功能名
 const FEATURE_LABEL: Record<string, string> = {
   risk: '风险评估',
   weekly_report: '周报建议',
+  assistant: '全站助手',
+  schedule_assistant: '排期助手',
 };
 
-const FEATURE_OPTIONS = [
-  { value: 'risk', label: '风险评估' },
-  { value: 'weekly_report', label: '周报建议' },
-];
-
 // 主流 AI API 网关预设配置
-const AI_PROVIDERS = [
-  {
-    key: 'openai',
-    label: 'OpenAI',
-    apiUrl: 'https://api.openai.com/v1/chat/completions',
-    modelName: 'gpt-4o-mini',
-  },
-  {
-    key: 'claude',
-    label: 'Anthropic Claude',
-    apiUrl: 'https://api.anthropic.com/v1/messages',
-    modelName: 'claude-sonnet-4-5-20250929',
-  },
-  {
-    key: 'deepseek',
-    label: 'DeepSeek',
-    apiUrl: 'https://api.deepseek.com/v1/chat/completions',
-    modelName: 'deepseek-chat',
-  },
+interface AiProvider {
+  key: string;
+  label: string;
+  apiUrl: string;
+  modelName: string;
+  /** 部分厂商「编码套餐(包月)」走不同的 OpenAI 兼容端点；填了才显示「接入方式」选择 */
+  codingApiUrl?: string;
+}
+
+const AI_PROVIDERS: AiProvider[] = [
+  { key: 'openai', label: 'OpenAI', apiUrl: 'https://api.openai.com/v1/chat/completions', modelName: 'gpt-4o-mini' },
+  { key: 'claude', label: 'Anthropic Claude', apiUrl: 'https://api.anthropic.com/v1/messages', modelName: 'claude-sonnet-4-5-20250929' },
+  { key: 'deepseek', label: 'DeepSeek', apiUrl: 'https://api.deepseek.com/v1/chat/completions', modelName: 'deepseek-chat' },
   {
     key: 'zhipu',
     label: '智谱 GLM',
     apiUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     modelName: 'glm-4-flash',
+    codingApiUrl: 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions',
   },
-  {
-    key: 'qwen',
-    label: '通义千问',
-    apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-    modelName: 'qwen-plus',
-  },
-  {
-    key: 'doubao',
-    label: '豆包 (火山引擎)',
-    apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-    modelName: 'doubao-1.5-pro-32k',
-  },
-  {
-    key: 'moonshot',
-    label: 'Moonshot (月之暗面)',
-    apiUrl: 'https://api.moonshot.cn/v1/chat/completions',
-    modelName: 'moonshot-v1-8k',
-  },
-  {
-    key: 'minimax',
-    label: 'MiniMax',
-    apiUrl: 'https://api.minimax.chat/v1/text/chatcompletion_v2',
-    modelName: 'MiniMax-Text-01',
-  },
-  {
-    key: 'yi',
-    label: '零一万物 (Yi)',
-    apiUrl: 'https://api.lingyiwanwu.com/v1/chat/completions',
-    modelName: 'yi-large',
-  },
-  {
-    key: 'baichuan',
-    label: '百川智能',
-    apiUrl: 'https://api.baichuan-ai.com/v1/chat/completions',
-    modelName: 'Baichuan4',
-  },
-  {
-    key: 'siliconflow',
-    label: '硅基流动 (SiliconFlow)',
-    apiUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    modelName: 'Qwen/Qwen2.5-7B-Instruct',
-  },
-  {
-    key: 'custom',
-    label: '自定义',
-    apiUrl: '',
-    modelName: '',
-  },
+  { key: 'qwen', label: '通义千问', apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', modelName: 'qwen-plus' },
+  { key: 'doubao', label: '豆包 (火山引擎)', apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', modelName: 'doubao-1.5-pro-32k' },
+  { key: 'moonshot', label: 'Moonshot (月之暗面)', apiUrl: 'https://api.moonshot.cn/v1/chat/completions', modelName: 'moonshot-v1-8k' },
+  { key: 'minimax', label: 'MiniMax', apiUrl: 'https://api.minimax.chat/v1/text/chatcompletion_v2', modelName: 'MiniMax-Text-01' },
+  { key: 'yi', label: '零一万物 (Yi)', apiUrl: 'https://api.lingyiwanwu.com/v1/chat/completions', modelName: 'yi-large' },
+  { key: 'baichuan', label: '百川智能', apiUrl: 'https://api.baichuan-ai.com/v1/chat/completions', modelName: 'Baichuan4' },
+  { key: 'siliconflow', label: '硅基流动 (SiliconFlow)', apiUrl: 'https://api.siliconflow.cn/v1/chat/completions', modelName: 'Qwen/Qwen2.5-7B-Instruct' },
+  { key: 'custom', label: '自定义', apiUrl: '', modelName: '' },
 ];
+
+const baseOf = (url: string): string => url.replace(/\/chat\/completions$|\/messages$|\/chatcompletion_v2$/, '');
+
+// 根据 apiUrl 推断 provider（同时识别厂商的编码套餐端点）
+export const detectProvider = (apiUrl: string): string => {
+  if (!apiUrl) return 'custom';
+  const match = AI_PROVIDERS.find(
+    (p) =>
+      p.key !== 'custom' &&
+      (apiUrl.startsWith(baseOf(p.apiUrl)) || (p.codingApiUrl ? apiUrl.startsWith(baseOf(p.codingApiUrl)) : false))
+  );
+  return match?.key || 'custom';
+};
+
+// 根据 apiUrl 推断接入方式（按量 / 编码套餐）
+export const detectApiMode = (apiUrl: string, providerKey: string): 'token' | 'coding' => {
+  const p = AI_PROVIDERS.find((x) => x.key === providerKey);
+  if (p?.codingApiUrl && apiUrl.startsWith(baseOf(p.codingApiUrl))) return 'coding';
+  return 'token';
+};
+
+interface ConfigForm {
+  name: string;
+  apiUrl: string;
+  apiKey: string;
+  modelName: string;
+}
+const EMPTY_FORM: ConfigForm = { name: '', apiUrl: '', apiKey: '', modelName: '' };
 
 const AiManagement: React.FC = () => {
   const { hasPermission } = useAuthStore();
-  const [configForm] = Form.useForm();
 
   // 配置列表
   const [configs, setConfigs] = useState<AiConfig[]>([]);
@@ -120,8 +111,18 @@ const AiManagement: React.FC = () => {
   const [saveLoading, setSaveLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>('custom');
+  const [apiMode, setApiMode] = useState<'token' | 'coding'>('token');
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AiConfig | null>(null);
+
+  // 表单字段（受控）
+  const [form, setForm] = useState<ConfigForm>(EMPTY_FORM);
+  const [errors, setErrors] = useState<{ name?: string; apiKey?: string }>({});
+  const setField = <K extends keyof ConfigForm>(k: K, v: ConfigForm[K]) => {
+    setForm((p) => ({ ...p, [k]: v }));
+    setErrors((p) => (p[k as 'name' | 'apiKey'] ? { ...p, [k]: undefined } : p));
+  };
 
   // 使用统计
   const [stats, setStats] = useState<AiUsageStats | null>(null);
@@ -138,7 +139,7 @@ const AiManagement: React.FC = () => {
       const response = await aiConfigApi.list();
       setConfigs(response.data);
     } catch {
-      Message.error('加载AI配置列表失败');
+      toast.error('加载AI配置列表失败');
     } finally {
       setConfigsLoading(false);
     }
@@ -150,71 +151,79 @@ const AiManagement: React.FC = () => {
       const response = await aiConfigApi.getUsageStats();
       setStats(response.data);
     } catch {
-      Message.error('加载使用统计失败');
+      toast.error('加载使用统计失败');
     } finally {
       setStatsLoading(false);
     }
   };
 
-  // 根据 apiUrl 推断 provider
-  const detectProvider = (apiUrl: string): string => {
-    if (!apiUrl) return 'custom';
-    const match = AI_PROVIDERS.find(
-      (p) => p.key !== 'custom' && apiUrl.startsWith(p.apiUrl.replace(/\/chat\/completions$|\/messages$|\/chatcompletion_v2$/, ''))
-    );
-    return match?.key || 'custom';
-  };
+  const currentProvider = AI_PROVIDERS.find((p) => p.key === selectedProvider);
 
   const handleProviderChange = (providerKey: string) => {
     setSelectedProvider(providerKey);
+    setApiMode('token');
     setModelOptions([]);
     const provider = AI_PROVIDERS.find((p) => p.key === providerKey);
     if (provider && providerKey !== 'custom') {
-      configForm.setFieldsValue({
+      setForm((prev) => ({
+        ...prev,
         apiUrl: provider.apiUrl,
         modelName: provider.modelName,
-      });
-      // 如果名称为空，自动填充 provider 名称
-      const currentName = configForm.getFieldValue('name');
-      if (!currentName) {
-        configForm.setFieldsValue({ name: provider.label });
-      }
+        name: prev.name || provider.label,
+      }));
     }
+  };
+
+  // 切换接入方式（按量 / 编码套餐）→ 填对应的 OpenAI 兼容端点
+  const handleApiModeChange = (mode: 'token' | 'coding') => {
+    setApiMode(mode);
+    const provider = AI_PROVIDERS.find((p) => p.key === selectedProvider);
+    if (!provider) return;
+    setField('apiUrl', mode === 'coding' && provider.codingApiUrl ? provider.codingApiUrl : provider.apiUrl);
   };
 
   const handleCreate = () => {
     setEditingConfig(null);
     setSelectedProvider('custom');
+    setApiMode('token');
     setModelOptions([]);
-    configForm.resetFields();
+    setForm(EMPTY_FORM);
+    setErrors({});
     setDrawerVisible(true);
   };
 
   const handleEdit = (record: AiConfig) => {
     setEditingConfig(record);
-    setSelectedProvider(detectProvider(record.apiUrl));
+    const providerKey = detectProvider(record.apiUrl);
+    setSelectedProvider(providerKey);
+    setApiMode(detectApiMode(record.apiUrl, providerKey));
     setModelOptions([]);
-    configForm.setFieldsValue({
-      ...record,
-      features: record.features ? record.features.split(',').filter(Boolean) : [],
+    setForm({
+      name: record.name || '',
+      apiUrl: record.apiUrl || '',
+      apiKey: record.apiKey || '',
+      modelName: record.modelName || '',
     });
+    setErrors({});
     setDrawerVisible(true);
   };
 
   const handleSave = async () => {
+    const e: { name?: string; apiKey?: string } = {};
+    if (!form.name.trim()) e.name = '请输入配置名称';
+    if (!editingConfig && !form.apiKey.trim()) e.apiKey = '请输入 API Key';
+    setErrors(e);
+    if (Object.keys(e).length) return;
+
     setSaveLoading(true);
     try {
-      const values = await configForm.validate();
-      const data = {
-        ...values,
-        features: values.features?.join(',') || '',
-      };
+      const data = { name: form.name, apiUrl: form.apiUrl, apiKey: form.apiKey, modelName: form.modelName };
       if (editingConfig) {
         await aiConfigApi.update(editingConfig.id, data);
-        Message.success('配置更新成功');
+        toast.success('配置更新成功');
       } else {
         await aiConfigApi.create(data);
-        Message.success('配置创建成功');
+        toast.success('配置创建成功');
       }
       setDrawerVisible(false);
       loadConfigs();
@@ -226,15 +235,13 @@ const AiManagement: React.FC = () => {
   };
 
   const handleTestConnection = async () => {
-    // 用 getFields() 获取全部字段值，比逐个 getFieldValue 更可靠
-    const fields = configForm.getFields();
-    const apiUrl = fields.apiUrl as string | undefined;
-    const apiKey = fields.apiKey as string | undefined;
-    const modelName = fields.modelName as string | undefined;
+    const apiUrl = form.apiUrl;
+    const apiKey = form.apiKey;
+    const modelName = form.modelName;
     const isMasked = apiKey?.startsWith('****');
 
     if (!apiUrl || (!apiKey && !editingConfig)) {
-      Message.warning('请填写 API URL 和 API Key');
+      toast.warning('请填写 API URL 和 API Key');
       return;
     }
 
@@ -244,29 +251,27 @@ const AiManagement: React.FC = () => {
         apiUrl,
         apiKey: apiKey || '',
         modelName,
-        // 编辑模式下 key 被掩码，传 configId 让服务端从数据库读取真实 key
         ...(isMasked && editingConfig ? { configId: editingConfig.id } : {}),
       });
       if (response.data.success) {
-        Message.success(response.data.message);
+        toast.success(response.data.message);
       } else {
-        Message.error(response.data.message);
+        toast.error(response.data.message);
       }
     } catch {
-      Message.error('验证请求失败');
+      toast.error('验证请求失败');
     } finally {
       setTestLoading(false);
     }
   };
 
   const handleFetchModels = async () => {
-    const fields = configForm.getFields();
-    const apiUrl = fields.apiUrl as string | undefined;
-    const apiKey = fields.apiKey as string | undefined;
+    const apiUrl = form.apiUrl;
+    const apiKey = form.apiKey;
     const isMasked = apiKey?.startsWith('****');
 
     if (!apiUrl || (!apiKey && !editingConfig)) {
-      Message.warning('请先填写 API URL 和 API Key');
+      toast.warning('请先填写 API URL 和 API Key');
       return;
     }
 
@@ -279,284 +284,296 @@ const AiManagement: React.FC = () => {
       });
       if (response.data.success && response.data.models.length > 0) {
         setModelOptions(response.data.models);
-        Message.success(response.data.message);
+        toast.success(response.data.message);
       } else {
-        Message.warning(response.data.message || '未获取到模型列表，可手动输入模型名称');
+        toast.warning(response.data.message || '未获取到模型列表，可手动输入模型名称');
       }
     } catch {
-      Message.warning('获取模型列表失败，可手动输入模型名称');
+      toast.warning('获取模型列表失败，可手动输入模型名称');
     } finally {
       setModelsLoading(false);
     }
   };
 
-  const handleDelete = (record: AiConfig) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除配置"${record.name}"吗？关联功能将回退到其他可用配置或环境变量。`,
-      onOk: async () => {
-        try {
-          await aiConfigApi.delete(record.id);
-          Message.success('配置删除成功');
-          loadConfigs();
-        } catch {
-          Message.error('删除失败');
-        }
-      },
-    });
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    try {
+      await aiConfigApi.delete(target.id);
+      toast.success('配置删除成功');
+      loadConfigs();
+    } catch {
+      toast.error('删除失败');
+    }
   };
 
-  const configColumns = [
-    {
-      title: '配置名称',
-      dataIndex: 'name',
-      width: 160,
-    },
-    {
-      title: 'API URL',
-      dataIndex: 'apiUrl',
-      width: 260,
-      render: (url: string) =>
-        url || <span style={{ color: 'var(--color-text-3)' }}>未配置</span>,
-    },
-    {
-      title: 'API Key',
-      dataIndex: 'apiKey',
-      width: 140,
-      render: (key: string) =>
-        key || <span style={{ color: 'var(--color-text-3)' }}>未配置</span>,
-    },
-    {
-      title: '模型',
-      dataIndex: 'modelName',
-      width: 140,
-    },
-    {
-      title: '关联功能',
-      dataIndex: 'features',
-      width: 200,
-      render: (features: string) => {
-        if (!features) return <span style={{ color: 'var(--color-text-3)' }}>无</span>;
-        return (
-          <Space wrap>
-            {features
-              .split(',')
-              .filter(Boolean)
-              .map((f) => (
-                <Tag key={f} color={f === 'risk' ? 'orange' : 'blue'}>
-                  {FEATURE_LABEL[f] || f}
-                </Tag>
-              ))}
-          </Space>
-        );
-      },
-    },
-    ...(hasPermission('user', 'update')
-      ? [
-          {
-            title: '操作',
-            width: 100,
-            render: (_: unknown, record: AiConfig) => (
-              <Space>
-                <Button
-                  type="text"
-                  icon={<IconEdit />}
-                  size="small"
-                  onClick={() => handleEdit(record)}
-                />
-                <Button
-                  type="text"
-                  status="danger"
-                  icon={<IconDelete />}
-                  size="small"
-                  onClick={() => handleDelete(record)}
-                />
-              </Space>
-            ),
-          },
-        ]
-      : []),
-  ];
-
-  const usageColumns = [
-    {
-      title: '时间',
-      dataIndex: 'createdAt',
-      width: 170,
-      render: (d: string) => dayjs(d).format('YYYY-MM-DD HH:mm'),
-    },
-    {
-      title: '功能',
-      dataIndex: 'feature',
-      width: 110,
-      render: (f: string) => (
-        <Tag color={f === 'risk' ? 'orange' : 'blue'}>
-          {FEATURE_LABEL[f] || f}
-        </Tag>
-      ),
-    },
-    {
-      title: '项目',
-      dataIndex: 'project',
-      width: 180,
-      render: (p?: { id: string; name: string }) => p?.name || '-',
-    },
-    {
-      title: '模型',
-      dataIndex: 'modelName',
-      width: 140,
-    },
-    {
-      title: 'Prompt',
-      dataIndex: 'promptTokens',
-      width: 100,
-    },
-    {
-      title: 'Completion',
-      dataIndex: 'completionTokens',
-      width: 110,
-    },
-    {
-      title: 'Total',
-      dataIndex: 'totalTokens',
-      width: 100,
-    },
+  const canManage = hasPermission('user', 'update');
+  const totals = stats?.totals;
+  const statCards = [
+    { label: '总调用次数', value: totals?.callCount ?? 0, sep: false },
+    { label: 'Prompt Tokens', value: totals?.promptTokens ?? 0, sep: true },
+    { label: 'Completion Tokens', value: totals?.completionTokens ?? 0, sep: true },
+    { label: 'Total Tokens', value: totals?.totalTokens ?? 0, sep: true },
   ];
 
   return (
     <div>
       {/* AI 配置列表 */}
-      <Card
-        title="API 配置"
-        style={{ marginBottom: 16 }}
-        extra={
-          hasPermission('user', 'update') && (
-            <Button type="primary" icon={<IconPlus />} size="small" onClick={handleCreate}>
+      <Card className="mb-4 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold">API 配置</div>
+          {canManage && (
+            <Button size="sm" onClick={handleCreate}>
+              <Plus className="size-4" />
               新建配置
             </Button>
-          )
-        }
-      >
-        <Table
-          columns={configColumns}
-          data={configs}
-          loading={configsLoading}
-          rowKey="id"
-          pagination={false}
-          scroll={{ x: 1200 }}
-          noDataElement={
-            <div style={{ padding: 40, color: 'var(--color-text-3)', textAlign: 'center' }}>
-              暂无AI配置，点击"新建配置"添加
-            </div>
-          }
-        />
+          )}
+        </div>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-40">配置名称</TableHead>
+                <TableHead>API URL</TableHead>
+                <TableHead className="w-36">API Key</TableHead>
+                <TableHead className="w-36">模型</TableHead>
+                {canManage && <TableHead className="w-24">操作</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {configsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={canManage ? 5 : 4} className="h-24 text-center">
+                    <Loader2 className="text-muted-foreground mx-auto size-6 animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : configs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={canManage ? 5 : 4} className="text-muted-foreground h-24 text-center">
+                    暂无AI配置，点击"新建配置"添加
+                  </TableCell>
+                </TableRow>
+              ) : (
+                configs.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell className="font-medium">{record.name}</TableCell>
+                    <TableCell>{record.apiUrl || <span className="text-muted-foreground">未配置</span>}</TableCell>
+                    <TableCell>{record.apiKey || <span className="text-muted-foreground">未配置</span>}</TableCell>
+                    <TableCell>{record.modelName}</TableCell>
+                    {canManage && (
+                      <TableCell>
+                        <div className="flex gap-0.5">
+                          <Button variant="ghost" size="icon" className="size-8" aria-label="编辑配置" onClick={() => handleEdit(record)}>
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive size-8"
+                            aria-label="删除配置"
+                            onClick={() => setDeleteTarget(record)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {/* Token 使用统计 */}
-      <Card title="Token 使用统计">
-        <Row gutter={24} style={{ marginBottom: 24 }}>
-          <Col span={6}>
-            <Statistic title="总调用次数" value={stats?.totals.callCount || 0} />
-          </Col>
-          <Col span={6}>
-            <Statistic title="Prompt Tokens" value={stats?.totals.promptTokens || 0} groupSeparator />
-          </Col>
-          <Col span={6}>
-            <Statistic title="Completion Tokens" value={stats?.totals.completionTokens || 0} groupSeparator />
-          </Col>
-          <Col span={6}>
-            <Statistic title="Total Tokens" value={stats?.totals.totalTokens || 0} groupSeparator />
-          </Col>
-        </Row>
+      <Card className="p-4">
+        <div className="mb-3 text-sm font-semibold">Token 使用统计</div>
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {statCards.map((c) => (
+            <div key={c.label}>
+              <div className="text-muted-foreground text-xs">{c.label}</div>
+              <div className="mt-1 text-2xl font-semibold">{c.sep ? c.value.toLocaleString('en-US') : c.value}</div>
+            </div>
+          ))}
+        </div>
 
-        <Table
-          columns={usageColumns}
-          data={stats?.recentLogs || []}
-          loading={statsLoading}
-          rowKey="id"
-          pagination={{ pageSize: 10, showTotal: true }}
-          scroll={{ x: 900 }}
-          noDataElement={
-            <div style={{ padding: 40, color: 'var(--color-text-3)', textAlign: 'center' }}>暂无调用记录</div>
-          }
-        />
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-44">时间</TableHead>
+                <TableHead className="w-28">功能</TableHead>
+                <TableHead className="w-44">项目</TableHead>
+                <TableHead className="w-36">模型</TableHead>
+                <TableHead className="w-24">Prompt</TableHead>
+                <TableHead className="w-28">Completion</TableHead>
+                <TableHead className="w-24">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {statsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <Loader2 className="text-muted-foreground mx-auto size-6 animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : (stats?.recentLogs || []).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
+                    暂无调用记录
+                  </TableCell>
+                </TableRow>
+              ) : (
+                (stats?.recentLogs || []).map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>{dayjs(log.createdAt).format('YYYY-MM-DD HH:mm')}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={arcoBadgeClass(log.feature === 'risk' ? 'orange' : 'blue')}>
+                        {FEATURE_LABEL[log.feature] || log.feature}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{log.project?.name || '-'}</TableCell>
+                    <TableCell>{log.modelName}</TableCell>
+                    <TableCell>{log.promptTokens}</TableCell>
+                    <TableCell>{log.completionTokens}</TableCell>
+                    <TableCell>{log.totalTokens}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {/* 新建/编辑配置 Drawer */}
-      <Drawer
-        title={editingConfig ? '编辑配置' : '新建配置'}
-        visible={drawerVisible}
-        width={480}
-        onCancel={() => setDrawerVisible(false)}
-        onOk={handleSave}
-        confirmLoading={saveLoading}
-      >
-        <Form form={configForm} layout="vertical">
-          <Form.Item label="服务商">
-            <Select
-              value={selectedProvider}
-              onChange={handleProviderChange}
-              placeholder="选择预设服务商，自动填充 API 地址和模型"
-            >
-              {AI_PROVIDERS.map((p) => (
-                <Select.Option key={p.key} value={p.key}>
-                  {p.label}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item
-            label="配置名称"
-            field="name"
-            rules={[{ required: true, message: '请输入配置名称' }]}
-          >
-            <Input placeholder="如：GPT-4o 风险评估" />
-          </Form.Item>
-          <Form.Item label="API URL" field="apiUrl">
-            <Input placeholder="https://api.openai.com/v1/chat/completions" />
-          </Form.Item>
-          <Form.Item
-            label="API Key"
-            field="apiKey"
-            rules={[{ required: !editingConfig, message: '请输入 API Key' }]}
-          >
-            <Input.Password placeholder="sk-..." />
-          </Form.Item>
-          <Form.Item label="模型名称" field="modelName">
-            <Select
-              showSearch
-              allowCreate
-              placeholder="选择或输入模型名称"
-              loading={modelsLoading}
-            >
-              {modelOptions.map((m) => (
-                <Select.Option key={m} value={m}>
-                  {m}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item label=" " colon={false}>
-            <Space>
-              <Button loading={modelsLoading} onClick={handleFetchModels}>
+      <Sheet open={drawerVisible} onOpenChange={(o) => !o && setDrawerVisible(false)}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[480px]" onInteractOutside={(e) => e.preventDefault()}>
+          <SheetHeader className="border-b px-6 py-4">
+            <SheetTitle>{editingConfig ? '编辑配置' : '新建配置'}</SheetTitle>
+            <SheetDescription className="sr-only">配置 AI 服务的接入参数</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div className="space-y-1.5">
+              <Label>服务商</Label>
+              <Select value={selectedProvider} onValueChange={handleProviderChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择预设服务商，自动填充 API 地址和模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_PROVIDERS.map((p) => (
+                    <SelectItem key={p.key} value={p.key}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {currentProvider?.codingApiUrl && (
+              <div className="space-y-1.5">
+                <Label>接入方式</Label>
+                <div className="bg-muted inline-flex rounded-md p-0.5">
+                  {(
+                    [
+                      { v: 'token', l: '按量计费 (Token)' },
+                      { v: 'coding', l: '编码套餐 (Coding Plan)' },
+                    ] as const
+                  ).map((m) => (
+                    <button
+                      key={m.v}
+                      type="button"
+                      onClick={() => handleApiModeChange(m.v)}
+                      className={cn(
+                        'rounded px-3 py-1 text-sm transition-colors',
+                        apiMode === m.v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      {m.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-xs">按量计费与编码套餐(包月)使用不同的接口地址，请按你购买的方式选择</p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>
+                配置名称<span className="text-destructive ml-0.5">*</span>
+              </Label>
+              <Input placeholder="如：GPT-4o 风险评估" value={form.name} onChange={(e) => setField('name', e.target.value)} />
+              {errors.name && <p className="text-destructive text-xs">{errors.name}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>API URL</Label>
+              <Input placeholder="https://api.openai.com/v1/chat/completions" value={form.apiUrl} onChange={(e) => setField('apiUrl', e.target.value)} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>
+                API Key{!editingConfig && <span className="text-destructive ml-0.5">*</span>}
+              </Label>
+              <Input type="password" placeholder="sk-..." value={form.apiKey} onChange={(e) => setField('apiKey', e.target.value)} />
+              {errors.apiKey && <p className="text-destructive text-xs">{errors.apiKey}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>模型名称</Label>
+              <Input
+                list="ai-model-options"
+                placeholder="选择或输入模型名称"
+                value={form.modelName}
+                onChange={(e) => setField('modelName', e.target.value)}
+              />
+              <datalist id="ai-model-options">
+                {modelOptions.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" disabled={modelsLoading} onClick={handleFetchModels}>
+                {modelsLoading && <Loader2 className="size-4 animate-spin" />}
                 获取模型列表
               </Button>
-              <Button loading={testLoading} onClick={handleTestConnection}>
+              <Button variant="outline" disabled={testLoading} onClick={handleTestConnection}>
+                {testLoading && <Loader2 className="size-4 animate-spin" />}
                 验证连接
               </Button>
-            </Space>
-          </Form.Item>
-          <Form.Item label="关联功能" field="features">
-            <Select mode="multiple" placeholder="选择此配置服务的功能" allowClear>
-              {FEATURE_OPTIONS.map((opt) => (
-                <Select.Option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Form>
-      </Drawer>
+            </div>
+          </div>
+
+          <SheetFooter className="flex-row justify-end gap-2 border-t px-6 py-4">
+            <Button variant="outline" onClick={() => setDrawerVisible(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSave} disabled={saveLoading}>
+              {saveLoading && <Loader2 className="size-4 animate-spin" />}
+              确定
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* 删除确认 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除配置"{deleteTarget?.name}"吗？删除后 AI 调用将回退到其他可用配置或环境变量。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

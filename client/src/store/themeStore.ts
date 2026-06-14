@@ -12,11 +12,12 @@ interface ThemeState {
 }
 
 const applyTheme = (theme: Theme) => {
-  if (theme === 'dark') {
-    document.body.setAttribute('arco-theme', 'dark');
-  } else {
-    document.body.removeAttribute('arco-theme');
-  }
+  const isDark = theme === 'dark';
+  // Arco（迁移期仍在）：body[arco-theme='dark']
+  if (isDark) document.body.setAttribute('arco-theme', 'dark');
+  else document.body.removeAttribute('arco-theme');
+  // shadcn：<html> 上切 .dark class
+  document.documentElement.classList.toggle('dark', isDark);
 };
 
 export const useThemeStore = create<ThemeState>((set, get) => ({

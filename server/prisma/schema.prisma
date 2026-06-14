@@ -214,6 +214,7 @@ model Activity {
   planStartDate DateTime?
   planEndDate   DateTime?
   planDuration  Int?
+  hardConstraintDate DateTime? // "硬节点"：计划完成不得晚于此日期（对话式排期助手的撞节点风险判定）
   startDate     DateTime?
   endDate       DateTime?
   duration      Int?
