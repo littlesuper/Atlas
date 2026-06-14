@@ -1,16 +1,15 @@
 import React, { useRef } from 'react';
-import { Plus, ArrowUp, Loader2 } from 'lucide-react';
+import { ArrowUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
-  onNewChat: () => void;
   sending: boolean;
 }
 
-const ChatInput: React.FC<Props> = ({ value, onChange, onSend, onNewChat, sending }) => {
+const ChatInput: React.FC<Props> = ({ value, onChange, onSend, sending }) => {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const resize = () => {
@@ -22,17 +21,7 @@ const ChatInput: React.FC<Props> = ({ value, onChange, onSend, onNewChat, sendin
   };
 
   return (
-    <div className="bg-background mx-auto flex w-full max-w-[760px] items-end gap-1 rounded-3xl border px-2 py-1.5 pl-3 shadow-sm">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label="新对话"
-        onClick={onNewChat}
-        className="text-muted-foreground size-8 shrink-0 rounded-full"
-      >
-        <Plus className="size-4" />
-      </Button>
+    <div className="bg-background mx-auto flex w-full max-w-[760px] items-end gap-1 rounded-3xl border px-2 py-1.5 pl-4 shadow-sm">
       <textarea
         ref={ref}
         value={value}
