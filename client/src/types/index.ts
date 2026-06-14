@@ -379,6 +379,43 @@ export interface AssistantApplyResult {
   risks: AssistantRiskRow[];
 }
 
+// ============ 助手聊天消息（前端对话流） ============
+export type AssistantMessage =
+  | { id: string; role: 'user'; text: string }
+  | {
+      id: string;
+      role: 'assistant';
+      kind: 'answer';
+      answer: string;
+      basis?: 'deterministic' | 'grounded';
+      elapsedMs?: number;
+    }
+  | {
+      id: string;
+      role: 'assistant';
+      kind: 'proposal';
+      proposalId: string | null;
+      preview: AssistantPreview;
+      narrative: string;
+      confidence?: 'high' | 'low';
+      elapsedMs?: number;
+      applied: boolean;
+      stale?: boolean;
+    }
+  | {
+      id: string;
+      role: 'assistant';
+      kind: 'status';
+      variant: 'ai_unavailable' | 'noop' | 'need_target' | 'error';
+      text: string;
+    };
+
+// 未带 id 的草稿（store 负责生成 id）
+export type AssistantDraft =
+  | Omit<Extract<AssistantMessage, { kind: 'answer' }>, 'id'>
+  | Omit<Extract<AssistantMessage, { kind: 'proposal' }>, 'id'>
+  | Omit<Extract<AssistantMessage, { kind: 'status' }>, 'id'>;
+
 // ============ 产品相关类型 ============
 
 export interface ProductImage {
