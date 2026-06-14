@@ -78,7 +78,7 @@ const RiskDashboard: React.FC = () => {
   if (loading) {
     return (
       <MainLayout>
-        <div className="mx-auto max-w-[1200px] space-y-4 p-6">
+        <div className="mx-auto max-w-[1200px] space-y-4">
           <Skeleton className="h-20 w-full" />
           <div className="grid grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -109,7 +109,7 @@ const RiskDashboard: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="mx-auto max-w-[1200px] p-6">
+      <div className="mx-auto max-w-[1200px]">
         <div className="mb-6">
           <h2 className="text-xl font-semibold">风险总览</h2>
           <p className="text-muted-foreground mt-1 text-sm">跨项目风险全景视图</p>

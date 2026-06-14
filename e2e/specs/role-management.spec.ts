@@ -2,7 +2,6 @@ import { test, expect } from '../fixtures/auth';
 import { uniqueName, text } from '../fixtures/test-data';
 import {
   clickNavItem,
-  clickTab,
   expectMessage,
   confirmModal,
   waitForTableLoad,
@@ -22,9 +21,8 @@ test.describe.serial('Role Management @p1', () => {
   const updatedRoleName = uniqueName('已修改角色');
 
   async function goToRoleTab(page: import('@playwright/test').Page) {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '账号管理');
     await waitForPageLoad(page);
-    await clickTab(page, '账号管理');
     await page.waitForTimeout(500);
     await page.getByText('角色管理', { exact: true }).click();
     await page.waitForTimeout(500);

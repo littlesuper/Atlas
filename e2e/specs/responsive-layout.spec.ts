@@ -28,7 +28,7 @@ test.describe('Layout & Navigation @p1', () => {
   test('sidebar contains all navigation items', async ({ authedPage: page }) => {
     await waitForPageLoad(page);
 
-    const navItems = ['项目管理', '项目周报', '产品管理', '项目资源', '系统管理'];
+    const navItems = ['项目管理', '项目周报', '产品管理', '项目资源', 'AI管理'];
     for (const item of navItems) {
       const navItem = page.locator('.nav-item').filter({ hasText: item });
       if (await navItem.isVisible({ timeout: 3_000 }).catch(() => false)) {

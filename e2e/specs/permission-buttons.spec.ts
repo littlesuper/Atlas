@@ -107,7 +107,7 @@ base.describe.serial('Permission-Based Button Visibility @p1', () => {
     await login(page, credentials.lisi.username, credentials.lisi.password);
 
     // Check if system admin nav item is visible
-    const adminNav = page.locator('.nav-item').filter({ hasText: '系统管理' });
+    const adminNav = page.locator('.nav-item').filter({ hasText: 'AI管理' });
     const hasAdminNav = await adminNav.isVisible({ timeout: 3_000 }).catch(() => false);
 
     // lisi should not have user:read permission, so admin nav should be hidden

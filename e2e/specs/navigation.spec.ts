@@ -12,21 +12,18 @@ test.describe.serial('Navigation @p1', () => {
     await clickNavItem(page, '产品管理');
     await expect(page).toHaveURL(/\/products/);
 
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await expect(page).toHaveURL(/\/admin/);
   });
 
   test('tab navigation within system admin', async ({ authedPage: page }) => {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, 'AI管理');
     await expect(page).toHaveURL(/\/admin/);
     await waitForPageLoad(page);
-
-    // Click AI管理 tab
-    await clickTab(page, 'AI管理');
     await expect(page.getByText('API 配置')).toBeVisible({ timeout: 5_000 });
 
-    // Click 账号管理 tab
-    await clickTab(page, '账号管理');
+    // Navigate to 账号管理 section
+    await clickNavItem(page, '账号管理');
     await page.waitForTimeout(500);
 
     // Within 账号管理, click sub-tabs
@@ -36,8 +33,8 @@ test.describe.serial('Navigation @p1', () => {
     await clickTab(page, '角色管理');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
 
-    // Click 操作日志 tab
-    await clickTab(page, '操作日志');
+    // Navigate to 操作日志 section
+    await clickNavItem(page, '操作日志');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
   });
 });

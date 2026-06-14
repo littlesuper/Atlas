@@ -1,7 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import {
   clickNavItem,
-  clickTab,
   waitForTableLoad,
   waitForPageLoad,
 } from '../helpers/arco';
@@ -15,9 +14,8 @@ import {
  */
 test.describe('Audit Log @p2', () => {
   async function goToAuditLog(page: import('@playwright/test').Page) {
-    await clickNavItem(page, '系统管理');
+    await clickNavItem(page, '操作日志');
     await waitForPageLoad(page);
-    await clickTab(page, '操作日志');
     await waitForTableLoad(page);
   }
 

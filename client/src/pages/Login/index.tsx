@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,6 +21,14 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
+
+  const [appVersion, setAppVersion] = useState('');
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d) => setAppVersion(d.version || ''))
+      .catch(() => {});
+  }, []);
 
   // URL 含 code 参数时默认选中企微 Tab
   const defaultTab = useMemo(() => {
@@ -52,7 +60,8 @@ const Login: React.FC = () => {
     <div className="login-container bg-muted/30 flex min-h-svh items-center justify-center p-6">
       <Card className="login-card w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">硬件管理系统</CardTitle>
+          <img src="/logo.png" alt="贝锐科技" className="mx-auto mb-2 size-16 object-contain" />
+          <CardTitle className="text-xl">硬件项目管理</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue={defaultTab}>
@@ -92,7 +101,7 @@ const Login: React.FC = () => {
             </TabsContent>
           </Tabs>
 
-          <p className="text-muted-foreground mt-6 text-center text-xs">贝锐科技 - 硬件项目管理平台</p>
+          <p className="text-muted-foreground mt-6 text-center text-xs">贝锐科技 - 硬件项目管理平台{appVersion ? ` · v${appVersion}` : ''}</p>
         </CardContent>
       </Card>
     </div>

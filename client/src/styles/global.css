@@ -118,7 +118,7 @@ body:not([arco-theme='dark']) {
 
 /* ============ 页面内容区背景 ============ */
 .page-content {
-  background-color: var(--page-bg);
+  background-color: var(--background);
   min-height: calc(100vh - 56px);
   padding: 24px;
 }
@@ -852,7 +852,7 @@ body[arco-theme='dark'] {
   --timeline-dot: #4b5563;
   --timeline-dot-active: #6b7280;
 
-  background-color: var(--page-bg);
+  background-color: var(--background);
 }
 
 /* 卡片：用极细边框代替重阴影，更通透 */
@@ -884,18 +884,19 @@ body[arco-theme='dark'] .arco-drawer-content {
   border-color: rgba(255, 255, 255, 0.06);
 }
 
-/* wangEditor 富文本编辑器在暗色模式下的适配 */
+/* wangEditor 富文本编辑器在暗色模式下的适配（用 shadcn 令牌，避免残留 Arco 深蓝 #0f172a） */
 body[arco-theme='dark'] .w-e-toolbar {
-  background-color: var(--color-bg-2) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: var(--muted) !important;
+  border-color: var(--border) !important;
 }
 
 body[arco-theme='dark'] .w-e-text-container {
-  background-color: var(--color-bg-1) !important;
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
 }
 
 body[arco-theme='dark'] .w-e-bar-item button:hover {
-  background-color: var(--color-fill-2) !important;
+  background-color: var(--accent) !important;
 }
 
 /* Tag 标签在暗色模式下降低饱和度 */
