@@ -229,10 +229,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       <SidebarInset>
         <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" size="icon-lg" />
+          <SidebarTrigger className="-ml-1" />
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell />
-            <Button variant="ghost" size="icon-lg" onClick={toggleTheme} aria-label="切换主题">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="切换主题">
               {theme === 'light' ? <Moon /> : <Sun />}
             </Button>
           </div>
