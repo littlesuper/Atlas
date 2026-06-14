@@ -26,7 +26,7 @@ const baseProposal = (over: Partial<AssistantProposeResult> = {}): AssistantProp
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  useAssistantChatStore.setState({ messages: [], pendingUtterance: null });
+  useAssistantChatStore.setState({ messages: [] });
 });
 
 describe('useAssistantChat', () => {

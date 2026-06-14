@@ -11,7 +11,6 @@ import {
   UserCog,
   CalendarDays,
   ScrollText,
-  Bot,
   ChevronsUpDown,
   LogOut,
   Sun,
@@ -91,10 +90,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navGroups: NavGroupDef[] = [
     {
       label: '概览',
-      items: [
-        { key: '/', label: '首页', path: '/', icon: Home },
-        { key: '/assistant', label: 'AI 助手', path: '/assistant', icon: Bot, permission: { resource: 'activity', action: 'update' } },
-      ],
+      items: [{ key: '/', label: '首页', path: '/', icon: Home }],
     },
     {
       label: '项目',
@@ -256,7 +252,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       </AlertDialog>
 
       {/* 全局 AI 助手浮层；首页已有 hero 输入 */}
-      {canUseAssistant && location.pathname !== '/' && location.pathname !== '/assistant' && (
+      {canUseAssistant && location.pathname !== '/' && (
         <AssistantLauncher projectId={routeProjectId} />
       )}
     </SidebarProvider>

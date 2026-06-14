@@ -9,11 +9,11 @@ interface AssistantLauncherProps {
 }
 
 /**
- * 右下角常驻 AI 助手按钮：点击跳转到全屏聊天页 /assistant，带当前项目上下文。
+ * 右下角常驻 AI 助手按钮：点击跳转到首页聊天 /，带当前项目上下文。
  */
 const AssistantLauncher: React.FC<AssistantLauncherProps> = ({ projectId }) => {
   const navigate = useNavigate();
-  const go = () => navigate(projectId ? `/assistant?project=${projectId}` : '/assistant');
+  const go = () => navigate(projectId ? `/?project=${projectId}` : '/');
 
   return (
     <Button

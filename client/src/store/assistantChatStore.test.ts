@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAssistantChatStore } from './assistantChatStore';
 
-const reset = () => useAssistantChatStore.setState({ messages: [], pendingUtterance: null });
+const reset = () => useAssistantChatStore.setState({ messages: [] });
 
 describe('assistantChatStore', () => {
   beforeEach(() => {
@@ -11,7 +11,6 @@ describe('assistantChatStore', () => {
 
   it('starts empty', () => {
     expect(useAssistantChatStore.getState().messages).toEqual([]);
-    expect(useAssistantChatStore.getState().pendingUtterance).toBeNull();
   });
 
   it('pushUser appends a user message and returns its id', () => {
@@ -54,13 +53,6 @@ describe('assistantChatStore', () => {
     useAssistantChatStore.getState().pushUser('x');
     useAssistantChatStore.getState().reset();
     expect(useAssistantChatStore.getState().messages).toEqual([]);
-  });
-
-  it('setPendingUtterance stores and clears the handoff', () => {
-    useAssistantChatStore.getState().setPendingUtterance('把项目甲优先级改成高');
-    expect(useAssistantChatStore.getState().pendingUtterance).toBe('把项目甲优先级改成高');
-    useAssistantChatStore.getState().setPendingUtterance(null);
-    expect(useAssistantChatStore.getState().pendingUtterance).toBeNull();
   });
 
   it('persists messages to localStorage', () => {
