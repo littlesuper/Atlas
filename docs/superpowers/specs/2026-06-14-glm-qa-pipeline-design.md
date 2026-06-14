@@ -149,7 +149,7 @@ GLM             复跑确认绿 → PR 标 ready → 人合并
 1. 本设计文档（已写）。
 2. `docs/qa/GLM-QA-GUIDE.md` —— GLM 操作手册：角色、硬边界、失败测试+PR 协议、bug 报告模板、沿用 `CLAUDE.md` 的测试命名/结构/mock 约定。
 3. `opencode.json` —— GLM provider + `qa` agent（key 留环境变量占位）。
-4. `qa-bug` 的 PR 模板（`.github/PULL_REQUEST_TEMPLATE/qa-bug.md`）+ 标签约定 + 在 README/文档登记新流程。
+4. `qa-bug` 标签 + 交接 checklist（并入 `docs/qa/bugs/_TEMPLATE.md` 作 PR `--body-file`，避免与现有默认 PR 模板冲突）+ 在 `docs/qa/README.md` 登记新流程。
 5. （可选）`docs/qa/bugs/` 目录与报告模板，作为 PR body 的来源。
 
 **Phase 2（可选，跑顺后再上）**
