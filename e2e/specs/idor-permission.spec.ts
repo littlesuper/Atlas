@@ -22,7 +22,7 @@ test.describe.serial('IDOR & Cross-Project Permission @smoke', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectAName);
-    await page.locator('.arco-table-td').getByText(projectAName).first().click();
+    await page.locator('td').getByText(projectAName).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
     projectAId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
     expect(projectAId).toBeTruthy();
@@ -36,7 +36,7 @@ test.describe.serial('IDOR & Cross-Project Permission @smoke', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectBName);
-    await page.locator('.arco-table-td').getByText(projectBName).first().click();
+    await page.locator('td').getByText(projectBName).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
     projectBId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
     expect(projectBId).toBeTruthy();
@@ -103,7 +103,7 @@ test.describe.serial('IDOR & Cross-Project Permission @smoke', () => {
     await page.goto(`/projects/${projectBId}`);
     await page.waitForTimeout(2_000);
 
-    const hasContent = await page.locator('.arco-table').isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasContent = await page.locator('table').isVisible({ timeout: 5_000 }).catch(() => false);
     if (hasContent) {
       const editBtn = page.locator('button[aria-label="编辑"]');
       if (await editBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -123,11 +123,11 @@ test.describe.serial('IDOR & Cross-Project Permission @smoke', () => {
       await page.waitForTimeout(300);
       await searchProject(page, name);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: name }).first();
+      const row = page.locator('tbody tr').filter({ hasText: name }).first();
       const delBtn = row.locator('button[class*="danger"]').first();
       if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await delBtn.click();
-        await page.locator('.arco-modal-footer .arco-btn-primary').click();
+        await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
         await expectMessage(page, '删除');
       }
     }

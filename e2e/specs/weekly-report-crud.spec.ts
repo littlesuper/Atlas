@@ -36,7 +36,7 @@ test.describe.serial('Weekly Report CRUD @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
     // Click on project name in the table
-    const projectLink = page.locator('.arco-table-td').getByText(projectName);
+    const projectLink = page.locator('td').getByText(projectName);
     await projectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
 
@@ -55,7 +55,7 @@ test.describe.serial('Weekly Report CRUD @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
     // Click on project name in the table
-    const projectLink2 = page.locator('.arco-table-td').getByText(projectName);
+    const projectLink2 = page.locator('td').getByText(projectName);
     await projectLink2.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
 
@@ -106,7 +106,7 @@ test.describe.serial('Weekly Report CRUD @p1', () => {
 
     // Table should be visible (multiple tables exist on this page, one per week)
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table').first()).toBeVisible();
+    await expect(page.locator('table').first()).toBeVisible();
   });
 
   // ──────── TC4: check drafts tab ────────
@@ -121,7 +121,7 @@ test.describe.serial('Weekly Report CRUD @p1', () => {
     await waitForTableLoad(page);
 
     // Should show the draft report table or empty state
-    const hasTable = await page.locator('.arco-table').first().isVisible({ timeout: 3_000 }).catch(() => false);
+    const hasTable = await page.locator('table').first().isVisible({ timeout: 3_000 }).catch(() => false);
     const hasEmpty = await page.locator('.arco-empty').isVisible({ timeout: 1_000 }).catch(() => false);
     expect(hasTable || hasEmpty).toBeTruthy();
   });
@@ -151,7 +151,7 @@ test.describe.serial('Weekly Report CRUD @p1', () => {
       await waitForTableLoad(page);
     }
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

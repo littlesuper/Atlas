@@ -21,7 +21,7 @@ test.describe.serial('Project Collaborators @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
     projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
     expect(projectId).toBeTruthy();
@@ -32,31 +32,31 @@ test.describe.serial('Project Collaborators @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
     const editBtn = row.getByRole('button', { name: '编辑' });
     await editBtn.click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(500);
 
-    const collaboratorSelect = page.locator('.arco-drawer .arco-select').filter({
+    const collaboratorSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({
       has: page.locator('[placeholder="选择项目协作者"]'),
     });
     if (await collaboratorSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await collaboratorSelect.click();
       await page.waitForTimeout(300);
 
-      const option = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const option = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await option.click();
         await page.waitForTimeout(300);
       }
 
-      await page.locator('.arco-drawer-footer').getByRole('button', { name: '保存修改' }).click();
+      await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '保存修改' }).click();
       await page.waitForTimeout(1_000);
     }
 
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 }).catch(() => {
-      page.locator('.arco-drawer-close-icon').click();
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 }).catch(() => {
+      page.locator('[data-slot="sheet-close"]').click();
     });
   });
 
@@ -65,23 +65,23 @@ test.describe.serial('Project Collaborators @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
     const editBtn = row.getByRole('button', { name: '编辑' });
     await editBtn.click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(500);
 
-    const collaboratorSelect = page.locator('.arco-drawer .arco-select').filter({
+    const collaboratorSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({
       has: page.locator('[placeholder="选择项目协作者"]'),
     });
     if (await collaboratorSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await collaboratorSelect.click();
       await page.waitForTimeout(300);
 
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       const count = await options.count();
 
-      const managerSelect = page.locator('.arco-drawer .arco-select').filter({
+      const managerSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({
         has: page.locator('[placeholder="选择项目经理"]'),
       });
       let managerName = '';
@@ -98,8 +98,8 @@ test.describe.serial('Project Collaborators @p1', () => {
       await page.waitForTimeout(300);
     }
 
-    await page.locator('.arco-drawer-close-icon').click();
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await page.locator('[data-slot="sheet-close"]').click();
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('PROJ-031: collaborator cannot add other collaborators', async ({ browser }) => {
@@ -129,11 +129,11 @@ test.describe.serial('Project Collaborators @p1', () => {
     await page.waitForTimeout(300);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
     const delBtn = row.locator('button[class*="danger"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
-      await page.locator('.arco-modal-footer .arco-btn-primary').click();
+      await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
       await expectMessage(page, '删除');
     }
   });

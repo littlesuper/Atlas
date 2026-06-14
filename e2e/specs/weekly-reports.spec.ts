@@ -9,7 +9,7 @@ test.describe.serial('Weekly Reports @p1', () => {
     // Should see the summary heading
     await expect(page.getByText('项目周报汇总')).toBeVisible();
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table').first()).toBeVisible();
+    await expect(page.locator('table').first()).toBeVisible();
   });
 
   test('navigate to project detail weekly reports tab', async ({ authedPage: page }) => {
@@ -18,14 +18,14 @@ test.describe.serial('Weekly Reports @p1', () => {
     await waitForTableLoad(page);
 
     // Click first project in the table
-    const firstProjectLink = page.locator('.arco-table-td a').first();
+    const firstProjectLink = page.locator('td a').first();
     if (await firstProjectLink.isVisible()) {
       const projectName = await firstProjectLink.textContent();
       await firstProjectLink.click();
       await expect(page).toHaveURL(/\/projects\/.+/);
 
       // Click the weekly reports tab inside project detail
-      const weeklyTab = page.locator('.arco-tabs-tab').filter({ hasText: '项目周报' });
+      const weeklyTab = page.locator('[role="tab"]').filter({ hasText: '项目周报' });
       if (await weeklyTab.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await weeklyTab.click();
         // Should see the weekly reports area (either cards or empty state)

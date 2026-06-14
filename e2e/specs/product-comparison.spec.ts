@@ -21,33 +21,33 @@ test.describe.serial('Product Comparison @p1', () => {
 
   async function createProduct(page: import('@playwright/test').Page, name: string, model: string) {
     await page.getByRole('button', { name: /新建产品/ }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(300);
 
     await page.getByPlaceholder('请输入产品名称').fill(name);
     await page.getByPlaceholder(/型号|RX/).fill(model);
 
     // Select category
-    const categorySelect = page.locator('.arco-drawer .arco-select').filter({ has: page.locator('[placeholder*="类别"]') });
+    const categorySelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({ has: page.locator('[placeholder*="类别"]') });
     if (await categorySelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await categorySelect.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
       await page.waitForTimeout(200);
     }
 
     // Select status
-    const statusSelect = page.locator('.arco-drawer .arco-select').filter({ has: page.locator('[placeholder*="状态"]') });
+    const statusSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({ has: page.locator('[placeholder*="状态"]') });
     if (await statusSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await statusSelect.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
       await page.waitForTimeout(200);
     }
 
     // Select related project (required field)
-    const projectSelect = page.locator('.arco-drawer .arco-select').filter({ has: page.locator('[placeholder="请选择关联项目"]') });
+    const projectSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').filter({ has: page.locator('[placeholder="请选择关联项目"]') });
     if (await projectSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await projectSelect.click();
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
       await page.waitForTimeout(200);
     }
 
@@ -57,7 +57,7 @@ test.describe.serial('Product Comparison @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await resp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
   }
 
@@ -77,7 +77,7 @@ test.describe.serial('Product Comparison @p1', () => {
     await waitForTableLoad(page);
 
     // Select first product checkbox
-    const checkboxes = page.locator('.arco-table-body .arco-checkbox');
+    const checkboxes = page.locator('tbody [data-slot="checkbox"]');
     const count = await checkboxes.count();
 
     if (count >= 2) {
@@ -100,7 +100,7 @@ test.describe.serial('Product Comparison @p1', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
 
-    const checkboxes = page.locator('.arco-table-body .arco-checkbox');
+    const checkboxes = page.locator('tbody [data-slot="checkbox"]');
     const count = await checkboxes.count();
 
     if (count >= 2) {
@@ -115,10 +115,10 @@ test.describe.serial('Product Comparison @p1', () => {
         await page.waitForTimeout(500);
 
         // Drawer should open with comparison table
-        const drawer = page.locator('.arco-drawer:visible');
+        const drawer = page.locator('[data-slot="sheet-content"]:visible');
         if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
           // Should contain product names
-          const table = drawer.locator('.arco-table, table');
+          const table = drawer.locator('table, table');
           await expect(table).toBeVisible({ timeout: 3_000 });
 
           // Close drawer
@@ -139,7 +139,7 @@ test.describe.serial('Product Comparison @p1', () => {
     expect(isVisible).toBeFalsy();
 
     // Select only one
-    const checkboxes = page.locator('.arco-table-body .arco-checkbox');
+    const checkboxes = page.locator('tbody [data-slot="checkbox"]');
     if (await checkboxes.count() >= 1) {
       await checkboxes.first().click();
       await page.waitForTimeout(200);
@@ -156,7 +156,7 @@ test.describe.serial('Product Comparison @p1', () => {
     await waitForTableLoad(page);
 
     for (const name of [product1, product2, product3]) {
-      const row = page.locator('.arco-table-tr').filter({ hasText: name });
+      const row = page.locator('tbody tr').filter({ hasText: name });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
         // Find delete button (icon)
         const deleteBtn = row.locator('button[class*="danger"]').first();

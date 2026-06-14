@@ -21,7 +21,7 @@ test.describe.serial('Activity Batch Import @smoke', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
     await waitForTableLoad(page);
@@ -43,7 +43,7 @@ test.describe.serial('Activity Batch Import @smoke', () => {
       await page.waitForTimeout(300);
 
       // Check for "批量导入" menu item
-      const importItem = page.locator('.arco-dropdown-menu-item, .arco-menu-item').filter({ hasText: /批量导入|导入/ });
+      const importItem = page.locator('[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-item"]').filter({ hasText: /批量导入|导入/ });
       await expect(importItem).toBeVisible({ timeout: 3_000 });
     }
   });
@@ -59,14 +59,14 @@ test.describe.serial('Activity Batch Import @smoke', () => {
     await activityDropdown.click();
     await page.waitForTimeout(300);
 
-    const importItem = page.locator('.arco-dropdown-menu-item, .arco-menu-item').filter({ hasText: /批量导入|导入/ });
+    const importItem = page.locator('[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-item"]').filter({ hasText: /批量导入|导入/ });
     if (!(await importItem.isVisible({ timeout: 3_000 }).catch(() => false))) return;
 
     await importItem.click();
     await page.waitForTimeout(500);
 
     // Modal should appear
-    const modal = page.locator('.arco-modal:visible');
+    const modal = page.locator('[data-slot="dialog-content"]:visible');
     if (await modal.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Should have a drag-drop upload area
       const uploadArea = modal.locator('.arco-upload-drag, [class*="upload"]');
@@ -96,13 +96,13 @@ test.describe.serial('Activity Batch Import @smoke', () => {
     await activityDropdown.click();
     await page.waitForTimeout(300);
 
-    const importItem = page.locator('.arco-dropdown-menu-item, .arco-menu-item').filter({ hasText: /批量导入|导入/ });
+    const importItem = page.locator('[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-item"]').filter({ hasText: /批量导入|导入/ });
     if (!(await importItem.isVisible({ timeout: 3_000 }).catch(() => false))) return;
 
     await importItem.click();
     await page.waitForTimeout(500);
 
-    const modal = page.locator('.arco-modal:visible');
+    const modal = page.locator('[data-slot="dialog-content"]:visible');
     if (await modal.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // The upload input should accept .xlsx and .xls
       const fileInput = modal.locator('input[type="file"]');
@@ -124,7 +124,7 @@ test.describe.serial('Activity Batch Import @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

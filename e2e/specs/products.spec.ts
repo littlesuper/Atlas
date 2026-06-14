@@ -9,7 +9,7 @@ test.describe.serial('Product Management @p1', () => {
     await clickNavItem(page, '产品管理');
     await expect(page).toHaveURL(/\/products/);
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table')).toBeVisible();
+    await expect(page.locator('table')).toBeVisible();
   });
 
   test('create new product', async ({ authedPage: page }) => {
@@ -17,18 +17,18 @@ test.describe.serial('Product Management @p1', () => {
     await waitForTableLoad(page);
 
     await page.getByRole('button', { name: '新建产品' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible();
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible();
 
     // Fill required fields
     await page.getByPlaceholder('请输入产品名称').fill(productName);
     await page.getByPlaceholder('例如: RX-3000').fill(text.productModel);
 
     // Select 关联项目
-    await page.locator('.arco-select').filter({ has: page.locator('[placeholder="请选择关联项目"]') }).click();
-    await page.locator('.arco-select-popup .arco-select-option').first().click();
+    await page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder="请选择关联项目"]') }).click();
+    await page.locator('[data-slot="select-content"] [role="option"]').first().click();
 
     // Submit
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '创建' }).click();
     await expectMessage(page, '产品创建成功');
 
     // Verify in list
@@ -40,7 +40,7 @@ test.describe.serial('Product Management @p1', () => {
     await clickNavItem(page, '产品管理');
     await waitForTableLoad(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: productName });
+    const row = page.locator('tbody tr').filter({ hasText: productName });
     await row.locator('button[class*="danger"]').click();
 
     await confirmModal(page);

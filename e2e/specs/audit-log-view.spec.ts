@@ -14,7 +14,7 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
     await clickTab(page, '操作日志');
 
     await page.waitForTimeout(1_000);
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('audit log table has expected columns', async ({ authedPage: page }) => {
@@ -23,7 +23,7 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
     await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
-    const table = page.locator('.arco-table').first();
+    const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10_000 });
 
     const expectedHeaders = ['时间', '用户', '操作'];
@@ -41,10 +41,10 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
     await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
-    const table = page.locator('.arco-table').first();
+    const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10_000 });
 
-    const rows = table.locator('.arco-table-tbody .arco-table-tr');
+    const rows = table.locator('tbody tbody tr');
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(0);
   });
@@ -55,7 +55,7 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
     await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
-    const filterSelect = page.locator('.arco-select').filter({
+    const filterSelect = page.locator('[role="combobox"]').filter({
       has: page.locator('[placeholder*="操作"]'),
     }).first();
 
@@ -63,7 +63,7 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
       await filterSelect.click();
       await page.waitForTimeout(300);
 
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       if (await options.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
         await options.first().click();
         await page.waitForTimeout(500);
@@ -78,7 +78,7 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
     await clickTab(page, '操作日志');
     await page.waitForTimeout(1_000);
 
-    const userFilter = page.locator('.arco-select').filter({
+    const userFilter = page.locator('[role="combobox"]').filter({
       has: page.locator('[placeholder*="用户"]'),
     }).first();
 
@@ -86,13 +86,13 @@ test.describe.serial('Audit Log View and Filter @p1', () => {
       await userFilter.click();
       await page.waitForTimeout(300);
 
-      const adminOption = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: 'admin' });
+      const adminOption = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: 'admin' });
       if (await adminOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await adminOption.click();
         await page.waitForTimeout(500);
         await waitForTableLoad(page);
 
-        const table = page.locator('.arco-table').first();
+        const table = page.locator('table').first();
         await expect(table).toBeVisible({ timeout: 5_000 });
       }
     }

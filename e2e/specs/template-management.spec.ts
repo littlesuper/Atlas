@@ -34,7 +34,7 @@ test.describe.serial('Template Management @p1', () => {
 
     // Should show template list or empty state
     await expect(
-      page.locator('.arco-table').or(page.locator('.arco-empty')).or(page.getByText('模板管理')),
+      page.locator('table').or(page.locator('.arco-empty')).or(page.getByText('模板管理')),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -92,7 +92,7 @@ test.describe.serial('Template Management @p1', () => {
         await page.waitForTimeout(300);
 
         // Fill activity name in the table row (inline)
-        const nameInputs = page.locator('.arco-table-body .arco-input').filter({
+        const nameInputs = page.locator('tbody [data-slot="input"]').filter({
           has: page.locator('[placeholder*="活动名称"]'),
         });
         if (await nameInputs.last().isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -126,7 +126,7 @@ test.describe.serial('Template Management @p1', () => {
       await templateLink.click();
       await page.waitForTimeout(1_000);
 
-      const table = page.locator('.arco-table').first();
+      const table = page.locator('table').first();
       if (await table.isVisible({ timeout: 5_000 }).catch(() => false)) {
         // Check column headers
         const headers = ['ID', '活动名称', '类型', '阶段', '工期'];
@@ -144,7 +144,7 @@ test.describe.serial('Template Management @p1', () => {
   test('copy template', async ({ authedPage: page }) => {
     await goToTemplates(page);
 
-    const row = page.locator('.arco-table-tr, .arco-card').filter({ hasText: templateName });
+    const row = page.locator('tbody tr, [data-slot="card"]').filter({ hasText: templateName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const copyBtn = row.getByRole('button', { name: /复制/ });
       if (await copyBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -164,7 +164,7 @@ test.describe.serial('Template Management @p1', () => {
     await goToTemplates(page);
 
     // Delete all test templates
-    let row = page.locator('.arco-table-tr, .arco-card').filter({ hasText: templateName }).first();
+    let row = page.locator('tbody tr, [data-slot="card"]').filter({ hasText: templateName }).first();
     while (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const deleteBtn = row.getByRole('button', { name: /删除/ });
       if (await deleteBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -174,7 +174,7 @@ test.describe.serial('Template Management @p1', () => {
       } else {
         break;
       }
-      row = page.locator('.arco-table-tr, .arco-card').filter({ hasText: templateName }).first();
+      row = page.locator('tbody tr, [data-slot="card"]').filter({ hasText: templateName }).first();
     }
   });
 });

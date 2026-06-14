@@ -21,7 +21,7 @@ test.describe.serial('Product Version Copy @p1', () => {
     await waitForTableLoad(page);
 
     await page.getByRole('button', { name: '新建产品' }).click();
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
 
     await drawer.getByPlaceholder('请输入产品名称').fill(productName);
@@ -32,32 +32,32 @@ test.describe.serial('Product Version Copy @p1', () => {
       await revisionInput.fill('V1.0');
     }
 
-    const categorySelect = drawer.locator('.arco-select').filter({
+    const categorySelect = drawer.locator('[role="combobox"]').filter({
       has: page.locator('[placeholder="请选择产品类别"]'),
     });
     if (await categorySelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await categorySelect.click();
       await page.waitForTimeout(300);
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     }
 
-    const projectSelect = drawer.locator('.arco-select').filter({
+    const projectSelect = drawer.locator('[role="combobox"]').filter({
       has: page.locator('[placeholder="请选择关联项目"]'),
     });
     await projectSelect.click();
     await page.waitForTimeout(300);
-    const projectOption = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: projectName });
+    const projectOption = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: projectName });
     if (await projectOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await projectOption.click();
     } else {
-      await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+      await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     }
 
     const responsePromise = page.waitForResponse(
       (r) => r.url().includes('/api/products') && r.request().method() === 'POST',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: '创建' }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: '创建' }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -70,7 +70,7 @@ test.describe.serial('Product Version Copy @p1', () => {
     await clickNavItem(page, '产品管理');
     await waitForTableLoad(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: productName });
+    const row = page.locator('tbody tr').filter({ hasText: productName });
     await expect(row).toBeVisible({ timeout: 5_000 });
 
     const allButtons = row.locator('button');
@@ -88,7 +88,7 @@ test.describe.serial('Product Version Copy @p1', () => {
     if (copyBtn) {
       await copyBtn.click();
 
-      const modal = page.locator('.arco-modal').filter({ hasText: '复制版本' });
+      const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '复制版本' });
       if (await modal.isVisible({ timeout: 3_000 }).catch(() => false)) {
         const versionInput = modal.getByPlaceholder(/新版本号/);
         if (await versionInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -126,19 +126,19 @@ test.describe.serial('Product Version Copy @p1', () => {
     await clickNavItem(page, '产品管理');
     await waitForTableLoad(page);
 
-    let row = page.locator('.arco-table-tr').filter({ hasText: productName }).first();
+    let row = page.locator('tbody tr').filter({ hasText: productName }).first();
     while (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);
       await page.waitForTimeout(1_000);
       await waitForTableLoad(page);
-      row = page.locator('.arco-table-tr').filter({ hasText: productName }).first();
+      row = page.locator('tbody tr').filter({ hasText: productName }).first();
     }
 
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    const projectRow = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const projectRow = page.locator('tbody tr').filter({ hasText: projectName });
     if (await projectRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await projectRow.locator('button[class*="danger"]').click();
       await confirmModal(page);

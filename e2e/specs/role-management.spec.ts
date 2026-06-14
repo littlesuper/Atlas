@@ -36,7 +36,7 @@ test.describe.serial('Role Management @p1', () => {
     await goToRoleTab(page);
 
     // Verify table is visible and contains known roles - scope to role section
-    const table = page.locator('.arco-table').filter({ hasText: '角色名称' });
+    const table = page.locator('table').filter({ hasText: '角色名称' });
     await expect(table).toBeVisible({ timeout: 5_000 });
     // At least the system admin role should exist
     await expect(table.getByText('系统管理员').first()).toBeVisible({ timeout: 5_000 });
@@ -48,7 +48,7 @@ test.describe.serial('Role Management @p1', () => {
 
     await page.getByRole('button', { name: /新建角色|创建角色|添加角色/ }).click();
 
-    const drawer = page.locator('.arco-drawer').filter({ hasText: /新建|创建|添加/ });
+    const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /新建|创建|添加/ });
     await expect(drawer).toBeVisible({ timeout: 5_000 });
 
     // Fill role name and description
@@ -59,7 +59,7 @@ test.describe.serial('Role Management @p1', () => {
     }
 
     // Select some permissions (checkboxes in the permission tree)
-    const permCheckboxes = drawer.locator('.arco-checkbox');
+    const permCheckboxes = drawer.locator('[data-slot="checkbox"]');
     const checkboxCount = await permCheckboxes.count();
     if (checkboxCount > 0) {
       // Check the first few permissions
@@ -74,13 +74,13 @@ test.describe.serial('Role Management @p1', () => {
       (r) => r.url().includes('/api/roles') && r.request().method() === 'POST',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: /确定|创建|提交/ }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: /确定|创建|提交/ }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
     await expect(drawer).not.toBeVisible({ timeout: 5_000 });
     await waitForTableLoad(page);
-    const roleTable = page.locator('.arco-table').filter({ hasText: '角色名称' });
+    const roleTable = page.locator('table').filter({ hasText: '角色名称' });
     await expect(roleTable.getByText(roleName)).toBeVisible({ timeout: 10_000 });
   });
 
@@ -88,15 +88,15 @@ test.describe.serial('Role Management @p1', () => {
   test('edit role name and description', async ({ authedPage: page }) => {
     await goToRoleTab(page);
 
-    const roleTable = page.locator('.arco-table').filter({ hasText: '角色名称' });
-    const row = roleTable.locator('.arco-table-tr').filter({ hasText: roleName });
+    const roleTable = page.locator('table').filter({ hasText: '角色名称' });
+    const row = roleTable.locator('tbody tr').filter({ hasText: roleName });
     await expect(row).toBeVisible();
 
     // Click edit button
     const editBtn = row.locator('button').filter({ has: page.locator('svg') }).first();
     await editBtn.click();
 
-    const drawer = page.locator('.arco-drawer').filter({ hasText: /编辑/ });
+    const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /编辑/ });
     await expect(drawer).toBeVisible({ timeout: 5_000 });
 
     // Update name
@@ -108,7 +108,7 @@ test.describe.serial('Role Management @p1', () => {
       (r) => r.url().includes('/api/roles') && r.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await page.locator('.arco-drawer-footer').getByRole('button', { name: /确定|更新|保存/ }).click();
+    await page.locator('[data-slot="sheet-footer"]').getByRole('button', { name: /确定|更新|保存/ }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -121,8 +121,8 @@ test.describe.serial('Role Management @p1', () => {
   test('delete role', async ({ authedPage: page }) => {
     await goToRoleTab(page);
 
-    const roleTable = page.locator('.arco-table').filter({ hasText: '角色名称' });
-    const row = roleTable.locator('.arco-table-tr').filter({ hasText: updatedRoleName });
+    const roleTable = page.locator('table').filter({ hasText: '角色名称' });
+    const row = roleTable.locator('tbody tr').filter({ hasText: updatedRoleName });
     await expect(row).toBeVisible();
 
     await row.locator('button[class*="danger"]').click();

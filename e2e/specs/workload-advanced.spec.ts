@@ -37,7 +37,7 @@ test.describe('Workload Advanced Features @p1', () => {
     await projectFilter.click();
     await page.waitForTimeout(300);
 
-    const options = page.locator('.arco-select-popup:visible .arco-select-option');
+    const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
     const optionCount = await options.count();
 
     if (optionCount > 0) {
@@ -59,7 +59,7 @@ test.describe('Workload Advanced Features @p1', () => {
 
     // Check that the bar chart container is present (rendered with colored bars)
     // The bar chart shows member names on the left with horizontal bars
-    const barChartSection = page.locator('.arco-card').filter({ hasText: '人员负载' });
+    const barChartSection = page.locator('[data-slot="card"]').filter({ hasText: '人员负载' });
     await expect(barChartSection).toBeVisible({ timeout: 5_000 });
   });
 
@@ -69,13 +69,13 @@ test.describe('Workload Advanced Features @p1', () => {
 
     // Each stat card should show a numeric value
     // Look for the stat value elements near the labels
-    const overdueCard = page.locator('.arco-card, .arco-statistic, div').filter({ hasText: '逾期任务' }).first();
+    const overdueCard = page.locator('[data-slot="card"], .arco-statistic, div').filter({ hasText: '逾期任务' }).first();
     await expect(overdueCard).toBeVisible({ timeout: 5_000 });
 
-    const unassignedCard = page.locator('.arco-card, .arco-statistic, div').filter({ hasText: '无人负责' }).first();
+    const unassignedCard = page.locator('[data-slot="card"], .arco-statistic, div').filter({ hasText: '无人负责' }).first();
     await expect(unassignedCard).toBeVisible({ timeout: 5_000 });
 
-    const overloadedCard = page.locator('.arco-card, .arco-statistic, div').filter({ hasText: '超载人员' }).first();
+    const overloadedCard = page.locator('[data-slot="card"], .arco-statistic, div').filter({ hasText: '超载人员' }).first();
     await expect(overloadedCard).toBeVisible({ timeout: 5_000 });
   });
 
@@ -84,7 +84,7 @@ test.describe('Workload Advanced Features @p1', () => {
     await goToWorkload(page);
 
     // The member load section uses horizontal bar charts (not table rows with progress bars)
-    const barChartSection = page.locator('.arco-card').filter({ hasText: '人员负载' });
+    const barChartSection = page.locator('[data-slot="card"]').filter({ hasText: '人员负载' });
     await expect(barChartSection).toBeVisible({ timeout: 5_000 });
 
     // Check that there is at least some content within the bar chart section

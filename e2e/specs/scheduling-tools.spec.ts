@@ -12,7 +12,7 @@ test.describe('Scheduling Tools @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     // Click the first project
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     await firstProjectLink.waitFor({ state: 'visible', timeout: 10_000 });
     await firstProjectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
@@ -69,7 +69,7 @@ test.describe('Scheduling Tools @p1', () => {
     await goToSchedulingTab(page);
 
     // Find the What-If card (use .last() to target the inner card, not the outer page card)
-    const whatIfCard = page.locator('.arco-card').filter({ hasText: 'What-If 模拟' }).last();
+    const whatIfCard = page.locator('[data-slot="card"]').filter({ hasText: 'What-If 模拟' }).last();
     await expect(whatIfCard).toBeVisible();
 
     // Verify delay/advance toggle buttons (rendered as text buttons, not .arco-radio)
@@ -84,7 +84,7 @@ test.describe('Scheduling Tools @p1', () => {
     await goToSchedulingTab(page);
 
     // "一键重排" card should NOT be visible
-    const rescheduleCard = page.locator('.arco-card').filter({ hasText: '一键重排' });
+    const rescheduleCard = page.locator('[data-slot="card"]').filter({ hasText: '一键重排' });
     await expect(rescheduleCard).not.toBeVisible();
   });
 });

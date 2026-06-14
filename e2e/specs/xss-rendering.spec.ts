@@ -22,7 +22,7 @@ test.describe.serial('XSS Rendering Verification @smoke', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
     projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
 
@@ -114,7 +114,7 @@ test.describe.serial('XSS Rendering Verification @smoke', () => {
     await page.goto(`/projects/${projectId}`);
     await waitForTableLoad(page);
 
-    const editIcon = page.locator('.arco-table-body .arco-table-tr').first().locator('.arco-icon-edit').first();
+    const editIcon = page.locator('tbody tbody tr').first().locator('[aria-label*="编辑"]').first();
     await editIcon.click();
     await expect(page.getByText('编辑活动')).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(1_000);
@@ -122,7 +122,7 @@ test.describe.serial('XSS Rendering Verification @smoke', () => {
     const xssFired = await page.evaluate(() => (window as any).__chkXss);
     expect(xssFired).toBeFalsy();
 
-    await page.locator('.arco-drawer-close-icon').click();
+    await page.locator('[data-slot="sheet-close"]').click();
   });
 
   test('cleanup: delete test project', async ({ authedPage: page }) => {
@@ -132,11 +132,11 @@ test.describe.serial('XSS Rendering Verification @smoke', () => {
     await page.waitForTimeout(300);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
     const delBtn = row.locator('button[class*="danger"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
-      await page.locator('.arco-modal-footer .arco-btn-primary').click();
+      await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
       await expectMessage(page, '删除');
     }
   });

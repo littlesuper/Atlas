@@ -20,7 +20,7 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
   }
@@ -28,9 +28,9 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
   async function createActivityHelper(page: import('@playwright/test').Page, name: string) {
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.waitForTimeout(300);
 
     await page.getByPlaceholder('请输入活动名称').fill(name);
@@ -43,7 +43,7 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
     await clickDrawerSubmit(page, '创建');
     expect((await resp).status()).toBeLessThan(400);
 
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(2_000);
   }
 
@@ -76,13 +76,13 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
   test('edit activity name and description', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: activityName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: activityName }).first();
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await row.locator('.arco-icon-edit, [class*="icon-edit"]').first().click().catch(() => {
+      await row.locator('[aria-label*="编辑"], [class*="icon-edit"]').first().click().catch(() => {
         row.locator('button').first().click();
       });
 
-      const drawer = page.locator('.arco-drawer').filter({ hasText: /编辑活动/ });
+      const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /编辑活动/ });
       if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
         const nameInput = drawer.getByPlaceholder('请输入活动名称');
         await nameInput.clear();
@@ -109,15 +109,15 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
   test('change activity status to IN_PROGRESS', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: activityName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: activityName }).first();
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await row.locator('.arco-icon-edit, [class*="icon-edit"]').first().click().catch(() => {
+      await row.locator('[aria-label*="编辑"], [class*="icon-edit"]').first().click().catch(() => {
         row.locator('button').first().click();
       });
 
-      const drawer = page.locator('.arco-drawer').filter({ hasText: /编辑活动/ });
+      const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /编辑活动/ });
       if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        const statusSelects = drawer.locator('.arco-select');
+        const statusSelects = drawer.locator('[role="combobox"]');
         let statusSelect = statusSelects.first();
         for (let i = 0; i < await statusSelects.count(); i++) {
           const el = statusSelects.nth(i);
@@ -131,11 +131,11 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
         await statusSelect.click();
         await page.waitForTimeout(300);
 
-        const inProgressOpt = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: '进行中' });
+        const inProgressOpt = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: '进行中' });
         if (await inProgressOpt.isVisible({ timeout: 2_000 }).catch(() => false)) {
           await inProgressOpt.click();
         } else {
-          const options = page.locator('.arco-select-popup:visible .arco-select-option');
+          const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
           if (await options.count() > 1) {
             await options.nth(1).click();
           }
@@ -158,13 +158,13 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
   test('add notes to activity', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: activityName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: activityName }).first();
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await row.locator('.arco-icon-edit, [class*="icon-edit"]').first().click().catch(() => {
+      await row.locator('[aria-label*="编辑"], [class*="icon-edit"]').first().click().catch(() => {
         row.locator('button').first().click();
       });
 
-      const drawer = page.locator('.arco-drawer').filter({ hasText: /编辑活动/ });
+      const drawer = page.locator('[data-slot="sheet-content"]').filter({ hasText: /编辑活动/ });
       if (await drawer.isVisible({ timeout: 5_000 }).catch(() => false)) {
         const notesInputs = drawer.locator('textarea');
         let notesInput = notesInputs.last();
@@ -198,9 +198,9 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
 
     for (const name of [activityName, activityName2]) {
       const suffixedName = name === activityName ? activityName + '已编辑' : name;
-      const row = page.locator('.arco-table-tr').filter({ hasText: suffixedName }).first();
+      const row = page.locator('tbody tr').filter({ hasText: suffixedName }).first();
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await row.locator('.arco-icon-delete').first().click();
+        await row.locator('[aria-label*="删除"]').first().click();
         await confirmModal(page);
         await page.waitForTimeout(1_000);
       }
@@ -212,7 +212,7 @@ test.describe.serial('Activity Full CRUD @smoke', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

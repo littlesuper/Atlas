@@ -28,9 +28,9 @@ test.describe.serial('Activity Comments @p1', () => {
     // Create activity
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName);
 
@@ -40,7 +40,7 @@ test.describe.serial('Activity Comments @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await actResp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('add comment to activity', async ({ authedPage: page }) => {
@@ -93,7 +93,7 @@ test.describe.serial('Activity Comments @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

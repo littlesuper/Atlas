@@ -17,7 +17,7 @@ test.describe.serial('Project Snapshot Flow @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
   }
@@ -52,7 +52,7 @@ test.describe.serial('Project Snapshot Flow @p1', () => {
       if (await createBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await createBtn.click();
 
-        const modal = page.locator('.arco-modal').filter({ hasText: '创建项目快照' });
+        const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '创建项目快照' });
         if (await modal.isVisible({ timeout: 3_000 }).catch(() => false)) {
           const remarkInput = modal.getByPlaceholder(/备注/);
           if (await remarkInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -117,7 +117,7 @@ test.describe.serial('Project Snapshot Flow @p1', () => {
       if (await createBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await createBtn.click();
 
-        const modal = page.locator('.arco-modal').filter({ hasText: '创建项目快照' });
+        const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '创建项目快照' });
         if (await modal.isVisible({ timeout: 3_000 }).catch(() => false)) {
           await modal.getByPlaceholder(/备注/).fill('E2E测试快照 - 第二次');
 
@@ -150,7 +150,7 @@ test.describe.serial('Project Snapshot Flow @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

@@ -12,11 +12,11 @@ test.describe('Activity Role Binding - Admin Role Members @smoke', () => {
     await page.goto('/admin?tab=account');
     await page.waitForTimeout(1000);
 
-    const roleMembersTab = page.locator('.arco-tabs-tab').getByText('角色成员');
+    const roleMembersTab = page.locator('[role="tab"]').getByText('角色成员');
     if (await roleMembersTab.isVisible().catch(() => false)) {
       await roleMembersTab.click();
       await page.waitForTimeout(1000);
-      await expect(page.locator('.arco-table').or(page.getByText(/暂无/))).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('table').or(page.getByText(/暂无/))).toBeVisible({ timeout: 5000 });
     }
   });
 });
@@ -31,13 +31,13 @@ test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
     await createProjectViaPage(page, { name: projectName });
     await searchProject(page, projectName);
 
-    const projectLink = page.locator('.arco-table-td').getByText(projectName).first();
+    const projectLink = page.locator('td').getByText(projectName).first();
     await projectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(2000);
 
     // Open create drawer via dropdown menu
-    const dropdownTrigger = page.locator('.arco-btn').filter({ has: page.locator('.arco-icon-more') }).or(page.locator('.arco-btn').filter({ has: page.locator('.arco-icon-plus') }));
+    const dropdownTrigger = page.locator('.arco-btn').filter({ has: page.locator('.arco-icon-more') }).or(page.locator('.arco-btn').filter({ has: page.locator('[aria-label*="新建"]') }));
     if (await dropdownTrigger.first().isVisible().catch(() => false)) {
       await dropdownTrigger.first().click();
       await page.waitForTimeout(300);
@@ -50,20 +50,20 @@ test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
     await page.waitForTimeout(500);
 
     // Verify drawer and role/executor fields
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     if (!(await drawer.isVisible().catch(() => false))) return;
 
-    const phaseSelect = drawer.locator('.arco-select').first();
+    const phaseSelect = drawer.locator('[role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await drawer.getByPlaceholder('请输入活动名称').fill(uniqueName('角色活动'));
 
     const roleFormItem = drawer.locator('.arco-form-item').filter({ hasText: '角色' });
-    const roleSelect = roleFormItem.locator('.arco-select').first();
+    const roleSelect = roleFormItem.locator('[role="combobox"]').first();
     if (await roleSelect.isVisible().catch(() => false)) {
       await roleSelect.click();
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       const optCount = await options.count();
       if (optCount > 0) {
         await options.nth(Math.min(1, optCount - 1)).click();
@@ -72,7 +72,7 @@ test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
     }
 
     const executorFormItem = drawer.locator('.arco-form-item').filter({ hasText: '执行人' });
-    await expect(executorFormItem.locator('.arco-select')).toBeVisible({ timeout: 3000 });
+    await expect(executorFormItem.locator('[role="combobox"]')).toBeVisible({ timeout: 3000 });
 
     // Submit
     const respPromise = page.waitForResponse(
@@ -86,7 +86,7 @@ test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
 
     // Verify activity list
     await page.waitForTimeout(1500);
-    const table = page.locator('.arco-table-tbody .arco-table-tr');
+    const table = page.locator('tbody tbody tr');
     const rowCount = await table.count();
     expect(rowCount).toBeGreaterThan(0);
 
@@ -94,9 +94,9 @@ test.describe.serial('Activity Role Binding - Full Flow @smoke', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible().catch(() => false)) {
-      await row.locator('.arco-icon-delete').click();
+      await row.locator('[aria-label*="删除"]').click();
       await confirmModal(page);
     }
   });

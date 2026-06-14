@@ -15,7 +15,7 @@ test.describe('Project Detail Tabs @p1', () => {
   async function goToProjectDetail(page: import('@playwright/test').Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     await firstProjectLink.waitFor({ state: 'visible', timeout: 10_000 });
     await firstProjectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
@@ -27,7 +27,7 @@ test.describe('Project Detail Tabs @p1', () => {
     await goToProjectDetail(page);
 
     // Activity table should be visible by default
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
 
     // "活动" dropdown button should be visible (it's a dropdown, not a "新建活动" button)
     await expect(
@@ -59,7 +59,7 @@ test.describe('Project Detail Tabs @p1', () => {
 
       // Should show product content
       await expect(
-        page.locator('.arco-table').first().or(page.locator('.arco-empty').first()),
+        page.locator('table').first().or(page.locator('.arco-empty').first()),
       ).toBeVisible({ timeout: 10_000 });
     }
   });
@@ -106,7 +106,7 @@ test.describe('Project Detail Tabs @p1', () => {
 
     // Count initial rows
     await waitForTableLoad(page);
-    const initialRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const initialRows = await page.locator('tbody tbody tr').count();
 
     // Switch away and back
     await clickTab(page, '项目周报');
@@ -116,7 +116,7 @@ test.describe('Project Detail Tabs @p1', () => {
     await waitForTableLoad(page);
 
     // Row count should match
-    const afterRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const afterRows = await page.locator('tbody tbody tr').count();
     expect(afterRows).toBe(initialRows);
   });
 
@@ -135,6 +135,6 @@ test.describe('Project Detail Tabs @p1', () => {
 
     // After rapid switching, page should still be functional
     await page.waitForTimeout(1_000);
-    await expect(page.locator('.arco-table, [class*="gantt"], canvas').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table, [class*="gantt"], canvas').first()).toBeVisible({ timeout: 10_000 });
   });
 });

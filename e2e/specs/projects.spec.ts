@@ -8,8 +8,8 @@ test.describe.serial('Project Management @smoke', () => {
   test('view project list with table', async ({ authedPage: page }) => {
     await expect(page).toHaveURL(/\/projects/);
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table')).toBeVisible();
-    await expect(page.locator('.arco-table-tr').first()).toBeVisible();
+    await expect(page.locator('table')).toBeVisible();
+    await expect(page.locator('tbody tr').first()).toBeVisible();
   });
 
   test('create new project', async ({ authedPage: page }) => {
@@ -23,14 +23,14 @@ test.describe.serial('Project Management @smoke', () => {
     await searchProject(page, projectName);
     await page.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
-    await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('delete project', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

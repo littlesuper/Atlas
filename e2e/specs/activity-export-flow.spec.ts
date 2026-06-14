@@ -18,7 +18,7 @@ test.describe.serial('Activity Export Flow @p2', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
   }
@@ -31,15 +31,15 @@ test.describe.serial('Activity Export Flow @p2', () => {
     await dropdownTrigger.click();
     await page.waitForTimeout(300);
 
-    await page.locator('.arco-dropdown-menu-item, .arco-menu-item').filter({ hasText: '新建活动' }).click();
+    await page.locator('[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-item"]').filter({ hasText: '新建活动' }).click();
     await page.waitForTimeout(500);
 
-    const drawer = page.locator('.arco-drawer');
+    const drawer = page.locator('[data-slot="sheet-content"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
 
-    const phaseSelect = drawer.locator('.arco-select').first();
+    const phaseSelect = drawer.locator('[role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.waitForTimeout(300);
 
     await drawer.getByPlaceholder('请输入活动名称').fill(activityName);
@@ -60,7 +60,7 @@ test.describe.serial('Activity Export Flow @p2', () => {
     await dropdownTrigger.click();
     await page.waitForTimeout(300);
 
-    const exportItem = page.locator('.arco-dropdown-menu-item, .arco-menu-item').filter({ hasText: '导出活动' });
+    const exportItem = page.locator('[data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-item"]').filter({ hasText: '导出活动' });
     if (await exportItem.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const downloadPromise = page.waitForEvent('download', { timeout: 15_000 }).catch(() => null);
       await exportItem.click();
@@ -78,11 +78,11 @@ test.describe.serial('Activity Export Flow @p2', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await page.waitForTimeout(500);
-      const confirmBtn = page.locator('.arco-modal-footer .arco-btn-primary');
+      const confirmBtn = page.locator('[data-slot="dialog-footer"] .arco-btn-primary');
       if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await confirmBtn.click();
         await page.waitForTimeout(1_000);

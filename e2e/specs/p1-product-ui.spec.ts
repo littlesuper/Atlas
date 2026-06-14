@@ -13,22 +13,22 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
     await waitForTableLoad(page);
 
     await page.getByRole('button', { name: '新建产品' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('.arco-drawer').getByText('新建产品')).toBeVisible();
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]').getByText('新建产品')).toBeVisible();
 
     const statusSelect = page
-      .locator('.arco-drawer .arco-select')
+      .locator('[data-slot="sheet-content"] [role="combobox"]')
       .filter({ has: page.locator('[placeholder="请选择产品状态"]') });
     await statusSelect.click();
     await page.waitForTimeout(500);
 
-    const options = page.locator('.arco-select-popup .arco-select-option, [role="option"]');
+    const options = page.locator('[data-slot="select-content"] [role="option"], [role="option"]');
     const visibleOptions = options.filter({ visible: true });
     const count = await visibleOptions.count();
     expect(count).toBe(1);
     await expect(visibleOptions.first()).toContainText('研发中');
 
-    await page.locator('.arco-drawer-close-icon').click();
+    await page.locator('[data-slot="sheet-close"]').click();
   });
 
   // ──────── PROD-028: Compare button not visible with < 2 selected ────────
@@ -74,8 +74,8 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
       let isVisible = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
       expect(isVisible).toBeFalsy();
 
-      const firstRow = page.locator('.arco-table-tr').filter({ hasText: `${productBaseName}-A` });
-      const secondRow = page.locator('.arco-table-tr').filter({ hasText: `${productBaseName}-B` });
+      const firstRow = page.locator('tbody tr').filter({ hasText: `${productBaseName}-A` });
+      const secondRow = page.locator('tbody tr').filter({ hasText: `${productBaseName}-B` });
       await expect(firstRow).toBeVisible({ timeout: 10_000 });
       await expect(secondRow).toBeVisible({ timeout: 10_000 });
 
@@ -92,7 +92,7 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
       await expect(compareBtn).toHaveText(/对比.*2/);
 
       await compareBtn.click();
-      const drawer = page.locator('.arco-drawer:visible');
+      const drawer = page.locator('[data-slot="sheet-content"]:visible');
       await expect(drawer).toBeVisible({ timeout: 5_000 });
       await expect(drawer.getByText(/产品对比/)).toBeVisible();
 
@@ -135,23 +135,23 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
       await clickNavItem(page, '产品管理');
       await waitForTableLoad(page);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: productName });
+      const row = page.locator('tbody tr').filter({ hasText: productName });
       await expect(row).toBeVisible({ timeout: 10_000 });
 
       const editBtn = row.locator('button').nth(1);
       await editBtn.click();
 
-      const drawer = page.locator('.arco-drawer');
+      const drawer = page.locator('[data-slot="sheet-content"]');
       await expect(drawer).toBeVisible({ timeout: 5_000 });
       await expect(drawer.getByText('编辑产品')).toBeVisible({ timeout: 5_000 });
 
       const statusSelect = drawer
-        .locator('.arco-select')
+        .locator('[role="combobox"]')
         .filter({ has: page.locator('[placeholder="请选择产品状态"]') });
       await statusSelect.click();
       await page.waitForTimeout(500);
 
-      const options = page.locator('.arco-select-popup .arco-select-option, [role="option"]').filter({ visible: true });
+      const options = page.locator('[data-slot="select-content"] [role="option"], [role="option"]').filter({ visible: true });
       const optionTexts = await options.allInnerTexts();
       const joined = optionTexts.join(',');
 
@@ -159,7 +159,7 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
       expect(joined).toContain('量产');
       expect(joined).not.toContain('停产');
 
-      await page.locator('.arco-drawer-close-icon').click();
+      await page.locator('[data-slot="sheet-close"]').click();
     } finally {
       const allResp = await page.request.get(`/api/products?keyword=${encodeURIComponent(productName)}&pageSize=50`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -205,13 +205,13 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
       await clickNavItem(page, '产品管理');
       await waitForTableLoad(page);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: productName });
+      const row = page.locator('tbody tr').filter({ hasText: productName });
       await expect(row).toBeVisible({ timeout: 10_000 });
 
       const editBtn = row.locator('button').nth(1);
       await editBtn.click();
 
-      const drawer = page.locator('.arco-drawer');
+      const drawer = page.locator('[data-slot="sheet-content"]');
       await expect(drawer).toBeVisible({ timeout: 5_000 });
       await expect(drawer.getByText('编辑产品')).toBeVisible({ timeout: 5_000 });
 
@@ -219,7 +219,7 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
       await expect(specSection).toBeVisible({ timeout: 3_000 });
 
       const valueInput = specSection.locator('input').filter({ hasText: '' }).nth(1);
-      const specInputs = specSection.locator('.arco-input');
+      const specInputs = specSection.locator('[data-slot="input"]');
       const keyInputs = await specInputs.count();
 
       let specValueInput;
@@ -245,7 +245,7 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
         }
       }
 
-      await page.locator('.arco-drawer-close-icon').click();
+      await page.locator('[data-slot="sheet-close"]').click();
     } finally {
       const allResp = await page.request.get(`/api/products?keyword=${encodeURIComponent(productName)}&pageSize=50`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -264,9 +264,9 @@ test.describe.serial('P1 Product UI Tests @p1', () => {
   // ──────── PROD-040: Project tab shows associated products ────────
   test('PROD-040: project tab shows associated products', async ({ authedPage: page }) => {
     await clickNavItem(page, '项目管理');
-    await page.waitForSelector('.arco-table-container table tbody tr', { timeout: 15_000 });
+    await page.waitForSelector('[data-slot="table-container"] table tbody tr', { timeout: 15_000 });
 
-    const firstProjectLink = page.locator('.arco-table-container table tbody tr a').first();
+    const firstProjectLink = page.locator('[data-slot="table-container"] table tbody tr a').first();
     await expect(firstProjectLink).toBeVisible({ timeout: 5_000 });
     await firstProjectLink.click();
 

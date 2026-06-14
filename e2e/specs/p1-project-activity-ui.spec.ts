@@ -27,7 +27,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
 
       await createProjectViaPage(page, { name: projectName });
       await searchProject(page, projectName);
-      await page.locator('.arco-table-td').getByText(projectName).click();
+      await page.locator('td').getByText(projectName).click();
       await expect(page).toHaveURL(/\/projects\/(.+)/);
       projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
       expect(projectId).toBeTruthy();
@@ -62,16 +62,16 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
       const bannerText = await banner.textContent();
       expect(bannerText).toMatch(/只读|快照/);
 
-      const editIcons = page.locator('.arco-table-td .arco-icon-edit');
-      const deleteIcons = page.locator('.arco-table-td .arco-icon-delete');
+      const editIcons = page.locator('td [aria-label*="编辑"]');
+      const deleteIcons = page.locator('td [aria-label*="删除"]');
       await expect(editIcons).toHaveCount(0);
       await expect(deleteIcons).toHaveCount(0);
 
       await expect(
-        page.locator('.arco-tabs-tab').filter({ hasText: '排期工具' }),
+        page.locator('[role="tab"]').filter({ hasText: '排期工具' }),
       ).not.toBeVisible();
       await expect(
-        page.locator('.arco-tabs-tab').filter({ hasText: '项目快照' }),
+        page.locator('[role="tab"]').filter({ hasText: '项目快照' }),
       ).not.toBeVisible();
 
       const returnBtn = page.getByRole('button', { name: '返回项目' });
@@ -92,7 +92,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
       await waitForTableLoad(page);
       await searchProject(page, projectName);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+      const row = page.locator('tbody tr').filter({ hasText: projectName });
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);
       await expectMessage(page, '项目删除成功');
@@ -111,7 +111,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
 
       await createProjectViaPage(page, { name: projectName });
       await searchProject(page, projectName);
-      await page.locator('.arco-table-td').getByText(projectName).click();
+      await page.locator('td').getByText(projectName).click();
       await expect(page).toHaveURL(/\/projects\/(.+)/);
       projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
       expect(projectId).toBeTruthy();
@@ -175,7 +175,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
 
       await createProjectViaPage(page, { name: projectName });
       await searchProject(page, projectName);
-      await page.locator('.arco-table-td').getByText(projectName).click();
+      await page.locator('td').getByText(projectName).click();
       await expect(page).toHaveURL(/\/projects\/(.+)/);
       projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
       expect(projectId).toBeTruthy();
@@ -217,7 +217,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
       await waitForTableLoad(page);
       await page.waitForTimeout(1_500);
 
-      const cpTag = page.locator('.arco-tag').filter({ hasText: /^CP$/ });
+      const cpTag = page.locator('[data-slot="badge"]').filter({ hasText: /^CP$/ });
       if (await cpTag.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await expect(cpTag).toBeVisible();
       }
@@ -252,7 +252,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
 
       await createProjectViaPage(page, { name: projectName });
       await searchProject(page, projectName);
-      await page.locator('.arco-table-td').getByText(projectName).click();
+      await page.locator('td').getByText(projectName).click();
       await expect(page).toHaveURL(/\/projects\/(.+)/);
       projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
       expect(projectId).toBeTruthy();
@@ -295,7 +295,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
       await page.goto(`/projects/${projectId}`);
       await page.waitForTimeout(2_000);
 
-      const checkItemsHeader = page.locator('.arco-table-th').filter({ hasText: '检查项' });
+      const checkItemsHeader = page.locator('th').filter({ hasText: '检查项' });
       if (!(await checkItemsHeader.isVisible({ timeout: 5_000 }).catch(() => false))) {
         const colSettingsBtn = page.locator('button').filter({ hasText: /列设置/ }).or(
           page.locator('[class*="column-settings"]'),
@@ -303,7 +303,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
         if (await colSettingsBtn.isVisible().catch(() => false)) {
           await colSettingsBtn.click();
           await page.waitForTimeout(300);
-          const checkItemsOption = page.locator('.arco-checkbox').filter({ hasText: '检查项' });
+          const checkItemsOption = page.locator('[data-slot="checkbox"]').filter({ hasText: '检查项' });
           if (await checkItemsOption.isVisible().catch(() => false)) {
             await checkItemsOption.click();
             await page.keyboard.press('Escape');
@@ -312,7 +312,7 @@ test.describe.serial('P1 Project & Activity UI Tests @p1', () => {
         }
       }
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: '检查项测试活动' });
+      const row = page.locator('tbody tr').filter({ hasText: '检查项测试活动' });
       await expect(row).toBeVisible({ timeout: 10_000 });
 
       await expect(row.getByText('3/5')).toBeVisible({ timeout: 5_000 });

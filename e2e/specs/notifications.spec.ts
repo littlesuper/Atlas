@@ -68,7 +68,7 @@ test.describe.serial('Notification Management @p1', () => {
 
     // The panel is a positioned div — scope delete button search within it
     const panel = page.locator('div[style*="position: absolute"][style*="width: 360"]');
-    const deleteBtn = panel.locator('.arco-icon-delete').first();
+    const deleteBtn = panel.locator('[aria-label*="删除"]').first();
     if (await deleteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await deleteBtn.click();
       await expectMessage(page, '已删除');

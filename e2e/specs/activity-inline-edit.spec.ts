@@ -30,16 +30,16 @@ test.describe.serial('Activity Inline Editing @p1', () => {
     await createProjectViaPage(page, { name: projectName });
     await searchProject(page, projectName);
 
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
     // Create activity
     await openCreateActivityDrawer(page);
 
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
 
     await page.getByPlaceholder('请输入活动名称').fill(activityName);
     await page.getByPlaceholder('请输入描述').fill(text.activityDesc);
@@ -50,7 +50,7 @@ test.describe.serial('Activity Inline Editing @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await actResp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(activityName)).toBeVisible({ timeout: 10_000 });
   });
 
@@ -59,7 +59,7 @@ test.describe.serial('Activity Inline Editing @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
     await waitForTableLoad(page);
@@ -70,16 +70,16 @@ test.describe.serial('Activity Inline Editing @p1', () => {
     await goToProject(page);
 
     // Find the activity row and click the name cell
-    const row = page.locator('.arco-table-tr').filter({ hasText: activityName });
+    const row = page.locator('tbody tr').filter({ hasText: activityName });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // Click on the name cell to enter edit mode
-    const nameCell = row.locator('.arco-table-td').filter({ hasText: activityName }).first();
+    const nameCell = row.locator('td').filter({ hasText: activityName }).first();
     await nameCell.click();
     await page.waitForTimeout(300);
 
     // An input should appear
-    const input = row.locator('.arco-input').first();
+    const input = row.locator('[data-slot="input"]').first();
     if (await input.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const newName = activityName + '_已编辑';
       await input.clear();
@@ -98,11 +98,11 @@ test.describe.serial('Activity Inline Editing @p1', () => {
   test('inline edit activity status', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-tr').filter({ has: page.locator('.arco-table-td') }).first();
+    const row = page.locator('tbody tr').filter({ has: page.locator('td') }).first();
     await expect(row).toBeVisible();
 
-    // Find the status cell — status is rendered as a clickable div, not .arco-tag
-    const statusCell = row.locator('.arco-table-td').filter({
+    // Find the status cell — status is rendered as a clickable div, not [data-slot="badge"]
+    const statusCell = row.locator('td').filter({
       hasText: /^(未开始|进行中|已完成|已取消)$/,
     });
 
@@ -111,10 +111,10 @@ test.describe.serial('Activity Inline Editing @p1', () => {
       await page.waitForTimeout(300);
 
       // AutoOpenSelect should appear
-      const selectPopup = page.locator('.arco-select-popup:visible');
+      const selectPopup = page.locator('[data-slot="select-content"]:visible');
       if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
         // Select "进行中"
-        const option = selectPopup.locator('.arco-select-option').filter({ hasText: '进行中' });
+        const option = selectPopup.locator('[role="option"]').filter({ hasText: '进行中' });
         if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
           const updateResp = page.waitForResponse(
             (r) => r.url().includes('/api/activities') && r.request().method() === 'PUT',
@@ -132,16 +132,16 @@ test.describe.serial('Activity Inline Editing @p1', () => {
   test('inline edit activity type', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-body .arco-table-tr').first();
-    const typeCell = row.locator('.arco-table-td').filter({ hasText: /任务|里程碑/ });
+    const row = page.locator('tbody tbody tr').first();
+    const typeCell = row.locator('td').filter({ hasText: /任务|里程碑/ });
 
     if (await typeCell.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await typeCell.click();
       await page.waitForTimeout(300);
 
-      const selectPopup = page.locator('.arco-select-popup:visible');
+      const selectPopup = page.locator('[data-slot="select-content"]:visible');
       if (await selectPopup.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        const milestoneOption = selectPopup.locator('.arco-select-option').filter({ hasText: '里程碑' });
+        const milestoneOption = selectPopup.locator('[role="option"]').filter({ hasText: '里程碑' });
         if (await milestoneOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
           const updateResp = page.waitForResponse(
             (r) => r.url().includes('/api/activities') && r.request().method() === 'PUT',
@@ -159,22 +159,22 @@ test.describe.serial('Activity Inline Editing @p1', () => {
   test('Esc key cancels inline edit without saving', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-tr').filter({ has: page.locator('.arco-table-td') }).first();
+    const row = page.locator('tbody tr').filter({ has: page.locator('td') }).first();
     // Name column is at index 5 (after checkbox, drag, ID, 前置, 阶段)
-    const nameText = await row.locator('.arco-table-td').nth(5).textContent();
+    const nameText = await row.locator('td').nth(5).textContent();
 
     // Click name cell to enter edit
-    await row.locator('.arco-table-td').nth(5).click();
+    await row.locator('td').nth(5).click();
     await page.waitForTimeout(300);
 
-    const input = row.locator('.arco-input').first();
+    const input = row.locator('[data-slot="input"]').first();
     if (await input.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await input.fill('不应该保存的名称');
       await page.keyboard.press('Escape');
       await page.waitForTimeout(500);
 
       // The original name should still be displayed
-      const currentText = await row.locator('.arco-table-td').nth(5).textContent();
+      const currentText = await row.locator('td').nth(5).textContent();
       expect(currentText).toContain(nameText?.trim() ?? '');
     }
   });
@@ -183,13 +183,13 @@ test.describe.serial('Activity Inline Editing @p1', () => {
   test('click-outside closes inline edit', async ({ authedPage: page }) => {
     await goToProject(page);
 
-    const row = page.locator('.arco-table-tr').filter({ has: page.locator('.arco-table-td') }).first();
+    const row = page.locator('tbody tr').filter({ has: page.locator('td') }).first();
 
     // Click name cell to enter edit
-    await row.locator('.arco-table-td').nth(5).click();
+    await row.locator('td').nth(5).click();
     await page.waitForTimeout(300);
 
-    const inlineInputs = page.locator('.arco-table .arco-input, .arco-table .arco-select-view');
+    const inlineInputs = page.locator('table [data-slot="input"], table .arco-select-view');
     const hasEdit = await inlineInputs.count() > 0;
 
     if (hasEdit) {
@@ -198,7 +198,7 @@ test.describe.serial('Activity Inline Editing @p1', () => {
       await page.waitForTimeout(500);
 
       // Inline editor should be dismissed
-      const remaining = await page.locator('.arco-table .arco-input').count();
+      const remaining = await page.locator('table [data-slot="input"]').count();
       expect(remaining).toBe(0);
     }
   });
@@ -209,7 +209,7 @@ test.describe.serial('Activity Inline Editing @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     await row.locator('button[class*="danger"]').click();
     await confirmModal(page);
     await expectMessage(page, '项目删除成功');

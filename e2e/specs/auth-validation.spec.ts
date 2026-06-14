@@ -50,7 +50,7 @@ base.describe('Login Form Validation @p0', () => {
     // Should either stay on login page or show an error
     // Short usernames may trigger client-side validation or server-side error
     const url = page.url();
-    const hasError = await page.locator('.arco-message, .arco-form-message').isVisible({ timeout: 3_000 }).catch(() => false);
+    const hasError = await page.locator('[data-sonner-toast], .text-destructive').isVisible({ timeout: 3_000 }).catch(() => false);
     // Either still on login page or showing error
     expect(url.includes('/login') || hasError).toBeTruthy();
   });
@@ -66,7 +66,7 @@ base.describe('Login Form Validation @p0', () => {
     await page.waitForTimeout(1_000);
 
     const url = page.url();
-    const hasError = await page.locator('.arco-message, .arco-form-message').isVisible({ timeout: 3_000 }).catch(() => false);
+    const hasError = await page.locator('[data-sonner-toast], .text-destructive').isVisible({ timeout: 3_000 }).catch(() => false);
     expect(url.includes('/login') || hasError).toBeTruthy();
   });
 

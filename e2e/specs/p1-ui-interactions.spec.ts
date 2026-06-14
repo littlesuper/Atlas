@@ -63,7 +63,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await page.getByPlaceholder('请输入密码').fill(credentials.admin.password);
       await page.getByRole('button', { name: '登录' }).click();
 
-      const errorMsg = page.locator('.arco-message, .arco-form-message-error, .arco-notification');
+      const errorMsg = page.locator('[data-sonner-toast], .arco-form-message-error, .arco-notification');
       await expect(errorMsg.first()).toBeVisible({ timeout: 10_000 });
 
       await page.waitForTimeout(1_000);
@@ -105,7 +105,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       const visibleBeforeSelect = await compareBtn.isVisible({ timeout: 2_000 }).catch(() => false);
       expect(visibleBeforeSelect).toBeFalsy();
 
-      const checkboxes = page.locator('.arco-table-body .arco-checkbox');
+      const checkboxes = page.locator('tbody [data-slot="checkbox"]');
       const count = await checkboxes.count();
 
       if (count >= 1) {
@@ -130,18 +130,18 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await waitForTableLoad(page);
 
       await page.getByRole('button', { name: /新建产品/ }).click();
-      await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
       await page.waitForTimeout(300);
 
       const statusSelect = page
-        .locator('.arco-drawer .arco-select')
+        .locator('[data-slot="sheet-content"] [role="combobox"]')
         .filter({ has: page.locator('[placeholder="请选择产品状态"]') });
 
       if (await statusSelect.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await statusSelect.click();
         await page.waitForTimeout(300);
 
-        const options = page.locator('.arco-select-popup:visible .arco-select-option');
+        const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
         const optionCount = await options.count();
 
         expect(optionCount).toBeGreaterThanOrEqual(1);
@@ -172,7 +172,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await waitForTableLoad(page);
       await searchProject(page, projectName);
 
-      await page.locator('.arco-table-td').getByText(projectName).click();
+      await page.locator('td').getByText(projectName).click();
       await expect(page).toHaveURL(/\/projects\/.+/);
       await page.waitForTimeout(1_000);
 
@@ -180,9 +180,9 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       if (await productsTab.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await productsTab.click();
         await page.waitForTimeout(1_000);
-        const tabContent = page.locator('.arco-tabs-content-item-active');
+        const tabContent = page.locator('[data-state="active"]');
         await expect(tabContent).toBeVisible({ timeout: 10_000 });
-        const hasTable = await tabContent.locator('.arco-table').isVisible().catch(() => false);
+        const hasTable = await tabContent.locator('table').isVisible().catch(() => false);
         const hasEmpty = await tabContent.locator('.arco-empty').isVisible().catch(() => false);
         expect(hasTable || hasEmpty).toBeTruthy();
       }
@@ -194,7 +194,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await waitForTableLoad(page);
       await searchProject(page, projectName);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+      const row = page.locator('tbody tr').filter({ hasText: projectName });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await row.locator('button[class*="danger"]').click();
         await confirmModal(page);
@@ -254,7 +254,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await page.goto('/projects');
       await waitForTableLoad(page);
       await searchProject(page, project);
-      const row = page.locator('.arco-table-tr').filter({ hasText: project });
+      const row = page.locator('tbody tr').filter({ hasText: project });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await row.locator('button[class*="danger"]').click();
         await confirmModal(page);
@@ -295,7 +295,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await login(page, credentials.admin.username, credentials.admin.password);
       await createProjectViaPage(page, { name: snapProject });
       await searchProject(page, snapProject);
-      await page.locator('.arco-table-td').getByText(snapProject).click();
+      await page.locator('td').getByText(snapProject).click();
       await expect(page).toHaveURL(/\/projects\/.+/);
       await page.waitForTimeout(1_000);
 
@@ -303,7 +303,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await page.waitForTimeout(500);
 
       await page.getByRole('button', { name: '创建快照' }).click();
-      const modal = page.locator('.arco-modal').filter({ hasText: '创建项目快照' });
+      const modal = page.locator('[data-slot="dialog-content"]').filter({ hasText: '创建项目快照' });
       await expect(modal).toBeVisible({ timeout: 5_000 });
 
       const createResp = await Promise.all([
@@ -322,7 +322,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await page.goto('/projects');
       await waitForTableLoad(page);
       await searchProject(page, snapProject);
-      await page.locator('.arco-table-td').getByText(snapProject).click();
+      await page.locator('td').getByText(snapProject).click();
       await expect(page).toHaveURL(/\/projects\/.+/);
       await page.waitForTimeout(1_000);
 
@@ -337,8 +337,8 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await expect(banner).toBeVisible({ timeout: 5_000 });
       await expect(banner.getByText('所有内容为只读')).toBeVisible();
 
-      const editIcons = page.locator('.arco-table-td .arco-icon-edit');
-      const deleteIcons = page.locator('.arco-table-td .arco-icon-delete');
+      const editIcons = page.locator('td [aria-label*="编辑"]');
+      const deleteIcons = page.locator('td [aria-label*="删除"]');
       await expect(editIcons).toHaveCount(0);
       await expect(deleteIcons).toHaveCount(0);
 
@@ -356,7 +356,7 @@ test.describe.serial('P1 UI Interactions @p1', () => {
       await waitForTableLoad(page);
       await searchProject(page, snapProject);
 
-      const row = page.locator('.arco-table-tr').filter({ hasText: snapProject });
+      const row = page.locator('tbody tr').filter({ hasText: snapProject });
       if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await row.locator('button[class*="danger"]').click();
         await confirmModal(page);

@@ -17,7 +17,7 @@ test.describe('Column Resize @p2', () => {
   async function goToProjectDetail(page: Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     await firstProjectLink.waitFor({ state: 'visible', timeout: 10_000 });
     await firstProjectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
@@ -28,7 +28,7 @@ test.describe('Column Resize @p2', () => {
   /** Get array of header th info from the compact-table */
   async function getHeaderInfo(page: Page) {
     return page.evaluate(() => {
-      const ths = document.querySelectorAll('.compact-table .arco-table-header th');
+      const ths = document.querySelectorAll('.compact-table thead th');
       return Array.from(ths).map(th => ({
         text: th.textContent?.trim() || '',
         width: Math.round(th.getBoundingClientRect().width),
@@ -44,7 +44,7 @@ test.describe('Column Resize @p2', () => {
   /** Get first body row td info */
   async function getFirstRowTdInfo(page: Page) {
     return page.evaluate(() => {
-      const row = document.querySelector('.compact-table .arco-table-body tr');
+      const row = document.querySelector('.compact-table tbody tr');
       if (!row) return [];
       const tds = row.querySelectorAll('td');
       return Array.from(tds).map(td => ({
@@ -125,7 +125,7 @@ test.describe('Column Resize @p2', () => {
     await goToProjectDetail(page);
 
     // Find the "活动名称" header with column key "name"
-    const nameTh = page.locator('.compact-table .arco-table-header th[data-column-key="name"]');
+    const nameTh = page.locator('.compact-table thead th[data-column-key="name"]');
     await expect(nameTh).toBeVisible();
     const resizeHandle = nameTh.locator('.column-resize-handle');
     await expect(resizeHandle).toBeAttached();
@@ -162,7 +162,7 @@ test.describe('Column Resize @p2', () => {
     await goToProjectDetail(page);
 
     // Use the "ID" column (smallest default width = 60px)
-    const idTh = page.locator('.compact-table .arco-table-header th[data-column-key="id"]');
+    const idTh = page.locator('.compact-table thead th[data-column-key="id"]');
     await expect(idTh).toBeVisible();
 
     const thBox = await idTh.boundingBox();
@@ -189,7 +189,7 @@ test.describe('Column Resize @p2', () => {
     const currentUrl = page.url();
 
     // Resize "状态" column by +60px
-    const statusTh = page.locator('.compact-table .arco-table-header th[data-column-key="status"]');
+    const statusTh = page.locator('.compact-table thead th[data-column-key="status"]');
     await expect(statusTh).toBeVisible();
     const initialWidth = await statusTh.evaluate(el => Math.round(el.getBoundingClientRect().width));
 
@@ -218,7 +218,7 @@ test.describe('Column Resize @p2', () => {
     await page.waitForTimeout(2000);
     await waitForTableLoad(page);
 
-    const statusThAfter = page.locator('.compact-table .arco-table-header th[data-column-key="status"]');
+    const statusThAfter = page.locator('.compact-table thead th[data-column-key="status"]');
     await expect(statusThAfter).toBeVisible({ timeout: 10_000 });
     const widthAfterReload = await statusThAfter.evaluate(el => Math.round(el.getBoundingClientRect().width));
 
@@ -231,7 +231,7 @@ test.describe('Column Resize @p2', () => {
     await goToProjectDetail(page);
 
     // First resize "类型" column to make it wider
-    const typeTh = page.locator('.compact-table .arco-table-header th[data-column-key="type"]');
+    const typeTh = page.locator('.compact-table thead th[data-column-key="type"]');
     await expect(typeTh).toBeVisible();
 
     // Get default width
@@ -256,11 +256,11 @@ test.describe('Column Resize @p2', () => {
     expect(widthAfterResize).toBeGreaterThan(defaultWidth);
 
     // Open column settings and click "恢复默认"
-    const settingsBtn = page.locator('button').filter({ has: page.locator('svg.arco-icon-more-vertical') });
+    const settingsBtn = page.locator('button').filter({ has: page.locator('svg[aria-label="列设置"]') });
     await settingsBtn.click();
     await page.waitForTimeout(300);
 
-    const popover = page.locator('.arco-popover-content');
+    const popover = page.locator('[data-slot="popover-content"]');
     await expect(popover).toBeVisible({ timeout: 5_000 });
     await popover.getByText('恢复默认').click();
     await page.waitForTimeout(1500);
@@ -278,7 +278,7 @@ test.describe('Column Resize @p2', () => {
   test('resize handle shows col-resize cursor on hover', async ({ authedPage: page }) => {
     await goToProjectDetail(page);
 
-    const nameTh = page.locator('.compact-table .arco-table-header th[data-column-key="name"]');
+    const nameTh = page.locator('.compact-table thead th[data-column-key="name"]');
     await expect(nameTh).toBeVisible();
     const handle = nameTh.locator('.column-resize-handle');
     await expect(handle).toBeAttached();
@@ -292,7 +292,7 @@ test.describe('Column Resize @p2', () => {
   test('body cursor and user-select reset after drag', async ({ authedPage: page }) => {
     await goToProjectDetail(page);
 
-    const nameTh = page.locator('.compact-table .arco-table-header th[data-column-key="name"]');
+    const nameTh = page.locator('.compact-table thead th[data-column-key="name"]');
     const thBox = await nameTh.boundingBox();
     expect(thBox).toBeTruthy();
 

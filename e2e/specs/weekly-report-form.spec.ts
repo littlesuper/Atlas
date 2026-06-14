@@ -30,7 +30,7 @@ test.describe.serial('Weekly Report Form @p1', () => {
   test('navigate to project weekly tab and click create', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -50,7 +50,7 @@ test.describe.serial('Weekly Report Form @p1', () => {
   test('fill in weekly report form and save as draft', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -98,7 +98,7 @@ test.describe.serial('Weekly Report Form @p1', () => {
   test('submit weekly report from form', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).click();
+    await page.locator('td').getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
 
@@ -129,7 +129,7 @@ test.describe.serial('Weekly Report Form @p1', () => {
       await submitBtn.click();
 
       // May have confirmation modal
-      const modal = page.locator('.arco-modal:visible');
+      const modal = page.locator('[data-slot="dialog-content"]:visible');
       if (await modal.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await confirmModal(page);
       }
@@ -144,9 +144,9 @@ test.describe.serial('Weekly Report Form @p1', () => {
     await page.goto('/weekly-reports');
     await page.waitForTimeout(2_000);
 
-    // The weekly reports page groups reports by week, each group has its own .arco-table
+    // The weekly reports page groups reports by week, each group has its own table
     // Use .first() to avoid strict mode violation with multiple tables
-    const table = page.locator('.arco-table').first();
+    const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10_000 });
 
     // Look for our project name in the reports
@@ -167,7 +167,7 @@ test.describe.serial('Weekly Report Form @p1', () => {
       await page.waitForTimeout(1_000);
 
       // Draft table should render (may be empty or have items)
-      const table = page.locator('.arco-table').first();
+      const table = page.locator('table').first();
       await expect(table).toBeVisible({ timeout: 5_000 });
     }
   });
@@ -178,7 +178,7 @@ test.describe.serial('Weekly Report Form @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

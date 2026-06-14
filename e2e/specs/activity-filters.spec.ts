@@ -15,7 +15,7 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     // Click the first project name link
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     await firstProjectLink.waitFor({ state: 'visible', timeout: 10_000 });
     await firstProjectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
@@ -26,7 +26,7 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
   test('phase duration tags are visible in activity list toolbar', async ({ authedPage: page }) => {
     await goToProjectDetail(page);
     // At least one phase tag (EVT/DVT/PVT/MP) with duration should be visible
-    const phaseTags = page.locator('.arco-tag').filter({ hasText: /^(EVT|DVT|PVT|MP) \d+天$/ });
+    const phaseTags = page.locator('[data-slot="badge"]').filter({ hasText: /^(EVT|DVT|PVT|MP) \d+天$/ });
     // Wait for table to load
     await waitForTableLoad(page);
     const count = await phaseTags.count();
@@ -40,7 +40,7 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     await goToProjectDetail(page);
     await waitForTableLoad(page);
 
-    const phaseTags = page.locator('.arco-tag').filter({ hasText: /^(EVT|DVT|PVT|MP) \d+天$/ });
+    const phaseTags = page.locator('[data-slot="badge"]').filter({ hasText: /^(EVT|DVT|PVT|MP) \d+天$/ });
     const tagCount = await phaseTags.count();
     if (tagCount === 0) {
       test.skip();
@@ -52,26 +52,26 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     const phase = tagText?.match(/^(EVT|DVT|PVT|MP)/)?.[1];
 
     // Count total rows before filtering
-    const totalRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const totalRows = await page.locator('tbody tbody tr').count();
 
     // Click phase tag to filter
     await phaseTags.first().click();
     await page.waitForTimeout(300);
 
     // Filtered rows should be <= total rows
-    const filteredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const filteredRows = await page.locator('tbody tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // All visible phase cells should match the selected phase
     if (phase && filteredRows > 0) {
-      const phaseCells = page.locator('.arco-table-body .arco-tag').filter({ hasText: phase });
+      const phaseCells = page.locator('tbody [data-slot="badge"]').filter({ hasText: phase });
       expect(await phaseCells.count()).toBe(filteredRows);
     }
 
     // Click again to clear filter
     await phaseTags.first().click();
     await page.waitForTimeout(300);
-    const restoredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const restoredRows = await page.locator('tbody tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 
@@ -82,19 +82,19 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     const notStartedFilter = page.locator('span').filter({ hasText: /^未开始 \d+$/ });
     await expect(notStartedFilter).toBeVisible({ timeout: 5_000 });
 
-    const totalRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const totalRows = await page.locator('tbody tbody tr').count();
 
     // Click to filter
     await notStartedFilter.click();
     await page.waitForTimeout(300);
 
-    const filteredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const filteredRows = await page.locator('tbody tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // Click again to clear
     await notStartedFilter.click();
     await page.waitForTimeout(300);
-    const restoredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const restoredRows = await page.locator('tbody tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 
@@ -105,18 +105,18 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     const inProgressFilter = page.locator('span').filter({ hasText: /^进行中 \d+$/ });
     await expect(inProgressFilter).toBeVisible({ timeout: 5_000 });
 
-    const totalRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const totalRows = await page.locator('tbody tbody tr').count();
 
     await inProgressFilter.click();
     await page.waitForTimeout(300);
 
-    const filteredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const filteredRows = await page.locator('tbody tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // Clear
     await inProgressFilter.click();
     await page.waitForTimeout(300);
-    const restoredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const restoredRows = await page.locator('tbody tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 
@@ -125,17 +125,17 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
     await waitForTableLoad(page);
 
     // Find the first data row
-    const firstRow = page.locator('.arco-table-tr').filter({ has: page.locator('.arco-table-td') }).first();
+    const firstRow = page.locator('tbody tr').filter({ has: page.locator('td') }).first();
     await expect(firstRow).toBeVisible({ timeout: 10_000 });
 
     // Click on the name cell to enter inline edit
     // Column order: checkbox(0), drag(1), ID(2), predecessor(3), phase(4), name(5)
-    const nameCell = firstRow.locator('.arco-table-td').nth(5);
+    const nameCell = firstRow.locator('td').nth(5);
     await nameCell.click();
     await page.waitForTimeout(500);
 
     // Check if an input appeared (inline edit mode)
-    const inlineInput = page.locator('.arco-table .arco-input, .arco-table .arco-select-view, .arco-table .arco-input-number');
+    const inlineInput = page.locator('table [data-slot="input"], table .arco-select-view, table .arco-input-number');
     const hasInlineEdit = await inlineInput.count() > 0;
 
     if (hasInlineEdit) {
@@ -144,7 +144,7 @@ test.describe('Activity List Filters & Inline Edit @p1', () => {
       await page.waitForTimeout(500);
 
       // Inline editor should be dismissed
-      const inputAfterEsc = await page.locator('.arco-table .arco-input').count();
+      const inputAfterEsc = await page.locator('table [data-slot="input"]').count();
       expect(inputAfterEsc).toBe(0);
     }
   });

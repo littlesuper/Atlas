@@ -20,7 +20,7 @@ test.describe.serial('Permission Access Control @p0', () => {
     await expect(page).toHaveURL(/\/projects/);
 
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table')).toBeVisible();
+    await expect(page.locator('table')).toBeVisible();
   });
 
   // ──────── TC2: non-admin can view product list ────────
@@ -30,7 +30,7 @@ test.describe.serial('Permission Access Control @p0', () => {
     await clickNavItem(page, '产品管理');
     await expect(page).toHaveURL(/\/products/);
     await waitForTableLoad(page);
-    await expect(page.locator('.arco-table')).toBeVisible();
+    await expect(page.locator('table')).toBeVisible();
   });
 
   // ──────── TC3: non-admin can view weekly reports ────────
@@ -66,14 +66,14 @@ test.describe.serial('Permission Access Control @p0', () => {
     await login(page, credentials.zhangsan.username, credentials.zhangsan.password);
     await waitForTableLoad(page);
 
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     if (await firstProjectLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await firstProjectLink.click();
       await expect(page).toHaveURL(/\/projects\/.+/);
       await page.waitForTimeout(1_000);
 
       // Should see activity table
-      await expect(page.locator('.arco-table').first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
     }
   });
 
@@ -87,15 +87,15 @@ test.describe.serial('Permission Access Control @p0', () => {
     // lisi may not have canLogin=true depending on seed data
     const loginResult = await Promise.race([
       page.waitForURL('**/projects**', { timeout: 10_000 }).then(() => 'success' as const),
-      page.locator('.arco-message').waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'denied' as const),
+      page.locator('[data-sonner-toast]').waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'denied' as const),
     ]);
 
     if (loginResult === 'success') {
       await waitForTableLoad(page);
-      await expect(page.locator('.arco-table')).toBeVisible();
+      await expect(page.locator('table')).toBeVisible();
     } else {
       // Login denied is a valid permission control response
-      await expect(page.locator('.arco-message')).toBeVisible();
+      await expect(page.locator('[data-sonner-toast]')).toBeVisible();
     }
   });
 });

@@ -105,11 +105,11 @@ test.describe('Visual Regression @visual @p2', () => {
   test('activity create drawer baseline', async ({ page }) => {
     await page.goto('/projects');
     await waitForTableLoad(page);
-    await page.locator('.arco-table-container table tbody tr a').first().click();
+    await page.locator('[data-slot="table-container"] table tbody tr a').first().click();
     await page.waitForURL('**/projects/**', { timeout: 10_000 });
     await openCreateActivityDrawer(page);
     await stabilizeVisualPage(page);
-    await expect(page.locator('.arco-drawer')).toHaveScreenshot('activity-create-drawer.png', {
+    await expect(page.locator('[data-slot="sheet-content"]')).toHaveScreenshot('activity-create-drawer.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     });
@@ -119,9 +119,9 @@ test.describe('Visual Regression @visual @p2', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
     await page.getByRole('button', { name: '新建产品' }).click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
     await stabilizeVisualPage(page);
-    await expect(page.locator('.arco-drawer')).toHaveScreenshot('product-create-drawer.png', {
+    await expect(page.locator('[data-slot="sheet-content"]')).toHaveScreenshot('product-create-drawer.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     });
@@ -131,13 +131,13 @@ test.describe('Visual Regression @visual @p2', () => {
     await page.goto('/products');
     await waitForTableLoad(page);
 
-    const productRow = page.locator('.arco-table-tr').filter({ has: page.locator('button') }).first();
+    const productRow = page.locator('tbody tr').filter({ has: page.locator('button') }).first();
     await expect(productRow).toBeVisible({ timeout: 5_000 });
     await productRow.locator('button').first().click();
-    await expect(page.locator('.arco-drawer')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible({ timeout: 5_000 });
 
     await stabilizeVisualPage(page);
-    await expect(page.locator('.arco-drawer')).toHaveScreenshot('product-detail-drawer.png', {
+    await expect(page.locator('[data-slot="sheet-content"]')).toHaveScreenshot('product-detail-drawer.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     });
@@ -160,9 +160,9 @@ test.describe('Visual Regression @visual @p2', () => {
     await gotoProjectRiskTab(page, projectId);
 
     await page.getByRole('button', { name: '新建' }).click();
-    await expect(page.locator('.arco-modal')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="dialog-content"]')).toBeVisible({ timeout: 5_000 });
     await stabilizeVisualPage(page);
-    await expect(page.locator('.arco-modal')).toHaveScreenshot('risk-item-create-modal.png', {
+    await expect(page.locator('[data-slot="dialog-content"]')).toHaveScreenshot('risk-item-create-modal.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     });
@@ -187,7 +187,7 @@ test.describe('Visual Regression @visual @p2', () => {
     try {
       await gotoProjectRiskTab(page, projectId);
       await page.getByText(title).click();
-      const drawer = page.locator('.arco-drawer');
+      const drawer = page.locator('[data-slot="sheet-content"]');
       await expect(drawer).toBeVisible({ timeout: 5_000 });
       await stabilizeVisualPage(page);
 

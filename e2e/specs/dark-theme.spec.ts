@@ -70,7 +70,7 @@ test.describe.serial('Dark Theme (THEME-001-003, SYS-007) @p1', () => {
     await waitForTableLoad(page);
     await page.waitForTimeout(1_000);
 
-    const textElements = await page.locator('body').locator('h1, h2, h3, .arco-typography, .arco-table-td, .arco-card').all();
+    const textElements = await page.locator('body').locator('h1, h2, h3, .arco-typography, td, [data-slot="card"]').all();
     let checked = 0;
     for (const el of textElements.slice(0, 10)) {
       const color = await el.evaluate((node) => {

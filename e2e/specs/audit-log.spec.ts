@@ -25,7 +25,7 @@ test.describe('Audit Log @p2', () => {
   test('audit log table displays with expected columns', async ({ authedPage: page }) => {
     await goToAuditLog(page);
 
-    const table = page.locator('.arco-table').first();
+    const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 5_000 });
 
     // Check column headers
@@ -42,8 +42,8 @@ test.describe('Audit Log @p2', () => {
   test('audit log contains login entries', async ({ authedPage: page }) => {
     await goToAuditLog(page);
 
-    const table = page.locator('.arco-table').first();
-    const rows = table.locator('tbody .arco-table-tr');
+    const table = page.locator('table').first();
+    const rows = table.locator('tbody tbody tr');
     const rowCount = await rows.count();
 
     // Should have at least 1 log entry (from our login)
@@ -78,20 +78,20 @@ test.describe('Audit Log @p2', () => {
     await goToAuditLog(page);
 
     // Look for action filter select
-    const actionFilter = page.locator('.arco-select').filter({ has: page.locator('[placeholder*="操作"]') });
+    const actionFilter = page.locator('[role="combobox"]').filter({ has: page.locator('[placeholder*="操作"]') });
     if (await actionFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await actionFilter.click();
       await page.waitForTimeout(300);
 
       // Select a specific action type
-      const loginOption = page.locator('.arco-select-popup:visible .arco-select-option').first();
+      const loginOption = page.locator('[data-slot="select-content"]:visible [role="option"]').first();
       if (await loginOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await loginOption.click();
         await page.waitForTimeout(500);
         await waitForTableLoad(page);
 
         // Table should still be visible (with filtered results)
-        await expect(page.locator('.arco-table').first()).toBeVisible();
+        await expect(page.locator('table').first()).toBeVisible();
       }
     }
   });

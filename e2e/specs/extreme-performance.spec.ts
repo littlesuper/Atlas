@@ -48,7 +48,7 @@ test.describe.serial('Extreme Performance Tests @p2', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
     const projectId = page.url().match(/\/projects\/([^/]+)/)?.[1]!;
 
@@ -88,11 +88,11 @@ test.describe.serial('Extreme Performance Tests @p2', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName }).first();
+    const row = page.locator('tbody tr').filter({ hasText: projectName }).first();
     const delBtn = row.locator('button[class*="danger"]').first();
     if (await delBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await delBtn.click();
-      await page.locator('.arco-modal-footer .arco-btn-primary').click();
+      await page.locator('[data-slot="dialog-footer"] .arco-btn-primary').click();
       await page.waitForTimeout(1_000);
     }
   });

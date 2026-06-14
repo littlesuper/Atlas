@@ -20,16 +20,16 @@ test.describe.serial('Activity Batch Operations @p1', () => {
     await page.goto('/projects');
     await waitForTableLoad(page);
     await searchProject(page, projectName);
-    await page.locator('.arco-table-td').getByText(projectName).first().click();
+    await page.locator('td').getByText(projectName).first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1_000);
   }
 
   async function createActivityHelper(page: import('@playwright/test').Page, name: string) {
     await openCreateActivityDrawer(page);
-    const phaseSelect = page.locator('.arco-drawer .arco-select').first();
+    const phaseSelect = page.locator('[data-slot="sheet-content"] [role="combobox"]').first();
     await phaseSelect.click();
-    await page.locator('.arco-select-popup:visible .arco-select-option').first().click();
+    await page.locator('[data-slot="select-content"]:visible [role="option"]').first().click();
     await page.waitForTimeout(300);
 
     await page.getByPlaceholder('请输入活动名称').fill(name);
@@ -40,7 +40,7 @@ test.describe.serial('Activity Batch Operations @p1', () => {
     );
     await clickDrawerSubmit(page, '创建');
     expect((await resp).status()).toBeLessThan(400);
-    await expect(page.locator('.arco-drawer')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-slot="sheet-content"]')).not.toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(2_000);
   }
 
@@ -59,11 +59,11 @@ test.describe.serial('Activity Batch Operations @p1', () => {
   test('select activities via checkboxes', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const checkboxes = page.locator('.arco-table .arco-checkbox').filter({
+    const checkboxes = page.locator('table [data-slot="checkbox"]').filter({
       has: page.locator('input[type="checkbox"]'),
     });
 
-    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('.arco-checkbox-indeterminate') });
+    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('[data-state="indeterminate"]') });
     if (await rowCheckboxes.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await rowCheckboxes.first().click();
       await page.waitForTimeout(300);
@@ -82,8 +82,8 @@ test.describe.serial('Activity Batch Operations @p1', () => {
   test('batch change status via toolbar', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const checkboxes = page.locator('.arco-table .arco-checkbox');
-    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('.arco-checkbox-indeterminate') });
+    const checkboxes = page.locator('table [data-slot="checkbox"]');
+    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('[data-state="indeterminate"]') });
     if (await rowCheckboxes.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await rowCheckboxes.first().click();
       await page.waitForTimeout(200);
@@ -98,7 +98,7 @@ test.describe.serial('Activity Batch Operations @p1', () => {
       await statusSelect.click();
       await page.waitForTimeout(300);
 
-      const inProgressOpt = page.locator('.arco-select-popup:visible .arco-select-option').filter({ hasText: '进行中' });
+      const inProgressOpt = page.locator('[data-slot="select-content"]:visible [role="option"]').filter({ hasText: '进行中' });
       if (await inProgressOpt.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await inProgressOpt.click();
         await page.waitForTimeout(1_000);
@@ -109,8 +109,8 @@ test.describe.serial('Activity Batch Operations @p1', () => {
   test('batch change phase via toolbar', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const checkboxes = page.locator('.arco-table .arco-checkbox');
-    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('.arco-checkbox-indeterminate') });
+    const checkboxes = page.locator('table [data-slot="checkbox"]');
+    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('[data-state="indeterminate"]') });
     if (await rowCheckboxes.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await rowCheckboxes.first().click();
       await page.waitForTimeout(200);
@@ -125,7 +125,7 @@ test.describe.serial('Activity Batch Operations @p1', () => {
       await phaseSelect.click();
       await page.waitForTimeout(300);
 
-      const options = page.locator('.arco-select-popup:visible .arco-select-option');
+      const options = page.locator('[data-slot="select-content"]:visible [role="option"]');
       if (await options.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
         await options.first().click();
         await page.waitForTimeout(1_000);
@@ -136,8 +136,8 @@ test.describe.serial('Activity Batch Operations @p1', () => {
   test('cancel selection', async ({ authedPage: page }) => {
     await navigateToProjectDetail(page);
 
-    const checkboxes = page.locator('.arco-table .arco-checkbox');
-    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('.arco-checkbox-indeterminate') });
+    const checkboxes = page.locator('table [data-slot="checkbox"]');
+    const rowCheckboxes = checkboxes.filter({ hasNot: page.locator('[data-state="indeterminate"]') });
     if (await rowCheckboxes.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await rowCheckboxes.first().click();
       await page.waitForTimeout(300);
@@ -157,7 +157,7 @@ test.describe.serial('Activity Batch Operations @p1', () => {
     await waitForTableLoad(page);
     await searchProject(page, projectName);
 
-    const row = page.locator('.arco-table-tr').filter({ hasText: projectName });
+    const row = page.locator('tbody tr').filter({ hasText: projectName });
     if (await row.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await row.locator('button[class*="danger"]').click();
       await confirmModal(page);

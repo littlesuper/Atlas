@@ -11,8 +11,8 @@ test.describe('Project List Filters @p1', () => {
     await waitForTableLoad(page);
 
     // Find product line checkable tags (蒲公英 / 向日葵)
-    const dandelionTag = page.locator('.arco-tag-checkable').filter({ hasText: '蒲公英' });
-    const sunflowerTag = page.locator('.arco-tag-checkable').filter({ hasText: '向日葵' });
+    const dandelionTag = page.locator('[data-slot="badge"]').filter({ hasText: '蒲公英' });
+    const sunflowerTag = page.locator('[data-slot="badge"]').filter({ hasText: '向日葵' });
 
     await expect(dandelionTag).toBeVisible();
     await expect(sunflowerTag).toBeVisible();
@@ -25,29 +25,29 @@ test.describe('Project List Filters @p1', () => {
   test('clicking product line tag toggles filter', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 
-    const totalRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const totalRows = await page.locator('tbody tbody tr').count();
 
     // Uncheck 向日葵 (should keep at least 蒲公英)
-    const sunflowerTag = page.locator('.arco-tag-checkable').filter({ hasText: '向日葵' });
+    const sunflowerTag = page.locator('[data-slot="badge"]').filter({ hasText: '向日葵' });
     await sunflowerTag.click();
     await waitForTableLoad(page);
 
-    const filteredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const filteredRows = await page.locator('tbody tbody tr').count();
     expect(filteredRows).toBeLessThanOrEqual(totalRows);
 
     // Re-check 向日葵
     await sunflowerTag.click();
     await waitForTableLoad(page);
 
-    const restoredRows = await page.locator('.arco-table-body .arco-table-tr').count();
+    const restoredRows = await page.locator('tbody tbody tr').count();
     expect(restoredRows).toBe(totalRows);
   });
 
   test('cannot uncheck the last product line tag', async ({ authedPage: page }) => {
     await waitForTableLoad(page);
 
-    const dandelionTag = page.locator('.arco-tag-checkable').filter({ hasText: '蒲公英' });
-    const sunflowerTag = page.locator('.arco-tag-checkable').filter({ hasText: '向日葵' });
+    const dandelionTag = page.locator('[data-slot="badge"]').filter({ hasText: '蒲公英' });
+    const sunflowerTag = page.locator('[data-slot="badge"]').filter({ hasText: '向日葵' });
 
     // Uncheck 蒲公英 first
     await dandelionTag.click();

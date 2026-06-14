@@ -12,7 +12,7 @@ test.describe('Column Settings @p2', () => {
   async function goToProjectDetail(page: import('@playwright/test').Page) {
     await page.goto('/projects');
     await waitForTableLoad(page);
-    const firstProjectLink = page.locator('.arco-table-td a, .arco-table-td .arco-link').first();
+    const firstProjectLink = page.locator('td a, td .arco-link').first();
     await firstProjectLink.waitFor({ state: 'visible', timeout: 10_000 });
     await firstProjectLink.click();
     await expect(page).toHaveURL(/\/projects\/.+/);
@@ -24,13 +24,13 @@ test.describe('Column Settings @p2', () => {
     await goToProjectDetail(page);
 
     // Find the settings button (⋮ icon or gear icon)
-    const settingsBtn = page.locator('button').filter({ has: page.locator('svg.arco-icon-more-vertical, svg.arco-icon-settings') });
+    const settingsBtn = page.locator('button').filter({ has: page.locator('svg[aria-label="列设置"], svg.arco-icon-settings') });
     if (await settingsBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await settingsBtn.click();
       await page.waitForTimeout(300);
 
       // A popover with column settings should appear
-      const settingsContent = page.locator('.arco-popover-content').getByText('列显示设置');
+      const settingsContent = page.locator('[data-slot="popover-content"]').getByText('列显示设置');
       await expect(settingsContent).toBeVisible({ timeout: 5_000 });
     }
   });
@@ -41,18 +41,18 @@ test.describe('Column Settings @p2', () => {
     await waitForTableLoad(page);
 
     // Count initial visible columns
-    const initialHeaders = await page.locator('.arco-table-header th, .arco-table thead th').count();
+    const initialHeaders = await page.locator('thead th, table thead th').count();
 
     // Open settings
-    const settingsBtn = page.locator('button').filter({ has: page.locator('svg.arco-icon-more-vertical, svg.arco-icon-settings') });
+    const settingsBtn = page.locator('button').filter({ has: page.locator('svg[aria-label="列设置"], svg.arco-icon-settings') });
     if (await settingsBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await settingsBtn.click();
       await page.waitForTimeout(300);
 
       // Find column checkboxes inside the popover
-      const popover = page.locator('.arco-popover-content');
+      const popover = page.locator('[data-slot="popover-content"]');
       await expect(popover).toBeVisible({ timeout: 5_000 });
-      const columnToggles = popover.locator('.arco-checkbox');
+      const columnToggles = popover.locator('[data-slot="checkbox"]');
 
       if (await columnToggles.count() > 0) {
         // Toggle a column off (click the last checkbox, e.g. "备注")
@@ -64,15 +64,15 @@ test.describe('Column Settings @p2', () => {
         await page.waitForTimeout(500);
 
         // Headers count should have changed
-        const newHeaders = await page.locator('.arco-table-header th, .arco-table thead th').count();
+        const newHeaders = await page.locator('thead th, table thead th').count();
         expect(newHeaders).not.toBe(initialHeaders);
 
         // Re-open settings and toggle back
         await settingsBtn.click();
         await page.waitForTimeout(300);
-        const popover2 = page.locator('.arco-popover-content');
+        const popover2 = page.locator('[data-slot="popover-content"]');
         await expect(popover2).toBeVisible({ timeout: 5_000 });
-        await popover2.locator('.arco-checkbox').last().click();
+        await popover2.locator('[data-slot="checkbox"]').last().click();
         await page.waitForTimeout(500);
       }
     }
@@ -83,7 +83,7 @@ test.describe('Column Settings @p2', () => {
     await goToProjectDetail(page);
     await waitForTableLoad(page);
 
-    const initialHeaders = await page.locator('.arco-table-header th, .arco-table thead th').count();
+    const initialHeaders = await page.locator('thead th, table thead th').count();
 
     // Switch to another tab and back
     await clickTab(page, '项目周报');
@@ -93,7 +93,7 @@ test.describe('Column Settings @p2', () => {
     await waitForTableLoad(page);
 
     // Column count should remain the same
-    const afterHeaders = await page.locator('.arco-table-header th, .arco-table thead th').count();
+    const afterHeaders = await page.locator('thead th, table thead th').count();
     expect(afterHeaders).toBe(initialHeaders);
   });
 });
