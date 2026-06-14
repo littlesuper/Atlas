@@ -80,7 +80,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 };
 
 const App: React.FC = () => {
-  const { fetchUser, isAuthenticated } = useAuthStore();
+  const { fetchUser } = useAuthStore();
   const { loadTheme, syncFromServer } = useThemeStore();
 
   useEffect(() => {
@@ -118,10 +118,15 @@ const App: React.FC = () => {
           {/* 登录页 */}
           <Route path="/login" element={<Login />} />
 
-          {/* 首页：AI 自然语言入口 + 项目风险点 */}
+          {/* 首页 = AI 聊天页；走 ProtectedRoute 以等待登录态恢复，
+              避免刷新瞬间 fetchUser 未完成时被误判未登录而踢回登录页 */}
           <Route
             path="/"
-            element={isAuthenticated ? <Home /> : <Navigate to="/login" replace />}
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
           />
 
           {/* 旧 /assistant 已并入首页，重定向兼容旧链接 */}
