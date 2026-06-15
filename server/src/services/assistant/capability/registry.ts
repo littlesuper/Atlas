@@ -25,7 +25,7 @@ export function listCapabilitiesForUser(permissions: string[]): Capability[] {
   return listCapabilities().filter((c) => hasPermission(permissions, c.permission.resource, c.permission.action));
 }
 
-function hasPermission(perms: string[], resource: string, action: string): boolean {
+export function hasPermission(perms: string[], resource: string, action: string): boolean {
   return perms.some((p) => {
     const [r, a] = p.split(':');
     if (r === '*' && a === '*') return true;

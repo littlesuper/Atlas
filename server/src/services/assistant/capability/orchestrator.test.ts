@@ -12,6 +12,7 @@ import type { CapabilityContext } from './types';
 import { z } from 'zod';
 import type { Capability, EntitySnapshot } from './types';
 import { VersionMismatchError } from '../orchestrator';
+import { CapabilityForbiddenError } from './orchestrator';
 
 const ctx: CapabilityContext = { userId: 'u1', userName: '张三', permissions: ['project:create'], projects: [] };
 
@@ -199,5 +200,41 @@ describe('capabilityPropose · 叙述', () => {
     expect(r.status).toBe('ok');
     if (r.status === 'ok') expect(r.narrative).toBe('值已设置。');
     expect(mockCallAi).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('capabilityPropose · 多轮续填', () => {
+  beforeEach(() => { registerCapability(projectCreateCapability); });
+
+  it('priorArgs 合并增量：上轮缺名、本轮补名 → ok（不再缺）', async () => {
+    mockCallAi.mockResolvedValue({ content: '{"name":"项目甲"}' }); // 本轮只解析出 name
+    const r = await capabilityPropose('project.create', '叫项目甲', ctx, { productLine: '蒲公英' });
+    expect(r.status).toBe('ok');
+  });
+
+  it('priorArgs 空值不抹已填：本轮空 name 不覆盖已填 name', async () => {
+    mockCallAi.mockResolvedValue({ content: '{"name":""}' });
+    const r = await capabilityPropose('project.create', 'x', ctx, { name: '项目甲', productLine: '蒲公英' });
+    expect(r.status).toBe('ok');
+  });
+});
+
+describe('capabilityApply · 归属/权限', () => {
+  beforeEach(() => { registerCapability(projectCreateCapability); });
+
+  it('非发起者应用 → CapabilityForbiddenError', async () => {
+    mockCallAi.mockResolvedValue({ content: '{"name":"甲","productLine":"蒲公英"}' });
+    const r = await capabilityPropose('project.create', 'x', ctx); // ctx.userId='u1'
+    if (r.status !== 'ok') throw new Error('expected ok');
+    const other = { ...ctx, userId: 'u2' };
+    await expect(capabilityApply(r.proposalId, other, {} as never)).rejects.toBeInstanceOf(CapabilityForbiddenError);
+  });
+
+  it('无权限应用 → CapabilityForbiddenError', async () => {
+    mockCallAi.mockResolvedValue({ content: '{"name":"甲","productLine":"蒲公英"}' });
+    const r = await capabilityPropose('project.create', 'x', ctx);
+    if (r.status !== 'ok') throw new Error('expected ok');
+    const noPerm = { ...ctx, permissions: [] };
+    await expect(capabilityApply(r.proposalId, noPerm, {} as never)).rejects.toBeInstanceOf(CapabilityForbiddenError);
   });
 });

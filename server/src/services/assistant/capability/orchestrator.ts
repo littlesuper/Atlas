@@ -8,9 +8,16 @@ import { resolveProjectTarget } from '../targetResolver';
 import { VersionMismatchError, TargetNotFoundError, ProposalNotFoundError, UnknownDomainError } from '../orchestrator';
 import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types';
 import { proposalStore } from '../proposalStore';
-import { getCapability } from './registry';
+import { getCapability, hasPermission } from './registry';
 import { genericPreview } from './genericPreview';
 import type { Capability, CapabilityContext, EntitySnapshot } from './types';
+
+export class CapabilityForbiddenError extends Error {
+  constructor(message = '无权应用此提议') {
+    super(message);
+    this.name = 'CapabilityForbiddenError';
+  }
+}
 
 export type CapabilityProposeOutcome =
   | { status: 'ok'; proposalId: string; preview: AssistantPreview; narrative: string }
@@ -64,43 +71,18 @@ function deterministicNarrative(cap: Capability, preview: AssistantPreview): str
   return `将${cap.description.replace(/。.*/, '')}：共 ${preview.rows.length} 项。`;
 }
 
-/** 默认解析管线：extractJson → inputSchema → validateRefs。parseArgs 存在则整体接管。 */
-function parseInput(
-  cap: Capability,
-  rawLLM: string,
-  ctx: CapabilityContext,
-  entity: EntitySnapshot | undefined
-): { ok: true; input: Record<string, unknown> } | { ok: false } {
-  if (cap.parseArgs) {
-    const r = cap.parseArgs(rawLLM, ctx, entity);
-    return r.ok ? { ok: true, input: r.input as Record<string, unknown> } : { ok: false };
-  }
-  const raw = extractJson(rawLLM);
-  if (raw == null) return { ok: false };
-  const parsed = cap.inputSchema.safeParse(raw);
-  if (!parsed.success) {
-    logger.info({ capabilityName: cap.name, issues: parsed.error.issues.map((i) => i.message) }, '能力参数未通过校验');
-    return { ok: false };
-  }
-  if (cap.validateRefs) {
-    const v = cap.validateRefs(parsed.data, ctx, entity);
-    if (!v.ok) {
-      logger.info({ capabilityName: cap.name, fabricated: v.fabricated }, '能力引用 id 未通过白名单');
-      return { ok: false };
-    }
-  }
-  return { ok: true, input: parsed.data as Record<string, unknown> };
-}
+const isEmptyVal = (v: unknown) => v == null || v === '';
 
 export async function capabilityPropose(
   capabilityName: string,
   utterance: string,
-  ctx: CapabilityContext
+  ctx: CapabilityContext,
+  priorArgs?: Record<string, unknown>
 ): Promise<CapabilityProposeOutcome> {
   const cap = getCapability(capabilityName);
   if (!cap) return { status: 'unknown_capability' };
 
-  // 目标定位（仅 target 类）：resolveProjectTarget → loadEntity
+  // 目标定位（仅 target 类）
   let targetId = '__new__';
   let entity: EntitySnapshot | undefined;
   if (cap.target === 'project') {
@@ -108,18 +90,21 @@ export async function capabilityPropose(
     if (t.status === 'ai_unavailable') return { status: 'ai_unavailable' };
     if (t.status === 'unresolved') return { status: 'need_target' };
     targetId = t.projectId;
-    // 已认出项目；loadEntity 返回 null 表示实体已不存在/归档/不可见 → 目标不存在（而非"没听清哪个项目"）
     const loaded = cap.loadEntity ? await cap.loadEntity(targetId, ctx) : null;
     if (!loaded) return { status: 'target_not_found' };
     entity = loaded;
   }
 
-  // LLM 边缘：填参
+  // LLM 边缘：填参；续填轮追加「已知字段」块，让 LLM 只补增量
   const prompt = cap.buildPrompt(utterance, ctx);
+  let userPrompt = prompt.user;
+  if (priorArgs && Object.keys(priorArgs).length > 0) {
+    userPrompt += `\n\n## 已确认字段（无需重复；只补未提供或用户明确纠正的字段）\n${JSON.stringify(priorArgs)}`;
+  }
   let content: string | null = null;
   try {
     const res = await aiCircuitBreaker.execute(() =>
-      callAi({ feature: 'assistant', label: 'intent', systemPrompt: prompt.system, userPrompt: prompt.user, temperature: 0 })
+      callAi({ feature: 'assistant', label: 'intent', systemPrompt: prompt.system, userPrompt, temperature: 0 })
     );
     content = res?.content ?? null;
   } catch (err) {
@@ -128,14 +113,45 @@ export async function capabilityPropose(
   }
   if (!content) return { status: 'ai_unavailable' };
 
-  const parsed = parseInput(cap, content, ctx, entity);
-  if (!parsed.ok) return { status: 'not_understood' };
+  // 解析增量：parseArgs 整体接管，或 extractJson + inputSchema
+  let increment: Record<string, unknown>;
+  if (cap.parseArgs) {
+    const r = cap.parseArgs(content, ctx, entity);
+    if (!r.ok) return { status: 'not_understood' };
+    increment = r.input as Record<string, unknown>;
+  } else {
+    const raw = extractJson(content);
+    if (raw == null) return { status: 'not_understood' };
+    // 续填轮 LLM 可能对"未提供"字段输出空串；在 schema 校验前把空值剥掉，避免 min(1) 误判
+    const stripped = raw != null && typeof raw === 'object' && !Array.isArray(raw)
+      ? Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter(([, v]) => !isEmptyVal(v)))
+      : raw;
+    const parsed = cap.inputSchema.safeParse(stripped);
+    if (!parsed.success) {
+      logger.info({ capabilityName, issues: parsed.error.issues.map((i) => i.message) }, '能力参数未通过校验');
+      return { status: 'not_understood' };
+    }
+    increment = parsed.data as Record<string, unknown>;
+  }
 
-  // 缺失必填 → 追问（PR1 一次性；PR3 接入跨轮记忆）
-  const missing = cap.missingRequired ? cap.missingRequired(parsed.input as never, ctx) : [];
-  if (missing.length > 0) return { status: 'need_input', missing, partialArgs: parsed.input };
+  // 合并跨轮已填字段：本轮非空值覆盖/补全，空值绝不抹掉已填
+  const merged: Record<string, unknown> = { ...(priorArgs ?? {}) };
+  for (const [k, v] of Object.entries(increment)) if (!isEmptyVal(v)) merged[k] = v;
 
-  const input = (cap.applyDefaults ? cap.applyDefaults(parsed.input as never, ctx) : parsed.input) as Record<string, unknown>;
+  // 引用 id 白名单（对合并后的完整意图）
+  if (cap.validateRefs) {
+    const v = cap.validateRefs(merged as never, ctx, entity);
+    if (!v.ok) {
+      logger.info({ capabilityName, fabricated: v.fabricated }, '能力引用 id 未通过白名单');
+      return { status: 'not_understood' };
+    }
+  }
+
+  // 缺失必填 → 追问（携带合并后的 partialArgs 供下一轮续填）
+  const missing = cap.missingRequired ? cap.missingRequired(merged as never, ctx) : [];
+  if (missing.length > 0) return { status: 'need_input', missing, partialArgs: merged };
+
+  const input = (cap.applyDefaults ? cap.applyDefaults(merged as never, ctx) : merged) as Record<string, unknown>;
 
   const preview: AssistantPreview = cap.buildPreview
     ? cap.buildPreview(input as never, entity, ctx)
@@ -176,9 +192,15 @@ export async function capabilityApply(
 ): Promise<{ rows: AssistantDiffRow[]; risks: AssistantRisk[] }> {
   const cached = proposalStore.get(proposalId);
   if (!cached || !cached.capabilityName) throw new ProposalNotFoundError();
-  if (cached.applied) return { rows: cached.applied.rows, risks: cached.applied.risks };
+  // 归属：仅发起者本人可应用（拦截代他人应用 / 重放他人 proposalId）
+  if (cached.userId && cached.userId !== ctx.userId) throw new CapabilityForbiddenError();
   const cap = getCapability(cached.capabilityName);
   if (!cap) throw new UnknownDomainError(cached.capabilityName);
+  // 权限：能力边界 = 用户权限边界（apply 再核一次，防分类层被绕过）
+  if (!hasPermission(ctx.permissions, cap.permission.resource, cap.permission.action)) {
+    throw new CapabilityForbiddenError('权限不足');
+  }
+  if (cached.applied) return { rows: cached.applied.rows, risks: cached.applied.risks };
 
   // target 类：重载实体 + 指纹复核（并发保护）
   let target: { id: string; entity: EntitySnapshot } | undefined;
