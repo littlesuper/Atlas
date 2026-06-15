@@ -183,6 +183,74 @@ describe('computeProjectScheduleCascade', () => {
     });
   });
 
+  describe('multi-path reconvergence (GLM QA bug repro)', () => {
+    // 单个 seed S 经两条不等长路径汇聚到 X（S→A→X 与 S→B→C→X），且 X→Y。
+    // 期望：X 与 Y 都按"较晚路径"完整级联；Y 必须在 X 完成后才开始（FS 依赖）。
+    // 背景：写入路径 cascadeUpdateDependents 以单个 changedActivity 作为 seed 调本函数，
+    // 因此该拓扑会在生产中真实出现。
+    it('fully cascades Y when a single seed reaches convergence node X via two unequal-length paths', () => {
+      const snap = mkProject([
+        mkActivity({
+          id: 'S',
+          planStartDate: d('2026-03-16'),
+          planEndDate: d('2026-03-20'),
+          planDuration: 5,
+        }),
+        mkActivity({
+          id: 'A',
+          planStartDate: d('2026-03-09'),
+          planEndDate: d('2026-03-13'),
+          planDuration: 5,
+          dependencies: [{ id: 'S', type: '0' }],
+        }),
+        mkActivity({
+          id: 'B',
+          planStartDate: d('2026-03-09'),
+          planEndDate: d('2026-03-13'),
+          planDuration: 5,
+          dependencies: [{ id: 'S', type: '0' }],
+        }),
+        mkActivity({
+          id: 'C',
+          planStartDate: d('2026-03-16'),
+          planEndDate: d('2026-03-20'),
+          planDuration: 5,
+          dependencies: [{ id: 'B', type: '0' }],
+        }),
+        mkActivity({
+          id: 'X',
+          planStartDate: d('2026-03-23'),
+          planEndDate: d('2026-03-27'),
+          planDuration: 5,
+          dependencies: [
+            { id: 'A', type: '0' },
+            { id: 'C', type: '0' },
+          ],
+        }),
+        mkActivity({
+          id: 'Y',
+          planStartDate: d('2026-03-30'),
+          planEndDate: d('2026-04-03'),
+          planDuration: 5,
+          dependencies: [{ id: 'X', type: '0' }],
+        }),
+      ]);
+
+      const result = computeProjectScheduleCascade(snap, ['S']);
+
+      // X 正确收敛到较晚路径（经 C）：start 04-07，end 04-13（清明节 04-04~06 跳过）
+      expect(fmt(byId(result.snapshot, 'X')?.planStartDate)).toBe('2026-04-07');
+      expect(fmt(byId(result.snapshot, 'X')?.planEndDate)).toBe('2026-04-13');
+
+      // Y 依赖 X（FS）→ 必须在 X 完成后开始。期望 start 04-14，end 04-20。
+      // 实际（bug）：X 被"较短路径 A"率先更新时即被弹出并据中间值算出 Y；
+      // 随后较长路径 C 把 X 更新到最终值，但 X 已被 visited 标记、不再重算下游，
+      // 导致 Y 残留中间值 start 04-07、end 04-13（Y 在 X 完成前就开始——FS 依赖被违反）。
+      expect(fmt(byId(result.snapshot, 'Y')?.planStartDate)).toBe('2026-04-14');
+      expect(fmt(byId(result.snapshot, 'Y')?.planEndDate)).toBe('2026-04-20');
+    });
+  });
+
   describe('purity', () => {
     it('does not mutate input snapshot activities', () => {
       const a1 = mkActivity({
