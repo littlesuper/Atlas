@@ -146,6 +146,15 @@ router.post(
           case 'unknown_capability':
             res.status(400).json({ error: 'UNKNOWN_DOMAIN', message: `未知能力：${domain}` });
             return;
+          case 'need_target':
+            reply({
+              proposalId: null,
+              noOp: true,
+              needTarget: true,
+              preview: { rows: [], risks: [] },
+              narrative: '没听清你指的是哪个项目，请在话里点明项目名称（例如"把『GW-X500』的硬件打样推迟两周"）。',
+            });
+            return;
           case 'need_input':
             reply({ proposalId: null, noOp: true, mode: 'need_input', missing: out.missing, preview: { rows: [], risks: [] }, narrative: `还需要补充：${out.missing.join('、')}` });
             return;
