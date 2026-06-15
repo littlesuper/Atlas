@@ -49,8 +49,40 @@ export function formatDeps(
   }).join(', ');
 }
 
-export function computeSortOrder(activities: { sortOrder: number }[], atIndex: number): number {
-  const prev = atIndex > 0 ? activities[atIndex - 1].sortOrder : 0;
-  const next = atIndex < activities.length ? activities[atIndex].sortOrder : prev + 20;
-  return Math.floor((prev + next) / 2);
+// 计算在 atIndex 插入新活动时的 sortOrder 安排（sortOrder 是 Int，必须给唯一整数）。
+// - 邻居间有整数空隙（含两端余量）→ 取干净整数，不动同级（reindex 空）。
+// - 无空隙（相邻整数 / 0 值稠密）→ 把同级重排成 (pos+1)*STEP 等距网格、新活动落 idx 位，
+//   reindex 仅含 sortOrder 真正变化的同级。
+// 旧版 computeSortOrder 用 Math.floor((prev+next)/2)，在相邻整数上塌缩到 prev 造成冲突。
+export function planInsertSortOrder(
+  activities: { id: string; sortOrder: number }[],
+  atIndex: number,
+): { newSortOrder: number; reindex: { id: string; sortOrder: number }[] } {
+  const STEP = 10;
+  const idx = Math.max(0, Math.min(atIndex, activities.length));
+  const prev = idx > 0 ? activities[idx - 1].sortOrder : null;
+  const next = idx < activities.length ? activities[idx].sortOrder : null;
+
+  let clean: number | null = null;
+  if (prev === null && next === null) {
+    clean = STEP; // 空列表
+  } else if (prev === null && next !== null) {
+    if (next >= 2) clean = Math.floor(next / 2); // 开头有余量：落 [1, next-1]
+  } else if (prev !== null && next === null) {
+    clean = prev + STEP; // 末尾追加
+  } else if (prev !== null && next !== null && next - prev >= 2) {
+    clean = Math.floor((prev + next) / 2); // 中间有整数空隙
+  }
+  if (clean !== null) {
+    return { newSortOrder: clean, reindex: [] };
+  }
+
+  // 无空隙：重排成等距网格，新活动占 idx 位。
+  const reindex: { id: string; sortOrder: number }[] = [];
+  activities.forEach((a, i) => {
+    const finalPos = i < idx ? i : i + 1;
+    const target = (finalPos + 1) * STEP;
+    if (target !== a.sortOrder) reindex.push({ id: a.id, sortOrder: target });
+  });
+  return { newSortOrder: (idx + 1) * STEP, reindex };
 }
