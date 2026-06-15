@@ -67,5 +67,14 @@ Received: "MEDIUM"
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `3176afde`）：
+
+```
+cd server && npx vitest run
+ Test Files  136 passed (136)
+      Tests  158275 passed (158275)
+```
+
+- 反作弊：Claude 提交 `3176afde` 仅改动 `server/src/utils/riskPrompts.ts`（1 行源码）；GLM 复现测试 `server/src/utils/riskPrompts.test.ts` 零改动（`git diff 141f0613..HEAD` 为空）。✅ 已 `gh pr ready`。
+- 附带更正（GLM，按交接指令）：`server/src/utils/riskEngine.test.ts` 中一条 **PRE-EXISTING 的过时特征测试**（原断言 `validateRiskLevel('极高') === 'MEDIUM'`，即把缺陷行为当成期望）与 AI-007 spec / Claude 修复冲突，已更正为 `=== 'CRITICAL'`（属 README §3「测试本身过时断言」修复，非复现测试）。全量 158275 绿。
