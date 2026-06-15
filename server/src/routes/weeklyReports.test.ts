@@ -473,6 +473,22 @@ describe('Weekly Reports Routes', () => {
       expect(res.status).toBe(403);
       expect(res.body).toHaveProperty('error', '只能为自己负责的项目创建周报');
     });
+
+    it('GLM QA bug repro #5: 同周重复创建应返回 409（P2002 唯一约束），而非被 catch 吞成 500（WR-001）', async () => {
+      // schema 有 @@unique([projectId, year, weekNumber]) → 同周重复创建时 Prisma 抛 P2002。
+      // test-plan WR-001（P0）：期望 409/400 + 明确「本周已有周报」提示。
+      // 现状：crud.ts 创建处理器的 catch 不区分 P2002，统一返回 500「服务器内部错误」——
+      // 既违反 WR-001 的状态码契约，又把可预期的业务冲突伪装成服务端故障。
+      mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
+      const p2002 = Object.assign(new Error('Unique constraint failed on the fields: (`projectId`,`year`,`weekNumber`)'), { code: 'P2002' });
+      mockPrisma.weeklyReport.create.mockRejectedValue(p2002);
+
+      const res = await request(app)
+        .post('/api/weekly-reports')
+        .send(createBody);
+
+      expect(res.status).toBe(409);
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
