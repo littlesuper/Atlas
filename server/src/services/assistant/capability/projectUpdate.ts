@@ -11,16 +11,8 @@ import {
 import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types';
 import { genericNarrateUserPrompt } from './orchestrator';
 import type { Capability, CapabilityContext } from './types';
-
-// Task 5 will move this to errors.ts and rename to CapabilityValidationError; placeholder for now
-class LocalValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CapabilityValidationError';
-  }
-}
-// Exported for tests; Task 5 will switch callers to CapabilityValidationError from errors.ts
-export { LocalValidationError as ProjectUpdateValidationError };
+import { CapabilityValidationError } from '../errors';
+export { CapabilityValidationError as ProjectUpdateValidationError };
 
 interface ProjectFields { name: string; status: string; priority: string; startDate: Date | null; endDate: Date | null; }
 
@@ -110,7 +102,7 @@ export const projectUpdateCapability: Capability<ProjectChangeIntent> = {
   async execute(intent, _ctx: CapabilityContext, _req: Request, target) {
     const p = target!.entity.fields as unknown as ProjectFields;
     const { start, end } = resolveDates(intent, p);
-    if (start && end && !isValidDateRange(iso(start), iso(end))) throw new LocalValidationError('结束日期不能早于开始日期');
+    if (start && end && !isValidDateRange(iso(start), iso(end))) throw new CapabilityValidationError('结束日期不能早于开始日期');
     const data: Record<string, unknown> = {};
     for (const op of intent.operations) data[op.field] = (op.field === 'startDate' || op.field === 'endDate') ? new Date(`${op.value}T00:00:00.000Z`) : op.value;
     await prisma.project.update({ where: { id: target!.id }, data });

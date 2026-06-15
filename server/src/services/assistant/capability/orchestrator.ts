@@ -5,7 +5,7 @@ import { aiCircuitBreaker } from '../../../utils/circuitBreaker';
 import { logger } from '../../../utils/logger';
 import { auditLog } from '../../../utils/auditLog';
 import { resolveProjectTarget } from '../targetResolver';
-import { VersionMismatchError, TargetNotFoundError, ProposalNotFoundError, UnknownDomainError } from '../orchestrator';
+import { VersionMismatchError, TargetNotFoundError, ProposalNotFoundError, UnknownDomainError } from '../errors';
 import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types';
 import { proposalStore } from '../proposalStore';
 import { getCapability, hasPermission } from './registry';

@@ -5,21 +5,19 @@ import type { PrismaClient } from '../generated/prisma/client';
 
 const {
   mockPrisma,
-  mockGetAdapter,
-  mockListAdapters,
-  mockRunPropose,
-  mockRunApply,
-  mockResolveTarget,
+  mockCapabilityPropose,
+  mockCapabilityApply,
+  mockGetCapability,
+  mockListCapabilities,
   mockClassify,
   mockRunAsk,
   userState,
 } = vi.hoisted(() => ({
-  mockPrisma: { project: { findMany: vi.fn() } },
-  mockGetAdapter: vi.fn(),
-  mockListAdapters: vi.fn(),
-  mockRunPropose: vi.fn(),
-  mockRunApply: vi.fn(),
-  mockResolveTarget: vi.fn(),
+  mockPrisma: { project: { findMany: vi.fn() }, role: { findMany: vi.fn() } },
+  mockCapabilityPropose: vi.fn(),
+  mockCapabilityApply: vi.fn(),
+  mockGetCapability: vi.fn(),
+  mockListCapabilities: vi.fn(),
   mockClassify: vi.fn(),
   mockRunAsk: vi.fn(),
   userState: { permissions: ['*:*'] as string[] },
@@ -53,51 +51,64 @@ vi.mock('../middleware/permission', () => ({
   isAdmin: (req: Request) => (req.user?.permissions || []).includes('*:*'),
 }));
 
-vi.mock('../services/assistant/registry', () => ({
-  getAdapter: mockGetAdapter,
-  listAdapters: mockListAdapters,
-  registerAdapter: vi.fn(),
-  listDomains: vi.fn(() => ['schedule']),
-  __resetAdapters: vi.fn(),
+vi.mock('../services/assistant/capability/registry', () => ({
+  getCapability: mockGetCapability,
+  listCapabilitiesForUser: mockListCapabilities,
+  registerCapability: vi.fn(),
+  __resetCapabilities: vi.fn(),
 }));
 
-vi.mock('../services/assistant/targetResolver', () => ({ resolveProjectTarget: mockResolveTarget }));
+vi.mock('../services/assistant/capability/orchestrator', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/assistant/capability/orchestrator')>();
+  return {
+    ...actual,
+    capabilityPropose: mockCapabilityPropose,
+    capabilityApply: mockCapabilityApply,
+  };
+});
+
 vi.mock('../services/assistant/domainClassifier', () => ({ classifyDomain: mockClassify }));
 vi.mock('../services/assistant/query/askService', () => ({ runAsk: mockRunAsk }));
-
-vi.mock('../services/assistant/orchestrator', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/assistant/orchestrator')>();
-  return { ...actual, runPropose: mockRunPropose, runApply: mockRunApply };
-});
 
 import router from './assistant';
 import {
   ProposalNotFoundError,
   VersionMismatchError,
   TargetNotFoundError,
-} from '../services/assistant/orchestrator';
+  CapabilityValidationError,
+} from '../services/assistant/errors';
 import { DependencyCycleError } from '../services/scheduleAssistant';
 
 const app = express();
 app.use(express.json());
 app.use('/api/assistant', router);
 
-const fakeAdapter = { domain: 'schedule', description: '排期', permission: { resource: 'activity', action: 'update' } };
+const fakeCapability = {
+  name: 'schedule.update',
+  description: '调整活动排期',
+  permission: { resource: 'activity', action: 'update' },
+  mode: 'custom',
+  target: 'project',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   userState.permissions = ['*:*'];
-  mockGetAdapter.mockReturnValue(fakeAdapter);
-  mockListAdapters.mockReturnValue([fakeAdapter]);
-  mockClassify.mockResolvedValue({ status: 'ok', domain: 'schedule' });
+  mockGetCapability.mockReturnValue(fakeCapability);
+  mockListCapabilities.mockReturnValue([fakeCapability]);
+  mockClassify.mockResolvedValue({ status: 'ok', domain: 'schedule.update' });
   mockPrisma.project.findMany.mockResolvedValue([{ id: 'p1', name: '项目甲' }, { id: 'p2', name: '项目乙' }]);
-  mockResolveTarget.mockResolvedValue({ status: 'ok', projectId: 'p1' });
+  mockPrisma.role.findMany.mockResolvedValue([]);
   mockRunAsk.mockResolvedValue({ status: 'answered', answer: 'GW-X500 的 EVT 阶段：共 53 个工作日。', basis: 'deterministic' });
-  mockRunPropose.mockResolvedValue({
+  mockCapabilityPropose.mockResolvedValue({
     status: 'ok',
     proposalId: 'prop-1',
     preview: { rows: [{ key: 'A1', label: '硬件打样', before: 'x', after: 'y' }], risks: [] },
     narrative: '复述',
+  });
+  mockCapabilityApply.mockResolvedValue({
+    rows: [{ key: 'A1', label: '硬件打样', before: 'x', after: 'y' }],
+    risks: [],
   });
 });
 
@@ -106,21 +117,26 @@ const propose = (body: Record<string, unknown> = {}) =>
     .post('/api/assistant/propose')
     .send({ utterance: '把项目甲的硬件打样推迟两周', ...body });
 
-describe('POST /api/assistant/propose (conversational, AI resolves target)', () => {
-  it('ok: resolves target then 200 with proposalId + preview', async () => {
+describe('POST /api/assistant/propose (capability dispatch)', () => {
+  it('ok: classifies domain then dispatches to capability → 200 with proposalId + preview', async () => {
     const res = await propose();
     expect(res.status).toBe(200);
     expect(res.body.proposalId).toBe('prop-1');
-    expect(mockResolveTarget).toHaveBeenCalled();
-    expect(mockRunPropose).toHaveBeenCalledWith('schedule', 'p1', '把项目甲的硬件打样推迟两周');
+    expect(mockClassify).toHaveBeenCalled();
+    expect(mockCapabilityPropose).toHaveBeenCalledWith('schedule.update', '把项目甲的硬件打样推迟两周', expect.anything(), undefined);
   });
 
-  it('passes contextProjectId hint to the resolver', async () => {
+  it('passes contextProjectId into capability context', async () => {
     await propose({ contextProjectId: 'p2' });
-    expect(mockResolveTarget).toHaveBeenCalledWith(expect.objectContaining({ contextProjectId: 'p2' }));
+    expect(mockCapabilityPropose).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ contextProjectId: 'p2' }),
+      undefined
+    );
   });
 
-  it('only offers manageable, non-archived projects to the resolver', async () => {
+  it('only offers manageable, non-archived projects to the capability', async () => {
     await propose();
     const call = mockPrisma.project.findMany.mock.calls[0][0];
     expect(call.where.status).toEqual({ not: 'ARCHIVED' });
@@ -133,29 +149,31 @@ describe('POST /api/assistant/propose (conversational, AI resolves target)', () 
     expect(call.where.OR).toBeDefined();
   });
 
-  it('need_target (200 noOp) when AI cannot tell which project', async () => {
-    mockResolveTarget.mockResolvedValueOnce({ status: 'unresolved' });
+  it('need_target (200 noOp) when capability cannot identify the project', async () => {
+    mockCapabilityPropose.mockResolvedValueOnce({ status: 'need_target' });
     const res = await propose({ utterance: '随便调一下' });
     expect(res.status).toBe(200);
     expect(res.body.noOp).toBe(true);
     expect(res.body.needTarget).toBe(true);
     expect(res.body.proposalId).toBeNull();
-    expect(mockRunPropose).not.toHaveBeenCalled();
   });
 
-  it('503 when target resolution AI is unavailable', async () => {
-    mockResolveTarget.mockResolvedValueOnce({ status: 'ai_unavailable' });
-    const res = await propose();
-    expect(res.status).toBe(503);
-    expect(res.body.error).toBe('AI_UNAVAILABLE');
+  it('503 when classify AI is unavailable', async () => {
+    mockClassify.mockResolvedValueOnce({ status: 'ai_unavailable' });
+    expect((await propose()).status).toBe(503);
   });
 
-  it('classifies the domain from the utterance before resolving target', async () => {
-    mockClassify.mockResolvedValueOnce({ status: 'ok', domain: 'project' });
-    mockGetAdapter.mockReturnValueOnce({ domain: 'project', description: '项目', permission: { resource: 'project', action: 'update' } });
+  it('503 when capability propose AI unavailable', async () => {
+    mockCapabilityPropose.mockResolvedValueOnce({ status: 'ai_unavailable' });
+    expect((await propose()).status).toBe(503);
+  });
+
+  it('classifies the domain from the utterance before dispatching', async () => {
+    mockClassify.mockResolvedValueOnce({ status: 'ok', domain: 'project.update' });
+    mockGetCapability.mockReturnValueOnce({ ...fakeCapability, name: 'project.update' });
     await propose({ utterance: '把项目甲优先级改成高' });
     expect(mockClassify).toHaveBeenCalled();
-    expect(mockRunPropose).toHaveBeenCalledWith('project', 'p1', '把项目甲优先级改成高');
+    expect(mockCapabilityPropose).toHaveBeenCalledWith('project.update', expect.anything(), expect.anything(), undefined);
   });
 
   it('200 noOp when domain cannot be classified', async () => {
@@ -164,38 +182,26 @@ describe('POST /api/assistant/propose (conversational, AI resolves target)', () 
     expect(res.status).toBe(200);
     expect(res.body.noOp).toBe(true);
     expect(res.body.proposalId).toBeNull();
-    expect(mockResolveTarget).not.toHaveBeenCalled();
-    expect(mockRunPropose).not.toHaveBeenCalled();
+    expect(mockCapabilityPropose).not.toHaveBeenCalled();
   });
 
-  it('503 when classification AI is unavailable', async () => {
-    mockClassify.mockResolvedValueOnce({ status: 'ai_unavailable' });
-    expect((await propose()).status).toBe(503);
-  });
-
-  it('400 UNKNOWN_DOMAIN when classified domain has no adapter', async () => {
+  it('400 UNKNOWN_DOMAIN when capability not found for domain', async () => {
     mockClassify.mockResolvedValueOnce({ status: 'ok', domain: 'ghost' });
-    mockGetAdapter.mockReturnValueOnce(undefined);
+    mockGetCapability.mockReturnValueOnce(undefined);
     const res = await propose();
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('UNKNOWN_DOMAIN');
   });
 
-  it('403 when user lacks the classified-domain permission (no target-resolve / propose)', async () => {
-    userState.permissions = ['project:read'];
+  it('200 noOp when capability returns not_understood', async () => {
+    mockCapabilityPropose.mockResolvedValueOnce({ status: 'not_understood' });
     const res = await propose();
-    expect(res.status).toBe(403);
-    expect(mockResolveTarget).not.toHaveBeenCalled();
-    expect(mockRunPropose).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body.noOp).toBe(true);
   });
 
-  it('503 when scheduling parse AI unavailable (post-resolution)', async () => {
-    mockRunPropose.mockResolvedValueOnce({ status: 'ai_unavailable' });
-    expect((await propose()).status).toBe(503);
-  });
-
-  it('200 noOp when scheduling intent not understood', async () => {
-    mockRunPropose.mockResolvedValueOnce({ status: 'not_understood', reason: 'fabricated_id' });
+  it('200 noOp when capability returns noop', async () => {
+    mockCapabilityPropose.mockResolvedValueOnce({ status: 'noop' });
     const res = await propose();
     expect(res.status).toBe(200);
     expect(res.body.noOp).toBe(true);
@@ -215,7 +221,7 @@ describe('POST /api/assistant/propose (conversational, AI resolves target)', () 
     expect(res.body.basis).toBe('deterministic');
     expect(res.body.proposalId).toBeNull();
     expect(mockRunAsk).toHaveBeenCalled();
-    expect(mockRunPropose).not.toHaveBeenCalled();
+    expect(mockCapabilityPropose).not.toHaveBeenCalled();
   });
 
   it('query: cross-project grounded answer (no single target needed)', async () => {
@@ -224,7 +230,6 @@ describe('POST /api/assistant/propose (conversational, AI resolves target)', () 
     const res = await propose({ utterance: '哪个项目最危险' });
     expect(res.status).toBe(200);
     expect(res.body.basis).toBe('grounded');
-    // 跨项目问答不要求单一目标 → 不触发 need_target
     expect(res.body.needTarget).toBeUndefined();
   });
 
@@ -263,7 +268,6 @@ describe('POST /api/assistant/apply', () => {
   const apply = (proposalId = 'prop-1') => request(app).post('/api/assistant/apply').send({ proposalId });
 
   it('ok: 200 with appliedDiff', async () => {
-    mockRunApply.mockResolvedValueOnce({ rows: [{ key: 'A1', label: '硬件打样', before: 'x', after: 'y' }], risks: [] });
     const res = await apply();
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
@@ -271,25 +275,33 @@ describe('POST /api/assistant/apply', () => {
   });
 
   it('404 PROPOSAL_NOT_FOUND', async () => {
-    mockRunApply.mockRejectedValueOnce(new ProposalNotFoundError());
+    mockCapabilityApply.mockRejectedValueOnce(new ProposalNotFoundError());
     expect((await apply('nope')).status).toBe(404);
   });
 
   it('409 VERSION_MISMATCH', async () => {
-    mockRunApply.mockRejectedValueOnce(new VersionMismatchError());
+    mockCapabilityApply.mockRejectedValueOnce(new VersionMismatchError());
     expect((await apply()).status).toBe(409);
   });
 
   it('404 TARGET_NOT_FOUND', async () => {
-    mockRunApply.mockRejectedValueOnce(new TargetNotFoundError());
+    mockCapabilityApply.mockRejectedValueOnce(new TargetNotFoundError());
     expect((await apply()).status).toBe(404);
   });
 
   it('400 DEPENDENCY_CYCLE', async () => {
-    mockRunApply.mockRejectedValueOnce(new DependencyCycleError('A1'));
+    mockCapabilityApply.mockRejectedValueOnce(new DependencyCycleError('A1'));
     const res = await apply();
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('DEPENDENCY_CYCLE');
+  });
+
+  it('400 VALIDATION_ERROR (CapabilityValidationError, e.g. date range)', async () => {
+    mockCapabilityApply.mockRejectedValueOnce(new CapabilityValidationError('结束日期不能早于开始日期'));
+    const res = await apply();
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION_ERROR');
+    expect(res.body.message).toContain('结束日期');
   });
 
   it('400 when proposalId missing (Zod)', async () => {

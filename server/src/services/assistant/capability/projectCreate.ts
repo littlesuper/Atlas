@@ -4,13 +4,8 @@ import prisma from '../../../db';
 import { isValidDateRange } from '../../../utils/validation';
 import type { AssistantDiffRow } from '../types';
 import type { Capability } from './types';
-
-export class CapabilityValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CapabilityValidationError';
-  }
-}
+import { CapabilityValidationError } from '../errors';
+export { CapabilityValidationError };
 
 // 全字段可选 + 枚举约束：parse 阶段只拦类型/枚举，业务必填交给 missingRequired
 const projectCreateInputSchema = z.object({

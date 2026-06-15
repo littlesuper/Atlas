@@ -11,7 +11,7 @@ import { proposalStore } from '../proposalStore';
 import type { CapabilityContext } from './types';
 import { z } from 'zod';
 import type { Capability, EntitySnapshot } from './types';
-import { VersionMismatchError } from '../orchestrator';
+import { VersionMismatchError } from '../errors';
 import { CapabilityForbiddenError } from './orchestrator';
 
 const ctx: CapabilityContext = { userId: 'u1', userName: '张三', permissions: ['project:create'], projects: [] };
