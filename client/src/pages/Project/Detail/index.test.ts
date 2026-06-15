@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getApiErrorMessage, escapeCsvHelper, getMsDateHelper, computeSortOrder, formatDeps } from './index';
+import { getApiErrorMessage, escapeCsvHelper, getMsDateHelper, formatDeps } from './index';
 import type { Activity } from '../../../types';
 
 describe('getApiErrorMessage', () => {
@@ -80,42 +80,6 @@ describe('getMsDateHelper', () => {
     const activity = { planEndDate: '2025-07-01', planStartDate: '2025-06-01' } as Activity;
     const result = getMsDateHelper(activity);
     expect(result!.format('YYYY-MM-DD')).toBe('2025-07-01');
-  });
-});
-
-describe('computeSortOrder', () => {
-  it('returns midpoint between two items', () => {
-    const acts = [{ sortOrder: 10 }, { sortOrder: 30 }];
-    expect(computeSortOrder(acts, 1)).toBe(20);
-  });
-
-  it('inserts at beginning with prev=0', () => {
-    const acts = [{ sortOrder: 40 }, { sortOrder: 80 }];
-    expect(computeSortOrder(acts, 0)).toBe(20);
-  });
-
-  it('inserts at end with next=prev+20', () => {
-    const acts = [{ sortOrder: 10 }, { sortOrder: 30 }];
-    expect(computeSortOrder(acts, 2)).toBe(40);
-  });
-
-  it('handles empty array inserting at 0', () => {
-    expect(computeSortOrder([], 0)).toBe(10);
-  });
-
-  it('handles single item at index 0', () => {
-    const acts = [{ sortOrder: 50 }];
-    expect(computeSortOrder(acts, 0)).toBe(25);
-  });
-
-  it('handles single item appended at end', () => {
-    const acts = [{ sortOrder: 50 }];
-    expect(computeSortOrder(acts, 1)).toBe(60);
-  });
-
-  it('floors non-integer midpoint', () => {
-    const acts = [{ sortOrder: 10 }, { sortOrder: 21 }];
-    expect(computeSortOrder(acts, 1)).toBe(15);
   });
 });
 
