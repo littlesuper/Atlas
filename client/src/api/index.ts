@@ -737,10 +737,10 @@ export const scheduleAssistantApi = {
 // ============ 全系统 AI 助手框架 API ============
 export const assistantApi = {
   // 单框对话：服务端从用户可管理的项目里让 AI 认出目标项目（contextProjectId 为当前页项目，作默认）
-  propose: (utterance: string, contextProjectId?: string | null) =>
+  propose: (utterance: string, contextProjectId?: string | null, pendingId?: string | null) =>
     request.post<AssistantProposeResult>(
       '/assistant/propose',
-      { utterance, contextProjectId },
+      { utterance, contextProjectId, pendingId },
       { _silent: true } as never
     ),
 

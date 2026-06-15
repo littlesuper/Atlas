@@ -26,7 +26,7 @@ const baseProposal = (over: Partial<AssistantProposeResult> = {}): AssistantProp
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  useAssistantChatStore.setState({ messages: [] });
+  useAssistantChatStore.setState({ messages: [], pendingId: null });
 });
 
 describe('useAssistantChat', () => {
@@ -36,7 +36,7 @@ describe('useAssistantChat', () => {
     await act(async () => {
       await result.current.send('把硬件打样推迟两周', 'p1');
     });
-    expect(mockPropose).toHaveBeenCalledWith('把硬件打样推迟两周', 'p1');
+    expect(mockPropose).toHaveBeenCalledWith('把硬件打样推迟两周', 'p1', null);
     const msgs = useAssistantChatStore.getState().messages;
     expect(msgs[0]).toMatchObject({ role: 'user', text: '把硬件打样推迟两周' });
     expect(msgs[1]).toMatchObject({ role: 'assistant', kind: 'proposal', proposalId: 'prop-1', applied: false });
@@ -117,5 +117,25 @@ describe('useAssistantChat', () => {
     });
     expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('已被改动'));
     expect(useAssistantChatStore.getState().messages.find((m) => m.id === id)).toMatchObject({ stale: true });
+  });
+
+  it('need_input 设置 pendingId；下一轮 send 带上它', async () => {
+    mockPropose.mockResolvedValueOnce({ data: { proposalId: null, noOp: true, mode: 'need_input', missing: ['活动名称'], pendingId: 'pend-1', preview: { rows: [], risks: [] }, narrative: '还需要补充：活动名称' } });
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => { await result.current.send('建个活动', null); });
+    expect(useAssistantChatStore.getState().pendingId).toBe('pend-1');
+
+    mockPropose.mockResolvedValueOnce({ data: baseProposal() });
+    await act(async () => { await result.current.send('叫结构打样', null); });
+    expect(mockPropose).toHaveBeenLastCalledWith('叫结构打样', null, 'pend-1');
+    expect(useAssistantChatStore.getState().pendingId).toBeNull(); // 出预览后清空
+  });
+
+  it('cancelPending 清 pendingId 并推一条状态', async () => {
+    useAssistantChatStore.setState({ pendingId: 'pend-1' });
+    const { result } = renderHook(() => useAssistantChat());
+    act(() => { result.current.cancelPending(); });
+    expect(useAssistantChatStore.getState().pendingId).toBeNull();
+    expect(useAssistantChatStore.getState().messages.at(-1)).toMatchObject({ kind: 'status', variant: 'noop' });
   });
 });

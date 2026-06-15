@@ -17,7 +17,7 @@ import RiskOverview from './RiskOverview';
 const Home: React.FC = () => {
   const [params] = useSearchParams();
   const contextProjectId = params.get('project');
-  const { messages, sending, send, applyProposal, reset } = useAssistantChat();
+  const { messages, sending, send, applyProposal, reset, cancelPending, pendingId } = useAssistantChat();
   const [input, setInput] = useState('');
   const hasConversation = messages.length > 0;
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,7 @@ const Home: React.FC = () => {
         <div className="flex-1 overflow-auto">
           {hasConversation ? (
             <>
-              <MessageList messages={messages} onApply={applyProposal} />
+              <MessageList messages={messages} onApply={applyProposal} onCancelPending={cancelPending} activePendingId={pendingId} />
               <div ref={bottomRef} />
             </>
           ) : (
