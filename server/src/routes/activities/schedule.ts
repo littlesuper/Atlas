@@ -306,13 +306,17 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
       newEnd: target.planEndDate?.toISOString() || null,
     }];
 
-    const visited = new Set<string>();
+    // 传播到不动点：节点计划日期一旦真变化即重新入队，使其下游基于最新值重算。
+    // 不能用「访问过即跳过」去重——多条不等长路径汇聚时，后到达的更新必须能再次向下游
+    // 传播，否则下游残留中间值、违反 FS 依赖（与 utils/scheduleEngine.ts 同源缺陷）。
+    // maxIterations 仅为依赖环/异常数据兜底，正常无环 DAG 不会触发。
     const queue = [activityId];
+    const maxIterations = (allActivities.length + 1) * (allActivities.length + 1);
+    let iterations = 0;
 
     while (queue.length > 0) {
+      if (++iterations > maxIterations) break;
       const currentId = queue.shift()!;
-      if (visited.has(currentId)) continue;
-      visited.add(currentId);
 
       const dependentIds = reverseDeps.get(currentId) || [];
       for (const depId of dependentIds) {
@@ -343,14 +347,22 @@ router.post('/project/:projectId/what-if', authenticate, async (req: Request, re
           if (resolved.planEndDate) depAct.planEndDate = resolved.planEndDate;
           if (resolved.planDuration !== undefined) depAct.planDuration = resolved.planDuration;
 
-          affected.push({
-            id: depAct.id,
-            name: depAct.name,
-            originalStart: originalAct.planStartDate?.toISOString() || null,
-            originalEnd: originalAct.planEndDate?.toISOString() || null,
-            newStart: depAct.planStartDate?.toISOString() || null,
-            newEnd: depAct.planEndDate?.toISOString() || null,
-          });
+          // 每个受影响活动在 affected 里只保留一条并更新为最新值，
+          // 避免多路汇聚时出现重复条目 / 中间值条目（.find 取首条会拿到中间值）。
+          const existing = affected.find((e) => e.id === depAct.id);
+          if (existing) {
+            existing.newStart = depAct.planStartDate?.toISOString() || null;
+            existing.newEnd = depAct.planEndDate?.toISOString() || null;
+          } else {
+            affected.push({
+              id: depAct.id,
+              name: depAct.name,
+              originalStart: originalAct.planStartDate?.toISOString() || null,
+              originalEnd: originalAct.planEndDate?.toISOString() || null,
+              newStart: depAct.planStartDate?.toISOString() || null,
+              newEnd: depAct.planEndDate?.toISOString() || null,
+            });
+          }
 
           queue.push(depId);
         }

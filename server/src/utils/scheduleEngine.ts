@@ -177,14 +177,20 @@ export function computeProjectScheduleCascade(
   const byId = new Map(cloned.map((a) => [a.id, a]));
   const reverseDeps = buildReverseDeps(cloned);
 
-  const visited = new Set<string>();
   const changedIds = new Set<string>();
   const queue: string[] = Array.from(seedIds);
 
+  // 沿 reverse-deps 传播到不动点：某节点的计划日期一旦实际变化，就重新入队，
+  // 使其下游基于「最新值」重算。不能用「访问过即跳过」去重——多条不等长路径汇聚到
+  // 同一节点时，后到达的更新必须能再次向下游传播，否则下游会残留中间值、违反 FS 依赖。
+  // recomputeFromDeps 仅在值真正变化时返回 true，配合 DAG 的单调收敛保证终止；
+  // maxIterations 仅为依赖环/异常数据兜底，正常无环 DAG 不会触发。
+  const maxIterations = (cloned.length + 1) * (cloned.length + 1);
+  let iterations = 0;
+
   while (queue.length > 0) {
+    if (++iterations > maxIterations) break;
     const currentId = queue.shift()!;
-    if (visited.has(currentId)) continue;
-    visited.add(currentId);
 
     const dependentIds = reverseDeps.get(currentId);
     if (!dependentIds) continue;
