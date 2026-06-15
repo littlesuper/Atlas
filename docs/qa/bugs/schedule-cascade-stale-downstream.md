@@ -106,5 +106,13 @@ Received: "2026-04-07"
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `3df3b55e`）：
+
+```
+cd server && npx vitest run src/utils/scheduleEngine.test.ts
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+```
+
+- 反作弊：`git diff ae6620b0..HEAD -- server/src/utils/scheduleEngine.test.ts` 为空（复现测试零改动）；Claude 提交 `3df3b55e` 仅改动 `server/src/utils/scheduleEngine.ts`（源码，无任何 `.test` 文件）。✅ 已 `gh pr ready`。
