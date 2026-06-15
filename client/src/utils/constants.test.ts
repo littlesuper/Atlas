@@ -148,15 +148,24 @@ describe('ACTIVITY_STATUS_MAP', () => {
 // ============ ACTIVITY_TYPE_MAP（活动类型）============
 
 describe('ACTIVITY_TYPE_MAP', () => {
-  it('包含 MILESTONE、TASK 两种类型', () => {
-    expect(Object.keys(ACTIVITY_TYPE_MAP)).toHaveLength(2);
+  it('包含 MILESTONE、TASK、PHASE 三种类型', () => {
+    expect(Object.keys(ACTIVITY_TYPE_MAP)).toHaveLength(3);
     expect(ACTIVITY_TYPE_MAP).toHaveProperty('MILESTONE');
     expect(ACTIVITY_TYPE_MAP).toHaveProperty('TASK');
+    expect(ACTIVITY_TYPE_MAP).toHaveProperty('PHASE');
   });
 
   it('MILESTONE 标签为"里程碑"，颜色为 purple', () => {
     expect(ACTIVITY_TYPE_MAP.MILESTONE.label).toBe('里程碑');
     expect(ACTIVITY_TYPE_MAP.MILESTONE.color).toBe('purple');
+  });
+
+  it('GLM QA bug repro #8: 应包含 PHASE（schema ActivityType 枚举含 PHASE，当前缺失）', () => {
+    // schema.prisma enum ActivityType { TASK MILESTONE PHASE }；excelActivityParser/前端
+    // 也认 PHASE。但 ACTIVITY_TYPE_MAP 只有 TASK/MILESTONE，缺 PHASE →
+    //   1) ActivityDrawer/useActivityColumns/TemplateManagement 的「类型」下拉遍历此表 → 无 PHASE 选项，用户无法新建/选择 PHASE 活动；
+    //   2) useActivityColumns 渲染 PHASE 活动时回落 { label: record.type } → 显示原始英文 'PHASE' 而非中文。
+    expect(ACTIVITY_TYPE_MAP).toHaveProperty('PHASE');
   });
 });
 

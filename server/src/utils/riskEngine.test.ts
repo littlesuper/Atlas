@@ -371,9 +371,8 @@ describe('assessProjectRisk', () => {
   });
 
   describe('AI-007: Chinese severity normalization', () => {
-    it('AI-007 "极高" is not in current cnMap and defaults to MEDIUM', () => {
-      const result = validateRiskLevel('极高');
-      expect(result).toBe('MEDIUM');
+    it('AI-007 "极高" normalizes to CRITICAL', () => {
+      expect(validateRiskLevel('极高')).toBe('CRITICAL');
     });
 
     it('AI-007 "严重" normalizes to CRITICAL', () => {

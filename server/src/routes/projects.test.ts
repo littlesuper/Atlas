@@ -583,6 +583,23 @@ describe('ARC-008: unarchive restores original status', () => {
       );
     }
   });
+
+  it('GLM QA bug repro #6 (ARC-009): 归档项目无 archive 记录时 unarchive 应 400/404，而非静默回落 COMPLETED 返回 200', async () => {
+    // test-plan ARC-009（P2）：project.status=ARCHIVED 但没有任何 projectArchive 记录（快照丢失/被删）
+    // 时，POST /unarchive 应返回 400/404。
+    // 现状：archive.ts:137 `readArchivedProjectStatus(latestArchive?.snapshot) || 'COMPLETED'` ——
+    // 当 latestArchive===null，直接回落到 COMPLETED 并 update 返回 200，违反 ARC-009。
+    // （此为低频但 spec 明确的场景；可视为 graceful fallback vs spec 偏差，交 Claude/团队定夺。）
+    const archivedProject = { ...sampleProject, status: 'ARCHIVED' };
+    mockPrisma.project.findUnique.mockResolvedValue(archivedProject);
+    mockPrisma.projectArchive.findFirst.mockResolvedValue(null); // 无 archive 记录
+    mockPrisma.project.update.mockResolvedValue({ ...sampleProject, status: 'COMPLETED' });
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/unarchive');
+
+    expect([400, 404]).toContain(res.status);
+  });
 });
 
 describe('ARC-011: unarchive then immediate write', () => {

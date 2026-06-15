@@ -78,8 +78,8 @@ function parseAssignees(raw: string): string[] {
 function parseStatus(raw: string): string | undefined {
   if (!raw) return undefined;
   const s = raw.trim();
-  if (/已完成|完成/.test(s)) return 'COMPLETED';
-  if (/进行中|进行/.test(s)) return 'IN_PROGRESS';
+  if (/完成/.test(s) && !/未完成/.test(s)) return 'COMPLETED'; // 「未完成」含子串「完成」但语义相反，须排除
+  if (/进行中|进行|已开始/.test(s)) return 'IN_PROGRESS';
   if (/未开始|未启动/.test(s)) return 'NOT_STARTED';
   if (/暂停|挂起/.test(s)) return 'ON_HOLD';
   if (/已取消|取消/.test(s)) return 'CANCELLED';

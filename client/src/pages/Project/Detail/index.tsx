@@ -36,7 +36,7 @@ import {
   DEFAULT_COLUMN_ORDER,
   DEFAULT_COLUMN_VISIBLE,
   formatDeps,
-  computeSortOrder,
+  planInsertSortOrder,
 } from './helpers';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
@@ -64,7 +64,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-export { getApiErrorMessage, escapeCsvHelper, getMsDateHelper, formatDeps, computeSortOrder };
+export { getApiErrorMessage, escapeCsvHelper, getMsDateHelper, formatDeps };
 
 const ProjectDetail: React.FC = () => {
   const { id, snapshotId } = useParams<{ id: string; snapshotId?: string }>();
@@ -177,9 +177,10 @@ const ProjectDetail: React.FC = () => {
 
   const handleInsertActivity = useCallback(async (atIndex: number) => {
     if (!id) return;
-    const sortOrder = computeSortOrder(activities, atIndex);
+    const { newSortOrder, reindex } = planInsertSortOrder(activities, atIndex);
     try {
-      const resp = await activitiesApi.create({ projectId: id, name: '新活动', type: 'TASK', status: 'NOT_STARTED', sortOrder });
+      if (reindex.length > 0) await activitiesApi.reorder(id, reindex);
+      const resp = await activitiesApi.create({ projectId: id, name: '新活动', type: 'TASK', status: 'NOT_STARTED', sortOrder: newSortOrder });
       const newId = (resp as { data?: { id?: string } }).data?.id ?? (resp as unknown as Activity).id;
       await loadActivities();
       if (newId) {
@@ -199,6 +200,20 @@ const ProjectDetail: React.FC = () => {
     formDeps: { id: string; type: string; lag: number }[]
   ) => {
     if (!id) return;
+
+    // 计算插入位 sortOrder：编辑沿用原值；插入走 planInsertSortOrder（无空隙时先重排同级开槽）；
+    // 末尾追加用网格步长。sortOrder 是 Int，必须给唯一整数。
+    let resolvedSortOrder: number;
+    if (editingActivity) {
+      resolvedSortOrder = editingActivity.sortOrder;
+    } else if (insertAtIndexRef.current !== null) {
+      const plan = planInsertSortOrder(activities, insertAtIndexRef.current);
+      if (plan.reindex.length > 0) await activitiesApi.reorder(id, plan.reindex);
+      resolvedSortOrder = plan.newSortOrder;
+    } else {
+      resolvedSortOrder = (activities.length + 1) * 10;
+    }
+
     const data: Parameters<typeof activitiesApi.create>[0] = {
       projectId: id,
       name: values.name,
@@ -215,11 +230,7 @@ const ProjectDetail: React.FC = () => {
       roleId: values.roleId ?? null,
       executorIds: values.executorIds || [],
       notes: values.notes,
-      sortOrder: editingActivity
-        ? editingActivity.sortOrder
-        : insertAtIndexRef.current !== null
-          ? computeSortOrder(activities, insertAtIndexRef.current!)
-          : (activities.length + 1) * 10,
+      sortOrder: resolvedSortOrder,
       dependencies: formDeps.filter((d) => d.id).map((d) => ({ id: d.id, type: d.type, lag: d.lag || 0 })),
     };
 
