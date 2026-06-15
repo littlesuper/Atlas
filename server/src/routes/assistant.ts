@@ -35,6 +35,8 @@ import { DependencyCycleError } from '../services/scheduleAssistant';
 import { ProjectValidationError } from '../services/assistant/adapters/projectAdapter';
 import { ActivityCreateError } from './activities/shared';
 import { ActivityCapabilityError } from '../services/assistant/capability/activityCreate';
+import { pendingSlotStore } from '../services/assistant/capability/pendingSlotStore';
+import { CapabilityForbiddenError } from '../services/assistant/capability/orchestrator';
 
 // 只读问答伪领域（无写适配器）：分类器据此把"提问"与"改动"区分开
 const QUERY_DOMAIN = {
@@ -69,35 +71,43 @@ router.post(
     // 把端到端耗时回填进每个成功响应体，前端直接显示「耗时 X.X 秒」
     const reply = (body: Record<string, unknown>) => res.json({ ...body, elapsedMs: Date.now() - t0 });
     try {
-      const { utterance, contextProjectId } = req.body as {
+      const { utterance, contextProjectId, pendingId } = req.body as {
         utterance: string;
         contextProjectId?: string | null;
+        pendingId?: string | null;
       };
 
-      // 领域分类：先判断是"提问(只读)"还是某个"改动"领域（排期/项目字段/风险项/能力）
-      const userCaps = listCapabilitiesForUser(req.user?.permissions || []);
-      const domainOptions = [
-        ...listAdapters().map((a) => ({ key: a.domain, description: a.description })),
-        ...userCaps.map((c) => ({ key: c.name, description: c.description })),
-        QUERY_DOMAIN,
-      ];
-      const classified = await classifyDomain({ utterance, domains: domainOptions });
-      if (classified.status === 'ai_unavailable') {
-        res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
-        return;
-      }
-      if (classified.status === 'unresolved') {
-        reply({
-          proposalId: null,
-          noOp: true,
-          needTarget: false,
-          preview: { rows: [], risks: [] },
-          narrative: '没听懂你想做什么，请换个更明确的说法（支持调整排期、修改项目字段/风险项，或提问阶段工期等）。',
-        });
-        return;
+      // 多轮续填：命中有效 pending（归属本人）→ 跳过分类，直接续填该能力
+      const pending = pendingId ? pendingSlotStore.get(pendingId, req.user!.id) : null;
+      let domain: string;
+      if (pending) {
+        domain = pending.capabilityName;
+      } else {
+        // 领域分类：先判断是"提问(只读)"还是某个"改动"领域（排期/项目字段/风险项/能力）
+        const userCaps = listCapabilitiesForUser(req.user?.permissions || []);
+        const domainOptions = [
+          ...listAdapters().map((a) => ({ key: a.domain, description: a.description })),
+          ...userCaps.map((c) => ({ key: c.name, description: c.description })),
+          QUERY_DOMAIN,
+        ];
+        const classified = await classifyDomain({ utterance, domains: domainOptions });
+        if (classified.status === 'ai_unavailable') {
+          res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
+          return;
+        }
+        if (classified.status === 'unresolved') {
+          reply({
+            proposalId: null,
+            noOp: true,
+            needTarget: false,
+            preview: { rows: [], risks: [] },
+            narrative: '没听懂你想做什么，请换个更明确的说法（支持调整排期、修改项目字段/风险项，或提问阶段工期等）。',
+          });
+          return;
+        }
+        domain = classified.domain;
       }
 
-      const domain = classified.domain;
       const isQuery = domain === QUERY_DOMAIN.key;
 
       // 该用户「可管理且未归档」的项目清单——既是问答上下文的权限边界，也是写操作的目标候选。
@@ -142,7 +152,14 @@ router.post(
           projects: manageable,
           roles,
         };
-        const out = await capabilityPropose(domain, utterance, capCtx);
+        const out = await capabilityPropose(domain, utterance, capCtx, pending?.partialArgs);
+        // 本轮消费掉旧 pending（若有）
+        if (pending && pendingId) pendingSlotStore.delete(pendingId);
+        if (out.status === 'need_input') {
+          const newPendingId = pendingSlotStore.set({ userId: req.user!.id, capabilityName: domain, partialArgs: out.partialArgs, missing: out.missing });
+          reply({ proposalId: null, noOp: true, mode: 'need_input', missing: out.missing, pendingId: newPendingId, preview: { rows: [], risks: [] }, narrative: `还需要补充：${out.missing.join('、')}` });
+          return;
+        }
         switch (out.status) {
           case 'ai_unavailable':
             res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
@@ -161,9 +178,6 @@ router.post(
             return;
           case 'target_not_found':
             res.status(404).json({ error: '目标对象不存在' });
-            return;
-          case 'need_input':
-            reply({ proposalId: null, noOp: true, mode: 'need_input', missing: out.missing, preview: { rows: [], risks: [] }, narrative: `还需要补充：${out.missing.join('、')}` });
             return;
           case 'not_understood':
             reply({ proposalId: null, noOp: true, preview: { rows: [], risks: [] }, narrative: '没听懂这句话，请换个更明确的说法。' });
@@ -270,6 +284,10 @@ router.post(
     } catch (error) {
       if (error instanceof ProposalNotFoundError) {
         res.status(404).json({ error: 'PROPOSAL_NOT_FOUND', message: '提议不存在或已过期，请重新发起对话' });
+        return;
+      }
+      if (error instanceof CapabilityForbiddenError) {
+        res.status(403).json({ error: 'FORBIDDEN', message: error.message });
         return;
       }
       if (error instanceof VersionMismatchError) {
