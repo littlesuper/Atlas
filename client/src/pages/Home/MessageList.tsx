@@ -22,9 +22,11 @@ interface Props {
   messages: AssistantMessage[];
   onApply: (id: string) => void;
   onCancelPending?: () => void;
+  /** 当前活跃的续填 token：仅该 need_input 气泡才显示「取消补充」 */
+  activePendingId?: string | null;
 }
 
-const MessageList: React.FC<Props> = ({ messages, onApply, onCancelPending }) => (
+const MessageList: React.FC<Props> = ({ messages, onApply, onCancelPending, activePendingId }) => (
   <div className="mx-auto flex w-full max-w-[760px] flex-col gap-6 px-4 py-6">
     {messages.map((m) => {
       if (m.role === 'user') {
@@ -60,7 +62,7 @@ const MessageList: React.FC<Props> = ({ messages, onApply, onCancelPending }) =>
             <div className="font-medium">还需要补充信息</div>
             <div className="mt-1">{m.missing?.length ? `缺少：${m.missing.join('、')}` : m.text}</div>
             <div className="mt-1.5 text-xs opacity-80">直接在下方输入框补充即可，我接着办。</div>
-            {onCancelPending && (
+            {onCancelPending && m.pendingId && m.pendingId === activePendingId && (
               <button type="button" onClick={onCancelPending} className="mt-2 text-xs underline opacity-80 hover:opacity-100">
                 取消补充
               </button>

@@ -153,7 +153,12 @@ router.post(
           roles,
         };
         const out = await capabilityPropose(domain, utterance, capCtx, pending?.partialArgs);
-        // 本轮消费掉旧 pending（若有）
+        // AI 暂不可用：本轮未得出结论 → 保留 pending，已填字段不丢，下一轮可继续
+        if (out.status === 'ai_unavailable') {
+          res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
+          return;
+        }
+        // 结论性结局：消费掉旧 pending（若有）
         if (pending && pendingId) pendingSlotStore.delete(pendingId);
         if (out.status === 'need_input') {
           const newPendingId = pendingSlotStore.set({ userId: req.user!.id, capabilityName: domain, partialArgs: out.partialArgs, missing: out.missing });
@@ -161,9 +166,6 @@ router.post(
           return;
         }
         switch (out.status) {
-          case 'ai_unavailable':
-            res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
-            return;
           case 'unknown_capability':
             res.status(400).json({ error: 'UNKNOWN_DOMAIN', message: `未知能力：${domain}` });
             return;

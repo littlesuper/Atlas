@@ -42,6 +42,7 @@ export function useAssistantChat() {
   const reset = useAssistantChatStore((s) => s.reset);
   const setPending = useAssistantChatStore((s) => s.setPending);
   const clearPending = useAssistantChatStore((s) => s.clearPending);
+  const pendingId = useAssistantChatStore((s) => s.pendingId);
   const [sending, setSending] = useState(false);
 
   const send = useCallback(
@@ -103,5 +104,5 @@ export function useAssistantChat() {
     pushAssistant({ role: 'assistant', kind: 'status', variant: 'noop', text: '已取消补充，可重新发起。' });
   }, [clearPending, pushAssistant]);
 
-  return { messages, sending, send, applyProposal, reset, cancelPending };
+  return { messages, sending, send, applyProposal, reset, cancelPending, pendingId };
 }

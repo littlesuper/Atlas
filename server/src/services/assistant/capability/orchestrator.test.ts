@@ -217,6 +217,34 @@ describe('capabilityPropose · 多轮续填', () => {
     const r = await capabilityPropose('project.create', 'x', ctx, { name: '项目甲', productLine: '蒲公英' });
     expect(r.status).toBe('ok');
   });
+
+  it('LLM 对未提供字段输出空串 → 剥离后不触发 min(1)（回 need_input 而非 not_understood）', async () => {
+    mockCallAi.mockResolvedValue({ content: '{"name":"","productLine":"蒲公英"}' });
+    const r = await capabilityPropose('project.create', '产品线蒲公英', ctx); // 无 priorArgs，name 缺
+    expect(r.status).toBe('need_input');
+    if (r.status === 'need_input') expect(r.missing).toContain('项目名称');
+  });
+
+  it('续填新引入的编造 id 仍被 validateRefs 拦（作用于合并后的完整意图）', async () => {
+    const refCap: Capability = {
+      name: 'ref2.create',
+      description: '带引用2。',
+      permission: { resource: 'x', action: 'create' },
+      mode: 'create',
+      inputSchema: z.object({ refId: z.string().optional(), other: z.string().optional() }),
+      buildPrompt: () => ({ system: 's', user: 'u' }),
+      validateRefs: (input) => {
+        const id = (input as { refId?: string }).refId;
+        return id === 'real' ? { ok: true } : { ok: false, fabricated: [String(id)] };
+      },
+      buildPreview: () => ({ rows: [{ key: 'refId', label: 'R', before: '（空）', after: 'real' }], risks: [] }),
+      execute: async () => ({ rows: [], risks: [] }),
+    };
+    registerCapability(refCap);
+    mockCallAi.mockResolvedValue({ content: '{"refId":"造假的"}' }); // 本轮增量带编造 id
+    const r = await capabilityPropose('ref2.create', 'x', { ...ctx, permissions: ['x:create'] }, { other: 'kept' });
+    expect(r.status).toBe('not_understood');
+  });
 });
 
 describe('capabilityApply · 归属/权限', () => {
