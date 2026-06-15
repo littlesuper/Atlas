@@ -47,6 +47,17 @@ specs/                # 需求规格文档
 docs/                 # QA 测试计划与报告
 ```
 
+## 文档归档
+
+新建或移动文档前先看 [`docs/README.md`](docs/README.md)（归档总规范：分区地图 / 命名 / 日期格式 / 归档流程）。速记：
+
+- 长期**产品需求规格**（系统该是什么）→ `specs/<module>-spec.md`
+- 某次**特性 / 改造的设计文档**（怎么做的）→ `docs/specs/<initiative>/NN-*.md`（一特性一目录 + `INDEX.md`）
+- **测试计划 / 用例 / 报告** → `docs/qa/`（当前权威用例源：`docs/qa/test-plan.md`）
+- **质量制度 / 方法论** → `atlas-quality-system/`；其 `docs/*.md` 必须登记进 `server/src/utils/qualityKnowledgeIndexData.ts`，否则 `npm run quality:knowledge-index` 与单测会失败
+- **临时工作笔记** → `docs/working/`，不要散在 `docs/` 根目录
+- 日期一律 ISO `YYYY-MM-DD`；删除 / 移动文档前先 `grep` 引用（尤其 `atlas-quality-system/` 被脚本引用）
+
 ## 常用命令
 
 ```bash
