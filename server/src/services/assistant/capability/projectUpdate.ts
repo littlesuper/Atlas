@@ -12,7 +12,6 @@ import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types
 import { genericNarrateUserPrompt } from './orchestrator';
 import type { Capability, CapabilityContext } from './types';
 import { CapabilityValidationError } from '../errors';
-export { CapabilityValidationError as ProjectUpdateValidationError };
 
 interface ProjectFields { name: string; status: string; priority: string; startDate: Date | null; endDate: Date | null; }
 

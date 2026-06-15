@@ -5,7 +5,8 @@ const { mockPrisma } = vi.hoisted(() => ({
 }));
 vi.mock('../../../db', () => ({ default: mockPrisma, prisma: mockPrisma }));
 
-import { projectUpdateCapability, ProjectUpdateValidationError } from './projectUpdate';
+import { projectUpdateCapability } from './projectUpdate';
+import { CapabilityValidationError } from '../errors';
 import type { ProjectChangeIntent } from '../../../schemas/projectAssistant';
 import type { EntitySnapshot } from './types';
 
@@ -169,7 +170,7 @@ describe('projectUpdateCapability', () => {
       const data = mockPrisma.project.update.mock.calls[0][0].data;
       expect(data.endDate).toBeInstanceOf(Date);
     });
-    it('throws ProjectUpdateValidationError when resulting end < start', async () => {
+    it('throws CapabilityValidationError when resulting end < start', async () => {
       const entity = makeEntity();
       await expect(
         projectUpdateCapability.execute(
@@ -178,7 +179,7 @@ describe('projectUpdateCapability', () => {
           {} as never,
           { id: 'p1', entity }
         )
-      ).rejects.toBeInstanceOf(ProjectUpdateValidationError);
+      ).rejects.toBeInstanceOf(CapabilityValidationError);
       expect(mockPrisma.project.update).not.toHaveBeenCalled();
     });
   });
