@@ -134,7 +134,13 @@ router.post(
         orderBy: { archivedAt: 'desc' },
       });
 
-      const previousStatus = readArchivedProjectStatus(latestArchive?.snapshot) || 'COMPLETED';
+      const previousStatus = readArchivedProjectStatus(latestArchive?.snapshot);
+      if (!previousStatus) {
+        // 无归档快照（记录丢失/被删/绕过 archive 端点直接改库）→ 没有可信的原状态可恢复，
+        // 显式拒绝而非静默回落 COMPLETED（ARC-009）。
+        res.status(400).json({ error: '无归档快照，无法恢复原状态' });
+        return;
+      }
       const restoredStatus = (['IN_PROGRESS', 'COMPLETED', 'ON_HOLD'].includes(previousStatus))
         ? previousStatus as ProjectStatus
         : ProjectStatus.COMPLETED;
