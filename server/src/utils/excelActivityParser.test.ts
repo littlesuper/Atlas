@@ -226,6 +226,21 @@ describe('Status Mapping', () => {
     expect(result[0].status).toBe('CANCELLED');
   });
 
+  it('GLM QA bug repro #4: "未完成" 不得被误判为 COMPLETED（含子串「完成」但语义相反）', async () => {
+    // specs/project-spec.md:661 的状态映射表只定义 已完成/进行中/未开始；"未完成" 非法定输入，
+    // 无定义目标状态。但其字面语义 = 未完成，**绝不可归为 COMPLETED**。
+    // 现状：parseStatus 的 /已完成|完成/ 排最前，"未完成" 含子串 "完成" → 命中 → 误返回
+    // 'COMPLETED'（方向相反的数据污染：未完成任务被标成已完成，进而污染进度统计/风险引擎）。
+    // 不变量断言：parseStatus("未完成") !== 'COMPLETED'（修法收敛 "完成" 匹配后会落到 undefined
+    // 或其它非 COMPLETED 值，均满足此不变量）。
+    const buf = await createExcelBuffer([
+      ['任务描述', '状态'],
+      ['Task H', '未完成'],
+    ]);
+    const result = await parseExcelActivities(buf);
+    expect(result[0].status).not.toBe('COMPLETED');
+  });
+
   it('IMP-032 (GLM QA bug repro #3): maps "已开始" → "IN_PROGRESS"（spec 同义词，当前漏判为 undefined）', async () => {
     // test-plan IMP-032 明确："进行中" / "已开始" / "进行" 均应映射到 IN_PROGRESS（P1 业务）。
     // 现状：parseStatus 的正则 /进行中|进行/ 不含 "已开始" → 返回 undefined → 活动以
