@@ -225,6 +225,18 @@ describe('Status Mapping', () => {
     const result = await parseExcelActivities(buf);
     expect(result[0].status).toBe('CANCELLED');
   });
+
+  it('IMP-032 (GLM QA bug repro #3): maps "已开始" → "IN_PROGRESS"（spec 同义词，当前漏判为 undefined）', async () => {
+    // test-plan IMP-032 明确："进行中" / "已开始" / "进行" 均应映射到 IN_PROGRESS（P1 业务）。
+    // 现状：parseStatus 的正则 /进行中|进行/ 不含 "已开始" → 返回 undefined → 活动以
+    // 「未开始」状态入库，与导入者的本意（已开始/进行中）相反。
+    const buf = await createExcelBuffer([
+      ['任务描述', '状态'],
+      ['Task G', '已开始'],
+    ]);
+    const result = await parseExcelActivities(buf);
+    expect(result[0].status).toBe('IN_PROGRESS');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
