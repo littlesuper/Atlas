@@ -72,3 +72,25 @@ function normalizeItem(item: KnowledgeIndexItem): KnowledgeIndexItem {
 function normalizeList(values: string[]): string[] {
   return values.map((value) => value.trim()).filter(Boolean);
 }
+
+/**
+ * 漂移护栏：返回「磁盘上存在、但未登记进索引 sections」的文档文件名。
+ * 用于在测试/脚本里断言每个 atlas-quality-system/docs/*.md 都已纳入知识库索引
+ * （38/39/40 曾因漏登记而静默漂移）。excludeBasenames 用于排除索引页自身。
+ */
+export function findUnindexedDocs(
+  diskDocBasenames: string[],
+  sections: KnowledgeIndexSection[],
+  excludeBasenames: string[] = [],
+): string[] {
+  const indexed = new Set(
+    sections.flatMap((section) => section.items.map((item) => lastPathSegment(item.path))),
+  );
+  const exclude = new Set(excludeBasenames);
+  return diskDocBasenames.filter((name) => !exclude.has(name) && !indexed.has(name));
+}
+
+function lastPathSegment(path: string): string {
+  const segments = path.split('/');
+  return segments[segments.length - 1] ?? path;
+}
