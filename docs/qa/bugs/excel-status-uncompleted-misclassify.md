@@ -70,5 +70,15 @@ AssertionError: expected 'COMPLETED' not to be 'COMPLETED' // Object.is equality
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `9bbd4cf1`）：
+
+```
+cd server && npx vitest run src/utils/excelActivityParser.test.ts
+ Test Files  1 passed (1)
+      Tests  60 passed (60)
+```
+
+- 反作弊：`git diff 65974fce..HEAD -- server/src/utils/excelActivityParser.test.ts` 为空（复现测试零改动）；Claude 提交 `9bbd4cf1` 仅改动 `server/src/utils/excelActivityParser.ts`（1 行，源码，无任何 `.test` 文件）。✅ 已 `gh pr ready`。
+- 修法确认：`parseStatus` 的 COMPLETED 匹配收紧为「含 `完成` 且排除 `未完成`」→「已完成」「完成」仍 COMPLETED，「未完成」落 undefined（不再误判）。与本 PR 不变量断言一致。
+- 合并提醒：本 PR 与 #73 改的是 `parseStatus` **不同行**（#73 动 IN_PROGRESS 行加「已开始」、本 PR 动 COMPLETED 行排除「未完成」），互补可共存；二者都合入后建议再跑一次 `npx vitest run src/utils/excelActivityParser.test.ts` 确认复合无碍（两条用例都应过）。
