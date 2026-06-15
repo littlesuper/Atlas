@@ -35,7 +35,7 @@ server/src/           # 后端源码
   middleware/         # auth, permission, validate(Zod), requestId, httpLogger, cache
   schemas/            # Zod 校验 schema（auth, users, projects, assistant, scheduleAssistant）
   services/           # 编排层
-    assistant/        # 全系统 AI 助手框架（registry/orchestrator/proposalStore、adapters/{schedule,project,risk}、query/ 只读问答、domainClassifier、targetResolver）
+    assistant/        # 全系统 AI 助手框架（capability/ 能力层：types/registry/orchestrator/genericPreview/pendingSlotStore + 5 个能力、errors、proposalStore、query/ 只读问答、domainClassifier、targetResolver）
     scheduleAssistant.ts  # 排期领域 propose/apply 编排
   utils/              # 工具函数（workday, dependencyScheduler, scheduleEngine, scheduleRisks, riskEngine, logger, circuitBreaker, roleMembershipResolver 等）
   swagger.ts          # OpenAPI/Swagger 文档配置
@@ -151,23 +151,26 @@ npx playwright test e2e/login.spec.ts
 4. **代码层护栏**（不靠 prompt 自觉）：结构化意图过 Zod（拦造假字段/非法枚举）、实体 id 对真实库白名单校验（拦造假 id）、LLM 不得填用户未陈述的值、解析不出就"没听懂"不瞎猜。
 5. **全程审计可回滚**：记录 `rawUtterance` + `resolvedIntent` + `appliedDiff`。
 
-### 助手框架（`server/src/services/assistant/`）
+### 助手框架（`server/src/services/assistant/capability/`，Phase 2 起统一）
 
-- **适配器** `types.ts` 的 `AssistantActionAdapter`：每个可写领域一个，提供 `loadContext` / `buildIntentPrompts` / `parseIntent`（Zod + id 白名单，纯函数可离线测）/ `buildPreview`（确定性 diff + 风险）/ `fingerprint`（防并发）/ `apply`（调现有校验路由）/ 可选 `narrate`。
-- **注册表/引导** `registry.ts` + `bootstrap.ts`：集中注册 `schedule`、`project`、`risk` 三个适配器（按 domain 幂等覆盖）。**新增领域只需写 adapter 并注册，分类器/路由/前端零改动**。
-- **通用编排** `orchestrator.ts`：`runPropose` / `runApply`，复用 `proposalStore.ts` 的 `ProposalCache`（TTL 10min + 指纹 + 幂等）。**apply 只认服务端缓存意图，不信前端 diff**。
-- **领域分类** `domainClassifier.ts`：从一句话路由到 排期/项目字段/风险项/只读提问（LLM 边缘，经 `aiCircuitBreaker`）。
+全站写操作统一为声明式 **能力（Capability）**；旧 `AssistantActionAdapter` 体系（registry/orchestrator/adapters）已删除——dispatch 只剩两条路：`query`（只读问答）与 capability（写）。
+
+- **能力声明** `capability/types.ts` 的 `Capability`：`name`/`description`/`permission`/`mode`(create/update/delete/custom)/`inputSchema`(Zod)/`buildPrompt`/`missingRequired`/`applyDefaults`/`previewLabels`+`previewDisplay`/`validateRefs`(引用 id 白名单)/`parseArgs`(复杂领域自定义解析)/`buildPreview`/`loadEntity`+`fingerprint`(target 类)/`narrate`/`execute`(走现有校验写入路径)。简单 CRUD 用 `genericPreview.ts`(mode 驱动通用 diff) 近零样板；复杂领域(排期)用 `parseArgs`+自定义 `buildPreview`。**新增可写能力只写一个 Capability 并注册，分类器/路由/前端零改动**。
+- **注册表/引导** `capability/registry.ts` + `capability/bootstrap.ts`：注册全部能力；`listCapabilitiesForUser` 按 RBAC 过滤——**AI 能力边界 = 用户权限边界**；`target` 类注册时强制 `loadEntity`+`fingerprint` 齐备。
+- **通用编排** `capability/orchestrator.ts`：`capabilityPropose` / `capabilityApply`，复用 `proposalStore.ts`（TTL 10min + 指纹 + 幂等）。`target` 类 propose 时 `resolveProjectTarget`+`loadEntity`；apply 时**重载实体 + 指纹复核**(防并发→409) + **归属(应用者==发起者) + 权限校验**。**apply 只认服务端缓存意图，不信前端 diff**。错误类集中在 `assistant/errors.ts`。
+- **真·多轮槽位填充** `capability/pendingSlotStore.ts`：缺必填时 `need_input` 返回不透明 `pendingId`（半成品意图**只在服务端**，前端只持 token）；下一轮续填合并增量、缺啥再问，跨轮记忆。
+- **领域分类** `domainClassifier.ts`：从一句话路由到 某能力 / 只读提问（LLM 边缘，经 `aiCircuitBreaker`）。
 - **目标定位** `targetResolver.ts`：先确定性按项目名匹配（`matchProjectByName`，命中即免一次 LLM 调用），匹配不上再 LLM 兜底。
 
-### 可写领域（已交付 Phase 1–3）
+### 可写能力（`capability/`，已交付 5 个）
 
-- **schedule**（排期）`adapters/scheduleAdapter.ts`：日期/风险由**确定性引擎**算，LLM 碰不到真值——反幻觉最强的领域。
-  - `utils/scheduleEngine.ts`：`dryRunSchedule`（干跑算假设排期 + before/after diff）、`computeProjectScheduleCascade`（纯级联，与写入路径 `cascadeUpdateDependents` 共用同一算法，保证"干跑 = 实算"）
-  - `utils/scheduleRisks.ts`：`assessRisks` 三类确定性风险——撞里程碑(`milestone_slip`)、撞硬节点(`hard_node_breach`)、整体超期(`project_overdue`)
-  - `utils/scheduleAssistantPrompts.ts`：prompt + `parseIntentResponse`（Zod + 活动白名单兜底，拦 LLM 编造的 activityId）
-  - **硬节点** `Activity.hardConstraintDate`（可空 `DateTime`）= 计划完成不得晚于的日期，仅用于撞硬节点判定
-- **project.update**（项目字段）`adapters/projectAdapter.ts`：名称/状态/优先级/起止日的字段 diff，Zod + 枚举校验、日期区间风险、归档保护，走 `prisma.project.update`。
-- **risk**（风险项）`adapters/riskAdapter.ts`：新建风险项 / 改严重度·状态；riskItemId 对本项目风险项白名单校验，写入复用 riskItem + RiskItemLog 语义。
+写入均复用各模块既有 service/校验路径（安全铁律③）。`schedule.update`/`project.update`/`risk.update`（改已有项目的）都经 `canManageProject` 门控，与各自真实路由一致。
+
+- **`project.create`**（新建项目）`projectCreate.ts`：name/productLine 必填，managerId 默认当前用户；genericPreview。
+- **`activity.create`**（新建活动）`activityCreate.ts`：**含角色绑定**——选角色 → 落库时 `createActivityCore`（`routes/activities/shared.ts`，路由与能力共用）自动展开该角色在职用户为执行人；projectId/roleId 经 `validateRefs` 白名单。
+- **`schedule.update`**（排期，custom）`scheduleUpdate.ts`：日期/风险由**确定性引擎**算，LLM 碰不到真值——反幻觉最强。复用 `utils/scheduleEngine.ts`(`dryRunSchedule`，与写入路径 `cascadeUpdateDependents` 同算法保证"干跑=实算")、`utils/scheduleRisks.ts`(`assessRisks` 三类：`milestone_slip`/`hard_node_breach`/`project_overdue`)、`utils/scheduleAssistantPrompts.ts`(`parseIntentResponse` 活动白名单)、`services/scheduleAssistant.ts`(`executeScheduleApply`)。**硬节点** `Activity.hardConstraintDate`(可空 `DateTime`)= 计划完成不得晚于的日期。
+- **`project.update`**（项目字段，custom）`projectUpdate.ts`：名称/状态/优先级/起止日的字段 diff，Zod + 枚举校验、日期区间风险、归档保护，走 `prisma.project.update`。
+- **`risk.update`**（风险项，custom）`riskUpdate.ts`：新建风险项 / 改严重度·状态；riskItemId 对本项目风险项白名单，写入复用 riskItem + RiskItemLog（先写库、成功后再补审计日志）。
 
 ### 只读提问（混合 Q&A，`server/src/services/assistant/query/`）
 
@@ -178,9 +181,9 @@ npx playwright test e2e/login.spec.ts
 ### 前端
 
 - **首页即聊天页** `client/src/pages/Home/index.tsx`（路由 `/`，登录后默认进入；走 `ProtectedRoute` 等待登录态恢复，刷新不掉线）：claude.ai 式全屏对话。**空态**：问候 → 输入框 → 示例 chip 垂直居中；示例 chip 为轻量小标签，点击只**填入输入框**（含占位"项目甲"，需改成真实项目后再发），不直接发起对话；下方按需风险区（`pages/Home/RiskOverview.tsx`，仅当有真实风险点——高风险项目 / 重点行动项才显示，善意提示 `topConcerns` 不计入）。**会话态**：气泡流（用户气泡 / Markdown 回答 + 来源徽标 / 改动预览卡片 / 状态提示），处理中在末尾显示"思考中…"指示器（`MessageList` 的 `sending`）；输入框 sticky 停靠在滚动区底部（滚动条贯通到底、不被遮挡），新消息自动滚到底；右上角浮层「新对话」一键清空。进入首页（或点新对话后）自动聚焦输入框。
-- **对话状态 + 编排**：`store/assistantChatStore.ts`（Zustand + persist，对话持久化到 localStorage、跨刷新保留）；`hooks/useAssistantChat.ts` 复用 `assistantApi.propose/apply` 做编排（每轮独立 propose、**不发送历史**，确认弹窗后才 apply）。展示组件在 `pages/Home/`：`MessageList`/`ProposalCard`/`AnswerBubble`（react-markdown + remark-gfm）/`ChatInput`/`EmptyState`/`RiskOverview`。
+- **对话状态 + 编排**：`store/assistantChatStore.ts`（Zustand + persist，对话持久化到 localStorage、跨刷新保留；另持非持久化 `pendingId` 跟踪多轮续填态）；`hooks/useAssistantChat.ts` 复用 `assistantApi.propose/apply` 做编排（每轮独立 propose、**不发送历史**，确认弹窗后才 apply）。**多轮槽位填充**：缺字段时显示**琥珀色 `need_input` 气泡**列出待补项 +「取消补充」，下一轮带 `pendingId` 续填、缺啥补啥。展示组件在 `pages/Home/`：`MessageList`/`ProposalCard`/`AnswerBubble`（react-markdown + remark-gfm）/`ChatInput`/`EmptyState`/`RiskOverview`。
 - **右下角入口** `client/src/components/AssistantLauncher.tsx`（挂在 `layouts/MainLayout.tsx`）：非首页显示的浮动按钮，点击跳转到首页 `/?project=<当前项目>`（首页本身不显示）。
-- **API** `assistantApi.propose(utterance, contextProjectId?)` / `apply(proposalId)`；`/api/schedule-assistant/*` 保留为薄别名（向后兼容）。风险种类中文/颜色见 `client/src/utils/constants.ts` 的 `SCHEDULE_RISK_KIND_MAP`。
+- **API** `assistantApi.propose(utterance, contextProjectId?, pendingId?)` / `apply(proposalId)`（`pendingId` 用于多轮续填）；`/api/schedule-assistant/*` 保留为薄别名（向后兼容，独立于能力层）。风险种类中文/颜色见 `client/src/utils/constants.ts` 的 `SCHEDULE_RISK_KIND_MAP`。
 - 注：旧 `AssistantConversation.tsx`、`AssistantHeroInput.tsx` 与独立 `/assistant` 页已移除（`/assistant` 重定向到 `/`）。设计见 `docs/specs/assistant-chat-ui/`。
 
 ### 降级与可观测
