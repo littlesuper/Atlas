@@ -64,6 +64,15 @@ describe('useAssistantChat', () => {
     expect(useAssistantChatStore.getState().messages.at(-1)).toMatchObject({ kind: 'status', variant: 'noop', text: '没听懂这句话' });
   });
 
+  it('send maps need_input to a status message listing missing fields', async () => {
+    mockPropose.mockResolvedValue({ data: { proposalId: null, noOp: true, mode: 'need_input', missing: ['项目名称', '产品线'], preview: { rows: [], risks: [] }, narrative: '还需要补充：项目名称、产品线' } });
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.send('帮我建个新项目', null);
+    });
+    expect(useAssistantChatStore.getState().messages.at(-1)).toMatchObject({ kind: 'status', variant: 'need_input', text: '还需要补充：项目名称、产品线' });
+  });
+
   it('send maps a 503 to an ai_unavailable status', async () => {
     mockPropose.mockRejectedValue({ response: { status: 503 } });
     const { result } = renderHook(() => useAssistantChat());
