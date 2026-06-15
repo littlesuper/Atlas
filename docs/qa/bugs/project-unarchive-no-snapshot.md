@@ -67,5 +67,13 @@ AssertionError: expected [ 400, 404 ] to include 200
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `83da6491`）：
+
+```
+cd server && npx vitest run src/routes/projects.test.ts
+ Test Files  1 passed (1)
+      Tests  50 passed (50)
+```
+
+- 反作弊：`git diff e844eff2..HEAD -- server/src/routes/projects.test.ts` 为空（复现测试零改动）；Claude 提交 `83da6491` 仅改动 `server/src/routes/projects/archive.ts`（+7/−1 源码，无任何 `.test` 文件）。✅ 已 `gh pr ready`。
