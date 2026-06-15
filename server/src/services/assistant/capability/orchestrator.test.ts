@@ -91,6 +91,20 @@ const fakeUpdateCap: Capability = {
   execute: async () => ({ rows: [{ key: 'value', label: '值', before: 'old', after: 'new' }], risks: [] }),
 };
 
+// 项目能认出，但实体已不存在（loadEntity 返回 null）
+const fakeMissingCap: Capability = {
+  name: 'fake.missing',
+  description: '目标实体不存在测试。',
+  permission: { resource: 'x', action: 'update' },
+  mode: 'update',
+  target: 'project',
+  inputSchema: z.object({ value: z.string().optional() }),
+  buildPrompt: () => ({ system: 's', user: 'u' }),
+  loadEntity: async () => null,
+  fingerprint: () => 'fp',
+  execute: async () => ({ rows: [], risks: [] }),
+};
+
 describe('capabilityPropose · target 类', () => {
   beforeEach(() => { fakeFp = 'fp1'; registerCapability(fakeUpdateCap); });
 
@@ -109,6 +123,12 @@ describe('capabilityPropose · target 类', () => {
     mockCallAi.mockResolvedValue({ content: '{"value":"new"}' });
     const r = await capabilityPropose('fake.update', '把那个东西改一下', targetCtx);
     expect(r.status).toBe('need_target');
+  });
+
+  it('项目认出但实体不存在 → target_not_found（而非 need_target）', async () => {
+    registerCapability(fakeMissingCap);
+    const r = await capabilityPropose('fake.missing', '把甲项目改一下', targetCtx);
+    expect(r.status).toBe('target_not_found');
   });
 });
 

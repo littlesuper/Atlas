@@ -5,7 +5,7 @@ import { aiCircuitBreaker } from '../../../utils/circuitBreaker';
 import { logger } from '../../../utils/logger';
 import { auditLog } from '../../../utils/auditLog';
 import { resolveProjectTarget } from '../targetResolver';
-import { VersionMismatchError, TargetNotFoundError, ProposalNotFoundError } from '../orchestrator';
+import { VersionMismatchError, TargetNotFoundError, ProposalNotFoundError, UnknownDomainError } from '../orchestrator';
 import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types';
 import { proposalStore } from '../proposalStore';
 import { getCapability } from './registry';
@@ -16,6 +16,7 @@ export type CapabilityProposeOutcome =
   | { status: 'ok'; proposalId: string; preview: AssistantPreview; narrative: string }
   | { status: 'need_input'; missing: string[]; partialArgs: Record<string, unknown> }
   | { status: 'need_target' }
+  | { status: 'target_not_found' }
   | { status: 'noop' }
   | { status: 'not_understood' }
   | { status: 'ai_unavailable' }
@@ -107,8 +108,9 @@ export async function capabilityPropose(
     if (t.status === 'ai_unavailable') return { status: 'ai_unavailable' };
     if (t.status === 'unresolved') return { status: 'need_target' };
     targetId = t.projectId;
+    // 已认出项目；loadEntity 返回 null 表示实体已不存在/归档/不可见 → 目标不存在（而非"没听清哪个项目"）
     const loaded = cap.loadEntity ? await cap.loadEntity(targetId, ctx) : null;
-    if (!loaded) return { status: 'need_target' };
+    if (!loaded) return { status: 'target_not_found' };
     entity = loaded;
   }
 
@@ -176,7 +178,7 @@ export async function capabilityApply(
   if (!cached || !cached.capabilityName) throw new ProposalNotFoundError();
   if (cached.applied) return { rows: cached.applied.rows, risks: cached.applied.risks };
   const cap = getCapability(cached.capabilityName);
-  if (!cap) throw new Error('UNKNOWN_CAPABILITY');
+  if (!cap) throw new UnknownDomainError(cached.capabilityName);
 
   // target 类：重载实体 + 指纹复核（并发保护）
   let target: { id: string; entity: EntitySnapshot } | undefined;

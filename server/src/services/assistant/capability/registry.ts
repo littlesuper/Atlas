@@ -3,6 +3,12 @@ import type { Capability } from './types';
 const capabilities = new Map<string, Capability>();
 
 export function registerCapability(cap: Capability): void {
+  // target 类能力必须 loadEntity + fingerprint 齐备：否则 apply 无法做并发指纹复核（静默丢失保护）。
+  if (cap.target && (!cap.loadEntity || !cap.fingerprint)) {
+    throw new Error(
+      `能力 ${cap.name} 声明了 target='${cap.target}'，但缺少 loadEntity/fingerprint：target 类能力必须二者齐备，否则 apply 无法做并发指纹复核。`
+    );
+  }
   capabilities.set(cap.name, cap);
 }
 

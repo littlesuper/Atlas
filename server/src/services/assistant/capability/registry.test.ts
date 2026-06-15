@@ -37,4 +37,19 @@ describe('capability registry', () => {
     registerCapability(fake('risk.delete', 'risk', 'delete'));
     expect(listCapabilitiesForUser(['*:*']).length).toBe(2);
   });
+
+  it('target 类能力缺 fingerprint → 注册即抛错（保护并发指纹复核）', () => {
+    const bad = {
+      name: 'bad.update',
+      description: 'desc bad',
+      permission: { resource: 'x', action: 'update' },
+      mode: 'update',
+      target: 'project',
+      inputSchema: z.object({}).passthrough(),
+      buildPrompt: () => ({ system: '', user: '' }),
+      loadEntity: async () => null,
+      execute: async () => ({ rows: [], risks: [] }),
+    } as Capability;
+    expect(() => registerCapability(bad)).toThrow(/fingerprint/);
+  });
 });

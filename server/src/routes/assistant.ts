@@ -155,6 +155,9 @@ router.post(
               narrative: '没听清你指的是哪个项目，请在话里点明项目名称（例如"把『GW-X500』的硬件打样推迟两周"）。',
             });
             return;
+          case 'target_not_found':
+            res.status(404).json({ error: '目标对象不存在' });
+            return;
           case 'need_input':
             reply({ proposalId: null, noOp: true, mode: 'need_input', missing: out.missing, preview: { rows: [], risks: [] }, narrative: `还需要补充：${out.missing.join('、')}` });
             return;
