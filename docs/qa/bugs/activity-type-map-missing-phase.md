@@ -62,5 +62,14 @@ Claude 修复（加 PHASE）后这条 `toHaveLength(2)` 会失败。**GLM 在复
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且复现测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `04d0ea99`）：
+
+```
+cd client && npx vitest run src/utils/constants.test.ts
+ Test Files  1 passed (1)
+      Tests  1721 passed (1721)
+```
+
+- 反作弊：Claude 提交 `04d0ea99` 仅改动 `client/src/utils/constants.ts`（+4 行源码，补 PHASE=阶段/cyan）；GLM 复现用例（`GLM QA bug repro #8`）零改动（`git diff d923b962..HEAD -- constants.test.ts` 在 GLM 更正前为空）。✅ 已 `gh pr ready`。
+- 附带更正（GLM，按交接指令）：同文件 `constants.test.ts:151` 的 PRE-EXISTING 锁测试 `toHaveLength(2)` 已更正为 `toHaveLength(3)`（+ PHASE 断言），属 README §3「源码契约变更后的过时锁测试」修复，非复现用例。全量 1721 绿。
