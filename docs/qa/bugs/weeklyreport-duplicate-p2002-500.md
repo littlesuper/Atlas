@@ -63,5 +63,13 @@ AssertionError: expected 500 to be 409 // Object.is equality
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `d4cc3bc2`）：
+
+```
+cd server && npx vitest run src/routes/weeklyReports.test.ts
+ Test Files  1 passed (1)
+      Tests  51 passed (51)
+```
+
+- 反作弊：`git diff 59398538..HEAD -- server/src/routes/weeklyReports.test.ts` 为空（复现测试零改动）；Claude 提交 `d4cc3bc2` 仅改动 `server/src/routes/weeklyReports/crud.ts`（+6 行源码，无任何 `.test` 文件）。✅ 已 `gh pr ready`。
