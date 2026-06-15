@@ -74,5 +74,14 @@ cd server && npx vitest run src/utils/excelActivityParser.test.ts -t "GLM QA bug
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `c8d80d43`）：
+
+```
+cd server && npx vitest run src/utils/excelActivityParser.test.ts
+ Test Files  1 passed (1)
+      Tests  60 passed (60)
+```
+
+- 反作弊：`git diff c3aac7fc..HEAD -- server/src/utils/excelActivityParser.test.ts` 为空（复现测试零改动）；Claude 提交 `c8d80d43` 仅改动 `server/src/utils/excelActivityParser.ts`（1 行，源码，无任何 `.test` 文件）。✅ 已 `gh pr ready`。
+- 注：Claude 仅修了「已开始」同义词（IMP-032），**未**触碰 `完成` 子串匹配——故本报告提到的「未完成」→COMPLETED 更严重隐患**仍然存在**，已由 GLM 另开独立 PR 复现（见 `docs/qa/bugs/excel-status-uncompleted-misclassify.md`）。
