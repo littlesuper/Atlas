@@ -10,6 +10,9 @@ import {
 import { autoAssignByRole } from '../../utils/roleMembershipResolver';
 import { isFeatureEnabled, parseFeatureFlags } from '../../utils/featureFlags';
 import prisma from '../../db';
+import { canManageProject } from '../../middleware/permission';
+import { calculateWorkdays } from '../../utils/workday';
+import { updateProjectProgress } from '../../utils/projectProgress';
 
 export { Prisma, prisma, ActivityStatus, ActivityType };
 export type { Priority };
@@ -215,3 +218,82 @@ export const requireFeatureFlag = (feature: string, message: string) =>
     }
     next();
   };
+
+export class ActivityCreateError extends Error {
+  constructor(public readonly code: 'PROJECT_ARCHIVED' | 'FORBIDDEN') {
+    super(code);
+    this.name = 'ActivityCreateError';
+  }
+}
+
+export interface CreateActivityCoreParams {
+  name: string;
+  description?: string | null;
+  type?: ActivityType;
+  phase?: string | null;
+  roleId?: string | null;
+  executorIds?: string[];
+  status?: ActivityStatus;
+  priority?: Priority;
+  planStartDate?: Date | null;
+  planEndDate?: Date | null;
+  planDuration?: number | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  duration?: number | null;
+  dependencies?: unknown;
+  notes?: string | null;
+  sortOrder?: number;
+}
+
+/**
+ * 活动创建核心（路由与 AI 能力共用，安全铁律③）。
+ * 接收已取的 project（调用方各自查找一次），做归档/权限校验 + 执行人展开 + 工期补算 + 落库 + 进度刷新。
+ * 不含：依赖环检测/依赖派生日期（留路由）、审计（调用方各自审计）。
+ */
+export async function createActivityCore(
+  project: { id: string; managerId: string; status: string },
+  params: CreateActivityCoreParams,
+  req: Request
+) {
+  if (project.status === 'ARCHIVED') throw new ActivityCreateError('PROJECT_ARCHIVED');
+  if (!canManageProject(req, project.managerId, project.id)) throw new ActivityCreateError('FORBIDDEN');
+
+  const executorData = await buildExecutorsForActivity(params.roleId, params.executorIds, req.user?.id || '');
+
+  let planDuration = params.planDuration ?? null;
+  if (params.planStartDate && params.planEndDate && !planDuration) {
+    planDuration = calculateWorkdays(params.planStartDate, params.planEndDate);
+  }
+  let duration = params.duration ?? null;
+  if (params.startDate && params.endDate && !duration) {
+    duration = calculateWorkdays(params.startDate, params.endDate);
+  }
+
+  const activity = await prisma.activity.create({
+    data: {
+      projectId: project.id,
+      name: params.name,
+      description: params.description ?? null,
+      type: params.type || ActivityType.TASK,
+      phase: params.phase ?? null,
+      roleId: params.roleId ?? null,
+      executors: { create: executorData },
+      status: params.status || ActivityStatus.NOT_STARTED,
+      priority: params.priority ?? ('MEDIUM' as Priority),
+      planStartDate: params.planStartDate ?? null,
+      planEndDate: params.planEndDate ?? null,
+      planDuration,
+      startDate: params.startDate ?? null,
+      endDate: params.endDate ?? null,
+      duration,
+      dependencies: (params.dependencies ?? null) as never,
+      notes: params.notes ?? null,
+      sortOrder: params.sortOrder ?? 0,
+    },
+    include: EXECUTOR_INCLUDE,
+  });
+
+  await updateProjectProgress(project.id);
+  return activity;
+}

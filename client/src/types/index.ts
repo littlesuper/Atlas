@@ -364,6 +364,8 @@ export interface AssistantProposeResult {
   mode?: 'answer' | 'need_input';
   /** 缺失必填项（mode==='need_input' 时有值，用于「还需要补充…」提示） */
   missing?: string[];
+  /** 多轮续填 token（mode==='need_input' 时返回，前端下一轮带回） */
+  pendingId?: string;
   /** 只读问答的答案文本（mode==='answer' 时有值） */
   answer?: string;
   /** 答案来源：deterministic=代码精确计算（零幻觉）；grounded=AI 据系统数据整理 */
@@ -410,6 +412,9 @@ export type AssistantMessage =
       kind: 'status';
       variant: 'ai_unavailable' | 'noop' | 'need_target' | 'error' | 'need_input';
       text: string;
+      /** need_input 专用：缺失字段 + 续填 token */
+      missing?: string[];
+      pendingId?: string;
     };
 
 // 未带 id 的草稿（store 负责生成 id）

@@ -4,11 +4,14 @@ import type { AssistantMessage, AssistantDraft } from '../types';
 
 interface AssistantChatState {
   messages: AssistantMessage[];
+  pendingId: string | null;
   pushUser: (text: string) => string;
   pushAssistant: (draft: AssistantDraft) => string;
   // updateMessage 只用于就地改 proposal 卡片状态（applied/stale），故按 proposal 收窄
   // （Partial<union> 只暴露公共键 id/role，无法接受 { applied } —— 必须 Extract）
   updateMessage: (id: string, patch: Partial<Extract<AssistantMessage, { kind: 'proposal' }>>) => void;
+  setPending: (id: string | null) => void;
+  clearPending: () => void;
   reset: () => void;
 }
 
@@ -19,6 +22,7 @@ export const useAssistantChatStore = create<AssistantChatState>()(
   persist(
     (set) => ({
       messages: [],
+      pendingId: null,
 
       pushUser: (text) => {
         const id = newId();
@@ -37,7 +41,9 @@ export const useAssistantChatStore = create<AssistantChatState>()(
           messages: s.messages.map((m) => (m.id === id ? ({ ...m, ...patch } as AssistantMessage) : m)),
         })),
 
-      reset: () => set({ messages: [] }),
+      setPending: (id) => set({ pendingId: id }),
+      clearPending: () => set({ pendingId: null }),
+      reset: () => set({ messages: [], pendingId: null }),
     }),
     {
       name: 'atlas-assistant-chat',

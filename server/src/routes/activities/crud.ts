@@ -22,7 +22,8 @@ import {
   requireFeatureFlag,
   type BatchActivityInput,
   type ReorderItem,
-  buildExecutorsForActivity,
+  createActivityCore,
+  ActivityCreateError,
 } from './shared';
 
 const router = express.Router();
@@ -238,22 +239,9 @@ router.post(
         sortOrder,
       } = req.body;
 
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-      });
-
-      if (project && project.status === 'ARCHIVED') {
-        res.status(403).json({ error: '归档项目不可修改' });
-        return;
-      }
-
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
       if (!project) {
         res.status(400).json({ error: '项目不存在' });
-        return;
-      }
-
-      if (!canManageProject(req, project.managerId, projectId)) {
-        res.status(403).json({ error: '只能在自己负责的项目中创建活动' });
         return;
       }
 
@@ -268,7 +256,6 @@ router.post(
       let resolvedPlanStart = planStartDate ? new Date(planStartDate) : null;
       let resolvedPlanEnd = planEndDate ? new Date(planEndDate) : null;
       let resolvedPlanDuration = planDuration;
-
       if (dependencies && Array.isArray(dependencies) && dependencies.length > 0) {
         const resolved = await computeDatesFromDeps(dependencies, planDuration);
         if (resolved.planStartDate) resolvedPlanStart = resolved.planStartDate;
@@ -276,51 +263,40 @@ router.post(
         if (resolved.planDuration !== undefined) resolvedPlanDuration = resolved.planDuration;
       }
 
-      let finalPlanDuration = resolvedPlanDuration;
-      let finalDuration = duration;
-
-      if (resolvedPlanStart && resolvedPlanEnd && !finalPlanDuration) {
-        finalPlanDuration = calculateWorkdays(resolvedPlanStart, resolvedPlanEnd);
-      }
-
-      if (startDate && endDate && !duration) {
-        finalDuration = calculateWorkdays(new Date(startDate), new Date(endDate));
-      }
-
-      const currentUserId = req.user?.id || '';
-      const executorData = await buildExecutorsForActivity(roleId, executorIds, currentUserId);
-
-      const activity = await prisma.activity.create({
-        data: {
-          projectId,
-          name,
-          description,
-          type: type || ActivityType.TASK,
-          phase,
-          roleId: roleId ?? null,
-          executors: {
-            create: executorData,
+      try {
+        const activity = await createActivityCore(
+          project,
+          {
+            name,
+            description,
+            type,
+            phase,
+            roleId,
+            executorIds,
+            status,
+            priority,
+            planStartDate: resolvedPlanStart,
+            planEndDate: resolvedPlanEnd,
+            planDuration: resolvedPlanDuration,
+            startDate: startDate ? new Date(startDate) : null,
+            endDate: endDate ? new Date(endDate) : null,
+            duration,
+            dependencies,
+            notes,
+            sortOrder,
           },
-          status: status || 'NOT_STARTED',
-          priority,
-          planStartDate: resolvedPlanStart,
-          planEndDate: resolvedPlanEnd,
-          planDuration: finalPlanDuration,
-          startDate: startDate ? new Date(startDate) : null,
-          endDate: endDate ? new Date(endDate) : null,
-          duration: finalDuration,
-          dependencies: dependencies || null,
-          notes,
-          sortOrder: sortOrder || 0,
-        },
-        include: EXECUTOR_INCLUDE,
-      });
-
-      await updateProjectProgress(projectId);
-
-      auditLog({ req, action: 'CREATE', resourceType: 'activity', resourceId: activity.id, resourceName: activity.name });
-
-      res.status(201).json(activity);
+          req
+        );
+        auditLog({ req, action: 'CREATE', resourceType: 'activity', resourceId: activity.id, resourceName: activity.name });
+        res.status(201).json(activity);
+      } catch (e) {
+        if (e instanceof ActivityCreateError) {
+          if (e.code === 'PROJECT_ARCHIVED') { res.status(403).json({ error: '归档项目不可修改' }); return; }
+          res.status(403).json({ error: '只能在自己负责的项目中创建活动' });
+          return;
+        }
+        throw e;
+      }
     } catch (error) {
       logger.error({ err: error }, '创建活动错误');
       res.status(500).json({ error: '服务器内部错误' });

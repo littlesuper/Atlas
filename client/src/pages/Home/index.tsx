@@ -17,7 +17,7 @@ import RiskOverview from './RiskOverview';
 const Home: React.FC = () => {
   const [params] = useSearchParams();
   const contextProjectId = params.get('project');
-  const { messages, sending, send, applyProposal, reset } = useAssistantChat();
+  const { messages, sending, send, applyProposal, reset, cancelPending, pendingId } = useAssistantChat();
   const [input, setInput] = useState('');
   const hasConversation = messages.length > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -58,7 +58,7 @@ const Home: React.FC = () => {
             {/* 消息区占满高度→滚动条贯通到底；输入框 sticky 停靠底部、随滚动区内（不遮挡滚动条），少消息时由 spacer 推到底（claude.ai 式） */}
             <div ref={scrollRef} className="scrollbar-subtle flex-1 overflow-auto pt-2">
               <div className="flex min-h-full flex-col">
-                <MessageList messages={messages} onApply={applyProposal} sending={sending} />
+                <MessageList messages={messages} onApply={applyProposal} sending={sending} onCancelPending={cancelPending} activePendingId={pendingId} />
                 <div className="flex-1" />
                 <div className="bg-background sticky bottom-0 px-4 pb-4 pt-2">
                   <ChatInput value={input} onChange={setInput} onSend={() => doSend(input)} sending={sending} />

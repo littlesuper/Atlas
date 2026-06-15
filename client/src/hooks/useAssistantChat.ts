@@ -11,7 +11,7 @@ const toAssistantDraft = (r: AssistantProposeResult): AssistantDraft => {
     return { role: 'assistant', kind: 'answer', answer: r.answer, basis: r.basis, elapsedMs: r.elapsedMs };
   }
   if (r.mode === 'need_input') {
-    return { role: 'assistant', kind: 'status', variant: 'need_input', text: r.narrative || `还需要补充：${(r.missing ?? []).join('、')}` };
+    return { role: 'assistant', kind: 'status', variant: 'need_input', text: r.narrative || `还需要补充：${(r.missing ?? []).join('、')}`, missing: r.missing, pendingId: r.pendingId };
   }
   const rows = r.preview?.rows ?? [];
   if (r.proposalId && rows.length > 0) {
@@ -40,6 +40,9 @@ export function useAssistantChat() {
   const pushAssistant = useAssistantChatStore((s) => s.pushAssistant);
   const updateMessage = useAssistantChatStore((s) => s.updateMessage);
   const reset = useAssistantChatStore((s) => s.reset);
+  const setPending = useAssistantChatStore((s) => s.setPending);
+  const clearPending = useAssistantChatStore((s) => s.clearPending);
+  const pendingId = useAssistantChatStore((s) => s.pendingId);
   const [sending, setSending] = useState(false);
 
   const send = useCallback(
@@ -48,9 +51,12 @@ export function useAssistantChat() {
       if (!t || sending) return;
       pushUser(t);
       setSending(true);
+      const { pendingId } = useAssistantChatStore.getState();
       try {
-        const res = await assistantApi.propose(t, contextProjectId);
+        const res = await assistantApi.propose(t, contextProjectId, pendingId);
         pushAssistant(toAssistantDraft(res.data));
+        if (res.data.mode === 'need_input') setPending(res.data.pendingId ?? null);
+        else clearPending();
       } catch (error) {
         const status = (error as { response?: { status?: number } })?.response?.status;
         if (status === 503) {
@@ -63,7 +69,7 @@ export function useAssistantChat() {
         setSending(false);
       }
     },
-    [sending, pushUser, pushAssistant]
+    [sending, pushUser, pushAssistant, setPending, clearPending]
   );
 
   const applyProposal = useCallback(
@@ -93,5 +99,10 @@ export function useAssistantChat() {
     [messages, updateMessage]
   );
 
-  return { messages, sending, send, applyProposal, reset };
+  const cancelPending = useCallback(() => {
+    clearPending();
+    pushAssistant({ role: 'assistant', kind: 'status', variant: 'noop', text: '已取消补充，可重新发起。' });
+  }, [clearPending, pushAssistant]);
+
+  return { messages, sending, send, applyProposal, reset, cancelPending, pendingId };
 }

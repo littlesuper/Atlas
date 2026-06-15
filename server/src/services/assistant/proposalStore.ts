@@ -15,6 +15,8 @@ export interface StoredProposal<TIntent = unknown> {
   intent: TIntent;
   fingerprint: string;
   createdAt: number;
+  /** 发起提议的用户 id（供 pending 槽位归属校验等用） */
+  userId?: string;
   /** capability 提议专用：有此字段则 apply 走 capabilityApply */
   capabilityName?: string;
   args?: unknown;
