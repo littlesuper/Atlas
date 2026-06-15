@@ -7,9 +7,9 @@ import './bootstrap'; // 触发注册
 import { listDomains, getAdapter } from './registry';
 
 describe('assistant bootstrap', () => {
-  it('registers schedule, project and risk adapters', () => {
+  it('registers project and risk adapters (schedule migrated to capability layer)', () => {
     const domains = listDomains();
-    expect(domains).toContain('schedule');
+    // schedule migrated to schedule.update capability in Task 2
     expect(domains).toContain('project');
     expect(domains).toContain('risk');
   });
