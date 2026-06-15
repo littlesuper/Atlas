@@ -106,11 +106,14 @@ vi.mock('../utils/workday', () => ({
     return result;
   }),
 }));
-vi.mock('../utils/dependencyScheduler', () => ({
-  resolveActivityDates: vi.fn().mockReturnValue({}),
-  DependencyInput: {},
-  PredecessorData: {},
-}));
+vi.mock('../utils/dependencyScheduler', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/dependencyScheduler')>();
+  return {
+    ...actual,
+    // 默认透传真实实现，使级联真正可测；个别需要屏蔽级联的用例可局部 mockReturnValue({})
+    resolveActivityDates: vi.fn(actual.resolveActivityDates),
+  };
+});
 vi.mock('../utils/aiClient', () => ({
   callAi: vi.fn().mockResolvedValue(null),
 }));
@@ -366,7 +369,9 @@ describe('GET /api/activities/project/:projectId/critical-path', () => {
   it('should return empty array when no activities', async () => {
     mockPrisma.activity.findMany.mockResolvedValue([]);
     const { calculateCriticalPath } = await import('../utils/criticalPath');
-    vi.mocked(calculateCriticalPath).mockReturnValue([]);
+    // 用 Once 避免污染共享 mock（mockReturnValue 会持续生效，clearAllMocks 不重置，
+    // 曾在 --sequence.shuffle 下导致同 describe 的「should return critical activity IDs」失败）
+    vi.mocked(calculateCriticalPath).mockReturnValueOnce([]);
 
     const res = await request(app).get(
       '/api/activities/project/proj-1/critical-path'
@@ -1726,5 +1731,112 @@ describe('DELETE /api/activities/:id - permission edge case', () => {
     const res = await request(app).delete('/api/activities/act-1');
 
     expect(res.status).toBe(500);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 级联正向覆盖（GLM QA coverage）
+//
+// 背景：此前文件级 mock 把 resolveActivityDates 固定成返回 {}，导致 what-if / reschedule
+// 的级联分支从未被真正执行（既有用例均为「单活动无依赖」退化场景）。现已把该 mock 改为
+// 默认透传真实实现（见上方 vi.mock('../utils/dependencyScheduler', ...)），级联可被正常
+// 测试。下面用例补齐 FS 链式级联的正向覆盖（与 bug #71 的多路径失败用例互补）。
+//
+// 注：offsetWorkdays 仍为文件级 mock（日历日偏移），故日期按日历日推算，确定性可复现。
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('级联正向覆盖（GLM QA coverage）', () => {
+  const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
+
+  it('what-if: 简单 FS 链 S→X→Y，顺延 S 时下游正确级联（非汇聚拓扑不应触发 #71 缺陷）', async () => {
+    const activities = [
+      { id: 'S', name: 'S', dependencies: null, planStartDate: d('2026-04-01'), planEndDate: d('2026-04-05'), planDuration: 5 },
+      { id: 'X', name: 'X', dependencies: [{ id: 'S', type: '0' }], planStartDate: d('2026-04-06'), planEndDate: d('2026-04-10'), planDuration: 5 },
+      { id: 'Y', name: 'Y', dependencies: [{ id: 'X', type: '0' }], planStartDate: d('2026-04-11'), planEndDate: d('2026-04-15'), planDuration: 5 },
+    ];
+    mockPrisma.activity.findMany.mockResolvedValue(activities);
+
+    // 顺延 S 3 天（日历日）：S → 04-04~04-08
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/what-if')
+      .send({ activityId: 'S', delayDays: 3 });
+
+    expect(res.status).toBe(200);
+    // X: S.end=04-08 → start=04-09；dur5 → end=04-13
+    // Y: X.end=04-13 → start=04-14；dur5 → end=04-18
+    const xEntry = (res.body.affected as Array<{ id: string; newEnd: string | null }>).find((a) => a.id === 'X');
+    const yEntry = (res.body.affected as Array<{ id: string; newEnd: string | null }>).find((a) => a.id === 'Y');
+    expect(xEntry).toBeDefined();
+    expect(yEntry).toBeDefined();
+    expect(xEntry!.newEnd).toBe('2026-04-13T00:00:00.000Z');
+    expect(yEntry!.newEnd).toBe('2026-04-18T00:00:00.000Z');
+    expect(res.body.affectedCount).toBe(3);
+  });
+
+  it('what-if: 负 delayDays 反向顺延（提前），FS 链同步前移', async () => {
+    const activities = [
+      { id: 'S', name: 'S', dependencies: null, planStartDate: d('2026-04-10'), planEndDate: d('2026-04-14'), planDuration: 5 },
+      { id: 'X', name: 'X', dependencies: [{ id: 'S', type: '0' }], planStartDate: d('2026-04-15'), planEndDate: d('2026-04-19'), planDuration: 5 },
+    ];
+    mockPrisma.activity.findMany.mockResolvedValue(activities);
+
+    // 提前 S 3 天：S → 04-07~04-11；X: S.end=04-11 → start=04-12，dur5 → end=04-16
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/what-if')
+      .send({ activityId: 'S', delayDays: -3 });
+
+    expect(res.status).toBe(200);
+    const sEntry = (res.body.affected as Array<{ id: string; newStart: string | null }>).find((a) => a.id === 'S');
+    const xEntry = (res.body.affected as Array<{ id: string; newEnd: string | null }>).find((a) => a.id === 'X');
+    expect(sEntry!.newStart).toBe('2026-04-07T00:00:00.000Z');
+    expect(xEntry!.newEnd).toBe('2026-04-16T00:00:00.000Z');
+  });
+
+  it('reschedule: 从 baseDate 起，FS 链 A→B→C 被拓扑级联重排（C 落到正确日期）', async () => {
+    const activities = [
+      { id: 'A', name: 'A', status: 'NOT_STARTED', dependencies: [], planStartDate: d('2026-01-01'), planEndDate: d('2026-01-03'), planDuration: 3, startDate: null, endDate: null, duration: null },
+      { id: 'B', name: 'B', status: 'NOT_STARTED', dependencies: [{ id: 'A', type: '0' }], planStartDate: d('2026-01-04'), planEndDate: d('2026-01-05'), planDuration: 2, startDate: null, endDate: null, duration: null },
+      { id: 'C', name: 'C', status: 'NOT_STARTED', dependencies: [{ id: 'B', type: '0' }], planStartDate: d('2026-01-06'), planEndDate: d('2026-01-07'), planDuration: 2, startDate: null, endDate: null, duration: null },
+    ];
+    mockPrisma.activity.findMany.mockResolvedValue(activities);
+    mockPrisma.activity.update.mockResolvedValue(activities[0]);
+    // 还原 $transaction 默认行为（既有用例可能把它改写为 mockResolvedValue）
+    mockPrisma.$transaction.mockImplementation((fn: unknown) =>
+      typeof fn === 'function' ? (fn as (c: typeof mockPrisma) => unknown)(mockPrisma) : Promise.all(fn as Promise<unknown>[]),
+    );
+
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/reschedule')
+      .send({ baseDate: '2026-04-01' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.updatedCount).toBe(3);
+    // A: start=04-01，end=offset(04-01,2)=04-03
+    // B: A.end=04-03 → start=offset(04-03,1)=04-04，dur2 → end=offset(04-04,1)=04-05
+    // C: B.end=04-05 → start=offset(04-05,1)=04-06 ← 验证链尾正确级联
+    const cUpdate = mockPrisma.activity.update.mock.calls.find((c) => c[0]?.where?.id === 'C');
+    expect(cUpdate).toBeDefined();
+    expect(cUpdate![0].data.planStartDate).toEqual(d('2026-04-06'));
+  });
+
+  it('reschedule: 已完成活动不参与重排（updatedCount 只计未完成）', async () => {
+    const activities = [
+      { id: 'A', name: 'A', status: 'COMPLETED', dependencies: [], planStartDate: d('2026-01-01'), planEndDate: d('2026-01-03'), planDuration: 3, startDate: null, endDate: null, duration: null },
+      { id: 'B', name: 'B', status: 'NOT_STARTED', dependencies: [{ id: 'A', type: '0' }], planStartDate: d('2026-01-04'), planEndDate: d('2026-01-05'), planDuration: 2, startDate: null, endDate: null, duration: null },
+    ];
+    mockPrisma.activity.findMany.mockResolvedValue(activities);
+    mockPrisma.activity.update.mockResolvedValue(activities[1]);
+
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/reschedule')
+      .send({ baseDate: '2026-04-01' });
+
+    expect(res.status).toBe(200);
+    // 仅 B（未完成）被重排；A 已完成不动。B 依赖 A（已完成，日期固定）→ B 由 A.end 驱动
+    expect(res.body.updatedCount).toBe(1);
+    const updatedIds = mockPrisma.activity.update.mock.calls.map((c) => c[0]?.where?.id);
+    expect(updatedIds).toContain('B');
+    expect(updatedIds).not.toContain('A');
   });
 });
