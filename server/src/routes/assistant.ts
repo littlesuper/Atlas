@@ -131,12 +131,14 @@ router.post(
       // 能力分支：命中某个 Capability（如 project.create）。新建类不需要 targetId，跳过项目定位。
       const capability = getCapability(domain);
       if (capability) {
+        const roles = await prisma.role.findMany({ select: { id: true, name: true } });
         const capCtx = {
           userId: req.user!.id,
           userName: req.user?.realName || req.user?.username || '我',
           permissions: req.user?.permissions || [],
           contextProjectId,
           projects: manageable,
+          roles,
         };
         const out = await capabilityPropose(domain, utterance, capCtx);
         switch (out.status) {
