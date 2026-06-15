@@ -1,27 +1,96 @@
 import { describe, it, expect } from 'vitest';
-import { computeSortOrder } from './helpers';
+import { planInsertSortOrder } from './helpers';
 
-// computeSortOrder 用 Math.floor((prev + next) / 2) 算插入位的 sortOrder。
-// 对「相邻整数」的稠密 sortOrder（seed/服务端默认 sortOrder||0 都会产出稠密/0 值），
-// floor 平均会塌缩到下界 → 新值与 prev 冲突，破坏排序。
+// planInsertSortOrder 是 computeSortOrder（floor 平均在稠密序列上塌缩到下界）的根治替代品。
+// 契约：
+//   planInsertSortOrder(activities: { id; sortOrder }[], atIndex)
+//     => { newSortOrder: number; reindex: { id; sortOrder }[] }
+//   STEP = 10。有空隙则取中点、不重排；稠密/0 值则把全部重排成 (i+1)*STEP 的等距序列。
+// 本文件为 test-first：函数尚未实现 → 下面所有用例应红（planInsertSortOrder 为 undefined）。
 
-describe('computeSortOrder (GLM QA bug repro #9)', () => {
-  it('相邻整数 sortOrder 之间插入，新值不得等于 prev 或 next（floor 平均会塌缩到下界）', () => {
-    // 现有 sortOrder 为相邻整数 [1,2,3]；在 index 1（1 和 2 之间）插入。
-    // 期望：新 sortOrder 严格大于 prev(1) 且严格小于 next(2)，保证不破坏排序。
-    // 现状：Math.floor((1+2)/2)=1 → 等于 prev，新活动与 sortOrder=1 的活动抢位 → 顺序错乱。
-    const activities = [{ sortOrder: 1 }, { sortOrder: 2 }, { sortOrder: 3 }];
-    const result = computeSortOrder(activities, 1);
-    expect(result).toBeGreaterThan(1);
-    expect(result).toBeLessThan(2);
+type Act = { id: string; sortOrder: number };
+type Plan = { newSortOrder: number; reindex: { id: string; sortOrder: number }[] };
+
+const sortById = (arr: { id: string; sortOrder: number }[]) =>
+  [...arr].sort((a, b) => a.id.localeCompare(b.id));
+
+describe('planInsertSortOrder (test-first, 应红)', () => {
+  it('有空隙不重排：[{a,10},{b,30}] @1 → newSortOrder=20, reindex=[]', () => {
+    const plan = planInsertSortOrder([{ id: 'a', sortOrder: 10 }, { id: 'b', sortOrder: 30 }], 1) as Plan;
+    expect(plan.newSortOrder).toBe(20);
+    expect(plan.reindex).toEqual([]);
   });
 
-  it('两端为 0 的退化情况：index 0 且首项 sortOrder=0 时，新值不得与首项冲突', () => {
-    // 服务端默认 sortOrder||0 → 实际数据里 sortOrder=0 很常见。
-    // activities[0].sortOrder=0；index 0：prev=0（atIndex>0? 否 → 0），next=activities[0].sortOrder=0。
-    // Math.floor((0+0)/2)=0 → 新值=0，与现有 sortOrder=0 的活动冲突。
-    const activities = [{ sortOrder: 0 }, { sortOrder: 10 }, { sortOrder: 20 }];
-    const result = computeSortOrder(activities, 0);
-    expect(result).toBeGreaterThan(0);
+  it('末尾追加：[{a,10}] @1 → newSortOrder=20, reindex=[]', () => {
+    const plan = planInsertSortOrder([{ id: 'a', sortOrder: 10 }], 1) as Plan;
+    expect(plan.newSortOrder).toBe(20);
+    expect(plan.reindex).toEqual([]);
+  });
+
+  it('开头有余量：[{a,40}] @0 → newSortOrder=20, reindex=[]', () => {
+    const plan = planInsertSortOrder([{ id: 'a', sortOrder: 40 }], 0) as Plan;
+    expect(plan.newSortOrder).toBe(20);
+    expect(plan.reindex).toEqual([]);
+  });
+
+  it('空列表：[] @0 → newSortOrder=10, reindex=[]', () => {
+    const plan = planInsertSortOrder([], 0) as Plan;
+    expect(plan.newSortOrder).toBe(10);
+    expect(plan.reindex).toEqual([]);
+  });
+
+  it('稠密重排（核心）：[{a,1},{b,2},{c,3}] @1 → newSortOrder=20，reindex 使 a/b/c=10/30/40', () => {
+    const plan = planInsertSortOrder(
+      [{ id: 'a', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }],
+      1,
+    ) as Plan;
+    expect(plan.newSortOrder).toBe(20);
+    // 最终顺序 a, 新(20), b, c → a=10, b=30, c=40
+    expect(sortById(plan.reindex)).toEqual(
+      sortById([{ id: 'a', sortOrder: 10 }, { id: 'b', sortOrder: 30 }, { id: 'c', sortOrder: 40 }]),
+    );
+  });
+
+  it('0 值开头重排：[{a,0},{b,10},{c,20}] @0 → newSortOrder=10，reindex 使 a/b/c=20/30/40', () => {
+    const plan = planInsertSortOrder(
+      [{ id: 'a', sortOrder: 0 }, { id: 'b', sortOrder: 10 }, { id: 'c', sortOrder: 20 }],
+      0,
+    ) as Plan;
+    expect(plan.newSortOrder).toBe(10);
+    // 最终顺序 新(10), a, b, c → a=20, b=30, c=40
+    expect(sortById(plan.reindex)).toEqual(
+      sortById([{ id: 'a', sortOrder: 20 }, { id: 'b', sortOrder: 30 }, { id: 'c', sortOrder: 40 }]),
+    );
+  });
+
+  it('通用不变量：newSortOrder 与所有最终 sortOrder 互不相同、均为正整数、保持原相对顺序', () => {
+    // 把 plan 应用回去得到最终序列（含占位新活动 __NEW__），校验唯一/正/保序
+    const applyPlan = (acts: Act[], atIndex: number, plan: Plan) => {
+      const seq = [...acts];
+      seq.splice(atIndex, 0, { id: '__NEW__', sortOrder: plan.newSortOrder });
+      const m = new Map(plan.reindex.map((r) => [r.id, r.sortOrder]));
+      return seq.map((a) => ({ id: a.id, sortOrder: m.get(a.id) ?? a.sortOrder }));
+    };
+
+    const cases: Array<{ acts: Act[]; atIndex: number }> = [
+      { acts: [{ id: 'a', sortOrder: 10 }, { id: 'b', sortOrder: 30 }], atIndex: 1 },
+      { acts: [{ id: 'a', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }], atIndex: 1 },
+      { acts: [{ id: 'a', sortOrder: 0 }, { id: 'b', sortOrder: 10 }, { id: 'c', sortOrder: 20 }], atIndex: 0 },
+    ];
+
+    for (const { acts, atIndex } of cases) {
+      const plan = planInsertSortOrder(acts, atIndex) as Plan;
+      const final = applyPlan(acts, atIndex, plan);
+
+      // 均为正整数
+      expect(final.every((x) => Number.isInteger(x.sortOrder) && x.sortOrder > 0)).toBe(true);
+      // 互不相同
+      const orders = final.map((x) => x.sortOrder);
+      expect(new Set(orders).size).toBe(orders.length);
+      // 按 sortOrder 升序后，去掉 __NEW__，其余保持原相对顺序
+      const ordered = [...final].sort((a, b) => a.sortOrder - b.sortOrder);
+      const withoutNew = ordered.filter((x) => x.id !== '__NEW__').map((x) => x.id);
+      expect(withoutNew).toEqual(acts.map((a) => a.id));
+    }
   });
 });
