@@ -192,8 +192,9 @@ export async function capabilityApply(
 ): Promise<{ rows: AssistantDiffRow[]; risks: AssistantRisk[] }> {
   const cached = proposalStore.get(proposalId);
   if (!cached || !cached.capabilityName) throw new ProposalNotFoundError();
-  // 归属：仅发起者本人可应用（拦截代他人应用 / 重放他人 proposalId）
-  if (cached.userId && cached.userId !== ctx.userId) throw new CapabilityForbiddenError();
+  // 归属：仅发起者本人可应用（拦截代他人应用 / 重放他人 proposalId）。
+  // 不用 `cached.userId &&` 短路——userId 缺失即视为归属不明、一律拒绝（旧 adapter 已删，正常提议必带 userId）。
+  if (cached.userId !== ctx.userId) throw new CapabilityForbiddenError();
   const cap = getCapability(cached.capabilityName);
   if (!cap) throw new UnknownDomainError(cached.capabilityName);
   // 权限：能力边界 = 用户权限边界（apply 再核一次，防分类层被绕过）

@@ -265,4 +265,26 @@ describe('capabilityApply · 归属/权限', () => {
     const noPerm = { ...ctx, permissions: [] };
     await expect(capabilityApply(r.proposalId, noPerm, {} as never)).rejects.toBeInstanceOf(CapabilityForbiddenError);
   });
+
+  // ── BUG: cached.userId 为 falsy 时归属校验被跳过 ──
+  it('BUG: 提议缺 userId 时归属校验被跳过（任意用户可应用）', async () => {
+    // 直接写入一条 userId=undefined 的提议（模拟遗留数据 / ctx.userId 丢失）
+    proposalStore.set('orphan-prop', {
+      domain: 'capability',
+      targetId: '__new__',
+      userId: undefined, // ← 漏洞触发条件
+      capabilityName: 'project.create',
+      args: { name: 'x', productLine: 'x', managerId: 'u1', status: 'IN_PROGRESS', priority: 'MEDIUM' },
+      rawUtterance: 'x',
+      intent: null,
+      fingerprint: 'abc',
+      createdAt: Date.now(),
+    });
+    // 阻止 execute 真正落库
+    const spy = vi.spyOn(projectCreateCapability, 'execute').mockResolvedValue({ rows: [], risks: [] });
+    // 攻击者（非发起者）尝试应用 —— 应被 CapabilityForbiddenError 拦截
+    const attacker: CapabilityContext = { userId: 'attacker', userName: '攻击者', permissions: ['project:create'], projects: [] };
+    await expect(capabilityApply('orphan-prop', attacker, {} as never)).rejects.toBeInstanceOf(CapabilityForbiddenError);
+    spy.mockRestore();
+  });
 });

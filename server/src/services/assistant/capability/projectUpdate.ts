@@ -9,11 +9,12 @@ import {
   type ProjectOperation,
 } from '../../../schemas/projectAssistant';
 import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types';
-import { genericNarrateUserPrompt } from './orchestrator';
+import { genericNarrateUserPrompt, CapabilityForbiddenError } from './orchestrator';
+import { canManageProject } from '../../../middleware/permission';
 import type { Capability, CapabilityContext } from './types';
 import { CapabilityValidationError } from '../errors';
 
-interface ProjectFields { name: string; status: string; priority: string; startDate: Date | null; endDate: Date | null; }
+interface ProjectFields { name: string; status: string; priority: string; startDate: Date | null; endDate: Date | null; managerId: string; }
 
 const STATUS_LABEL: Record<string, string> = { IN_PROGRESS: '进行中', COMPLETED: '已完成', ON_HOLD: '已暂停', ARCHIVED: '已归档' };
 const PRIORITY_LABEL: Record<string, string> = { LOW: '低', MEDIUM: '中', HIGH: '高', CRITICAL: '紧急' };
@@ -38,7 +39,7 @@ function resolveDates(intent: ProjectChangeIntent, p: ProjectFields): { start: D
   return { start, end };
 }
 function fp(p: ProjectFields): string {
-  return crypto.createHash('sha256').update([p.name, p.status, p.priority, iso(p.startDate), iso(p.endDate)].join('|')).digest('hex').slice(0, 16);
+  return crypto.createHash('sha256').update([p.name, p.status, p.priority, iso(p.startDate), iso(p.endDate), p.managerId].join('|')).digest('hex').slice(0, 16);
 }
 
 export const projectUpdateCapability: Capability<ProjectChangeIntent> = {
@@ -50,10 +51,10 @@ export const projectUpdateCapability: Capability<ProjectChangeIntent> = {
   inputSchema: z.any() as unknown as z.ZodType<ProjectChangeIntent>,
 
   async loadEntity(id) {
-    const project = await prisma.project.findUnique({ where: { id }, select: { id: true, name: true, status: true, priority: true, startDate: true, endDate: true } });
+    const project = await prisma.project.findUnique({ where: { id }, select: { id: true, name: true, status: true, priority: true, startDate: true, endDate: true, managerId: true } });
     if (!project) return null;
     if (project.status === 'ARCHIVED') return null; // 归档不可编辑 → target_not_found
-    const fields: ProjectFields = { name: project.name, status: project.status, priority: project.priority, startDate: project.startDate, endDate: project.endDate };
+    const fields: ProjectFields = { name: project.name, status: project.status, priority: project.priority, startDate: project.startDate, endDate: project.endDate, managerId: project.managerId };
     return { id, fingerprint: fp(fields), fields: fields as unknown as Record<string, unknown> };
   },
   fingerprint: (e) => e?.fingerprint ?? '',
@@ -98,8 +99,10 @@ export const projectUpdateCapability: Capability<ProjectChangeIntent> = {
 
   narrate: (preview) => genericNarrateUserPrompt(preview),
 
-  async execute(intent, _ctx: CapabilityContext, _req: Request, target) {
+  async execute(intent, _ctx: CapabilityContext, req: Request, target) {
     const p = target!.entity.fields as unknown as ProjectFields;
+    // 走现有校验路径：仅管理员/项目经理/协作者可改（与 PUT /api/projects/:id 的 canManageProject 门控一致）
+    if (!canManageProject(req, p.managerId, target!.id)) throw new CapabilityForbiddenError('只能修改自己负责的项目');
     const { start, end } = resolveDates(intent, p);
     if (start && end && !isValidDateRange(iso(start), iso(end))) throw new CapabilityValidationError('结束日期不能早于开始日期');
     const data: Record<string, unknown> = {};

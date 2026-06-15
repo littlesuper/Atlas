@@ -149,5 +149,22 @@ describe('riskUpdateCapability', () => {
       await riskUpdateCapability.execute(intent, {} as never, makeReq(), { id: 'p1', entity: makeEntity() });
       expect(mockPrisma.riskItem.update).not.toHaveBeenCalled();
     });
+
+    // ── BUG: 审计日志在 DB 更新前写入（失败时产生孤儿日志）──
+    it('BUG: update_risk 在 DB 更新失败时不应已写审计日志', async () => {
+      mockPrisma.riskItem.update.mockRejectedValueOnce(new Error('DB connection lost'));
+      const intent: RiskChangeIntent = {
+        operations: [{ type: 'update_risk', riskItemId: 'r1', severity: 'CRITICAL' }],
+        confidence: 'high',
+        unresolved: [],
+      };
+      // execute 应因 update 失败而抛错
+      await expect(
+        riskUpdateCapability.execute(intent, {} as never, makeReq(), { id: 'p1', entity: makeEntity() })
+      ).rejects.toThrow();
+      // 正确行为：更新失败时审计日志不应被写入
+      // 当前代码在 riskItem.update 之前就调了 riskItemLog.create → 此断言失败
+      expect(mockPrisma.riskItemLog.create).not.toHaveBeenCalled();
+    });
   });
 });

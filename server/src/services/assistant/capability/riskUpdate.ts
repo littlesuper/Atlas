@@ -96,18 +96,25 @@ export const riskUpdateCapability: Capability<RiskChangeIntent> = {
         const existing = byId.get(op.riskItemId);
         if (!existing) continue;
         const data: Record<string, unknown> = {};
+        const logs: { action: string; content: string }[] = [];
         if (op.severity && op.severity !== existing.severity) {
           data.severity = op.severity;
-          await prisma.riskItemLog.create({ data: { riskItemId: op.riskItemId, action: 'SEVERITY_CHANGED', content: `严重度从 ${existing.severity} 变更为 ${op.severity}`, userId } });
+          logs.push({ action: 'SEVERITY_CHANGED', content: `严重度从 ${existing.severity} 变更为 ${op.severity}` });
           rows.push({ key: `${op.riskItemId}:severity`, label: `「${existing.title}」严重度`, before: SEVERITY_LABEL[existing.severity] ?? existing.severity, after: SEVERITY_LABEL[op.severity] });
         }
         if (op.status && op.status !== existing.status) {
           data.status = op.status;
           if (op.status === 'RESOLVED') data.resolvedAt = new Date();
-          await prisma.riskItemLog.create({ data: { riskItemId: op.riskItemId, action: 'STATUS_CHANGED', content: `状态从 ${existing.status} 变更为 ${op.status}`, userId } });
+          logs.push({ action: 'STATUS_CHANGED', content: `状态从 ${existing.status} 变更为 ${op.status}` });
           rows.push({ key: `${op.riskItemId}:status`, label: `「${existing.title}」状态`, before: STATUS_LABEL[existing.status] ?? existing.status, after: STATUS_LABEL[op.status] });
         }
-        if (Object.keys(data).length > 0) await prisma.riskItem.update({ where: { id: op.riskItemId }, data });
+        if (Object.keys(data).length > 0) {
+          // 先写库、成功后再补审计日志——避免更新失败留下「已变更」孤儿日志
+          await prisma.riskItem.update({ where: { id: op.riskItemId }, data });
+          for (const l of logs) {
+            await prisma.riskItemLog.create({ data: { riskItemId: op.riskItemId, action: l.action, content: l.content, userId } });
+          }
+        }
       }
     }
     return { rows, risks: [] };
