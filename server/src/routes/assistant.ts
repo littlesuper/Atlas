@@ -33,6 +33,8 @@ import { classifyDomain } from '../services/assistant/domainClassifier';
 import { runAsk } from '../services/assistant/query/askService';
 import { DependencyCycleError } from '../services/scheduleAssistant';
 import { ProjectValidationError } from '../services/assistant/adapters/projectAdapter';
+import { ActivityCreateError } from './activities/shared';
+import { ActivityCapabilityError } from '../services/assistant/capability/activityCreate';
 
 // 只读问答伪领域（无写适配器）：分类器据此把"提问"与"改动"区分开
 const QUERY_DOMAIN = {
@@ -284,6 +286,15 @@ router.post(
       }
       if (error instanceof ProjectValidationError) {
         res.status(400).json({ error: 'VALIDATION_ERROR', message: error.message });
+        return;
+      }
+      if (error instanceof ActivityCreateError) {
+        if (error.code === 'PROJECT_ARCHIVED') { res.status(403).json({ error: '归档项目不可修改' }); return; }
+        res.status(403).json({ error: '只能在自己负责的项目中创建活动' });
+        return;
+      }
+      if (error instanceof ActivityCapabilityError) {
+        res.status(404).json({ error: '项目不存在' });
         return;
       }
       if (error instanceof UnknownDomainError) {

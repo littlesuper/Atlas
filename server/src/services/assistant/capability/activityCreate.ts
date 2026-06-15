@@ -115,15 +115,26 @@ export const activityCreateCapability: Capability<ActivityCreateInput> = {
       req
     );
 
+    // 角色名以 DB 为准（apply 路径的 ctx 不带 roles，且 execute 应信库不信 ctx/LLM）
+    const role = input.roleId
+      ? await prisma.role.findUnique({ where: { id: input.roleId }, select: { name: true } })
+      : null;
     const executorCount = (activity as { executors?: unknown[] }).executors?.length ?? 0;
+
+    // diff 与预览字段集对齐：name/项目/类型/优先级/状态恒列，日期/阶段/描述按需列
     const rows: AssistantDiffRow[] = [
       { key: 'name', label: '活动名称', before: '（空）', after: input.name! },
       { key: 'project', label: '项目', before: '（空）', after: project.name },
       { key: 'type', label: '类型', before: '（空）', after: TYPE_LABEL[input.type ?? 'TASK'] },
       { key: 'priority', label: '优先级', before: '（空）', after: PRIORITY_LABEL[input.priority ?? 'MEDIUM'] },
+      { key: 'status', label: '状态', before: '（空）', after: STATUS_LABEL[input.status ?? 'NOT_STARTED'] },
     ];
+    if (input.planStartDate) rows.push({ key: 'planStartDate', label: '计划开始', before: '（空）', after: input.planStartDate });
+    if (input.planEndDate) rows.push({ key: 'planEndDate', label: '计划结束', before: '（空）', after: input.planEndDate });
+    if (input.phase) rows.push({ key: 'phase', label: '阶段', before: '（空）', after: input.phase });
+    if (input.description) rows.push({ key: 'description', label: '描述', before: '（空）', after: input.description });
     if (input.roleId) {
-      const roleName = (_ctx.roles ?? []).find((r) => r.id === input.roleId)?.name ?? input.roleId;
+      const roleName = role?.name ?? input.roleId;
       rows.push({ key: 'executors', label: '执行人', before: '（空）', after: `按角色「${roleName}」自动填入 ${executorCount} 人` });
     }
     return { rows, risks: [] };
