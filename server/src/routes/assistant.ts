@@ -16,6 +16,10 @@ import prisma from '../db';
 import { assistantProposeSchema, assistantApplySchema } from '../schemas/assistant';
 import { getAdapter, listAdapters } from '../services/assistant/registry';
 import '../services/assistant/bootstrap'; // 触发适配器注册
+import '../services/assistant/capability/bootstrap'; // 触发能力注册
+import { listCapabilitiesForUser, getCapability } from '../services/assistant/capability/registry';
+import { capabilityPropose, capabilityApply } from '../services/assistant/capability/orchestrator';
+import { proposalStore } from '../services/assistant/proposalStore';
 import {
   runPropose,
   runApply,
@@ -68,8 +72,13 @@ router.post(
         contextProjectId?: string | null;
       };
 
-      // 领域分类：先判断是"提问(只读)"还是某个"改动"领域（排期/项目字段/风险项）
-      const domainOptions = [...listAdapters().map((a) => ({ key: a.domain, description: a.description })), QUERY_DOMAIN];
+      // 领域分类：先判断是"提问(只读)"还是某个"改动"领域（排期/项目字段/风险项/能力）
+      const userCaps = listCapabilitiesForUser(req.user?.permissions || []);
+      const domainOptions = [
+        ...listAdapters().map((a) => ({ key: a.domain, description: a.description })),
+        ...userCaps.map((c) => ({ key: c.name, description: c.description })),
+        QUERY_DOMAIN,
+      ];
       const classified = await classifyDomain({ utterance, domains: domainOptions });
       if (classified.status === 'ai_unavailable') {
         res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
@@ -117,6 +126,39 @@ router.post(
           narrative: ask.answer,
         });
         return;
+      }
+
+      // 能力分支：命中某个 Capability（如 project.create）。新建类不需要 targetId，跳过项目定位。
+      const capability = getCapability(domain);
+      if (capability) {
+        const capCtx = {
+          userId: req.user!.id,
+          userName: req.user?.realName || req.user?.username || '我',
+          permissions: req.user?.permissions || [],
+          contextProjectId,
+          projects: manageable,
+        };
+        const out = await capabilityPropose(domain, utterance, capCtx);
+        switch (out.status) {
+          case 'ai_unavailable':
+            res.status(503).json({ error: 'AI_UNAVAILABLE', message: 'AI 助手暂不可用，请手动操作' });
+            return;
+          case 'unknown_capability':
+            res.status(400).json({ error: 'UNKNOWN_DOMAIN', message: `未知能力：${domain}` });
+            return;
+          case 'need_input':
+            reply({ proposalId: null, noOp: true, mode: 'need_input', missing: out.missing, preview: { rows: [], risks: [] }, narrative: `还需要补充：${out.missing.join('、')}` });
+            return;
+          case 'not_understood':
+            reply({ proposalId: null, noOp: true, preview: { rows: [], risks: [] }, narrative: '没听懂这句话，请换个更明确的说法。' });
+            return;
+          case 'noop':
+            reply({ proposalId: null, noOp: true, preview: { rows: [], risks: [] }, narrative: '没有可执行的改动。' });
+            return;
+          case 'ok':
+            reply({ proposalId: out.proposalId, noOp: false, domain, preview: out.preview, narrative: out.narrative });
+            return;
+        }
       }
 
       // 写领域：权限校验（廉价，先做）→ LLM 定位目标项目
@@ -194,7 +236,20 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { proposalId } = req.body as { proposalId: string };
-      const result = await runApply(proposalId, req);
+      const cached = proposalStore.get(proposalId);
+      let result;
+      if (cached?.capabilityName) {
+        const capCtx = {
+          userId: req.user!.id,
+          userName: req.user?.realName || req.user?.username || '我',
+          permissions: req.user?.permissions || [],
+          contextProjectId: null,
+          projects: [],
+        };
+        result = await capabilityApply(proposalId, capCtx, req);
+      } else {
+        result = await runApply(proposalId, req);
+      }
       res.json({ ok: true, appliedDiff: { rows: result.rows }, risks: result.risks });
     } catch (error) {
       if (error instanceof ProposalNotFoundError) {
