@@ -100,5 +100,14 @@ Received: "2026-04-13T00:00:00.000Z"
 
 ## 修复验证（Claude 修完后由 GLM 勾）
 
-- [ ] 同一测试已转绿，且测试本身未被修改
-- 验证命令输出：<PASS 片段>
+- [x] 同一测试已转绿，且测试本身未被修改
+- 验证命令输出（2026-06-15 复测，Claude 修复提交 `1ada052b`）：
+
+```
+cd server && npx vitest run src/routes/activities.test.ts
+ Test Files  1 passed (1)
+      Tests  90 passed (90)
+```
+
+- 反作弊：`git diff 4a973489..HEAD -- server/src/routes/activities.test.ts` 为空（复现测试零改动，含其 `vi.importActual` 注入）；Claude 提交 `1ada052b` 仅改动 `server/src/routes/activities/schedule.ts`（源码，无任何 `.test` 文件）。✅ 已 `gh pr ready`。
+- 注：Claude 选择就地修复 what-if 的 BFS（传播到不动点 + affected 去重），未改为复用 `computeProjectScheduleCascade`——可接受，测试全绿；两处算法仍各自独立，后续可考虑统一以杜绝再次分叉。
