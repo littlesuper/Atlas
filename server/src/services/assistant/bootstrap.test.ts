@@ -7,11 +7,13 @@ import './bootstrap'; // 触发注册
 import { listDomains, getAdapter } from './registry';
 
 describe('assistant bootstrap', () => {
-  it('registers risk adapter (schedule + project migrated to capability layer)', () => {
+  it('has no remaining adapters (all migrated to capability layer)', () => {
     const domains = listDomains();
-    // schedule migrated to schedule.update capability in Task 2
-    // project migrated to project.update capability in Task 3
-    expect(domains).toContain('risk');
+    // schedule → schedule.update (Task 2)
+    // project → project.update (Task 3)
+    // risk → risk.update (Task 4)
+    // This whole bootstrap.ts will be deleted in Task 5
+    expect(domains).toHaveLength(0);
   });
 
   it('every registered adapter declares domain/description/permission (classifier+route depend on it)', () => {

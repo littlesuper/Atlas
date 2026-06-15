@@ -4,14 +4,14 @@
  * 在此集中注册所有领域适配器。被 routes/assistant.ts 与 server/src/index.ts 导入一次即可。
  * registerAdapter 按 domain 覆盖，幂等。
  */
-import { registerAdapter } from './registry';
-import { riskAdapter } from './adapters/riskAdapter';
+// All adapters have been migrated to the capability layer.
+// This file is kept as an empty shell until Task 5 deletes it entirely.
 
 let registered = false;
 
 export function registerAllAdapters(): void {
   if (registered) return;
-  registerAdapter(riskAdapter);
+  // No adapters remain; all domains now registered via capability/bootstrap.ts
   registered = true;
 }
 
