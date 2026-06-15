@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import request from 'supertest';
 import express, { NextFunction, Request, Response } from 'express';
 import type { Prisma, PrismaClient } from '../generated/prisma/client';
+import { resolveActivityDates } from '../utils/dependencyScheduler';
+import { offsetWorkdays, calculateWorkdays } from '../utils/workday';
 
 type ExecutorCreateInput = { source?: string };
 
@@ -1726,5 +1728,81 @@ describe('DELETE /api/activities/:id - permission edge case', () => {
     const res = await request(app).delete('/api/activities/act-1');
 
     expect(res.status).toBe(500);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POST /api/activities/project/:projectId/what-if — 多路径汇聚级联（GLM QA bug repro #2）
+//
+// 与 computeProjectScheduleCascade（bug #70）同源的 visited-BFS 缺陷，但这里是
+// what-if 端点内联的独立副本（schedule.ts:309-358），修 #70 不会修到这里。
+// 注意：文件级 mock 把 resolveActivityDates 固定成返回 {}，完全屏蔽了级联——
+// 既有 what-if 用例因此只测了「单活动无依赖」的退化场景，从未真正触发级联。
+// 本用例临时注入真实实现以真正触发级联，并在 afterEach 还原默认 mock 行为。
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('POST /api/activities/project/:projectId/what-if — 多路径汇聚级联（GLM QA bug repro #2）', () => {
+  // 真实实现，用于绕过文件级 mock（在 beforeAll 里异步加载）
+  let realResolveActivityDates: typeof resolveActivityDates;
+  let realOffsetWorkdays: typeof offsetWorkdays;
+  let realCalculateWorkdays: typeof calculateWorkdays;
+
+  beforeAll(async () => {
+    const actualSched = await vi.importActual<typeof import('../utils/dependencyScheduler')>(
+      '../utils/dependencyScheduler',
+    );
+    const actualWd = await vi.importActual<typeof import('../utils/workday')>('../utils/workday');
+    realResolveActivityDates = actualSched.resolveActivityDates;
+    realOffsetWorkdays = actualWd.offsetWorkdays;
+    realCalculateWorkdays = actualWd.calculateWorkdays;
+  });
+
+  beforeEach(() => {
+    // 让 what-if 端点真正跑级联算法（而非被 {} mock 屏蔽）
+    vi.mocked(resolveActivityDates).mockImplementation(realResolveActivityDates);
+    vi.mocked(offsetWorkdays).mockImplementation(realOffsetWorkdays);
+    vi.mocked(calculateWorkdays).mockImplementation(realCalculateWorkdays);
+  });
+
+  afterEach(() => {
+    // 还原文件级默认 mock，避免影响其它用例
+    vi.mocked(resolveActivityDates).mockReturnValue({});
+    vi.mocked(offsetWorkdays).mockImplementation((base: Date, offsetDays: number) => {
+      const r = new Date(base);
+      r.setDate(r.getDate() + offsetDays);
+      return r;
+    });
+    vi.mocked(calculateWorkdays).mockReturnValue(5);
+  });
+
+  it('单个 seed 经两条不等长路径汇聚到 X 时，下游 Y 不应残留中间值（FS 依赖被违反）', async () => {
+    const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
+    // 拓扑（全 FS，工期 5）：S→A→X，S→B→C→X，X→Y
+    const activities = [
+      { id: 'S', name: 'S', dependencies: null, planStartDate: d('2026-03-02'), planEndDate: d('2026-03-06'), planDuration: 5 },
+      { id: 'A', name: 'A', dependencies: [{ id: 'S', type: '0' }], planStartDate: d('2026-03-09'), planEndDate: d('2026-03-13'), planDuration: 5 },
+      { id: 'B', name: 'B', dependencies: [{ id: 'S', type: '0' }], planStartDate: d('2026-03-09'), planEndDate: d('2026-03-13'), planDuration: 5 },
+      { id: 'C', name: 'C', dependencies: [{ id: 'B', type: '0' }], planStartDate: d('2026-03-16'), planEndDate: d('2026-03-20'), planDuration: 5 },
+      { id: 'X', name: 'X', dependencies: [{ id: 'A', type: '0' }, { id: 'C', type: '0' }], planStartDate: d('2026-03-23'), planEndDate: d('2026-03-27'), planDuration: 5 },
+      { id: 'Y', name: 'Y', dependencies: [{ id: 'X', type: '0' }], planStartDate: d('2026-03-30'), planEndDate: d('2026-04-03'), planDuration: 5 },
+    ];
+    mockPrisma.activity.findMany.mockResolvedValue(activities);
+
+    // 把 S 顺延 10 个工作日（= S 新区间 03-16~03-20），触发两条不等长路径的级联
+    const res = await request(app)
+      .post('/api/activities/project/proj-1/what-if')
+      .send({ activityId: 'S', delayDays: 10 });
+
+    expect(res.status).toBe(200);
+    const yEntry = (res.body.affected as Array<{ id: string; newEnd: string | null }>).find(
+      (a) => a.id === 'Y',
+    );
+    expect(yEntry).toBeDefined();
+    // 期望（正确）：X 最终由较晚路径 C 驱动 → X.end=04-13（清明 04-04~06 跳过）；
+    //   Y 依赖 X(FS) → Y.start=04-14、Y.end=04-20。
+    // 实际（bug）：X 被较短路径 A 率先更新时即被弹出并据中间值算出 Y；随后较长路径 C
+    //   把 X 更新到最终值，但 X 已被 visited 标记、不再重算下游 → Y 残留中间值
+    //   newEnd≈04-13（Y 在其 FS 前置 X 完成前就结束——FS 依赖被违反）。
+    expect(yEntry!.newEnd).toBe('2026-04-20T00:00:00.000Z');
   });
 });
