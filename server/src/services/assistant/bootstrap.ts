@@ -5,14 +5,12 @@
  * registerAdapter 按 domain 覆盖，幂等。
  */
 import { registerAdapter } from './registry';
-import { projectAdapter } from './adapters/projectAdapter';
 import { riskAdapter } from './adapters/riskAdapter';
 
 let registered = false;
 
 export function registerAllAdapters(): void {
   if (registered) return;
-  registerAdapter(projectAdapter);
   registerAdapter(riskAdapter);
   registered = true;
 }
