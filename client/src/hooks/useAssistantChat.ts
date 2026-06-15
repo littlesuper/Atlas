@@ -10,6 +10,9 @@ const toAssistantDraft = (r: AssistantProposeResult): AssistantDraft => {
   if (r.answer) {
     return { role: 'assistant', kind: 'answer', answer: r.answer, basis: r.basis, elapsedMs: r.elapsedMs };
   }
+  if (r.mode === 'need_input') {
+    return { role: 'assistant', kind: 'status', variant: 'need_input', text: r.narrative || `还需要补充：${(r.missing ?? []).join('、')}` };
+  }
   const rows = r.preview?.rows ?? [];
   if (r.proposalId && rows.length > 0) {
     return {
