@@ -96,7 +96,7 @@ export async function capabilityPropose(
   }
 
   // LLM 边缘：填参；续填轮追加「已知字段」块，让 LLM 只补增量
-  const prompt = cap.buildPrompt(utterance, ctx);
+  const prompt = cap.buildPrompt(utterance, ctx, entity);
   let userPrompt = prompt.user;
   if (priorArgs && Object.keys(priorArgs).length > 0) {
     userPrompt += `\n\n## 已确认字段（无需重复；只补未提供或用户明确纠正的字段）\n${JSON.stringify(priorArgs)}`;

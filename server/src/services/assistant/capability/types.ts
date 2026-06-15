@@ -34,7 +34,7 @@ export interface Capability<TInput = Record<string, unknown>> {
   /** 全字段可选 + 枚举约束：用于 parse 阶段拦类型/枚举；业务必填交给 missingRequired */
   inputSchema: z.ZodType<TInput>;
   /** 填参 prompt（含字段说明 + 「绝不编造未陈述值」铁律） */
-  buildPrompt(utterance: string, ctx: CapabilityContext): { system: string; user: string };
+  buildPrompt(utterance: string, ctx: CapabilityContext, entity?: EntitySnapshot): { system: string; user: string };
   /** 缺失必填字段的中文名清单；不提供则视为无缺失 */
   missingRequired?(input: TInput, ctx: CapabilityContext): string[];
   /** 在 missingRequired 通过后补默认值（如 managerId=当前用户），返回用于预览/写入的完整 input */
