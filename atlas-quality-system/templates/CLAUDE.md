@@ -1,3 +1,9 @@
+> ⚠️ **这是「质量方法论包」自带的通用占位模板，不是本项目的真实规范。**
+> 文中技术栈为示例占位（如 React 18 / NestJS / PostgreSQL），**与 Atlas 实际不符**（实际为 React 19 / Express / Prisma + SQLite）。
+> 项目真实规范以仓库根的 [`CLAUDE.md`](../../CLAUDE.md) ＝ `AGENTS.md` 为准。本文件仅作为「把模板复制到新项目根目录」的起点。
+
+---
+
 # Atlas 项目规范(CLAUDE.md)
 
 > **重要:每次让Claude生成或修改代码时,必须把本文件完整内容贴入对话开头。**

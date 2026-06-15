@@ -62,6 +62,14 @@ const sections: KnowledgeIndexSection[] = [
       { title: '月度质量审计清单', path: 'atlas-quality-system/checklists/月度质量审计清单.md', audience: 'guardian' },
     ],
   },
+  {
+    name: '交接与持续执行',
+    items: [
+      { title: 'GLM 继续执行交接', path: 'atlas-quality-system/docs/38-GLM继续执行交接.md', audience: 'guardian' },
+      { title: '进度看板自检故障速查', path: 'atlas-quality-system/docs/39-进度看板自检故障速查.md', audience: 'guardian', command: 'npm run quality:progress-guard --workspace=server' },
+      { title: 'P2 团队执行包', path: 'atlas-quality-system/docs/40-P2团队执行包.md', audience: 'pm' },
+    ],
+  },
 ];
 
 const requiredPaths = [

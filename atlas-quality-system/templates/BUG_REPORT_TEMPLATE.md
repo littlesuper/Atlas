@@ -1,5 +1,9 @@
 # Bug 报告模板
 
+> ℹ️ 本模板属「质量方法论包」（`atlas-quality-system/`）。日常报缺陷请优先用：
+> GitHub Issue 表单 [`.github/ISSUE_TEMPLATE/bug_report.md`](../../.github/ISSUE_TEMPLATE/bug_report.md)；
+> GLM-QA 闭环用 [`docs/qa/bugs/_TEMPLATE.md`](../../docs/qa/bugs/_TEMPLATE.md)。归档规范见 [`docs/README.md`](../../docs/README.md)。
+
 > 使用说明:
 > 1. 复制本模板,在GitHub Issues或团队Wiki创建
 > 2. 填写所有"必填"项
@@ -273,4 +277,4 @@ Why5: 为什么会被遗漏?
 - P0/P1必填:12, 13
 - 其他酌情填写
 
-填写示例参见: `docs/examples/bug-report-example.md`
+（本模板各章节已含填写示例，无独立示例文件。）

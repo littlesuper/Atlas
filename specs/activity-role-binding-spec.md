@@ -549,7 +549,7 @@ interface ActivityFormState {
 
 ### 5.3 活动列表内联编辑
 
-延续现有 `activity-list-inline-edit.md` 的"单例编辑"约束：
+延续现有 `docs/specs/activity-inline-edit/00-requirements.md`（原 `activity-list-inline-edit.md`）的"单例编辑"约束：
 
 | 单元格 | 单击行为 |
 |---|---|
@@ -1287,7 +1287,7 @@ systemctl start atlas
 
 | 文档 | 交叉点 |
 |---|---|
-| `activity-list-inline-edit.md` | 内联编辑约束（单例 + 依赖锁定）|
+| `docs/specs/activity-inline-edit/00-requirements.md` | 内联编辑约束（单例 + 依赖锁定）|
 | `permission-spec.md` | role 资源的权限定义 |
 | `auth-spec.md` | 认证缓存机制 |
 | `risk-spec.md`（如存在）| 风险规则中的"无负责人活动"加分项 |

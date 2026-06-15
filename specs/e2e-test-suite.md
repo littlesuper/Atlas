@@ -1,5 +1,7 @@
 # Atlas E2E 测试用例集（完整版）
 
+> ℹ️ **测试用例当前权威源：[docs/qa/test-plan.md](../docs/qa/test-plan.md)**（380+ 用例 / 16 模块，随回归更新）。本文件为历史快照（48 文件 / 254 用例，且 Arco 已迁移至 shadcn/ui），可能与现状不一致；归档规范见 [docs/README.md](../docs/README.md)。
+
 > 基于 Playwright + Arco Design 的端到端测试套件
 > 共 **48 个测试文件**，**254 个测试用例**（全部通过）
 
