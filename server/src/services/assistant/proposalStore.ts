@@ -15,6 +15,9 @@ export interface StoredProposal<TIntent = unknown> {
   intent: TIntent;
   fingerprint: string;
   createdAt: number;
+  /** capability 提议专用：有此字段则 apply 走 capabilityApply */
+  capabilityName?: string;
+  args?: unknown;
   applied?: { at: number; rows: AssistantDiffRow[]; risks: AssistantRisk[] };
 }
 

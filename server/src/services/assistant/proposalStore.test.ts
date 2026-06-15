@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ProposalStore, PROPOSAL_TTL_MS, type StoredProposal } from './proposalStore';
+import { ProposalStore, PROPOSAL_TTL_MS, type StoredProposal, proposalStore } from './proposalStore';
 
 const mk = (over: Partial<StoredProposal> = {}): StoredProposal => ({
   domain: 'schedule',
@@ -55,5 +55,25 @@ describe('ProposalStore', () => {
     store.set('a', mk());
     store.__reset();
     expect(store.get('a')).toBeNull();
+  });
+});
+
+describe('proposalStore capability proposals', () => {
+  beforeEach(() => proposalStore.__reset());
+
+  it('stores and retrieves a capability proposal', () => {
+    proposalStore.set('p1', {
+      domain: 'capability',
+      targetId: '__new__',
+      capabilityName: 'project.create',
+      args: { name: '项目甲' },
+      rawUtterance: '建个项目甲',
+      intent: null,
+      fingerprint: 'fp1',
+      createdAt: Date.now(),
+    });
+    const got = proposalStore.get('p1');
+    expect(got?.capabilityName).toBe('project.create');
+    expect(got?.args).toMatchObject({ name: '项目甲' });
   });
 });
