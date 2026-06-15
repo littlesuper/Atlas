@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { AssistantMessage } from '../../types';
 import ProposalCard from './ProposalCard';
 import AnswerBubble from './AnswerBubble';
@@ -21,9 +21,11 @@ const ANSWER_STEPS = ['问题解析〔AI〕', '查询计算〔系统〕'];
 interface Props {
   messages: AssistantMessage[];
   onApply: (id: string) => void;
+  /** 处理中（已发送、等待 AI 回复）→ 在末尾显示「思考中…」动画 */
+  sending: boolean;
 }
 
-const MessageList: React.FC<Props> = ({ messages, onApply }) => (
+const MessageList: React.FC<Props> = ({ messages, onApply, sending }) => (
   <div className="mx-auto flex w-full max-w-[760px] flex-col gap-6 px-4 py-6">
     {messages.map((m) => {
       if (m.role === 'user') {
@@ -59,6 +61,12 @@ const MessageList: React.FC<Props> = ({ messages, onApply }) => (
         </div>
       );
     })}
+    {sending && (
+      <div className="text-muted-foreground flex items-center gap-2 text-sm" aria-live="polite">
+        <Loader2 className="text-primary size-4 animate-spin" />
+        <span>思考中…</span>
+      </div>
+    )}
   </div>
 );
 

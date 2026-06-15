@@ -494,9 +494,9 @@ const ProductPage: React.FC = () => {
   return (
     <MainLayout>
       <TooltipProvider>
-        <Card className="p-4">
+        <div className="space-y-4">
           {/* 统计卡片 */}
-          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {statCards.map((card) => (
               <Card
                 key={card.label}
@@ -749,7 +749,7 @@ const ProductPage: React.FC = () => {
               下一页
             </Button>
           </div>
-        </Card>
+        </div>
 
         {/* 新建/编辑抽屉 */}
         <Sheet open={drawerVisible} onOpenChange={(o) => !o && setDrawerVisible(false)}>

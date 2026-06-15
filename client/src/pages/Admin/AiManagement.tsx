@@ -7,7 +7,7 @@ import { useAuthStore } from '../../store/authStore';
 import { arcoBadgeClass } from '../../utils/badgeColor';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
-import { Card } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -319,18 +319,22 @@ const AiManagement: React.FC = () => {
 
   return (
     <div>
-      {/* AI 配置列表 */}
-      <Card className="mb-4 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-semibold">API 配置</div>
+      <Tabs defaultValue="config">
+        <TabsList>
+          <TabsTrigger value="config">API 配置</TabsTrigger>
+          <TabsTrigger value="usage">Token 使用统计</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="config" className="mt-4">
           {canManage && (
-            <Button size="sm" onClick={handleCreate}>
-              <Plus className="size-4" />
-              新建配置
-            </Button>
+            <div className="mb-3 flex justify-end">
+              <Button size="sm" onClick={handleCreate}>
+                <Plus className="size-4" />
+                新建配置
+              </Button>
+            </div>
           )}
-        </div>
-        <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -385,11 +389,9 @@ const AiManagement: React.FC = () => {
             </TableBody>
           </Table>
         </div>
-      </Card>
+        </TabsContent>
 
-      {/* Token 使用统计 */}
-      <Card className="p-4">
-        <div className="mb-3 text-sm font-semibold">Token 使用统计</div>
+        <TabsContent value="usage" className="mt-4">
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {statCards.map((c) => (
             <div key={c.label}>
@@ -445,7 +447,8 @@ const AiManagement: React.FC = () => {
             </TableBody>
           </Table>
         </div>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* 新建/编辑配置 Drawer */}
       <Sheet open={drawerVisible} onOpenChange={(o) => !o && setDrawerVisible(false)}>

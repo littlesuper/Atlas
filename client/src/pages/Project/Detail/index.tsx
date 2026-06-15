@@ -671,8 +671,8 @@ const ProjectDetail: React.FC = () => {
             </div>
           )}
 
-          {/* 顶部卡片 */}
-          <Card className="mb-4 space-y-3 p-4">
+          {/* 顶部信息（平铺，不再套外层卡） */}
+          <div className="mb-4 space-y-3">
             <div className="flex items-center gap-3">
               {!isSnapshot && (
                 <Button variant="outline" onClick={() => navigate('/projects')}>
@@ -694,7 +694,7 @@ const ProjectDetail: React.FC = () => {
                 </Card>
               ))}
             </div>
-          </Card>
+          </div>
 
           {/* 归档只读提示 */}
           {isArchived && !isSnapshot && (
@@ -723,8 +723,8 @@ const ProjectDetail: React.FC = () => {
               {/* 活动列表 */}
               <TabsContent value="activities" className="mt-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground text-xs">{saving ? '保存排序中...' : ''}</span>
                   <div className="flex flex-wrap items-center gap-2">
+                    {saving && <span className="text-muted-foreground text-xs">保存排序中...</span>}
                     {/* 阶段工时 */}
                     <div className="flex items-center gap-1 text-xs">
                       {(['EVT', 'DVT', 'PVT', 'MP'] as const).map((phase) => {
@@ -756,7 +756,8 @@ const ProjectDetail: React.FC = () => {
                         进行中 <span className="font-medium">{activities.filter((a) => a.status === 'IN_PROGRESS').length}</span>
                       </button>
                     </div>
-
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button size="sm">

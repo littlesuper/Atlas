@@ -971,3 +971,23 @@ body[arco-theme='dark'] .arco-modal-footer .arco-btn-primary:not(.arco-btn-disab
     gap: 12px;
   }
 }
+
+/* ============ 细而淡的滚动条（给需要的滚动区叠加 .scrollbar-subtle） ============ */
+.scrollbar-subtle {
+  scrollbar-width: thin; /* Firefox：细 */
+  scrollbar-color: color-mix(in oklch, var(--foreground) 16%, transparent) transparent; /* Firefox：淡 */
+}
+.scrollbar-subtle::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-subtle::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--foreground) 16%, transparent);
+  border-radius: 9999px;
+}
+.scrollbar-subtle::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklch, var(--foreground) 30%, transparent);
+}
+.scrollbar-subtle::-webkit-scrollbar-track {
+  background-color: transparent;
+}

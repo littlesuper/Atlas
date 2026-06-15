@@ -8,29 +8,31 @@ const EXAMPLES = [
   '项目甲现在有几个高风险？',
 ];
 
-interface Props {
-  onPick: (text: string) => void;
-}
-
-const EmptyState: React.FC<Props> = ({ onPick }) => (
-  <div className="mx-auto flex max-w-[640px] flex-col items-center px-4 py-16 text-center">
+/** 空态问候（图标 + 标题 + 副标题）；示例 chips 拆到 ExampleChips，便于排在输入框下方 */
+const EmptyState: React.FC = () => (
+  <div className="flex flex-col items-center text-center">
     <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-xl">
       <Bot className="size-6" />
     </div>
     <h2 className="mt-4 text-xl font-semibold">用一句话使用系统</h2>
     <p className="text-muted-foreground mt-1 text-sm">排期、项目字段、风险项——直接说，AI 帮你理解并预览，确认后才写入</p>
-    <div className="mt-6 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
-      {EXAMPLES.map((ex) => (
-        <button
-          key={ex}
-          type="button"
-          onClick={() => onPick(ex)}
-          className="hover:border-primary/40 hover:bg-muted/50 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors"
-        >
-          {ex}
-        </button>
-      ))}
-    </div>
+  </div>
+);
+
+/** 示例提示：轻量小标签，点击仅「填入输入框」（含「项目甲」等占位，需改成真实项目后再发送），不直接发起对话 */
+export const ExampleChips: React.FC<{ onPick: (text: string) => void }> = ({ onPick }) => (
+  <div className="flex flex-wrap justify-center gap-1.5">
+    {EXAMPLES.map((ex) => (
+      <button
+        key={ex}
+        type="button"
+        onClick={() => onPick(ex)}
+        title="点击填入输入框后可修改再发送"
+        className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full border px-2.5 py-1 text-xs transition-colors"
+      >
+        {ex}
+      </button>
+    ))}
   </div>
 );
 

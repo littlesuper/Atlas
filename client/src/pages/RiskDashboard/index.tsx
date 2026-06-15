@@ -110,11 +110,6 @@ const RiskDashboard: React.FC = () => {
   return (
     <MainLayout>
       <div className="mx-auto max-w-[1200px]">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold">风险总览</h2>
-          <p className="text-muted-foreground mt-1 text-sm">跨项目风险全景视图</p>
-        </div>
-
         {/* AI 洞察 */}
         {insights && insights.topConcerns.length > 0 && (
           <Card className="border-l-primary mb-5 rounded-l-none border-l-4 p-5">

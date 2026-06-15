@@ -16,7 +16,6 @@ import WecomManagement from './WecomManagement';
 import HolidayManagement from './HolidayManagement';
 import { arcoBadgeClass } from '../../utils/badgeColor';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -421,24 +420,23 @@ const AdminPage: React.FC = () => {
   return (
     <MainLayout>
       <TooltipProvider>
-        <Card className="p-4">
-          {visibleTabs.length === 0 && (
-            <div className="text-muted-foreground flex min-h-[40vh] flex-col items-center justify-center gap-2">
-              <div className="text-base font-medium">权限不足</div>
-              <div className="text-sm">您没有系统管理的访问权限</div>
-            </div>
+        {visibleTabs.length === 0 && (
+          <div className="text-muted-foreground flex min-h-[40vh] flex-col items-center justify-center gap-2">
+            <div className="text-base font-medium">权限不足</div>
+            <div className="text-sm">您没有系统管理的访问权限</div>
+          </div>
+        )}
+        {/* 一级分区已平铺到侧边栏（/admin?tab=*）；各分区内容各自成卡片，
+            不再套外层 Card（避免与 AiManagement 自带卡片重复成层）。内容由 URL ?tab= 驱动。 */}
+        <Tabs value={mainTab} onValueChange={setMainTab}>
+          {hasPermission('system', 'ai') && (
+            <TabsContent value="ai">
+              <AiManagement />
+            </TabsContent>
           )}
-          {/* 一级分区已平铺到左侧边栏（/admin?tab=*）；此处不再显示顶部 Tab 条，
-              内容仍由 URL ?tab= 驱动的 mainTab 控制。账号管理内的二级 Tab 保留。 */}
-          <Tabs value={mainTab} onValueChange={setMainTab}>
-            {hasPermission('system', 'ai') && (
-              <TabsContent value="ai" className="mt-4">
-                <AiManagement />
-              </TabsContent>
-            )}
 
-            {hasPermission('system', 'account') && (
-              <TabsContent value="account" className="mt-4">
+          {hasPermission('system', 'account') && (
+            <TabsContent value="account">
                 <Tabs value={accountTab} onValueChange={setAccountTab}>
                   <TabsList>
                     <TabsTrigger value="users">用户管理</TabsTrigger>
@@ -448,8 +446,8 @@ const AdminPage: React.FC = () => {
 
                   {/* 用户管理 */}
                   <TabsContent value="users" className="mt-4">
-                    <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-                      <span className="text-muted-foreground text-[13px]">共 {users.length} 个用户</span>
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="text-muted-foreground mr-auto text-[13px]">共 {users.length} 个用户</span>
                       <Select value={canLoginFilter || ALL} onValueChange={(v) => setCanLoginFilter(v === ALL ? '' : v)}>
                         <SelectTrigger className="w-36" size="sm">
                           <SelectValue placeholder="全部" />
@@ -675,22 +673,21 @@ const AdminPage: React.FC = () => {
                     <WecomManagement />
                   </TabsContent>
                 </Tabs>
-              </TabsContent>
-            )}
+            </TabsContent>
+          )}
 
-            {hasPermission('system', 'account') && (
-              <TabsContent value="holidays" className="mt-4">
-                <HolidayManagement />
-              </TabsContent>
-            )}
+          {hasPermission('system', 'account') && (
+            <TabsContent value="holidays">
+              <HolidayManagement />
+            </TabsContent>
+          )}
 
-            {hasPermission('system', 'audit_log') && (
-              <TabsContent value="audit" className="mt-4">
-                <AuditLogTab />
-              </TabsContent>
-            )}
-          </Tabs>
-        </Card>
+          {hasPermission('system', 'audit_log') && (
+            <TabsContent value="audit">
+              <AuditLogTab />
+            </TabsContent>
+          )}
+        </Tabs>
 
         {/* 用户抽屉 */}
         <Sheet open={userModalVisible} onOpenChange={(o) => !o && setUserModalVisible(false)}>

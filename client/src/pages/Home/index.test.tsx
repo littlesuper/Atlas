@@ -20,7 +20,8 @@ vi.mock('../../layouts/MainLayout', () => ({
 }));
 // 隔离子组件（各自有独立测试）：用占位 + 暴露关键回调
 vi.mock('./EmptyState', () => ({
-  default: ({ onPick }: { onPick: (t: string) => void }) => (
+  default: () => <div data-testid="empty-state" />,
+  ExampleChips: ({ onPick }: { onPick: (t: string) => void }) => (
     <button data-testid="empty-pick" onClick={() => onPick('问一句')}>empty</button>
   ),
 }));
@@ -29,8 +30,11 @@ vi.mock('./MessageList', () => ({
   default: ({ messages }: { messages: AssistantMessage[] }) => <div data-testid="message-list">{messages.length}</div>,
 }));
 vi.mock('./ChatInput', () => ({
-  default: ({ onSend }: { onSend: () => void }) => (
-    <button data-testid="chat-send" onClick={onSend}>send</button>
+  default: ({ value, onChange, onSend }: { value: string; onChange: (v: string) => void; onSend: () => void }) => (
+    <div>
+      <input data-testid="chat-text" value={value} onChange={(e) => onChange(e.target.value)} />
+      <button data-testid="chat-send" onClick={onSend}>send</button>
+    </div>
   ),
 }));
 
@@ -68,15 +72,24 @@ describe('Home (AI 聊天首页)', () => {
     expect(h.reset).toHaveBeenCalled();
   });
 
-  it('发送时带上 ?project= 上下文', () => {
+  it('输入后发送,带上 ?project= 上下文', () => {
     renderAt('/?project=p9');
-    fireEvent.click(screen.getByTestId('empty-pick'));
+    fireEvent.change(screen.getByTestId('chat-text'), { target: { value: '问一句' } });
+    fireEvent.click(screen.getByTestId('chat-send'));
     expect(h.send).toHaveBeenCalledWith('问一句', 'p9');
   });
 
   it('无 project 参数时上下文为 null', () => {
     renderAt('/');
-    fireEvent.click(screen.getByTestId('empty-pick'));
+    fireEvent.change(screen.getByTestId('chat-text'), { target: { value: '问一句' } });
+    fireEvent.click(screen.getByTestId('chat-send'));
     expect(h.send).toHaveBeenCalledWith('问一句', null);
+  });
+
+  it('点击示例只填入输入框,不直接发送', () => {
+    renderAt('/');
+    fireEvent.click(screen.getByTestId('empty-pick'));
+    expect(h.send).not.toHaveBeenCalled();
+    expect(screen.getByTestId('chat-text')).toHaveValue('问一句');
   });
 });

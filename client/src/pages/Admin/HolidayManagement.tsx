@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { holidaysApi, Holiday, HolidaySource, SourceStatusResult } from '../../api';
 import { cn } from '@/lib/utils';
 import { arcoBadgeClass } from '../../utils/badgeColor';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -309,7 +308,7 @@ const HolidayManagement: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <Card className="p-4">
+      <div className="space-y-4">
         {renderBanner()}
 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -615,7 +614,7 @@ const HolidayManagement: React.FC = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </Card>
+      </div>
     </TooltipProvider>
   );
 };

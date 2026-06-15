@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
   FolderKanban,
@@ -76,7 +76,6 @@ interface NavGroupDef {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  const navigate = useNavigate();
   const location = useLocation();
   const { user, hasPermission, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
@@ -145,14 +144,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       const Icon = item.icon;
       return (
         <SidebarMenuItem key={item.key}>
+          {/* 用真实链接而非 button+onClick：鼠标点击导航不残留焦点框；非输入项不显示焦点描边，键盘聚焦改用淡底色提示 */}
           <SidebarMenuButton
-            className="nav-item"
+            asChild
+            className="nav-item focus-visible:bg-sidebar-accent focus-visible:ring-0"
             isActive={isActive(item)}
             tooltip={item.label}
-            onClick={() => navigate(item.path)}
           >
-            <Icon />
-            <span>{item.label}</span>
+            <Link to={item.path}>
+              <Icon />
+              <span>{item.label}</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       );
@@ -164,15 +166,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" onClick={() => navigate('/')} className="gap-1.5">
-                {/* shrink-0：收起时按钮被压成 32px 图标槽，没有它 flex 会把图标挤成长方形 → 变形 */}
+              {/* 仅展示，不作跳转链接 */}
+              <div className="flex h-12 w-full items-center gap-1.5 overflow-hidden p-2 text-left group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!">
+                {/* shrink-0：收起时被压成 32px 图标槽，没有它 flex 会把图标挤成长方形 → 变形 */}
                 <div className="flex aspect-square size-8 shrink-0 items-center justify-center">
                   <img src="/logo.png" alt="贝锐科技" className="size-8 object-contain" />
                 </div>
                 <div className="grid flex-1 text-left text-lg leading-tight">
                   <span className="truncate font-medium">硬件项目管理</span>
                 </div>
-              </SidebarMenuButton>
+              </div>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
@@ -206,10 +209,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     <ChevronsUpDown className="ml-auto size-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="end" className="min-w-56 rounded-lg">
+                {/* 关闭后不把焦点交还触发按钮，避免鼠标操作后残留 focus-visible 焦点环（看着像选择框） */}
+                <DropdownMenuContent side="right" align="end" className="min-w-56 rounded-lg" onCloseAutoFocus={(e) => e.preventDefault()}>
                   <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
                     {user?.realName || user?.username || '用户'}
-                    {appVersion ? ` · v${appVersion}` : ''}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setLogoutOpen(true)}>
@@ -220,6 +223,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </DropdownMenu>
             </SidebarMenuItem>
           </SidebarMenu>
+          {/* 极弱化版本号：仅为排障，不影响整体美观；侧栏收起时隐藏 */}
+          {appVersion && (
+            <div
+              title="系统版本"
+              className="text-muted-foreground/40 px-2 text-[10px] leading-none tabular-nums group-data-[collapsible=icon]:hidden"
+            >
+              v{appVersion}
+            </div>
+          )}
         </SidebarFooter>
       </Sidebar>
 

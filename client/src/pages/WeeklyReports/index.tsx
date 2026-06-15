@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -19,17 +19,15 @@ import { WeeklyReport, ReportAttachment } from '../../types';
 import { useReportPermission } from '../../hooks/useReportPermission';
 import AttachmentList from '../../components/AttachmentList';
 import SafeHtml from '../../components/SafeHtml';
+import { cn } from '@/lib/utils';
 import { PRODUCT_LINE_MAP } from '../../utils/constants';
 import { arcoBadgeClass } from '../../utils/badgeColor';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -108,13 +106,20 @@ const WeeklyReportsSummary: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<string>('submitted');
   const [currentWeek, setCurrentWeek] = useState<dayjs.Dayjs | null>(null);
-  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [productLine, setProductLine] = useState<string>('');
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [drafts, setDrafts] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [confirm, setConfirm] = useState<{ title: string; content: string; onOk: () => Promise<void> } | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const weekStart = currentWeek?.startOf('isoWeek' as dayjs.OpUnitType);
   const weekEnd = weekStart?.add(6, 'day');
@@ -124,23 +129,16 @@ const WeeklyReportsSummary: React.FC = () => {
   const loadReports = useCallback(async () => {
     setLoading(true);
     try {
-      if (currentWeek && year !== undefined && weekNumber !== undefined) {
-        const params = productLine ? { productLine } : undefined;
-        const res = await weeklyReportsApi.getByWeek(year, weekNumber, params);
-        const data = (res.data || []) as WeeklyReport[];
-        setReports(data.filter((r) => r.status !== 'DRAFT'));
-      } else {
-        const params: Record<string, unknown> = { pageSize: 100 };
-        if (productLine) params.productLine = productLine;
-        const res = await weeklyReportsApi.list(params as Parameters<typeof weeklyReportsApi.list>[0]);
-        setReports(res.data?.data || []);
-      }
+      const params: Record<string, unknown> = { pageSize: 100 };
+      if (productLine) params.productLine = productLine;
+      const res = await weeklyReportsApi.list(params as Parameters<typeof weeklyReportsApi.list>[0]);
+      setReports(res.data?.data || []);
     } catch {
       setReports([]);
     } finally {
       setLoading(false);
     }
-  }, [currentWeek, productLine, weekNumber, year]);
+  }, [productLine]);
 
   const loadDrafts = useCallback(async () => {
     setDraftsLoading(true);
@@ -199,6 +197,22 @@ const WeeklyReportsSummary: React.FC = () => {
   };
 
   const weekGroups = useMemo<WeekGroup[]>(() => groupReportsByWeek(reports), [reports]);
+  const displayGroups = useMemo<WeekGroup[]>(
+    () =>
+      currentWeek && year !== undefined && weekNumber !== undefined
+        ? weekGroups.filter((g) => g.year === year && g.weekNumber === weekNumber)
+        : weekGroups,
+    [weekGroups, currentWeek, year, weekNumber]
+  );
+
+  // 首次加载后默认定位到最新有周报的一周（groupReportsByWeek 已按年/周降序）
+  const weekInitRef = useRef(false);
+  useEffect(() => {
+    if (weekInitRef.current || weekGroups.length === 0) return;
+    weekInitRef.current = true;
+    const latest = weekGroups[0];
+    setCurrentWeek(dayjs().year(latest.year).isoWeek(latest.weekNumber));
+  }, [weekGroups]);
 
   const SECTION_COLS: Array<{ key: keyof WeeklyReport; title: string; section?: string; wide?: boolean }> = [
     { key: 'changeOverview', title: '变更概述' },
@@ -208,137 +222,154 @@ const WeeklyReportsSummary: React.FC = () => {
     { key: 'riskWarning', title: '风险预警', section: 'riskWarning' },
   ];
 
-  const renderReportRow = (record: WeeklyReport, mode: 'submitted' | 'drafts') => (
-    <TableRow key={record.id}>
-      <TableCell className="align-top">
-        <button
-          className="text-primary cursor-pointer font-medium hover:underline"
-          onClick={() => navigate(`/projects/${record.projectId}?tab=weekly`)}
-        >
-          {record.project?.name || '-'}
-        </button>
-      </TableCell>
-      <TableCell className="align-top">
-        {(() => {
-          const pl = record.project?.productLine || '';
-          const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP] ?? { label: pl || '-', color: 'default' };
-          return (
+  const renderActions = (record: WeeklyReport, mode: 'submitted' | 'drafts') =>
+    mode === 'submitted' ? (
+      canEditReport(record) && (
+        <div className="flex justify-end gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" aria-label="编辑周报" onClick={() => navigate(`/weekly-reports/${record.id}/edit`)}>
+                <Pencil className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>编辑</TooltipContent>
+          </Tooltip>
+          {canDelete(record) && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除周报" onClick={() => handleDelete(record)}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>删除</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      )
+    ) : (
+      <div className="flex justify-end gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-8" aria-label="编辑草稿" onClick={() => navigate(`/weekly-reports/${record.id}/edit`)}>
+              <Pencil className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>编辑</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-8" aria-label="提交周报" onClick={() => handleSubmit(record)}>
+              <Send className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>提交</TooltipContent>
+        </Tooltip>
+        {canDelete(record) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除草稿" onClick={() => handleDelete(record)}>
+                <Trash2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>删除</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    );
+
+  const renderReportRow = (record: WeeklyReport, mode: 'submitted' | 'drafts') => {
+    const expanded = !collapsedIds.has(record.id);
+    const pl = record.project?.productLine || '';
+    const cfg = PRODUCT_LINE_MAP[pl as keyof typeof PRODUCT_LINE_MAP] ?? { label: pl || '-', color: 'default' };
+    return (
+      <React.Fragment key={record.id}>
+        <TableRow className="cursor-pointer" data-state={expanded ? 'open' : undefined} onClick={() => toggleExpand(record.id)}>
+          <TableCell className="pr-0">
+            <ChevronRight className={cn('text-muted-foreground size-4 shrink-0 transition-transform', expanded && 'rotate-90')} />
+          </TableCell>
+          <TableCell>
+            <button
+              className="text-primary cursor-pointer text-left font-medium hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/projects/${record.projectId}?tab=weekly`);
+              }}
+            >
+              {record.project?.name || '-'}
+            </button>
+          </TableCell>
+          <TableCell>
             <Badge variant="outline" className={arcoBadgeClass(cfg.color)}>
               {cfg.label}
             </Badge>
-          );
-        })()}
-      </TableCell>
-      <TableCell className="align-top">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">{progressIcon(record.progressStatus)}</span>
-          </TooltipTrigger>
-          <TooltipContent>{PROGRESS_TOOLTIP[record.progressStatus] || record.progressStatus}</TooltipContent>
-        </Tooltip>
-      </TableCell>
-      {SECTION_COLS.map((col) => {
-        const html = (record[col.key] as string) || SECTION_PLACEHOLDER[col.key as string];
-        const sectionAtts = col.section
-          ? ((record.attachments as ReportAttachment[] | undefined) || []).filter((a) => a.section === col.section)
-          : [];
-        return (
-          <TableCell key={col.key as string} className="align-top">
-            <div className="overflow-hidden">
-              <SafeHtml className="html-content text-muted-foreground text-[13px]" style={{ maxHeight: 80, overflow: 'hidden' }} html={html} />
-              {sectionAtts.length > 0 && col.section && (
-                <AttachmentList attachments={sectionAtts} section={col.section} readOnly />
-              )}
-            </div>
           </TableCell>
-        );
-      })}
-      <TableCell className="align-top text-right">
-        {mode === 'submitted' ? (
-          canEditReport(record) && (
-            <div className="flex justify-end gap-0.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-8" aria-label="编辑周报" onClick={() => navigate(`/weekly-reports/${record.id}/edit`)}>
-                    <Pencil className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>编辑</TooltipContent>
-              </Tooltip>
-              {canDelete(record) && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除周报" onClick={() => handleDelete(record)}>
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>删除</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-          )
-        ) : (
-          <div className="flex justify-end gap-0.5">
+          <TableCell>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8" aria-label="编辑草稿" onClick={() => navigate(`/weekly-reports/${record.id}/edit`)}>
-                  <Pencil className="size-4" />
-                </Button>
+                <span className="inline-flex">{progressIcon(record.progressStatus)}</span>
               </TooltipTrigger>
-              <TooltipContent>编辑</TooltipContent>
+              <TooltipContent>{PROGRESS_TOOLTIP[record.progressStatus] || record.progressStatus}</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8" aria-label="提交周报" onClick={() => handleSubmit(record)}>
-                  <Send className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>提交</TooltipContent>
-            </Tooltip>
-            {canDelete(record) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive size-8" aria-label="删除草稿" onClick={() => handleDelete(record)}>
-                    <Trash2 className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>删除</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          </TableCell>
+          <TableCell className="text-muted-foreground text-[13px] whitespace-nowrap">第 {record.weekNumber} 周</TableCell>
+          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+            {renderActions(record, mode)}
+          </TableCell>
+        </TableRow>
+        {expanded && (
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={COLSPAN} className="bg-muted/30 p-0">
+              <div className="grid grid-cols-1 gap-x-8 gap-y-4 px-6 py-4 lg:grid-cols-2">
+                {SECTION_COLS.map((col) => {
+                  const html = (record[col.key] as string) || SECTION_PLACEHOLDER[col.key as string];
+                  const sectionAtts = col.section
+                    ? ((record.attachments as ReportAttachment[] | undefined) || []).filter((a) => a.section === col.section)
+                    : [];
+                  return (
+                    <div key={col.key as string} className="min-w-0">
+                      <div className="text-muted-foreground mb-1 text-xs font-semibold">{col.title}</div>
+                      <SafeHtml className="html-content text-sm break-words" html={html} />
+                      {sectionAtts.length > 0 && col.section && (
+                        <AttachmentList attachments={sectionAtts} section={col.section} readOnly />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </TableCell>
+          </TableRow>
         )}
-      </TableCell>
-    </TableRow>
-  );
+      </React.Fragment>
+    );
+  };
 
   const ReportTableHead = () => (
     <TableHeader>
       <TableRow>
-        <TableHead className="w-52">项目名称</TableHead>
-        <TableHead className="w-28">产品线</TableHead>
+        <TableHead className="w-9" />
+        <TableHead>项目名称</TableHead>
+        <TableHead className="w-32">产品线</TableHead>
         <TableHead className="w-20">状态</TableHead>
-        {SECTION_COLS.map((c) => (
-          <TableHead key={c.key as string} className={c.wide ? 'min-w-48' : 'w-44'}>
-            {c.title}
-          </TableHead>
-        ))}
+        <TableHead className="w-24">周次</TableHead>
         <TableHead className="w-28 text-right">操作</TableHead>
       </TableRow>
     </TableHeader>
   );
 
-  const COLSPAN = 3 + SECTION_COLS.length + 1;
+  const COLSPAN = 6;
 
   return (
     <MainLayout>
       <TooltipProvider>
-        {/* 标题和操作栏 */}
-        <Card className="mb-4 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold whitespace-nowrap">项目周报汇总</h2>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="submitted">已提交周报</TabsTrigger>
+            <TabsTrigger value="drafts">草稿箱</TabsTrigger>
+          </TabsList>
 
-            {activeTab === 'submitted' && (
-              <div className="flex flex-wrap items-center gap-2">
+          <TabsContent value="submitted" className="mt-4">
+            {/* 周次/产品线筛选：tab 下方单独一行右对齐（与 AI管理「新建配置」布局一致） */}
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
                 {/* 周次选择器 */}
                 <div className="bg-muted flex items-center gap-1 rounded-md p-1">
                   <Button
@@ -350,37 +381,14 @@ const WeeklyReportsSummary: React.FC = () => {
                   >
                     <ChevronLeft className="size-4" />
                   </Button>
-                  <Popover open={weekPickerOpen} onOpenChange={setWeekPickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 w-36 justify-center font-normal">
-                        {currentWeek ? `${year} 第 ${weekNumber} 周` : '全部周次'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="center">
-                      <Calendar
-                        mode="single"
-                        selected={currentWeek?.toDate()}
-                        onSelect={(d) => {
-                          setCurrentWeek(d ? dayjs(d).startOf('isoWeek' as dayjs.OpUnitType) : null);
-                          setWeekPickerOpen(false);
-                        }}
-                        autoFocus
-                      />
-                      <div className="border-t p-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            setCurrentWeek(null);
-                            setWeekPickerOpen(false);
-                          }}
-                        >
-                          全部周次
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <button
+                    type="button"
+                    className="hover:text-foreground h-7 w-32 text-center text-sm font-normal"
+                    onClick={() => setCurrentWeek((d) => (d ? null : dayjs()))}
+                    title={currentWeek ? '点击查看全部周次' : '点击回到本周'}
+                  >
+                    {currentWeek ? `${year} 第 ${weekNumber} 周` : '全部周次'}
+                  </button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -412,28 +420,19 @@ const WeeklyReportsSummary: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
-          </div>
-        </Card>
+            </div>
 
-        {/* Tab 切换 */}
-        <Card className="p-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              <TabsTrigger value="submitted">已提交周报</TabsTrigger>
-              <TabsTrigger value="drafts">草稿箱</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="submitted" className="mt-4">
-              {weekGroups.length === 0 && !loading ? (
+              {displayGroups.length === 0 && !loading ? (
                 <div className="text-muted-foreground py-12 text-center text-sm">
                   {currentWeek ? '该周暂无周报' : '暂无周报'}
                 </div>
               ) : (
-                weekGroups.map((group) => (
+                displayGroups.map((group) => (
                   <div key={group.key} className="mb-6">
-                    <div className="mb-2 border-b pb-1.5 text-sm font-semibold">{group.label}</div>
+                    {/* 选中单周时，周次已由上方选择器标识，无需重复分组标题；仅“全部周次”时显示 */}
+                    {!currentWeek && (
+                      <div className="mb-2 border-b pb-1.5 text-sm font-semibold">{group.label}</div>
+                    )}
                     <div className="overflow-x-auto rounded-md border">
                       <Table>
                         <ReportTableHead />
@@ -463,8 +462,7 @@ const WeeklyReportsSummary: React.FC = () => {
                 </Table>
               </div>
             </TabsContent>
-          </Tabs>
-        </Card>
+        </Tabs>
 
         <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
           <AlertDialogContent>

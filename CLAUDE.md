@@ -113,6 +113,19 @@ npx playwright test e2e/login.spec.ts
 - AI API 调用受熔断器保护（`server/src/utils/circuitBreaker.ts`）
 - 前端共享工具函数使用 `client/src/utils/apiError.ts`（`getApiErrorMessage`）
 
+## 前端 UI 布局规范
+
+界面已全量迁移到 shadcn/ui，子页面布局遵循以下约定（新建或改造页面时一并遵守，保持全站一致）：
+
+- **左侧边栏分组**：菜单按 概览 / 项目 / 产品 / 系统 四组分类（`client/src/layouts/MainLayout.tsx` 的 `navGroups`）；系统设置的一级项（AI管理 / 账号管理 / 节假日 / 操作日志）直接平铺在侧边栏，不再有独立的「系统设置」聚合页。
+- **不重复功能名标题**：顶栏与子页面内容区**都不**再显示与当前菜单项同名的功能名标题（左侧菜单已标识）。保留：具体实体名（如项目详情的项目名）、动作标题（「创建周报」「新建配置」）、页面内区块小标题（「人员负载」）、首页 hero 文案。
+- **内容区不套外层 Card**：内容直接平铺，不再包一层 `<Card>`；表格用自带的 `rounded-md border`（配 `overflow-x-auto`），避免「卡内套卡 / 双层边框」。
+- **操作栏对齐**：操作栏用 `flex justify-between`——统计/说明等信息靠左，主操作按钮（新建、保存等）靠右；表格行内操作按钮用 `justify-end` 靠右。
+- **tab 与筛选/操作的布局**：`<TabsList>` 单独占第一行（靠左），筛选器或主操作放在对应 `<TabsContent>` 内、右对齐另起一行（`mb-3 flex justify-end`）。参考 `pages/Admin/AiManagement.tsx`（API配置 / Token统计 + 新建配置）与 `pages/WeeklyReports/index.tsx`（已提交 / 草稿 + 周次/产品线筛选）。
+- **tab 样式**：统一用 shadcn `Tabs`（胶囊式：`bg-muted` 容器 + 选中态白底），不自造 tab 切换控件。
+- **焦点描边只给输入**：导航等「可点击但非输入」的元素不显示焦点描边环——导航项用真实 `<Link>`（`SidebarMenuButton asChild`，而非 `button+onClick`，避免鼠标点击后残留焦点框），键盘聚焦改用淡底色提示（`focus-visible:bg-sidebar-accent focus-visible:ring-0`）；真正的输入框可保留聚焦光环，但要弱（细 + 低透明度，如 `ring-1 ring-ring/15`）。
+- **细淡滚动条**：需要弱化滚动条的滚动区叠加 `.scrollbar-subtle`（`client/src/styles/global.css`，6px + 淡色、明暗自适应），如首页会话区。
+
 ## 活动角色绑定（Activity Role Binding）
 
 活动的执行人通过 RBAC 角色自动填入：选择角色后，系统自动查询拥有该角色的用户（UserRole）并填入执行人列表，支持手动增减。
@@ -164,7 +177,7 @@ npx playwright test e2e/login.spec.ts
 
 ### 前端
 
-- **首页即聊天页** `client/src/pages/Home/index.tsx`（路由 `/`，登录后默认进入；走 `ProtectedRoute` 等待登录态恢复，刷新不掉线）：claude.ai 式全屏对话。空态展示问候 + 示例 chip + 按需风险区（`pages/Home/RiskOverview.tsx`，仅当有真实风险点——高风险项目 / 重点行动项才显示，善意提示 `topConcerns` 不计入）；开始对话后进入气泡流（用户气泡 / Markdown 回答 + 来源徽标 / 改动预览卡片 / 状态提示），消息区独立滚动并自动到底，输入框固定底部，顶部「新对话」一键清空。
+- **首页即聊天页** `client/src/pages/Home/index.tsx`（路由 `/`，登录后默认进入；走 `ProtectedRoute` 等待登录态恢复，刷新不掉线）：claude.ai 式全屏对话。**空态**：问候 → 输入框 → 示例 chip 垂直居中；示例 chip 为轻量小标签，点击只**填入输入框**（含占位"项目甲"，需改成真实项目后再发），不直接发起对话；下方按需风险区（`pages/Home/RiskOverview.tsx`，仅当有真实风险点——高风险项目 / 重点行动项才显示，善意提示 `topConcerns` 不计入）。**会话态**：气泡流（用户气泡 / Markdown 回答 + 来源徽标 / 改动预览卡片 / 状态提示），处理中在末尾显示"思考中…"指示器（`MessageList` 的 `sending`）；输入框 sticky 停靠在滚动区底部（滚动条贯通到底、不被遮挡），新消息自动滚到底；右上角浮层「新对话」一键清空。进入首页（或点新对话后）自动聚焦输入框。
 - **对话状态 + 编排**：`store/assistantChatStore.ts`（Zustand + persist，对话持久化到 localStorage、跨刷新保留）；`hooks/useAssistantChat.ts` 复用 `assistantApi.propose/apply` 做编排（每轮独立 propose、**不发送历史**，确认弹窗后才 apply）。展示组件在 `pages/Home/`：`MessageList`/`ProposalCard`/`AnswerBubble`（react-markdown + remark-gfm）/`ChatInput`/`EmptyState`/`RiskOverview`。
 - **右下角入口** `client/src/components/AssistantLauncher.tsx`（挂在 `layouts/MainLayout.tsx`）：非首页显示的浮动按钮，点击跳转到首页 `/?project=<当前项目>`（首页本身不显示）。
 - **API** `assistantApi.propose(utterance, contextProjectId?)` / `apply(proposalId)`；`/api/schedule-assistant/*` 保留为薄别名（向后兼容）。风险种类中文/颜色见 `client/src/utils/constants.ts` 的 `SCHEDULE_RISK_KIND_MAP`。
@@ -209,7 +222,7 @@ User 模型支持两种使用场景：
 - **z（提交版本）**：自动递增，每次 git commit 通过 `post-commit` Hook 自动 +1；当 x 或 y 变化时 z 重置为 1
 
 健康检查接口 `/api/health` 每次请求实时读取 `package.json` 返回 `version`（格式 `x.y.z`）
-前端右上角与登录页版本号通过 `/api/health` 动态获取，刷新页面即可看到最新版本
+前端版本号通过 `/api/health` 动态获取（刷新即更新），显示在：侧边栏左下角（极弱化样式，仅排障用）、登录页
 
 ## 环境变量
 
