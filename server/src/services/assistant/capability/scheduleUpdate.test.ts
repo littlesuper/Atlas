@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ProjectSnapshot } from '../../../utils/scheduleEngine';
 
-const { mockLoad, mockFingerprint, mockExecute } = vi.hoisted(() => ({
+const { mockLoad, mockFingerprint, mockExecute, mockProjectFind } = vi.hoisted(() => ({
   mockLoad: vi.fn(),
   mockFingerprint: vi.fn(() => 'fp-1'),
   mockExecute: vi.fn(),
+  mockProjectFind: vi.fn(),
 }));
 
 // Only mock DB-backed exports; pure logic (dryRunSchedule/assessRisks/parseIntentResponse) runs for real
@@ -15,7 +16,11 @@ vi.mock('../../scheduleAssistant', () => ({
   DependencyCycleError: class extends Error {},
 }));
 
+// execute 修复后会调 prisma.project.findUnique 取 managerId 做 canManageProject 校验
+vi.mock('../../../db', () => ({ default: { project: { findUnique: mockProjectFind } } }));
+
 import { scheduleUpdateCapability } from './scheduleUpdate';
+import { CapabilityForbiddenError } from './orchestrator';
 
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
@@ -140,15 +145,30 @@ describe('scheduleUpdateCapability', () => {
 
   describe('execute (delegates to shared executeScheduleApply)', () => {
     it('calls executeScheduleApply and maps result rows', async () => {
+      // 修复后 execute 会先查 managerId 并过 canManageProject；这里以项目经理身份放行
+      mockProjectFind.mockResolvedValue({ managerId: 'u1' });
       mockExecute.mockResolvedValueOnce({
         diff: { items: [{ activityId: 'A1', name: '硬件打样', before: { start: d('2026-03-02'), end: d('2026-03-06') }, after: { start: d('2026-03-16'), end: d('2026-03-20') }, changed: true }] },
         risks: [],
       });
       const entity = { id: 'p1', fingerprint: 'fp-1', fields: { snapshot: snapshot(), validIds: ['A1', 'A2', 'M1'], promptActivities: [] } as unknown as Record<string, unknown> };
       const intent = { projectId: 'p1', operations: [{ type: 'shift_activity' as const, activityId: 'A1', deltaDays: 14 }], confidence: 'high' as const, unresolved: [] };
-      const res = await scheduleUpdateCapability.execute(intent, {} as never, {} as never, { id: 'p1', entity });
+      const managerReq = { user: { id: 'u1', collaboratingProjectIds: [] } } as never;
+      const res = await scheduleUpdateCapability.execute(intent, {} as never, managerReq, { id: 'p1', entity });
       expect(mockExecute).toHaveBeenCalledWith('p1', intent.operations, expect.anything(), expect.anything());
       expect(res.rows[0].key).toBe('A1');
+    });
+
+    // ── BUG: execute 不校验当前用户是否为项目经理（与已修的 project.update 同源） ──
+    // 真实路由 /api/schedule-assistant 有 canManageProject 门控（scheduleAssistant.ts:70），
+    // 但 capability execute 直连 executeScheduleApply 写库，绕过了项目路由的权限中间件。
+    it('BUG: 非项目经理经 AI 调整排期未被拦截（execute 缺 canManageProject）', async () => {
+      mockProjectFind.mockResolvedValue({ managerId: 'owner-1' });
+      const entity = { id: 'p1', fingerprint: 'fp-1', fields: { snapshot: snapshot(), validIds: ['A1', 'A2', 'M1'], promptActivities: [] } as unknown as Record<string, unknown> };
+      const intent = { projectId: 'p1', operations: [{ type: 'shift_activity' as const, activityId: 'A1', deltaDays: 14 }], confidence: 'high' as const, unresolved: [] };
+      const strangerReq = { user: { id: 'stranger', permissions: ['activity:update'], collaboratingProjectIds: [] } } as never;
+      await expect(scheduleUpdateCapability.execute(intent, {} as never, strangerReq, { id: 'p1', entity })).rejects.toBeInstanceOf(CapabilityForbiddenError);
+      expect(mockExecute).not.toHaveBeenCalled();
     });
   });
 });

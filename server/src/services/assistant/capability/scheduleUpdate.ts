@@ -16,7 +16,9 @@ import {
 } from '../../../utils/scheduleAssistantPrompts';
 import type { ScheduleChangeIntent } from '../../../schemas/scheduleAssistant';
 import type { AssistantPreview, AssistantDiffRow, AssistantRisk } from '../types';
-import { genericNarrateUserPrompt } from './orchestrator';
+import { genericNarrateUserPrompt, CapabilityForbiddenError } from './orchestrator';
+import { canManageProject } from '../../../middleware/permission';
+import prisma from '../../../db';
 import type { Capability, CapabilityContext, EntitySnapshot } from './types';
 
 const iso = (d: Date | null) => (d ? d.toISOString().split('T')[0] : '—');
@@ -99,6 +101,9 @@ export const scheduleUpdateCapability: Capability<ScheduleChangeIntent> = {
 
   async execute(intent, _ctx: CapabilityContext, req: Request, target) {
     const f = target!.entity.fields as unknown as ScheduleFields;
+    // 走现有校验路径：仅管理员/项目经理/协作者可调排期（与 /api/schedule-assistant 的 canManageProject 门控一致）
+    const proj = await prisma.project.findUnique({ where: { id: target!.id }, select: { managerId: true } });
+    if (!proj || !canManageProject(req, proj.managerId, target!.id)) throw new CapabilityForbiddenError('只能调整自己负责的项目');
     const { diff, risks } = await executeScheduleApply(target!.id, intent.operations, f.snapshot, req);
     const rows: AssistantDiffRow[] = diff.items
       .filter((i) => i.changed)
