@@ -194,6 +194,6 @@ export function validateRiskLevel(level: string): string {
   const upper = level?.toUpperCase?.() || '';
   if (valid.includes(upper)) return upper;
   // Chinese fallback
-  const cnMap: Record<string, string> = { '低': 'LOW', '中': 'MEDIUM', '高': 'HIGH', '严重': 'CRITICAL' };
+  const cnMap: Record<string, string> = { '低': 'LOW', '中': 'MEDIUM', '高': 'HIGH', '严重': 'CRITICAL', '极高': 'CRITICAL' };
   return cnMap[level] || 'MEDIUM';
 }

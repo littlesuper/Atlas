@@ -224,6 +224,18 @@ router.put(
 
       // 4. 更新权限关联(全量替换)
       if (permissionIds && Array.isArray(permissionIds)) {
+        // 先校验所有 permissionId 存在（与 POST 对齐）——必须在 deleteMany 之前，
+        // 否则非法 id 会让 createMany 抛 P2003，而旧权限已被 deleteMany 清空（数据损坏）。
+        if (permissionIds.length > 0) {
+          const existingPermissions = await prisma.permission.count({
+            where: { id: { in: permissionIds } },
+          });
+          if (existingPermissions !== permissionIds.length) {
+            res.status(400).json({ error: '部分权限ID不存在' });
+            return;
+          }
+        }
+
         // 先删除所有旧关联
         await prisma.rolePermission.deleteMany({
           where: { roleId: id },

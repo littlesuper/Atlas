@@ -247,7 +247,7 @@ describe('POST /api/auth/refresh', () => {
 
   it('returns new access token on success', async () => {
     mockJwt.verify.mockReturnValue({ userId: 'user-1', username: 'admin' });
-    mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', username: 'admin', status: 'ACTIVE' });
+    mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', username: 'admin', status: 'ACTIVE', canLogin: true });
     mockJwt.sign.mockReturnValue('new-access-token');
 
     const res = await request(app)
@@ -523,6 +523,7 @@ describe('AUTH-016: accessToken expired auto refresh', () => {
       id: 'user-1',
       username: 'admin',
       status: 'ACTIVE',
+      canLogin: true,
       userRoles: [{ role: { rolePermissions: [] } }],
     });
     mockJwt.sign.mockReturnValue('new-access-token');
@@ -562,6 +563,7 @@ describe('AUTH-016: accessToken expired auto refresh', () => {
       id: 'user-1',
       username: 'admin',
       status: 'ACTIVE',
+      canLogin: true,
       userRoles: [],
     });
     mockJwt.sign.mockReturnValue('new-access');
@@ -724,6 +726,7 @@ describe('AUTH-023: concurrent refresh storm', () => {
       id: 'user-1',
       username: 'admin',
       status: 'ACTIVE',
+      canLogin: true,
       userRoles: [],
     });
     mockJwt.sign.mockReturnValue('new-access-token');
