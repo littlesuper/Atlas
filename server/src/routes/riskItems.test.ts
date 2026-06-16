@@ -464,6 +464,8 @@ describe('POST /api/risk-items/:id/comment', () => {
 describe('POST /api/risk-items/from-assessment/:assessmentId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 越权门：项目须存在、非归档、当前管理员(*:*)可管理
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
   });
 
   it('creates risk items from assessment action items', async () => {

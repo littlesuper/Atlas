@@ -366,6 +366,21 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
       return;
     }
 
+    // 越权防护：用评估所属项目判定，仅项目经理/管理员可导入；项目须存在且未归档。
+    const project = await prisma.project.findUnique({ where: { id: assessment.projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, assessment.projectId)) {
+      res.status(403).json({ error: '只能管理自己负责项目的风险项' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
+      return;
+    }
+
     // Map priority to severity
     const priorityToSeverity: Record<string, string> = {
       HIGH: 'HIGH',
