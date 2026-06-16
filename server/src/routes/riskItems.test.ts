@@ -22,6 +22,9 @@ const { mockPrisma } = vi.hoisted(() => {
     riskAssessment: {
       findUnique: vi.fn(),
     },
+    project: {
+      findUnique: vi.fn(),
+    },
     user: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -370,6 +373,8 @@ describe('PUT /api/risk-items/:id', () => {
 describe('DELETE /api/risk-items/:id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 越权门：项目须存在、非归档、当前管理员(*:*)可管理
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
   });
 
   it('deletes a risk item and returns success', async () => {
