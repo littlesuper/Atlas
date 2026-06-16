@@ -156,6 +156,12 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // 与登录路径同语义：撤销登录权限（canLogin=false）后，refreshToken 也不得再换发 accessToken。
+    if (!user.canLogin) {
+      res.status(403).json({ error: '该账号未开启登录权限' });
+      return;
+    }
+
     const newAccessToken = jwt.sign(
       {
         userId: user.id,
