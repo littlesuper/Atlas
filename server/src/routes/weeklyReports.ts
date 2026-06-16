@@ -494,6 +494,12 @@ router.post(
       recordBusinessEvent('weekly_report_create', 'success');
       res.status(201).json(report);
     } catch (error) {
+      // 同周重复创建命中 @@unique([projectId, year, weekNumber]) → P2002，
+      // 属可预期业务冲突，返回 409 而非 500（WR-001）。
+      if (typeof error === 'object' && error && 'code' in error && (error as { code?: string }).code === 'P2002') {
+        res.status(409).json({ error: '本周该项目已存在周报' });
+        return;
+      }
       logger.error({ err: error }, '创建周报错误');
       res.status(500).json({ error: '服务器内部错误' });
     }

@@ -228,9 +228,16 @@ describe('assessProjectRisk', () => {
   });
 
   describe('AI-007: Chinese severity normalization', () => {
-    it('AI-007 "极高" is not in current cnMap and defaults to MEDIUM', () => {
-      const result = validateRiskLevel('极高');
-      expect(result).toBe('MEDIUM');
+    it('AI-007 "极高" normalizes to CRITICAL', () => {
+      expect(validateRiskLevel('极高')).toBe('CRITICAL');
+    });
+
+    it('AI-007 (GLM QA bug repro #7): 「极高」应归一化为 CRITICAL，而非回落 MEDIUM', () => {
+      // test-plan AI-007（P1）：severity 中文「极高」→ CRITICAL。
+      // 修复前：validateRiskLevel 的 cnMap 只有 {低,中,高,严重}，不含「极高」；
+      // 「极高」未命中 valid 英文枚举、也未命中 cnMap → 回落默认 'MEDIUM'——把最高级别风险
+      // 降级成中等，污染风险评估输出（漏报，比误报更危险）。
+      expect(validateRiskLevel('极高')).toBe('CRITICAL');
     });
 
     it('AI-007 "严重" normalizes to CRITICAL', () => {

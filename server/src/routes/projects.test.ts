@@ -582,6 +582,24 @@ describe('ARC-008: unarchive restores original status', () => {
       );
     }
   });
+
+  it('ARC-009 unarchive without an archive snapshot returns 400/404 instead of silently restoring COMPLETED', async () => {
+    // test-plan ARC-009（P2）：project.status=ARCHIVED 但没有任何 projectArchive 记录（快照丢失/被删）
+    // 时，POST /unarchive 必须显式拒绝（400/404），不得静默回落 COMPLETED 并返回 200。
+    // GLM QA #76：原 `(latestArchive?.snapshot)?.project?.status || 'COMPLETED'` 在 latestArchive===null
+    // 时凭空把项目置为 COMPLETED。
+    const archivedProject = { ...sampleProject, status: 'ARCHIVED' };
+    mockPrisma.project.findUnique.mockResolvedValue(archivedProject);
+    mockPrisma.projectArchive.findFirst.mockResolvedValue(null); // 无 archive 记录
+    mockPrisma.project.update.mockResolvedValue({ ...sampleProject, status: 'COMPLETED' });
+
+    const res = await request(app)
+      .post('/api/projects/proj-1/unarchive');
+
+    expect([400, 404]).toContain(res.status);
+    // 关键：不得误把项目恢复（写库）
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('ARC-011: unarchive then immediate write', () => {
@@ -1350,19 +1368,18 @@ describe('Week 4 coverage closure: project route branch behavior', () => {
     expect(mockPrisma.project.update).not.toHaveBeenCalled();
   });
 
-  it('falls back to COMPLETED when unarchiving has no archive snapshot', async () => {
+  it('returns 400 when unarchiving has no archive snapshot (ARC-009)', async () => {
+    // 无归档快照（latestArchive===null）时，没有可信的原状态可恢复 →
+    // 显式 400，而非静默回落 COMPLETED 返回 200（ARC-009，GLM QA #76）。
     mockPrisma.project.findUnique.mockResolvedValue({ ...sampleProject, status: 'ARCHIVED' });
     mockPrisma.projectArchive.findFirst.mockResolvedValue(null);
     mockPrisma.project.update.mockResolvedValue({ ...sampleProject, status: 'COMPLETED' });
 
     const res = await request(app).post('/api/projects/proj-1/unarchive');
 
-    expect(res.status).toBe(200);
-    expect(mockPrisma.project.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: { status: 'COMPLETED' },
-      })
-    );
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('无归档快照，无法恢复原状态');
+    expect(mockPrisma.project.update).not.toHaveBeenCalled();
   });
 
   it('returns 404 without querying snapshot data when snapshot project is missing', async () => {

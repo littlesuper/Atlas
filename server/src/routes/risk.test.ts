@@ -43,6 +43,7 @@ vi.mock('../middleware/auth', () => ({
 
 vi.mock('../middleware/permission', () => ({
   requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  canManageProject: () => true, // 管理员(*:*) 可管理所有项目（风险项越权门 #88）
   sanitizePagination: (page: any, pageSize: any) => ({
     pageNum: parseInt(page) || 1,
     pageSizeNum: parseInt(pageSize) || 20,
@@ -439,7 +440,11 @@ describe('RISK-008: delete assessment preserves risk items', () => {
 });
 
 describe('RISK-006: RiskItem status transitions OPEN → IN_PROGRESS → RESOLVED', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 风险项写操作越权门（#88）：项目须存在、非归档，管理员(*:*)可管理
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
+  });
 
   it('RISK-006 OPEN → IN_PROGRESS → RESOLVED with resolvedAt set', async () => {
     // Step 1: OPEN → IN_PROGRESS
@@ -476,6 +481,7 @@ describe('RISK-006: RiskItem status transitions OPEN → IN_PROGRESS → RESOLVE
 
     // Step 2: IN_PROGRESS → RESOLVED (resolvedAt should be set)
     vi.clearAllMocks();
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
     const inProgressItem = { ...openItem, status: 'IN_PROGRESS' };
     mockPrisma.riskItem.findUnique.mockResolvedValue(inProgressItem);
     mockPrisma.riskItem.update.mockImplementation((args: any) => {
