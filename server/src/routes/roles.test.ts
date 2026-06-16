@@ -335,6 +335,7 @@ describe('PUT /api/roles/:id', () => {
         _count: { userRoles: 5 },
       });
     mockPrisma.role.update.mockResolvedValue({});
+    mockPrisma.permission.count.mockResolvedValue(50); // 新越权门：count 校验须 === permissionIds.length
     mockPrisma.rolePermission.deleteMany.mockResolvedValue({ count: 50 });
     mockPrisma.rolePermission.createMany.mockResolvedValue({ count: 50 });
 

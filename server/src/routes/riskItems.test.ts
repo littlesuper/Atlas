@@ -148,6 +148,8 @@ describe('GET /api/risk-items', () => {
 describe('POST /api/risk-items', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 越权门：项目须存在、非归档、当前管理员可管理（user-1 持 *:*）
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
   });
 
   it('creates a risk item and returns 201', async () => {
@@ -278,6 +280,8 @@ describe('GET /api/risk-items/:id', () => {
 describe('PUT /api/risk-items/:id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 越权门：项目须存在、非归档、当前管理员(*:*)可管理
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
   });
 
   it('updates status and creates a log', async () => {
@@ -373,6 +377,8 @@ describe('PUT /api/risk-items/:id', () => {
 describe('DELETE /api/risk-items/:id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 越权门：项目须存在、非归档、当前管理员(*:*)可管理
+    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' });
   });
 
   it('deletes a risk item and returns success', async () => {
