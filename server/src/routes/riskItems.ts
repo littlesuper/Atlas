@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { type Prisma } from '../generated/prisma/client';
 import { authenticate } from '../middleware/auth';
-import { sanitizePagination } from '../middleware/permission';
+import { sanitizePagination, canManageProject } from '../middleware/permission';
 import { validate } from '../middleware/validate';
 import { createRiskItemSchema, updateRiskItemSchema, riskItemCommentSchema } from '../schemas/riskItems';
 import { logger } from '../utils/logger';
@@ -317,6 +317,21 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
     const enhanced = assessment.aiEnhancedData;
     if (!isRiskAssessmentEnhancedData(enhanced) || !Array.isArray(enhanced.actionItems)) {
       res.status(400).json({ error: '该评估无可导入的行动项' });
+      return;
+    }
+
+    // 越权防护：用评估所属项目判定，仅项目经理/管理员可导入；项目须存在且未归档。
+    const project = await prisma.project.findUnique({ where: { id: assessment.projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, assessment.projectId)) {
+      res.status(403).json({ error: '只能管理自己负责项目的风险项' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
       return;
     }
 
