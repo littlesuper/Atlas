@@ -854,6 +854,7 @@ describe('POST /api/activities/project/:projectId/reschedule', () => {
       endDate: null,
       duration: null,
     };
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
     mockPrisma.activity.findMany.mockResolvedValue([incompleteAct]);
     mockPrisma.activity.update.mockResolvedValue(incompleteAct);
     mockPrisma.$transaction.mockResolvedValue([incompleteAct]);
@@ -880,6 +881,7 @@ describe('POST /api/activities/project/:projectId/reschedule', () => {
       endDate: null,
       duration: null,
     };
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
     mockPrisma.activity.findMany.mockResolvedValue([completedAct]);
 
     const res = await request(app)
@@ -892,6 +894,7 @@ describe('POST /api/activities/project/:projectId/reschedule', () => {
   });
 
   it('should accept optional baseDate parameter', async () => {
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
     mockPrisma.activity.findMany.mockResolvedValue([]);
 
     const res = await request(app)
