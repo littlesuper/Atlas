@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
-import { sanitizePagination } from '../middleware/permission';
+import { sanitizePagination, canManageProject } from '../middleware/permission';
 import { validate } from '../middleware/validate';
 import { createRiskItemSchema, updateRiskItemSchema, riskItemCommentSchema } from '../schemas/riskItems';
 import { logger } from '../utils/logger';
@@ -53,6 +53,21 @@ router.post('/', authenticate, validate({ body: createRiskItemSchema }), async (
 
     if (!projectId || !title || !severity) {
       res.status(400).json({ error: '项目ID、标题和严重度不能为空' });
+      return;
+    }
+
+    // 越权防护：风险项归属项目，仅项目经理/管理员可创建；项目须存在且未归档。
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, projectId)) {
+      res.status(403).json({ error: '只能管理自己负责项目的风险项' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
       return;
     }
 
@@ -148,6 +163,21 @@ router.put('/:id', authenticate, validate({ body: updateRiskItemSchema }), async
       return;
     }
 
+    // 越权防护：用风险项所属项目判定，仅项目经理/管理员可改；项目须存在且未归档。
+    const project = await prisma.project.findUnique({ where: { id: existing.projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, existing.projectId)) {
+      res.status(403).json({ error: '只能管理自己负责项目的风险项' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
+      return;
+    }
+
     const updateData: any = {};
     const logs: Array<{ action: string; content: string }> = [];
 
@@ -224,6 +254,22 @@ router.delete('/:id', authenticate, async (req: Request, res: Response): Promise
       res.status(404).json({ error: '风险项不存在' });
       return;
     }
+
+    // 越权防护：用风险项所属项目判定，仅项目经理/管理员可删；项目须存在且未归档。
+    const project = await prisma.project.findUnique({ where: { id: existing.projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, existing.projectId)) {
+      res.status(403).json({ error: '只能管理自己负责项目的风险项' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
+      return;
+    }
+
     await prisma.riskItem.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
@@ -294,6 +340,21 @@ router.post('/from-assessment/:assessmentId', authenticate, async (req: Request,
     const enhanced = assessment.aiEnhancedData as any;
     if (!enhanced?.actionItems || !Array.isArray(enhanced.actionItems)) {
       res.status(400).json({ error: '该评估无可导入的行动项' });
+      return;
+    }
+
+    // 越权防护：用评估所属项目判定，仅项目经理/管理员可导入；项目须存在且未归档。
+    const project = await prisma.project.findUnique({ where: { id: assessment.projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, assessment.projectId)) {
+      res.status(403).json({ error: '只能管理自己负责项目的风险项' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
       return;
     }
 

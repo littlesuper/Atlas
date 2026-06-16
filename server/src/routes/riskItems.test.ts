@@ -21,12 +21,18 @@ const { mockPrisma } = vi.hoisted(() => ({
     riskAssessment: {
       findUnique: vi.fn(),
     },
+    project: {
+      findUnique: vi.fn(),
+    },
     user: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
   },
 }));
+
+// 风险项写操作的越权防护需要查项目；默认返回一个非归档项目，admin 用户经真实 canManageProject 放行。
+const sampleProject = { id: 'proj-1', managerId: 'user-1', status: 'IN_PROGRESS' };
 
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
@@ -110,6 +116,7 @@ describe('GET /api/risk-items', () => {
 describe('POST /api/risk-items', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
   });
 
   it('creates a manual risk item and writes a CREATED log', async () => {
@@ -205,6 +212,7 @@ describe('GET /api/risk-items/:id', () => {
 describe('PUT /api/risk-items/:id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
   });
 
   it('sets resolvedAt and writes a status-change log when resolving a risk item', async () => {
@@ -329,6 +337,7 @@ describe('POST /api/risk-items/:id/comment', () => {
 describe('POST /api/risk-items/from-assessment/:assessmentId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.project.findUnique.mockResolvedValue(sampleProject);
   });
 
   it('returns 404 and does not create risk items when the assessment is missing', async () => {
