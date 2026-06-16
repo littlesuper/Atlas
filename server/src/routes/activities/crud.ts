@@ -152,11 +152,19 @@ router.post('/batch-create', authenticate, requirePermission('activity', 'create
       res.status(400).json({ error: '请提供活动数据' }); return;
     }
 
-    const projectId = items[0].projectId;
+    // 单一项目约束：批量创建必须全部属于同一项目（对照 batch-update/delete），防止仅校验 items[0] 致跨项目越权写入。
+    const projectIds = [...new Set((items as BatchActivityInput[]).map((i) => i.projectId))];
+    if (projectIds.length !== 1) {
+      res.status(400).json({ error: '批量创建的活动必须属于同一项目' }); return;
+    }
+    const projectId = projectIds[0];
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) { res.status(404).json({ error: '项目不存在' }); return; }
     if (!canManageProject(req, project.managerId, projectId)) {
       res.status(403).json({ error: '无权操作' }); return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' }); return;
     }
 
     const created = await prisma.$transaction(
