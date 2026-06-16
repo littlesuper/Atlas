@@ -160,9 +160,24 @@ ${JSON.stringify(historyData, null, 2)}`,
   }
 });
 
-router.post('/project/:projectId/reschedule', authenticate, async (req: Request, res: Response): Promise<void> => {
+router.post('/project/:projectId/reschedule', authenticate, requirePermission('activity', 'update'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      res.status(404).json({ error: '项目不存在' });
+      return;
+    }
+    if (!canManageProject(req, project.managerId, projectId)) {
+      res.status(403).json({ error: '只能重排自己负责的项目' });
+      return;
+    }
+    if (project.status === 'ARCHIVED') {
+      res.status(403).json({ error: '归档项目不可修改' });
+      return;
+    }
+
     const { baseDate } = req.body;
     const { offsetWorkdays: owFn } = await import('../../utils/workday');
 
